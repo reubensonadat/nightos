@@ -1,0 +1,532 @@
+import { useMemo, useState } from "react";
+import {
+    ArrowLeftIcon,
+    ArrowRightIcon,
+    ClockIcon,
+    MapPinIcon,
+    MinusIcon,
+    PencilSquareIcon,
+    PlusIcon,
+    TrashIcon,
+    UserIcon,
+} from "@heroicons/react/24/outline";
+import { PaperAirplaneIcon } from "@heroicons/react/24/solid";
+import { formatGHS } from "../data/menu";
+import { getLineUnitPrice, useCart } from "../context/CartContext";
+import type { OrderSummary } from "./OrderTrackingScreen";
+
+type Props = {
+    onBack?: () => void;
+    onContinueShopping?: () => void;
+    onOrderSent?: (order: OrderSummary) => void;
+};
+
+/** Estimated prep time based on item count — gives the page a "living" feel. */
+function estimatePrepMinutes(itemCount: number): string {
+    if (itemCount === 0) return "—";
+    const base = 8;
+    const perItem = 2;
+    const min = base + Math.floor(itemCount * perItem);
+    return `${min}–${min + 4} min`;
+}
+
+export function CartScreen({ onBack, onContinueShopping, onOrderSent }: Props) {
+    const { lines, itemCount, subtotal, setQty, remove, clear } = useCart();
+    const [orderNotes, setOrderNotes] = useState("");
+    const [sending, setSending] = useState(false);
+
+    // Bill math
+    const { serviceCharge, vat, total } = useMemo(() => {
+        const service = Math.round(subtotal * 0.1 * 100) / 100; // 10%
+        const tax = Math.round(subtotal * 0.125 * 100) / 100; // 12.5% VAT
+        return {
+            serviceCharge: service,
+            vat: tax,
+            total: subtotal + service + tax,
+        };
+    }, [subtotal]);
+
+    const handleSendToKitchen = () => {
+        setSending(true);
+        window.setTimeout(() => {
+            // Build order summary BEFORE clearing the cart
+            const orderNumber = `VL-${Math.floor(1000 + Math.random() * 9000)}`;
+            const order: OrderSummary = {
+                orderNumber,
+                items: lines.map((line) => {
+                    const unitPrice = getLineUnitPrice(line);
+                    return {
+                        name: line.item.name,
+                        qty: line.qty,
+                        image: line.item.image,
+                        lineTotal: unitPrice * line.qty,
+                    };
+                }),
+                total,
+                itemCount,
+                sentAt: Date.now(),
+            };
+            // Clear cart and notify parent — parent routes to tracking
+            clear();
+            onOrderSent?.(order);
+        }, 1200);
+    };
+
+    // ── Empty state ──
+    if (itemCount === 0) {
+        return (
+            <main className="relative min-h-svh w-full overflow-x-hidden bg-isabelline font-sans text-licorice antialiased">
+                {/* Dark hero */}
+                <div className="relative overflow-hidden bg-gradient-to-b from-licorice via-licorice to-licorice/95 px-5 pt-[max(env(safe-area-inset-top),20px)] pb-20">
+                    <div
+                        aria-hidden="true"
+                        className="pointer-events-none absolute inset-0"
+                    >
+                        <div className="absolute -top-16 -right-12 h-56 w-56 rounded-full bg-khaki mix-blend-screen blur-[70px] opacity-20" />
+                        <div className="absolute top-20 -left-16 h-48 w-48 rounded-full bg-light-blue mix-blend-screen blur-[70px] opacity-15" />
+                    </div>
+
+                    <div className="relative z-10 flex items-center justify-between">
+                        <button
+                            type="button"
+                            onClick={onBack}
+                            aria-label="Back"
+                            className="flex h-9 w-9 items-center justify-center rounded-full border border-isabelline/15 bg-isabelline/5 text-isabelline transition-colors hover:bg-isabelline/10 active:scale-95"
+                        >
+                            <ArrowLeftIcon className="h-4 w-4" strokeWidth={2.25} />
+                        </button>
+                        <div className="flex items-center gap-1.5 rounded-full border border-isabelline/15 bg-isabelline/5 px-2.5 py-1.5">
+                            <MapPinIcon className="h-3 w-3 text-khaki" strokeWidth={2.25} />
+                            <span className="text-[10px] font-bold uppercase tracking-wider text-isabelline">
+                                T·04
+                            </span>
+                        </div>
+                    </div>
+
+                    <div className="relative z-10 mt-8 text-center">
+                        <p className="text-[11px] font-bold uppercase tracking-[0.22em] text-khaki">
+                            Your Tab
+                        </p>
+                        <h1 className="mt-2 text-[2rem] font-black leading-tight tracking-[-0.04em] text-isabelline">
+                            Nothing here
+                            <br />
+                            <span className="italic font-serif font-bold text-khaki">
+                                just yet
+                            </span>
+                        </h1>
+                        <p className="mx-auto mt-3 max-w-[280px] text-[13px] leading-[1.55] tracking-tight text-isabelline/65">
+                            Head back to the menu and add a few things to get
+                            started.
+                        </p>
+                    </div>
+                </div>
+
+                {/* Overlapping CTA */}
+                <section className="relative z-20 -mt-10 px-5">
+                    <button
+                        type="button"
+                        onClick={onContinueShopping}
+                        className="
+                            group flex w-full max-w-md md:max-w-2xl mx-auto items-center justify-between
+                            gap-3 rounded-full bg-licorice px-6 py-4
+                            shadow-[0_20px_50px_rgba(35,20,12,0.25)]
+                            ring-1 ring-licorice/80
+                            transition-all duration-200 ease-out
+                            hover:bg-licorice/95
+                            active:scale-[0.985]
+                        "
+                    >
+                        <span className="flex flex-col items-start leading-tight">
+                            <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-khaki">
+                                Browse
+                            </span>
+                            <span className="text-[15px] font-bold tracking-tight text-isabelline">
+                                Open the Menu
+                            </span>
+                        </span>
+                        <span className="flex h-9 w-9 items-center justify-center rounded-full bg-isabelline text-licorice transition-transform duration-200 group-hover:translate-x-0.5">
+                            <ArrowRightIcon className="h-4 w-4" strokeWidth={2.5} />
+                        </span>
+                    </button>
+                </section>
+            </main>
+        );
+    }
+
+    // ── Main cart view ──
+    return (
+        <main className="relative min-h-svh w-full overflow-x-hidden bg-isabelline font-sans text-licorice antialiased">
+            {/* ═══════════════════════════════════════════════════════════
+                DARK LICORICE HERO
+              ═══════════════════════════════════════════════════════════ */}
+            <header className="relative overflow-hidden bg-gradient-to-b from-licorice via-licorice to-licorice/95 px-5 pt-[max(env(safe-area-inset-top),20px)] pb-20">
+                {/* Blur orbs */}
+                <div
+                    aria-hidden="true"
+                    className="pointer-events-none absolute inset-0"
+                >
+                    <div className="absolute -top-16 -right-12 h-56 w-56 rounded-full bg-khaki mix-blend-screen blur-[70px] opacity-20" />
+                    <div className="absolute top-20 -left-16 h-48 w-48 rounded-full bg-light-blue mix-blend-screen blur-[70px] opacity-15" />
+                </div>
+
+                {/* Top bar */}
+                <div className="relative z-10 flex items-center justify-between">
+                    <div className="flex items-center gap-2.5">
+                        <button
+                            type="button"
+                            onClick={onBack}
+                            aria-label="Back"
+                            className="flex h-9 w-9 items-center justify-center rounded-full border border-isabelline/15 bg-isabelline/5 text-isabelline transition-colors hover:bg-isabelline/10 active:scale-95"
+                        >
+                            <ArrowLeftIcon className="h-4 w-4" strokeWidth={2.25} />
+                        </button>
+                        <div className="flex flex-col leading-tight">
+                            <span className="text-[12px] font-bold tracking-tight text-isabelline">
+                                Your Order
+                            </span>
+                            <span className="text-[9px] font-semibold uppercase tracking-[0.18em] text-isabelline/50">
+                                Velvet Lounge
+                            </span>
+                        </div>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-1.5 rounded-full border border-isabelline/15 bg-isabelline/5 px-2.5 py-1.5">
+                            <MapPinIcon className="h-3 w-3 text-khaki" strokeWidth={2.25} />
+                            <span className="text-[10px] font-bold uppercase tracking-wider text-isabelline">
+                                T·04
+                            </span>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Hero summary */}
+                <div className="relative z-10 mt-7">
+                    <p className="text-[11px] font-bold uppercase tracking-[0.22em] text-khaki">
+                        {itemCount} {itemCount === 1 ? "item" : "items"} ready
+                    </p>
+                    <h1 className="mt-2 text-[2rem] font-black leading-[1.05] tracking-[-0.04em] text-isabelline">
+                        Review &
+                        <br />
+                        <span className="italic font-serif font-bold text-khaki">
+                            send
+                        </span>{" "}
+                        to the kitchen.
+                    </h1>
+                </div>
+
+                {/* Widget strip — quiet, just two pills */}
+                <div className="relative z-10 mt-5 flex flex-wrap gap-2">
+                    <div className="inline-flex items-center gap-1.5 rounded-2xl border border-khaki/30 bg-khaki/10 px-3 py-2 backdrop-blur-md">
+                        <ClockIcon className="h-3.5 w-3.5 text-khaki" strokeWidth={2.25} />
+                        <div className="flex flex-col leading-tight">
+                            <span className="text-[9px] font-bold uppercase tracking-wider text-khaki">
+                                Est. Prep
+                            </span>
+                            <span className="text-[11px] font-bold text-isabelline">
+                                {estimatePrepMinutes(itemCount)}
+                            </span>
+                        </div>
+                    </div>
+                    <div className="inline-flex items-center gap-1.5 rounded-2xl border border-isabelline/15 bg-isabelline/5 px-3 py-2 backdrop-blur-md">
+                        <UserIcon className="h-3.5 w-3.5 text-isabelline/70" strokeWidth={2.25} />
+                        <div className="flex flex-col leading-tight">
+                            <span className="text-[9px] font-bold uppercase tracking-wider text-isabelline/60">
+                                Server
+                            </span>
+                            <span className="text-[11px] font-bold text-isabelline">
+                                Kojo
+                            </span>
+                        </div>
+                    </div>
+                </div>
+            </header>
+
+            {/* ═══════════════════════════════════════════════════════════
+                OVERLAPPING CONTENT
+              ═══════════════════════════════════════════════════════════ */}
+            <section className="relative z-20 mx-auto w-full max-w-3xl -mt-12 px-5 md:px-8 pb-[calc(140px+env(safe-area-inset-bottom))]">
+                {/* ── Cart line items ── */}
+                <div className="flex flex-col gap-3">
+                    {lines.map((line, idx) => {
+                        const unitPrice = getLineUnitPrice(line);
+                        const lineTotal = unitPrice * line.qty;
+                        return (
+                            <div
+                                key={line.lineId}
+                                className="
+                                    animate-velvet-rise
+                                    relative overflow-hidden rounded-2xl bg-white p-3
+                                    shadow-[0_4px_16px_rgba(35,20,12,0.06)]
+                                    ring-1 ring-isabelline
+                                "
+                                style={{ animationDelay: `${Math.min(idx * 40, 200)}ms` }}
+                            >
+                                <div className="flex gap-3">
+                                    {/* Square image */}
+                                    <div className="relative h-20 w-20 shrink-0 overflow-hidden rounded-xl ring-1 ring-isabelline">
+                                        <img
+                                            src={line.item.image}
+                                            alt={line.item.name}
+                                            className="h-full w-full object-cover"
+                                        />
+                                    </div>
+
+                                    {/* Body */}
+                                    <div className="flex min-w-0 flex-1 flex-col">
+                                        <div className="flex items-start justify-between gap-2">
+                                            <div className="min-w-0">
+                                                <h3 className="truncate text-[14px] font-bold leading-tight tracking-tight text-licorice">
+                                                    {line.item.name}
+                                                </h3>
+                                                <p className="mt-0.5 text-[10px] font-semibold uppercase tracking-wider text-feldgrau">
+                                                    {line.item.category}
+                                                </p>
+                                            </div>
+                                            <button
+                                                type="button"
+                                                onClick={() => remove(line.lineId)}
+                                                aria-label={`Remove ${line.item.name} from cart`}
+                                                className="
+                                                    flex h-7 w-7 shrink-0 items-center justify-center
+                                                    rounded-full text-feldgrau transition-all
+                                                    hover:bg-dark-red/10 hover:text-dark-red active:scale-90
+                                                "
+                                            >
+                                                <TrashIcon className="h-3.5 w-3.5" strokeWidth={2} />
+                                            </button>
+                                        </div>
+
+                                        {/* Modifier chips */}
+                                        {line.modifiers.length > 0 && (
+                                            <div className="mt-1.5 flex flex-wrap gap-1">
+                                                {line.modifiers.map((m) => (
+                                                    <span
+                                                        key={`${m.groupId}-${m.option.id}`}
+                                                        className="
+                                                            inline-flex items-center gap-0.5 rounded-full
+                                                            bg-isabelline px-1.5 py-0.5
+                                                            text-[9px] font-semibold tracking-tight text-feldgrau
+                                                        "
+                                                    >
+                                                        {m.option.name}
+                                                    </span>
+                                                ))}
+                                            </div>
+                                        )}
+
+                                        {/* Notes */}
+                                        {line.notes && (
+                                            <p className="mt-1.5 line-clamp-1 text-[10.5px] italic tracking-tight text-feldgrau/80">
+                                                "{line.notes}"
+                                            </p>
+                                        )}
+
+                                        {/* Bottom row: qty stepper + line total */}
+                                        <div className="mt-auto flex items-center justify-between pt-2">
+                                            <div className="flex items-center gap-1 rounded-full bg-isabelline p-0.5">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setQty(line.lineId, line.qty - 1)}
+                                                    aria-label="Decrease quantity"
+                                                    className="
+                                                        flex h-7 w-7 items-center justify-center rounded-full
+                                                        text-licorice transition-colors
+                                                        hover:bg-white active:scale-90
+                                                    "
+                                                >
+                                                    <MinusIcon className="h-3 w-3" strokeWidth={2.5} />
+                                                </button>
+                                                <span className="w-5 text-center font-mono text-[12px] font-bold tabular-nums text-licorice">
+                                                    {line.qty}
+                                                </span>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setQty(line.lineId, line.qty + 1)}
+                                                    aria-label="Increase quantity"
+                                                    className="
+                                                        flex h-7 w-7 items-center justify-center rounded-full
+                                                        bg-licorice text-isabelline transition-colors
+                                                        hover:bg-licorice/90 active:scale-90
+                                                    "
+                                                >
+                                                    <PlusIcon className="h-3 w-3" strokeWidth={2.5} />
+                                                </button>
+                                            </div>
+
+                                            <span className="font-mono text-[14px] font-bold tabular-nums text-khaki">
+                                                {formatGHS(lineTotal)}
+                                            </span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        );
+                    })}
+                </div>
+
+                {/* ── Add more items link ── */}
+                <button
+                    type="button"
+                    onClick={onContinueShopping}
+                    className="
+                        mt-3 flex w-full items-center justify-center gap-1.5
+                        rounded-2xl bg-white/70 px-4 py-3
+                        text-[12px] font-bold tracking-tight text-licorice
+                        ring-1 ring-isabelline backdrop-blur-md
+                        transition-all hover:bg-white hover:ring-khaki/30 active:scale-[0.99]
+                    "
+                >
+                    <PlusIcon className="h-3.5 w-3.5" strokeWidth={2.5} />
+                    Add more items
+                </button>
+
+                {/* ── Order notes ── */}
+                <div className="mt-4 rounded-2xl bg-white p-4 shadow-[0_4px_16px_rgba(35,20,12,0.04)] ring-1 ring-isabelline">
+                    <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                            <div className="flex h-7 w-7 items-center justify-center rounded-full bg-khaki/15">
+                                <PencilSquareIcon className="h-3.5 w-3.5 text-licorice/70" strokeWidth={2} />
+                            </div>
+                            <span className="text-[12px] font-bold tracking-tight text-licorice">
+                                Notes for the kitchen
+                            </span>
+                        </div>
+                        <span className="text-[9px] font-bold uppercase tracking-wider text-feldgrau">
+                            Optional
+                        </span>
+                    </div>
+                    <textarea
+                        value={orderNotes}
+                        onChange={(e) => setOrderNotes(e.target.value.slice(0, 200))}
+                        placeholder="Allergies, timing, or anything we should know…"
+                        rows={2}
+                        className="
+                            mt-3 w-full resize-none rounded-xl
+                            bg-isabelline/60 px-3 py-2.5
+                            text-[12.5px] text-licorice
+                            placeholder:text-feldgrau/60
+                            ring-1 ring-isabelline
+                            focus:outline-none focus:ring-2 focus:ring-licorice/20
+                            transition-all
+                        "
+                    />
+                    <div className="mt-1 text-right text-[9px] font-medium tracking-tight text-feldgrau/70">
+                        {orderNotes.length}/200
+                    </div>
+                </div>
+
+                {/* ── Bill summary ── */}
+                <div className="mt-4 overflow-hidden rounded-2xl bg-licorice text-isabelline shadow-[0_12px_32px_rgba(35,20,12,0.18)]">
+                    {/* Header */}
+                    <div className="flex items-center justify-between border-b border-isabelline/10 px-4 py-3">
+                        <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-khaki">
+                            Bill Summary
+                        </span>
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-isabelline/50">
+                            Table 04
+                        </span>
+                    </div>
+
+                    {/* Rows */}
+                    <div className="space-y-2 px-4 py-3">
+                        <div className="flex items-center justify-between text-[12px]">
+                            <span className="tracking-tight text-isabelline/70">Subtotal</span>
+                            <span className="font-mono font-bold tabular-nums text-isabelline">
+                                {formatGHS(subtotal)}
+                            </span>
+                        </div>
+                        <div className="flex items-center justify-between text-[12px]">
+                            <span className="tracking-tight text-isabelline/70">
+                                Service charge <span className="text-isabelline/40">(10%)</span>
+                            </span>
+                            <span className="font-mono font-bold tabular-nums text-isabelline">
+                                {formatGHS(serviceCharge)}
+                            </span>
+                        </div>
+                        <div className="flex items-center justify-between text-[12px]">
+                            <span className="tracking-tight text-isabelline/70">
+                                VAT <span className="text-isabelline/40">(12.5%)</span>
+                            </span>
+                            <span className="font-mono font-bold tabular-nums text-isabelline">
+                                {formatGHS(vat)}
+                            </span>
+                        </div>
+                    </div>
+
+                    {/* Grand total */}
+                    <div className="flex items-end justify-between border-t border-isabelline/10 px-4 py-4">
+                        <div>
+                            <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-khaki">
+                                Grand Total
+                            </p>
+                            <p className="text-[10px] font-medium tracking-tight text-isabelline/50">
+                                Pay after your meal
+                            </p>
+                        </div>
+                        <span className="font-mono text-[22px] font-black tabular-nums text-isabelline">
+                            {formatGHS(total)}
+                        </span>
+                    </div>
+                </div>
+            </section>
+
+            {/* ═══════════════════════════════════════════════════════════
+                STICKY BOTTOM CTA — Send to Kitchen
+              ═══════════════════════════════════════════════════════════ */}
+            <div className="fixed inset-x-0 bottom-0 z-40 flex justify-center px-5 pb-[max(env(safe-area-inset-bottom),18px)] pt-3 bg-gradient-to-t from-isabelline via-isabelline/95 to-transparent">
+                <button
+                    type="button"
+                    onClick={handleSendToKitchen}
+                    disabled={sending}
+                    className="
+                        group flex w-full max-w-md md:max-w-2xl items-center justify-between
+                        gap-3 rounded-full bg-licorice px-6 py-4
+                        shadow-[0_20px_50px_rgba(35,20,12,0.25)]
+                        ring-1 ring-licorice/80
+                        transition-all duration-200 ease-out
+                        hover:bg-licorice/95 hover:shadow-[0_24px_60px_rgba(35,20,12,0.30)]
+                        active:scale-[0.985]
+                        focus:outline-none focus-visible:ring-2 focus-visible:ring-khaki
+                        disabled:opacity-90
+                    "
+                >
+                    <span className="flex flex-col items-start leading-tight">
+                        <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-khaki">
+                            {sending ? "Sending…" : "Ready"}
+                        </span>
+                        <span className="text-[15px] font-bold tracking-tight text-isabelline">
+                            {sending ? "Sending to kitchen" : "Send to Kitchen"}
+                        </span>
+                    </span>
+                    <span className="flex h-9 w-9 items-center justify-center rounded-full bg-isabelline text-licorice transition-transform duration-200 group-hover:translate-x-0.5">
+                        {sending ? (
+                            <svg
+                                className="h-4 w-4 animate-spin"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                            >
+                                <circle
+                                    cx="12"
+                                    cy="12"
+                                    r="10"
+                                    stroke="currentColor"
+                                    strokeWidth="3"
+                                    strokeOpacity="0.25"
+                                />
+                                <path
+                                    d="M22 12a10 10 0 0 1-10 10"
+                                    stroke="currentColor"
+                                    strokeWidth="3"
+                                    strokeLinecap="round"
+                                />
+                            </svg>
+                        ) : (
+                            <PaperAirplaneIcon className="h-4 w-4" strokeWidth={2} />
+                        )}
+                    </span>
+                </button>
+            </div>
+        </main>
+    );
+}

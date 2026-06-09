@@ -1,0 +1,124 @@
+@import "tailwindcss";
+
+@theme {
+  /* Velvet Lounge Color System — 60-30-10 Rule */
+
+  /* 60% Base — Backgrounds & Soft Surfaces */
+  --color-isabelline: #F3F3E3;
+  --color-white: #FFFFFF;
+
+  /* 30% Accents — Secondary Text, Borders, Subtle States */
+  --color-feldgrau: #606F69;
+  --color-light-blue: #A9CFE0;
+
+  /* 10% Brand Identity & Contrast */
+  --color-licorice: #23140C;
+  --color-khaki: #D0BA98;
+  --color-dark-red: #91040C;
+
+  /* Typography */
+  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-mono: 'JetBrains Mono', 'SF Mono', 'Fira Code', monospace;
+
+  /* Border radius tokens */
+  --radius-pill: 9999px;
+
+  /* Shadows — Velvet Lounge floating elevations */
+  --shadow-velvet-float: 0 16px 40px rgba(35, 20, 12, 0.10);
+  --shadow-velvet-soft: 0 8px 24px rgba(35, 20, 12, 0.06);
+  --shadow-velvet-card: 0 4px 16px rgba(35, 20, 12, 0.05);
+}
+
+/* Base styles */
+html,
+body,
+#root {
+  height: 100%;
+  min-height: 100svh;
+}
+
+body {
+  margin: 0;
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  background-color: var(--color-isabelline);
+  color: var(--color-licorice);
+  text-rendering: optimizeLegibility;
+}
+
+/* Hide scrollbar utility for horizontal category navs */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* Subtle shimmer for loading states */
+@keyframes velvet-shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+.shimmer {
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0) 0%,
+    rgba(255, 255, 255, 0.6) 50%,
+    rgba(255, 255, 255, 0) 100%
+  );
+  background-size: 200% 100%;
+  animation: velvet-shimmer 1.6s linear infinite;
+}
+
+/* Soft entrance animation for splash elements */
+@keyframes velvet-rise {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes velvet-fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes velvet-scale-in {
+  from {
+    opacity: 0;
+    transform: scale(0.94);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.animate-velvet-rise {
+  animation: velvet-rise 600ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.animate-velvet-fade {
+  animation: velvet-fade 800ms ease-out both;
+}
+
+.animate-velvet-scale-in {
+  animation: velvet-scale-in 500ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* Respect reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  .animate-velvet-rise,
+  .animate-velvet-fade,
+  .animate-velvet-scale-in,
+  .shimmer {
+    animation: none;
+  }
+}
