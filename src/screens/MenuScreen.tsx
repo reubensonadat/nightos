@@ -4,7 +4,6 @@ import {
     ArrowRightIcon,
     HeartIcon,
     MagnifyingGlassIcon,
-    MapPinIcon,
     PlusIcon,
 } from "@heroicons/react/24/outline";
 import { HeartIcon as HeartIconSolid } from "@heroicons/react/24/solid";
@@ -26,7 +25,6 @@ type Props = {
 export function MenuScreen({ onBack, onViewCart }: Props) {
     const [active, setActive] = useState<MenuCategory>("Signatures");
     const [query, setQuery] = useState("");
-    const [searchOpen, setSearchOpen] = useState(false);
     const [activeItemId, setActiveItemId] = useState<string | null>(null);
     const { addQuick, subtotal, itemCount, toggleFavorite, isFavorite } =
         useCart();
@@ -48,12 +46,7 @@ export function MenuScreen({ onBack, onViewCart }: Props) {
         ? MENU.find((m) => m.id === activeItemId) ?? null
         : null;
 
-    // Featured item — only shown on Signatures, no search
-    const featuredItem = MENU.find((m) => m.id === "sig-hibiscus-spritz");
-    const showFeatured = active === "Signatures" && !query && featuredItem;
-    const gridItems = showFeatured
-        ? visibleItems.filter((i) => i.id !== featuredItem!.id)
-        : visibleItems;
+    const gridItems = visibleItems;
 
     return (
         <main className="relative min-h-svh w-full overflow-x-hidden bg-isabelline font-sans text-licorice antialiased">
@@ -62,8 +55,8 @@ export function MenuScreen({ onBack, onViewCart }: Props) {
               ═══════════════════════════════════════════════════════════ */}
             <header className="sticky top-0 z-30 bg-isabelline/95 backdrop-blur-xl border-b border-licorice/8">
                 {/* ── Top Bar ── */}
-                <div className="mx-auto flex w-full max-w-7xl items-center justify-between px-5 md:px-8 pt-[max(env(safe-area-inset-top),16px)] pb-3">
-                    <div className="flex items-center gap-2.5">
+                <div className="mx-auto flex w-full max-w-7xl items-center justify-between px-5 md:px-8 pt-[max(env(safe-area-inset-top),16px)] pb-3 relative">
+                    <div className="flex items-center">
                         {onBack && (
                             <button
                                 type="button"
@@ -74,68 +67,56 @@ export function MenuScreen({ onBack, onViewCart }: Props) {
                                 <ArrowLeftIcon className="h-4 w-4" strokeWidth={2.25} />
                             </button>
                         )}
-                        <div className="flex items-center gap-2.5">
-                            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-licorice text-isabelline shadow-[0_4px_14px_rgba(35,20,12,0.25)]">
-                                <span className="font-serif text-[15px] font-bold leading-none tracking-tight">
-                                    V
-                                </span>
-                            </div>
-                            <div className="flex flex-col leading-tight">
-                                <span className="text-[13px] font-bold tracking-tight text-licorice">
-                                    Velvet Lounge
-                                </span>
-                                <span className="text-[9px] font-semibold uppercase tracking-[0.18em] text-feldgrau">
-                                    NightOS · Table 04
-                                </span>
-                            </div>
-                        </div>
                     </div>
 
-                    <div className="flex items-center gap-2">
-                        <div className="flex items-center gap-1.5 rounded-full bg-white px-3 py-2 shadow-sm ring-1 ring-licorice/8">
-                            <MapPinIcon className="h-3 w-3 text-dark-red" strokeWidth={2.25} />
-                            <span className="text-[10px] font-bold uppercase tracking-wider text-licorice">
-                                T·04
-                            </span>
-                        </div>
+                    <div className="absolute inset-x-0 top-[max(env(safe-area-inset-top),16px)] bottom-3 flex items-center justify-center pointer-events-none">
+                        <span className="text-[18px] font-bold tracking-tight text-licorice pointer-events-auto">
+                            Menu
+                        </span>
+                    </div>
+
+                    <div className="flex items-center">
                         <button
                             type="button"
-                            onClick={() => setSearchOpen((v) => !v)}
-                            aria-label={searchOpen ? "Close search" : "Open search"}
-                            className="flex h-9 w-9 items-center justify-center rounded-full bg-white text-licorice shadow-sm ring-1 ring-licorice/8 transition-colors hover:bg-isabelline active:scale-95"
+                            className="
+                                rounded-full border border-licorice/20 bg-transparent
+                                px-3 py-1.5
+                                text-[11px] font-bold uppercase tracking-wider text-licorice
+                                transition-all
+                                hover:border-licorice/40 hover:bg-licorice/5
+                                active:scale-95
+                            "
                         >
-                            <MagnifyingGlassIcon className="h-4 w-4" strokeWidth={2.25} />
+                            Table 4
                         </button>
                     </div>
                 </div>
 
                 {/* Search input */}
-                {searchOpen && (
-                    <div className="mx-auto w-full max-w-7xl px-5 md:px-8 pb-3 animate-velvet-fade">
-                        <div className="flex items-center gap-2 rounded-full bg-white px-4 py-2.5 shadow-sm ring-1 ring-licorice/8">
-                            <MagnifyingGlassIcon
-                                className="h-4 w-4 text-feldgrau"
-                                strokeWidth={2.25}
-                            />
-                            <input
-                                autoFocus
-                                value={query}
-                                onChange={(e) => setQuery(e.target.value)}
-                                placeholder="Search cocktails, wines, plates…"
-                                className="flex-1 bg-transparent text-[13px] text-licorice placeholder:text-feldgrau/70 focus:outline-none"
-                            />
-                            {query && (
-                                <button
-                                    type="button"
-                                    onClick={() => setQuery("")}
-                                    className="text-[10px] font-bold uppercase tracking-wider text-feldgrau hover:text-licorice"
-                                >
-                                    Clear
-                                </button>
-                            )}
-                        </div>
+                <div className="mx-auto w-full max-w-7xl px-5 md:px-8 pb-3 animate-velvet-fade">
+                    <div className="flex items-center gap-2 rounded-full bg-white px-4 py-2.5 shadow-sm ring-1 ring-licorice/8">
+                        <MagnifyingGlassIcon
+                            className="h-4 w-4 text-feldgrau"
+                            strokeWidth={2.25}
+                        />
+                        <input
+                            autoFocus
+                            value={query}
+                            onChange={(e) => setQuery(e.target.value)}
+                            placeholder="Search cocktails, wines, plates…"
+                            className="flex-1 bg-transparent text-[13px] text-licorice placeholder:text-feldgrau/70 focus:outline-none"
+                        />
+                        {query && (
+                            <button
+                                type="button"
+                                onClick={() => setQuery("")}
+                                className="text-[10px] font-bold uppercase tracking-wider text-feldgrau hover:text-licorice"
+                            >
+                                Clear
+                            </button>
+                        )}
                     </div>
-                )}
+                </div>
 
                 {/* ── Category pills ── */}
                 <nav className="mx-auto w-full max-w-7xl px-5 md:px-8 pb-3">
@@ -170,67 +151,18 @@ export function MenuScreen({ onBack, onViewCart }: Props) {
                 {/* ── Editorial Title Section ── */}
                 <div className="mb-6">
                     <p className="text-[10px] font-bold uppercase tracking-[0.22em] text-khaki">
-                        {searchOpen && query ? "Searching" : "Chapter"}
+                        {query ? "Searching" : "Chapter"}
                     </p>
                     <h1 className="mt-1.5 text-[2rem] font-black leading-[1.05] tracking-[-0.04em] text-licorice">
-                        {searchOpen && query ? (
-                            <>"{query}"</>
-                        ) : (
-                            <>
-                                {active}
-                                <br />
-                                <span className="italic font-serif font-bold text-khaki">
-                                    tonight
-                                </span>
-                            </>
-                        )}
+                        {query ? `"${query}"` : active}
                     </h1>
-                    {!searchOpen && (
+                    {!query && (
                         <p className="mt-2 max-w-[300px] text-[12.5px] leading-[1.55] tracking-tight text-feldgrau">
                             Curated by Chef Ama — tap any dish to read more.
                         </p>
                     )}
                 </div>
-                {/* ── Featured hero card — refined, no sparkles/stars ── */}
-                {showFeatured && featuredItem && (
-                    <button
-                        type="button"
-                        onClick={() => setActiveItemId(featuredItem.id)}
-                        className="group block w-full text-left mb-5 animate-velvet-rise"
-                    >
-                        <div className="relative overflow-hidden rounded-3xl bg-white shadow-[0_20px_50px_rgba(35,20,12,0.15)] ring-1 ring-isabelline transition-all duration-200 ease-out group-hover:shadow-[0_24px_60px_rgba(35,20,12,0.20)] group-active:scale-[0.99]">
-                            <div className="relative h-44 w-full overflow-hidden">
-                                <img
-                                    src={featuredItem.image}
-                                    alt={featuredItem.name}
-                                    className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
-                                />
-                                <div
-                                    aria-hidden="true"
-                                    className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-white"
-                                />
-                            </div>
-                            <div className="px-5 pb-5 pt-4">
-                                <p className="text-[9px] font-bold uppercase tracking-[0.22em] text-khaki">
-                                    Signature of the Night
-                                </p>
-                                <div className="mt-1.5 flex items-start justify-between gap-3">
-                                    <div className="min-w-0">
-                                        <h3 className="text-[20px] font-bold leading-tight tracking-[-0.035em] text-licorice">
-                                            {featuredItem.name}
-                                        </h3>
-                                        <p className="mt-1.5 text-[12px] leading-[1.55] tracking-tight text-feldgrau line-clamp-2">
-                                            {featuredItem.description}
-                                        </p>
-                                    </div>
-                                    <span className="shrink-0 font-mono text-[17px] font-bold tabular-nums text-licorice">
-                                        {formatGHS(featuredItem.price)}
-                                    </span>
-                                </div>
-                            </div>
-                        </div>
-                    </button>
-                )}
+
 
                 {/* Empty state */}
                 {visibleItems.length === 0 && (
@@ -341,26 +273,39 @@ export function MenuScreen({ onBack, onViewCart }: Props) {
                     <button
                         type="button"
                         onClick={onViewCart}
-                        className="animate-velvet-rise flex w-full max-w-md md:max-w-2xl items-center justify-between gap-3 rounded-full bg-licorice px-5 py-3.5 shadow-[0_20px_50px_rgba(35,20,12,0.25)] ring-1 ring-licorice/80 transition-all duration-200 ease-out hover:bg-licorice/95 hover:shadow-[0_24px_60px_rgba(35,20,12,0.30)] active:scale-[0.985] focus:outline-none focus-visible:ring-2 focus-visible:ring-khaki"
+                        className="
+                            group animate-velvet-rise flex w-full max-w-md md:max-w-2xl items-center justify-between
+                            gap-3 rounded-full bg-licorice px-6 py-4
+                            shadow-[0_20px_50px_rgba(35,20,12,0.25)]
+                            ring-1 ring-licorice/80
+                            transition-all duration-200 ease-out
+                            hover:bg-licorice/95 hover:shadow-[0_24px_60px_rgba(35,20,12,0.30)]
+                            active:scale-[0.985]
+                            focus:outline-none focus-visible:ring-2 focus-visible:ring-khaki
+                        "
                         aria-label={`View cart — ${itemCount} items, ${formatGHS(subtotal)}`}
                     >
                         <div className="flex items-center gap-3">
-                            <span className="flex h-7 w-7 items-center justify-center rounded-full bg-isabelline/15 text-[12px] font-bold text-isabelline ring-1 ring-isabelline/20">
+                            <span className="flex h-9 w-9 items-center justify-center rounded-full bg-isabelline/15 text-[13px] font-bold text-isabelline ring-1 ring-isabelline/20">
                                 {itemCount}
                             </span>
                             <div className="flex flex-col items-start leading-tight">
-                                <span className="text-[10px] font-bold uppercase tracking-wider text-khaki">
+                                <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-khaki">
                                     Your tab
                                 </span>
-                                <span className="font-mono text-[14px] font-bold tabular-nums text-isabelline">
+                                <span className="font-mono text-[15px] font-bold tabular-nums text-isabelline">
                                     {formatGHS(subtotal)}
                                 </span>
                             </div>
                         </div>
-                        <span className="flex items-center gap-1.5 text-[13px] font-bold tracking-tight text-isabelline">
-                            View Cart
-                            <ArrowRightIcon className="h-4 w-4" strokeWidth={2.25} />
-                        </span>
+                        <div className="flex items-center gap-3">
+                            <span className="text-[15px] font-bold tracking-tight text-isabelline">
+                                View Cart
+                            </span>
+                            <span className="flex h-9 w-9 items-center justify-center rounded-full bg-isabelline text-licorice transition-transform duration-200 group-hover:translate-x-0.5">
+                                <ArrowRightIcon className="h-4 w-4" strokeWidth={2.5} />
+                            </span>
+                        </div>
                     </button>
                 </div>
             )}

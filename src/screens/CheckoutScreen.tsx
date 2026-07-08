@@ -154,26 +154,39 @@ export function CheckoutScreen({ total, onBack, onPaid }: Props) {
                 LIGHT EDITORIAL HEADER
               ═══════════════════════════════════════════════════════════ */}
             <header className="sticky top-0 z-30 bg-isabelline/95 backdrop-blur-xl border-b border-licorice/8">
-                <div className="mx-auto flex w-full max-w-3xl items-center justify-between px-5 md:px-8 pt-[max(env(safe-area-inset-top),16px)] pb-3">
-                    <button
-                        type="button"
-                        onClick={onBack}
-                        aria-label="Back"
-                        className="flex h-9 w-9 items-center justify-center rounded-full bg-white text-licorice shadow-sm ring-1 ring-licorice/8 transition-colors hover:bg-isabelline active:scale-95"
-                    >
-                        <ArrowLeftIcon className="h-4 w-4" strokeWidth={2.25} />
-                    </button>
+                <div className="mx-auto flex w-full max-w-3xl items-center justify-between px-5 md:px-8 pt-[max(env(safe-area-inset-top),16px)] pb-3 relative">
+                    <div className="flex items-center">
+                        <button
+                            type="button"
+                            onClick={onBack}
+                            aria-label="Back"
+                            className="flex h-9 w-9 items-center justify-center rounded-full bg-white text-licorice shadow-sm ring-1 ring-licorice/8 transition-colors hover:bg-isabelline active:scale-95"
+                        >
+                            <ArrowLeftIcon className="h-4 w-4" strokeWidth={2.25} />
+                        </button>
+                    </div>
 
-                    <div className="flex flex-col items-center leading-tight">
-                        <span className="text-[13px] font-bold tracking-tight text-licorice">
+                    <div className="absolute inset-x-0 top-[max(env(safe-area-inset-top),16px)] bottom-3 flex items-center justify-center pointer-events-none">
+                        <span className="text-[18px] font-bold tracking-tight text-licorice pointer-events-auto">
                             Checkout
-                        </span>
-                        <span className="text-[9px] font-semibold uppercase tracking-[0.18em] text-feldgrau">
-                            Table 04
                         </span>
                     </div>
 
-                    <div className="w-9" />
+                    <div className="flex items-center">
+                        <button
+                            type="button"
+                            className="
+                                rounded-full border border-licorice/20 bg-transparent
+                                px-3 py-1.5
+                                text-[11px] font-bold uppercase tracking-wider text-licorice
+                                transition-all
+                                hover:border-licorice/40 hover:bg-licorice/5
+                                active:scale-95
+                            "
+                        >
+                            Table 4
+                        </button>
+                    </div>
                 </div>
             </header>
 

@@ -3,7 +3,6 @@ import {
     ArrowLeftIcon,
     ArrowRightIcon,
     ClockIcon,
-    MapPinIcon,
     MinusIcon,
     PencilSquareIcon,
     PlusIcon,
@@ -86,20 +85,38 @@ export function CartScreen({ onBack, onContinueShopping, onOrderSent }: Props) {
                         <div className="absolute top-20 -left-16 h-48 w-48 rounded-full bg-light-blue mix-blend-screen blur-[70px] opacity-15" />
                     </div>
 
-                    <div className="relative z-10 flex items-center justify-between">
-                        <button
-                            type="button"
-                            onClick={onBack}
-                            aria-label="Back"
-                            className="flex h-9 w-9 items-center justify-center rounded-full border border-isabelline/15 bg-isabelline/5 text-isabelline transition-colors hover:bg-isabelline/10 active:scale-95"
-                        >
-                            <ArrowLeftIcon className="h-4 w-4" strokeWidth={2.25} />
-                        </button>
-                        <div className="flex items-center gap-1.5 rounded-full border border-isabelline/15 bg-isabelline/5 px-2.5 py-1.5">
-                            <MapPinIcon className="h-3 w-3 text-khaki" strokeWidth={2.25} />
-                            <span className="text-[10px] font-bold uppercase tracking-wider text-isabelline">
-                                T·04
+                    <div className="relative z-10 flex items-center justify-between h-9">
+                        <div className="flex items-center">
+                            <button
+                                type="button"
+                                onClick={onBack}
+                                aria-label="Back"
+                                className="flex h-9 w-9 items-center justify-center rounded-full border border-isabelline/15 bg-isabelline/5 text-isabelline transition-colors hover:bg-isabelline/10 active:scale-95"
+                            >
+                                <ArrowLeftIcon className="h-4 w-4" strokeWidth={2.25} />
+                            </button>
+                        </div>
+
+                        <div className="absolute inset-x-0 top-0 flex items-center justify-center pointer-events-none h-9">
+                            <span className="text-[18px] font-bold tracking-tight text-isabelline pointer-events-auto">
+                                Your Order
                             </span>
+                        </div>
+
+                        <div className="flex items-center">
+                            <button
+                                type="button"
+                                className="
+                                    rounded-full border border-isabelline/20 bg-transparent
+                                    px-3 py-1.5
+                                    text-[11px] font-bold uppercase tracking-wider text-isabelline
+                                    backdrop-blur-md transition-all
+                                    hover:border-isabelline/40 hover:bg-isabelline/5
+                                    active:scale-95
+                                "
+                            >
+                                Table 4
+                            </button>
                         </div>
                     </div>
 
@@ -121,19 +138,20 @@ export function CartScreen({ onBack, onContinueShopping, onOrderSent }: Props) {
                     </div>
                 </div>
 
-                {/* Overlapping CTA */}
-                <section className="relative z-20 -mt-10 px-5">
+                {/* Sticky Bottom CTA */}
+                <div className="fixed inset-x-0 bottom-0 z-40 flex justify-center px-5 pb-[max(env(safe-area-inset-bottom),18px)] pt-3 bg-gradient-to-t from-isabelline via-isabelline/95 to-transparent">
                     <button
                         type="button"
                         onClick={onContinueShopping}
                         className="
-                            group flex w-full max-w-md md:max-w-2xl mx-auto items-center justify-between
+                            group flex w-full max-w-md md:max-w-2xl items-center justify-between
                             gap-3 rounded-full bg-licorice px-6 py-4
                             shadow-[0_20px_50px_rgba(35,20,12,0.25)]
                             ring-1 ring-licorice/80
                             transition-all duration-200 ease-out
-                            hover:bg-licorice/95
+                            hover:bg-licorice/95 hover:shadow-[0_24px_60px_rgba(35,20,12,0.30)]
                             active:scale-[0.985]
+                            focus:outline-none focus-visible:ring-2 focus-visible:ring-khaki
                         "
                     >
                         <span className="flex flex-col items-start leading-tight">
@@ -148,7 +166,7 @@ export function CartScreen({ onBack, onContinueShopping, onOrderSent }: Props) {
                             <ArrowRightIcon className="h-4 w-4" strokeWidth={2.5} />
                         </span>
                     </button>
-                </section>
+                </div>
             </main>
         );
     }
@@ -170,8 +188,8 @@ export function CartScreen({ onBack, onContinueShopping, onOrderSent }: Props) {
                 </div>
 
                 {/* Top bar */}
-                <div className="relative z-10 flex items-center justify-between">
-                    <div className="flex items-center gap-2.5">
+                <div className="relative z-10 flex items-center justify-between h-9">
+                    <div className="flex items-center">
                         <button
                             type="button"
                             onClick={onBack}
@@ -180,23 +198,28 @@ export function CartScreen({ onBack, onContinueShopping, onOrderSent }: Props) {
                         >
                             <ArrowLeftIcon className="h-4 w-4" strokeWidth={2.25} />
                         </button>
-                        <div className="flex flex-col leading-tight">
-                            <span className="text-[12px] font-bold tracking-tight text-isabelline">
-                                Your Order
-                            </span>
-                            <span className="text-[9px] font-semibold uppercase tracking-[0.18em] text-isabelline/50">
-                                Velvet Lounge
-                            </span>
-                        </div>
                     </div>
 
-                    <div className="flex items-center gap-2">
-                        <div className="flex items-center gap-1.5 rounded-full border border-isabelline/15 bg-isabelline/5 px-2.5 py-1.5">
-                            <MapPinIcon className="h-3 w-3 text-khaki" strokeWidth={2.25} />
-                            <span className="text-[10px] font-bold uppercase tracking-wider text-isabelline">
-                                T·04
-                            </span>
-                        </div>
+                    <div className="absolute inset-x-0 top-0 flex items-center justify-center pointer-events-none h-9">
+                        <span className="text-[18px] font-bold tracking-tight text-isabelline pointer-events-auto">
+                            Your Order
+                        </span>
+                    </div>
+
+                    <div className="flex items-center">
+                        <button
+                            type="button"
+                            className="
+                                rounded-full border border-isabelline/20 bg-transparent
+                                px-3 py-1.5
+                                text-[11px] font-bold uppercase tracking-wider text-isabelline
+                                backdrop-blur-md transition-all
+                                hover:border-isabelline/40 hover:bg-isabelline/5
+                                active:scale-95
+                            "
+                        >
+                            Table 4
+                        </button>
                     </div>
                 </div>
 
