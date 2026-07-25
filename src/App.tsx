@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useNavigate, useLocation } from "react-router-dom";
 import { CartProvider } from "./context/CartContext";
 import { WelcomeScreen } from "./screens/WelcomeScreen";
 import { MenuScreen } from "./screens/MenuScreen";
@@ -53,7 +54,19 @@ type WaiterScreen =
 type Mode = "customer" | "waiter" | "kitchen" | "manager";
 
 function App() {
-  const [mode, setMode] = useState<Mode>("customer");
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  // Sync mode from URL hash on mount
+  const getModeFromPath = (): Mode => {
+    const path = location.pathname.replace(/^\/+/, "").split("/")[0];
+    if (path === "waiter") return "waiter";
+    if (path === "kitchen") return "kitchen";
+    if (path === "manager") return "manager";
+    return "customer";
+  };
+
+  const [mode, setMode] = useState<Mode>(getModeFromPath);
   const [screen, setScreen] = useState<CustomerScreen>("welcome");
   const [lastOrder, setLastOrder] = useState<OrderSummary | null>(null);
 
@@ -66,6 +79,19 @@ function App() {
   const [managerAuthed, setManagerAuthed] = useState(false);
   const [managerName, setManagerName] = useState("");
   const [managerPage, setManagerPage] = useState<ManagerPage>("ops");
+
+  // Sync URL when mode changes
+  useEffect(() => {
+    const paths: Record<Mode, string> = {
+      customer: "/",
+      waiter: "/waiter",
+      kitchen: "/kitchen",
+      manager: "/manager",
+    };
+    if (location.pathname !== paths[mode]) {
+      navigate(paths[mode], { replace: true });
+    }
+  }, [mode, navigate, location.pathname]);
 
   /* ── Mode switchers ── */
   const switchToWaiter = () => {
@@ -80,6 +106,7 @@ function App() {
   const switchToManager = () => {
     setMode("manager");
     setManagerAuthed(false);
+    setManagerPage("ops");
   };
 
   const switchToCustomer = () => {
