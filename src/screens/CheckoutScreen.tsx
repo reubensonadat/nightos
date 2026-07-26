@@ -10,6 +10,8 @@ import {
 } from "@heroicons/react/24/outline";
 import { CheckCircleIcon } from "@heroicons/react/24/solid";
 import { formatGHS } from "../data/menu";
+import { PaystackButton } from "../components/PaystackButton";
+import { db } from "../lib/api";
 
 /* ────────────────────────── Payment methods ────────────────────────── */
 
@@ -67,13 +69,14 @@ const TIP_PRESETS = [
 /* ────────────────────────── Component ────────────────────────── */
 
 type Props = {
-    /** Bill total before tip (includes service + VAT). */
     total: number;
+    billId?: string;
+    venueId?: string;
     onBack: () => void;
     onPaid: () => void;
 };
 
-export function CheckoutScreen({ total, onBack, onPaid }: Props) {
+export function CheckoutScreen({ total, billId, venueId, onBack, onPaid }: Props) {
     const [tipPercent, setTipPercent] = useState<number>(15);
     const [method, setMethod] = useState<PaymentMethod>("momo");
     const [paying, setPaying] = useState(false);
@@ -98,15 +101,31 @@ export function CheckoutScreen({ total, onBack, onPaid }: Props) {
     );
     const grandTotal = total + tipAmount;
 
-    const handlePay = () => {
+    const handlePay = async () => {
         setPaying(true);
+
+        try {
+            if (billId && venueId) {
+                await db.createPayment(
+                    billId,
+                    venueId,
+                    grandTotal,
+                    method === 'card' ? 'card' : method === 'momo' ? 'mobile_money' : 'cash',
+                    undefined,
+                    undefined,
+                );
+            }
+        } catch {
+            // fall through
+        }
+
         window.setTimeout(() => {
             setPaying(false);
             setPaid(true);
             window.setTimeout(() => {
                 onPaid();
             }, 1800);
-        }, 1500);
+        }, 1200);
     };
 
     // ── Success state ──
@@ -392,59 +411,85 @@ export function CheckoutScreen({ total, onBack, onPaid }: Props) {
                 STICKY BOTTOM CTA — Pay
               ═══════════════════════════════════════════════════════════ */}
             <div className="fixed inset-x-0 bottom-0 z-40 flex justify-center px-5 pb-[max(env(safe-area-inset-bottom),18px)] pt-3 bg-gradient-to-t from-isabelline via-isabelline/95 to-transparent">
-                <button
-                    type="button"
-                    onClick={handlePay}
-                    disabled={paying}
-                    className="
-                        group flex w-full max-w-md md:max-w-2xl items-center justify-between
-                        gap-3 rounded-full bg-licorice px-6 py-4
-                        shadow-[0_20px_50px_rgba(35,20,12,0.25)]
-                        ring-1 ring-licorice/80
-                        transition-all duration-200 ease-out
-                        hover:bg-licorice/95 hover:shadow-[0_24px_60px_rgba(35,20,12,0.30)]
-                        active:scale-[0.985]
-                        focus:outline-none focus-visible:ring-2 focus-visible:ring-khaki
-                        disabled:opacity-90
-                    "
-                >
-                    <span className="flex flex-col items-start leading-tight">
-                        <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-khaki">
-                            {paying ? "Processing…" : "Confirm"}
+                {billId && venueId && (method === 'card' || method === 'momo') ? (
+                    <PaystackButton
+                        amount={grandTotal}
+                        billId={billId}
+                        venueId={venueId}
+                        onSuccess={async (ref) => {
+                            try {
+                                const { error } = await db.verifyPayment(ref, billId);
+                                if (error) {
+                                    await db.createPayment(billId, venueId, grandTotal, method === 'card' ? 'card' : 'mobile_money', ref);
+                                }
+                            } catch {
+                                await db.createPayment(billId, venueId, grandTotal, method === 'card' ? 'card' : 'mobile_money', ref);
+                            }
+                            setPaid(true);
+                        }}
+                        onClose={() => setPaying(false)}
+                        className="
+                            group flex w-full max-w-md md:max-w-2xl items-center justify-between
+                            gap-3 rounded-full bg-licorice px-6 py-4
+                            shadow-[0_20px_50px_rgba(35,20,12,0.25)]
+                            ring-1 ring-licorice/80
+                            transition-all duration-200 ease-out
+                            hover:bg-licorice/95 hover:shadow-[0_24px_60px_rgba(35,20,12,0.30)]
+                            active:scale-[0.985]
+                            focus:outline-none focus-visible:ring-2 focus-visible:ring-khaki
+                        "
+                    >
+                        <span className="flex flex-col items-start leading-tight">
+                            <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-khaki">
+                                Pay with {PAYMENT_OPTIONS.find((p) => p.id === method)?.label}
+                            </span>
+                            <span className="text-[15px] font-bold tracking-tight text-isabelline">
+                                Pay {formatGHS(grandTotal)}
+                            </span>
                         </span>
-                        <span className="text-[15px] font-bold tracking-tight text-isabelline">
-                            {paying
-                                ? `Paying via ${PAYMENT_OPTIONS.find((p) => p.id === method)?.label}`
-                                : `Pay ${formatGHS(grandTotal)}`}
-                        </span>
-                    </span>
-                    <span className="flex h-9 w-9 items-center justify-center rounded-full bg-isabelline text-licorice">
-                        {paying ? (
-                            <svg
-                                className="h-4 w-4 animate-spin"
-                                viewBox="0 0 24 24"
-                                fill="none"
-                            >
-                                <circle
-                                    cx="12"
-                                    cy="12"
-                                    r="10"
-                                    stroke="currentColor"
-                                    strokeWidth="3"
-                                    strokeOpacity="0.25"
-                                />
-                                <path
-                                    d="M22 12a10 10 0 0 1-10 10"
-                                    stroke="currentColor"
-                                    strokeWidth="3"
-                                    strokeLinecap="round"
-                                />
-                            </svg>
-                        ) : (
+                        <span className="flex h-9 w-9 items-center justify-center rounded-full bg-isabelline text-licorice">
                             <CheckIcon className="h-4 w-4" strokeWidth={3} />
-                        )}
-                    </span>
-                </button>
+                        </span>
+                    </PaystackButton>
+                ) : (
+                    <button
+                        type="button"
+                        onClick={handlePay}
+                        disabled={paying}
+                        className="
+                            group flex w-full max-w-md md:max-w-2xl items-center justify-between
+                            gap-3 rounded-full bg-licorice px-6 py-4
+                            shadow-[0_20px_50px_rgba(35,20,12,0.25)]
+                            ring-1 ring-licorice/80
+                            transition-all duration-200 ease-out
+                            hover:bg-licorice/95 hover:shadow-[0_24px_60px_rgba(35,20,12,0.30)]
+                            active:scale-[0.985]
+                            focus:outline-none focus-visible:ring-2 focus-visible:ring-khaki
+                            disabled:opacity-90
+                        "
+                    >
+                        <span className="flex flex-col items-start leading-tight">
+                            <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-khaki">
+                                {paying ? "Processing…" : "Confirm"}
+                            </span>
+                            <span className="text-[15px] font-bold tracking-tight text-isabelline">
+                                {paying
+                                    ? `Paying via ${PAYMENT_OPTIONS.find((p) => p.id === method)?.label}`
+                                    : `Pay ${formatGHS(grandTotal)}`}
+                            </span>
+                        </span>
+                        <span className="flex h-9 w-9 items-center justify-center rounded-full bg-isabelline text-licorice">
+                            {paying ? (
+                                <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none">
+                                    <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" strokeOpacity="0.25" />
+                                    <path d="M22 12a10 10 0 0 1-10 10" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
+                                </svg>
+                            ) : (
+                                <CheckIcon className="h-4 w-4" strokeWidth={3} />
+                            )}
+                        </span>
+                    </button>
+                )}
             </div>
         </main>
     );

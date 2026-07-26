@@ -13,8 +13,10 @@ import { PaperAirplaneIcon } from "@heroicons/react/24/solid";
 import { formatGHS } from "../data/menu";
 import { getLineUnitPrice, useTabStore, useTabComputed } from "../store/useTabStore";
 import type { OrderSummary } from "./OrderTrackingScreen";
+import { db } from "../lib/api";
 
 type Props = {
+    venueId: string;
     onBack?: () => void;
     onContinueShopping?: () => void;
     onOrderSent?: (order: OrderSummary) => void;
@@ -29,7 +31,7 @@ function estimatePrepMinutes(itemCount: number): string {
     return `${min}–${min + 4} min`;
 }
 
-export function CartScreen({ onBack, onContinueShopping, onOrderSent }: Props) {
+export function CartScreen({ venueId, onBack, onContinueShopping, onOrderSent }: Props) {
     const { lines, setQty, remove, clearCart } = useTabStore();
     const { cartItemCount: itemCount, cartSubtotal: subtotal } = useTabComputed();
     const [orderNotes, setOrderNotes] = useState("");
@@ -46,12 +48,49 @@ export function CartScreen({ onBack, onContinueShopping, onOrderSent }: Props) {
         };
     }, [subtotal]);
 
-    const handleSendToKitchen = () => {
+    const handleSendToKitchen = async () => {
         setSending(true);
-        window.setTimeout(() => {
-            const existingOrder = useTabStore.getState().activeOrder;
-            
-            const newItems = lines.map((line) => {
+        // Try to submit to Supabase — gracefully fall back to mock
+        let orderNumber = `VL-${Math.floor(1000 + Math.random() * 9000)}`;
+
+        try {
+            const station = lines.some((l) => l.item.category === "Small Plates")
+                ? 'kitchen'
+                : 'bar';
+
+            const { data: submission, error: subErr } = await db.createOrderSubmission(
+                '00000000-0000-0000-0000-000000000000', // billId — updated once bill context exists
+                venueId,
+                station,
+                orderNotes || undefined,
+            );
+
+            if (!subErr && submission) {
+                orderNumber = submission.id.slice(0, 8).toUpperCase();
+
+                for (const line of lines) {
+                    const unitPrice = getLineUnitPrice(line);
+                    await db.createOrderItem(
+                        submission.id,
+                        submission.bill_id,
+                        line.item.id,
+                        line.item.name,
+                        line.qty,
+                        unitPrice,
+                        line.modifiers.map((m) => ({ group_id: m.groupId, option_id: m.option.id, option_name: m.option.name, price_delta: m.option.priceDelta ?? 0 })),
+                        line.modifiers.reduce((s, m) => s + (m.option.priceDelta ?? 0) * line.qty, 0),
+                        unitPrice * line.qty,
+                        line.notes,
+                    );
+                }
+            }
+        } catch {
+            // fall through to mock
+        }
+
+        const order: OrderSummary = {
+            orderNumber,
+            items: lines.map((line) => {
                 const unitPrice = getLineUnitPrice(line);
                 return {
                     name: line.item.name,
@@ -59,19 +98,15 @@ export function CartScreen({ onBack, onContinueShopping, onOrderSent }: Props) {
                     image: line.item.image,
                     lineTotal: unitPrice * line.qty,
                 };
-            });
+            }),
+            total,
+            itemCount,
+            sentAt: Date.now(),
+            venueId,
+        };
 
-            const order: OrderSummary = {
-                orderNumber: existingOrder ? existingOrder.orderNumber : `VL-${Math.floor(1000 + Math.random() * 9000)}`,
-                items: existingOrder ? [...existingOrder.items, ...newItems] : newItems,
-                total: existingOrder ? existingOrder.total + total : total,
-                itemCount: existingOrder ? existingOrder.itemCount + itemCount : itemCount,
-                sentAt: existingOrder ? existingOrder.sentAt : Date.now(),
-            };
-            // Clear cart and notify parent — parent routes to tracking
-            clearCart();
-            onOrderSent?.(order);
-        }, 1200);
+        clearCart();
+        onOrderSent?.(order);
     };
 
     // ── Empty state ──

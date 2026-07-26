@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect, useCallback } from "react";
 import {
     ArrowRightIcon,
     ArrowPathIcon,
@@ -6,69 +6,48 @@ import {
     UserGroupIcon,
 } from "@heroicons/react/24/outline";
 import { formatGHS } from "../../data/menu";
+import { db } from "../../lib/api";
 
-/* ────────────────────────── Table types & mock data ────────────────────────── */
+/* ────────────────────────── Table types ────────────────────────── */
 
 export type TableStatus = "available" | "occupied" | "reserved";
 
 export type Table = {
     id: string;
     number: number;
+    label: string;
     status: TableStatus;
     guests?: number;
     tabTotal?: number;
     seatedAt?: string; // ISO time string
-    reservationTime?: string; // e.g. "7:30 PM"
+    reservationTime?: string;
     reservationGuests?: number;
     server?: string;
 };
 
 const MOCK_TABLES: Table[] = [
-    { id: "t01", number: 1, status: "available" },
+    { id: "t01", number: 1, label: "1", status: "available" },
     {
-        id: "t02",
-        number: 2,
-        status: "occupied",
-        guests: 2,
-        tabTotal: 245,
-        seatedAt: "20:15",
-        server: "Kojo",
+        id: "t02", number: 2, label: "2", status: "occupied",
+        guests: 2, tabTotal: 245, seatedAt: new Date(Date.now() - 45 * 60_000).toISOString(), server: "Kojo",
     },
     {
-        id: "t03",
-        number: 3,
-        status: "reserved",
-        reservationTime: "7:30 PM",
-        reservationGuests: 4,
+        id: "t03", number: 3, label: "3", status: "reserved",
+        reservationTime: "7:30 PM", reservationGuests: 4,
     },
     {
-        id: "t04",
-        number: 4,
-        status: "occupied",
-        guests: 1,
-        tabTotal: 95,
-        seatedAt: "21:42",
-        server: "Kojo",
+        id: "t04", number: 4, label: "4", status: "occupied",
+        guests: 1, tabTotal: 95, seatedAt: new Date(Date.now() - 18 * 60_000).toISOString(), server: "Kojo",
     },
-    { id: "t05", number: 5, status: "available" },
+    { id: "t05", number: 5, label: "5", status: "available" },
     {
-        id: "t06",
-        number: 6,
-        status: "occupied",
-        guests: 6,
-        tabTotal: 480,
-        seatedAt: "19:30",
-        server: "Ama",
+        id: "t06", number: 6, label: "6", status: "occupied",
+        guests: 6, tabTotal: 480, seatedAt: new Date(Date.now() - 90 * 60_000).toISOString(), server: "Ama",
     },
-    { id: "t07", number: 7, status: "available" },
+    { id: "t07", number: 7, label: "7", status: "available" },
     {
-        id: "t08",
-        number: 8,
-        status: "occupied",
-        guests: 3,
-        tabTotal: 180,
-        seatedAt: "20:45",
-        server: "Kojo",
+        id: "t08", number: 8, label: "8", status: "occupied",
+        guests: 3, tabTotal: 180, seatedAt: new Date(Date.now() - 35 * 60_000).toISOString(), server: "Kojo",
     },
 ];
 
@@ -136,34 +115,98 @@ const FILTERS: { id: Filter; label: string }[] = [
 /* ────────────────────────── Component ────────────────────────── */
 
 type Props = {
+    venueId: string;
     staffName: string;
     onSelectTable: (table: Table) => void;
     onSignOut: () => void;
     onViewShift?: () => void;
 };
 
-export function TablesDashboard({ staffName, onSelectTable, onSignOut, onViewShift }: Props) {
+function transformToTables(dbTables: any[], openBills: any[]): Table[] {
+    const billMap = new Map<string, any>();
+    for (const b of openBills) {
+        billMap.set(b.table_id, b);
+    }
+    return dbTables.map((t) => {
+        const bill = billMap.get(t.id);
+        if (bill) {
+            const guestCount = bill.guest_count ?? 1;
+            const seatedAt = bill.created_at;
+            // estimate duration from bill created_at
+            return {
+                id: t.id,
+                number: t.table_number,
+                label: t.table_label,
+                status: 'occupied' as const,
+                guests: guestCount,
+                tabTotal: bill.total,
+                seatedAt,
+                server: undefined, // bill.waiter_id could be resolved
+            };
+        }
+        return {
+            id: t.id,
+            number: t.table_number,
+            label: t.table_label,
+            status: 'available' as const,
+        };
+    });
+}
+
+export function TablesDashboard({ venueId, staffName, onSelectTable, onSignOut, onViewShift }: Props) {
+    const [tables, setTables] = useState<Table[]>(MOCK_TABLES);
     const [filter, setFilter] = useState<Filter>("all");
     const [refreshing, setRefreshing] = useState(false);
+    const [useMock, setUseMock] = useState(false);
+
+    const fetchData = useCallback(async () => {
+        if (!venueId) return;
+        setRefreshing(true);
+        try {
+            const [tablesResult, billsResult] = await Promise.all([
+                db.tablesByVenue(venueId),
+                db.billsByVenue(venueId),
+            ]);
+            if (tablesResult.data && tablesResult.data.length > 0) {
+                const transformed = transformToTables(tablesResult.data, billsResult.data ?? []);
+                setTables(transformed);
+                setUseMock(false);
+            } else {
+                setUseMock(true);
+            }
+        } catch {
+            setUseMock(true);
+        } finally {
+            setRefreshing(false);
+        }
+    }, [venueId]);
+
+    useEffect(() => {
+        fetchData();
+    }, [fetchData]);
+
+    const displayTables = useMemo(
+        () => (useMock ? MOCK_TABLES : tables),
+        [useMock, tables]
+    );
 
     const filteredTables = useMemo(
-        () => (filter === "all" ? MOCK_TABLES : MOCK_TABLES.filter((t) => t.status === filter)),
-        [filter]
+        () => (filter === "all" ? displayTables : displayTables.filter((t) => t.status === filter)),
+        [filter, displayTables]
     );
 
     const summary = useMemo(() => {
-        const occupied = MOCK_TABLES.filter((t) => t.status === "occupied");
+        const occupied = displayTables.filter((t) => t.status === "occupied");
         const totalTabs = occupied.reduce((sum, t) => sum + (t.tabTotal ?? 0), 0);
         return {
             occupied: occupied.length,
-            total: MOCK_TABLES.length,
+            total: displayTables.length,
             openTabs: totalTabs,
         };
-    }, []);
+    }, [displayTables]);
 
     const handleRefresh = () => {
-        setRefreshing(true);
-        window.setTimeout(() => setRefreshing(false), 800);
+        fetchData();
     };
 
     return (
@@ -264,8 +307,8 @@ export function TablesDashboard({ staffName, onSelectTable, onSignOut, onViewShi
                             const isActive = f.id === filter;
                             const count =
                                 f.id === "all"
-                                    ? MOCK_TABLES.length
-                                    : MOCK_TABLES.filter((t) => t.status === f.id).length;
+                                    ? displayTables.length
+                                    : displayTables.filter((t) => t.status === f.id).length;
                             return (
                                 <button
                                     key={f.id}

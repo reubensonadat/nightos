@@ -6,38 +6,29 @@ import {
     UserIcon,
 } from "@heroicons/react/24/outline";
 import { ShieldCheckIcon } from "@heroicons/react/24/solid";
+import { useStaff } from "../../hooks/useStaff";
 
 type Props = {
-    onSignIn: (staffName: string) => void;
+    onSignIn: (staffName: string, venueId: string, role: string) => void;
 };
 
 export function StaffAuthScreen({ onSignIn }: Props) {
-    const [staffId, setStaffId] = useState("");
-    const [password, setPassword] = useState("");
-    const [showPassword, setShowPassword] = useState(false);
-    const [loading, setLoading] = useState(false);
-    const [error, setError] = useState<string | null>(null);
+    const [phone, setPhone] = useState("");
+    const [pin, setPin] = useState("");
+    const [showPin, setShowPin] = useState(false);
+    const { loading, error: staffError, signIn, staff } = useStaff();
 
-    const handleSubmit = (e: FormEvent) => {
+    const handleSubmit = async (e: FormEvent) => {
         e.preventDefault();
-        setError(null);
 
-        if (!staffId.trim() || !password.trim()) {
-            setError("Please enter your staff ID and password.");
+        if (!phone.trim() || !pin.trim()) {
             return;
         }
 
-        setLoading(true);
-        // Mock auth — in production this calls Supabase Auth
-        window.setTimeout(() => {
-            setLoading(false);
-            // Derive a display name from the staff ID
-            const name = staffId
-                .split(/[.@]/)[0]
-                .replace(/[^a-zA-Z]/g, "")
-                .replace(/^\w/, (c) => c.toUpperCase());
-            onSignIn(name || "Staff");
-        }, 1200);
+        const result = await signIn(phone.trim(), pin.trim());
+        if (result) {
+            onSignIn(result.name, result.venue_id, result.role);
+        }
     };
 
     return (
@@ -83,52 +74,54 @@ export function StaffAuthScreen({ onSignIn }: Props) {
 
                     {/* Form */}
                     <form onSubmit={handleSubmit} className="flex flex-col gap-3">
-                        {/* Staff ID */}
+                        {/* Phone */}
                         <div>
                             <label
-                                htmlFor="staff-id"
+                                htmlFor="staff-phone"
                                 className="text-[10px] font-bold uppercase tracking-[0.18em] text-feldgrau"
                             >
-                                Staff ID or Email
+                                Phone Number
                             </label>
                             <div className="mt-1.5 flex items-center gap-2 rounded-xl bg-white px-3.5 py-3 shadow-sm ring-1 ring-licorice/8 focus-within:ring-2 focus-within:ring-licorice/20 transition-all">
                                 <UserIcon className="h-4 w-4 shrink-0 text-feldgrau" strokeWidth={2} />
                                 <input
-                                    id="staff-id"
-                                    type="text"
-                                    autoComplete="username"
+                                    id="staff-phone"
+                                    type="tel"
+                                    autoComplete="tel"
                                     autoFocus
-                                    value={staffId}
-                                    onChange={(e) => setStaffId(e.target.value)}
-                                    placeholder="kojo.mensah or kojo@velvetlounge.gh"
+                                    value={phone}
+                                    onChange={(e) => setPhone(e.target.value)}
+                                    placeholder="+233 24 000 0000"
                                     className="flex-1 bg-transparent text-[13px] text-licorice placeholder:text-feldgrau/50 focus:outline-none"
                                 />
                             </div>
                         </div>
 
-                        {/* Password */}
+                        {/* PIN */}
                         <div>
                             <label
-                                htmlFor="password"
+                                htmlFor="staff-pin"
                                 className="text-[10px] font-bold uppercase tracking-[0.18em] text-feldgrau"
                             >
-                                Password
+                                PIN
                             </label>
                             <div className="mt-1.5 flex items-center gap-2 rounded-xl bg-white px-3.5 py-3 shadow-sm ring-1 ring-licorice/8 focus-within:ring-2 focus-within:ring-licorice/20 transition-all">
                                 <LockClosedIcon className="h-4 w-4 shrink-0 text-feldgrau" strokeWidth={2} />
                                 <input
-                                    id="password"
-                                    type={showPassword ? "text" : "password"}
+                                    id="staff-pin"
+                                    type={showPin ? "text" : "password"}
                                     autoComplete="current-password"
-                                    value={password}
-                                    onChange={(e) => setPassword(e.target.value)}
-                                    placeholder="••••••••"
+                                    inputMode="numeric"
+                                    maxLength={6}
+                                    value={pin}
+                                    onChange={(e) => setPin(e.target.value.replace(/\D/g, ''))}
+                                    placeholder="••••••"
                                     className="flex-1 bg-transparent text-[13px] text-licorice placeholder:text-feldgrau/50 focus:outline-none"
                                 />
                                 <button
                                     type="button"
-                                    onClick={() => setShowPassword((v) => !v)}
-                                    aria-label={showPassword ? "Hide password" : "Show password"}
+                                    onClick={() => setShowPin((v) => !v)}
+                                    aria-label={showPin ? "Hide PIN" : "Show PIN"}
                                     className="text-feldgrau transition-colors hover:text-licorice"
                                 >
                                     <EyeIcon className="h-4 w-4" strokeWidth={2} />
@@ -137,9 +130,9 @@ export function StaffAuthScreen({ onSignIn }: Props) {
                         </div>
 
                         {/* Error message */}
-                        {error && (
+                        {staffError && (
                             <p className="rounded-lg bg-dark-red/8 px-3 py-2 text-[11px] font-semibold tracking-tight text-dark-red">
-                                {error}
+                                {staffError}
                             </p>
                         )}
 

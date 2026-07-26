@@ -1,4 +1,4 @@
-# NightOS — Nightclub POS & Management System
+ # NightOS — Nightclub POS & Management System
 ## Implementation Plan
 
 **Revenue target:** GHS 500+/month by end of August (Phase 1 live)

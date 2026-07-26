@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
     ArrowLeftIcon,
     HeartIcon,
@@ -15,36 +15,80 @@ import {
 } from "../data/menu";
 import { useTabStore, useTabComputed } from "../store/useTabStore";
 import { ItemDetailsSheet } from "../components/ItemDetailsSheet";
+import { db } from "../lib/api";
+import type { DbProduct } from "../lib/api";
 
 type Props = {
+    venueId?: string;
     onBack?: () => void;
 };
 
-export function MenuScreen({ onBack }: Props) {
+async function fetchProducts(venueId: string): Promise<MenuItem[]> {
+    const { data, error } = await db.products(venueId);
+    if (error || !data) return [];
+    return data.map((p: DbProduct) => ({
+        id: p.id,
+        name: p.name,
+        description: p.description || '',
+        longDescription: p.long_description || undefined,
+        price: p.price,
+        category: mapCategory(p.category_id),
+        image: p.images?.[0] || '',
+        tags: p.tags?.filter((t): t is MenuItem['tags'][number] =>
+            ['Popular', 'New', "Chef's Pick", 'Vegetarian'].includes(t as any)
+        ) || undefined,
+        abv: p.abv || undefined,
+        origin: p.origin || undefined,
+    }));
+}
+
+function mapCategory(_categoryId: string | null): MenuCategory {
+    return "Signatures";
+}
+
+export function MenuScreen({ venueId, onBack }: Props) {
     const [active, setActive] = useState<MenuCategory>("Signatures");
     const [query, setQuery] = useState("");
     const [activeItemId, setActiveItemId] = useState<string | null>(null);
     const { addQuick, toggleFavorite } = useTabStore();
     const { isFavorite } = useTabComputed();
+    const [supabaseItems, setSupabaseItems] = useState<MenuItem[] | null>(null);
+
+    useEffect(() => {
+        if (!venueId) return;
+        fetchProducts(venueId).then(items => {
+            if (items.length > 0) setSupabaseItems(items);
+        });
+    }, [venueId]);
+
+    const items = supabaseItems ?? MENU;
+    const categories: MenuCategory[] = supabaseItems
+        ? [...new Set(supabaseItems.map(i => i.category))]
+        : CATEGORIES;
 
     const visibleItems = useMemo<MenuItem[]>(() => {
         const q = query.trim().toLowerCase();
-        let items = MENU.filter((m) => m.category === active);
+        let filtered = items.filter((m) => m.category === active);
         if (q) {
-            items = items.filter(
+            filtered = filtered.filter(
                 (m) =>
                     m.name.toLowerCase().includes(q) ||
                     m.description.toLowerCase().includes(q)
             );
         }
-        return items;
-    }, [active, query]);
+        return filtered;
+    }, [active, query, items]);
 
     const activeItem = activeItemId
-        ? MENU.find((m) => m.id === activeItemId) ?? null
+        ? items.find((m) => m.id === activeItemId) ?? null
         : null;
 
-    const gridItems = visibleItems;
+    // Featured item — only shown on Signatures, no search
+    const featuredItem = items.find((m) => m.id === "sig-hibiscus-spritz");
+    const showFeatured = active === "Signatures" && !query && featuredItem;
+    const gridItems = showFeatured
+        ? visibleItems.filter((i) => i.id !== featuredItem!.id)
+        : visibleItems;
 
     return (
         <main className="relative min-h-svh w-full overflow-x-hidden bg-isabelline font-sans text-licorice antialiased">
@@ -119,7 +163,7 @@ export function MenuScreen({ onBack }: Props) {
                 {/* ── Category pills ── */}
                 <nav className="mx-auto w-full max-w-7xl px-5 md:px-8 pb-3">
                     <div className="no-scrollbar -mx-1 flex items-center gap-2 overflow-x-auto px-1 pb-1">
-                        {CATEGORIES.map((cat) => {
+                        {categories.map((cat) => {
                             const isActive = cat === active;
                             return (
                                 <button

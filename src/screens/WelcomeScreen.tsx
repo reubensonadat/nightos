@@ -7,6 +7,7 @@ import {
 } from "@heroicons/react/24/solid";
 import { formatGHS } from "../data/menu";
 import { useTabStore, useTabComputed } from "../store/useTabStore";
+import { useVenue } from "../hooks/useVenue";
 
 function TableIcon(props: React.SVGProps<SVGSVGElement>) {
     return (
@@ -82,6 +83,7 @@ export function WelcomeScreen({ onEnter, onStaffPortal, onKitchenDisplay, onMana
     const { cartItemCount } = useTabComputed();
     const showTabPill = cartItemCount > 0 || activeOrder !== null;
 
+    const { venue } = useVenue('velvet-lounge');
     // Live happy-hour countdown — gives the page a "living" feel
     const [now, setNow] = useState(new Date());
     const [staffCalled, setStaffCalled] = useState(false);
@@ -137,9 +139,14 @@ export function WelcomeScreen({ onEnter, onStaffPortal, onKitchenDisplay, onMana
                                 V
                             </span>
                         </div>
-                        <span className="text-[13px] font-bold tracking-tight text-isabelline">
-                            Velvet Lounge
-                        </span>
+                        <div className="flex flex-col leading-tight">
+                            <span className="text-[13px] font-bold tracking-tight text-isabelline">
+                                {venue.name}
+                            </span>
+                            <span className="text-[9px] font-semibold uppercase tracking-[0.18em] text-isabelline/50">
+                                NightOS · Table 04
+                            </span>
+                        </div>
                     </div>
 
                     <button
@@ -168,7 +175,7 @@ export function WelcomeScreen({ onEnter, onStaffPortal, onKitchenDisplay, onMana
                         {getGreeting()},
                         <br />
                         <span className="italic font-serif font-bold text-khaki">
-                            Velvet
+                            {venue.name.split(' ')[0]}
                         </span>{" "}
                         awaits.
                     </h1>
