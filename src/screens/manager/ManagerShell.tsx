@@ -8,6 +8,7 @@ import {
     LockClosedIcon,
     MapIcon,
     MegaphoneIcon,
+    PaintBrushIcon,
     Squares2X2Icon,
     UserCircleIcon,
     UserIcon,
@@ -163,7 +164,8 @@ export type ManagerPage =
     | "menu"
     | "staff"
     | "finance"
-    | "crm";
+    | "crm"
+    | "brand";
 
 type NavItem = {
     id: ManagerPage;
@@ -178,6 +180,7 @@ const NAV_ITEMS: NavItem[] = [
     { id: "staff", label: "Staff & Roles", icon: UsersIcon },
     { id: "finance", label: "Financial Reports", icon: BanknotesIcon },
     { id: "crm", label: "CRM & Marketing", icon: MegaphoneIcon },
+    { id: "brand", label: "Brand Colors", icon: PaintBrushIcon },
 ];
 
 type ShellProps = {

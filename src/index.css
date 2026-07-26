@@ -1,20 +1,36 @@
 @import "tailwindcss";
 
 @theme {
-  /* Velvet Lounge Color System — 60-30-10 Rule */
+  /* ── Brand Color Variables — dynamically set by BrandContext ── */
+  --brand-primary: #000000;
+  --brand-secondary: #FFFFFF;
+  --brand-accent: #666666;
+  --brand-text-secondary: #888888;
+  --brand-danger: #DC2626;
+  --brand-light-blue: #E5E7EB;
 
-  /* 60% Base — Backgrounds & Soft Surfaces */
-  --color-isabelline: #F3F3E3;
+  /* RGB variants for opacity/alpha usage */
+  --brand-primary-rgb: 0, 0, 0;
+  --brand-secondary-rgb: 255, 255, 255;
+  --brand-accent-rgb: 102, 102, 102;
+  --brand-danger-rgb: 220, 38, 38;
+
+  /* ── Tailwind color tokens mapped to brand variables ── */
+  --color-brand-primary: var(--brand-primary);
+  --color-brand-secondary: var(--brand-secondary);
+  --color-brand-accent: var(--brand-accent);
+  --color-brand-text-secondary: var(--brand-text-secondary);
+  --color-brand-danger: var(--brand-danger);
+  --color-brand-light-blue: var(--brand-light-blue);
+
+  /* ── Legacy alias tokens for backward compat with existing code ── */
+  --color-isabelline: var(--brand-secondary);
   --color-white: #FFFFFF;
-
-  /* 30% Accents — Secondary Text, Borders, Subtle States */
-  --color-feldgrau: #606F69;
-  --color-light-blue: #A9CFE0;
-
-  /* 10% Brand Identity & Contrast */
-  --color-licorice: #23140C;
-  --color-khaki: #D0BA98;
-  --color-dark-red: #91040C;
+  --color-feldgrau: var(--brand-text-secondary);
+  --color-light-blue: var(--brand-light-blue);
+  --color-licorice: var(--brand-primary);
+  --color-khaki: var(--brand-accent);
+  --color-dark-red: var(--brand-danger);
 
   /* Typography */
   --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
@@ -23,10 +39,10 @@
   /* Border radius tokens */
   --radius-pill: 9999px;
 
-  /* Shadows — Velvet Lounge floating elevations */
-  --shadow-velvet-float: 0 16px 40px rgba(35, 20, 12, 0.10);
-  --shadow-velvet-soft: 0 8px 24px rgba(35, 20, 12, 0.06);
-  --shadow-velvet-card: 0 4px 16px rgba(35, 20, 12, 0.05);
+  /* Shadows */
+  --shadow-velvet-float: 0 16px 40px rgba(0, 0, 0, 0.10);
+  --shadow-velvet-soft: 0 8px 24px rgba(0, 0, 0, 0.06);
+  --shadow-velvet-card: 0 4px 16px rgba(0, 0, 0, 0.05);
 }
 
 /* Base styles */
@@ -42,8 +58,8 @@ body {
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  background-color: var(--color-isabelline);
-  color: var(--color-licorice);
+  background-color: var(--brand-secondary);
+  color: var(--brand-primary);
   text-rendering: optimizeLegibility;
 }
 
@@ -57,7 +73,7 @@ body {
 }
 
 /* Subtle shimmer for loading states */
-@keyframes velvet-shimmer {
+@keyframes brand-shimmer {
   0% { background-position: -200% 0; }
   100% { background-position: 200% 0; }
 }
@@ -70,11 +86,11 @@ body {
     rgba(255, 255, 255, 0) 100%
   );
   background-size: 200% 100%;
-  animation: velvet-shimmer 1.6s linear infinite;
+  animation: brand-shimmer 1.6s linear infinite;
 }
 
-/* Soft entrance animation for splash elements */
-@keyframes velvet-rise {
+/* Soft entrance animation */
+@keyframes brand-rise {
   from {
     opacity: 0;
     transform: translateY(12px);
@@ -85,12 +101,12 @@ body {
   }
 }
 
-@keyframes velvet-fade {
+@keyframes brand-fade {
   from { opacity: 0; }
   to { opacity: 1; }
 }
 
-@keyframes velvet-scale-in {
+@keyframes brand-scale-in {
   from {
     opacity: 0;
     transform: scale(0.94);
@@ -101,23 +117,23 @@ body {
   }
 }
 
-.animate-velvet-rise {
-  animation: velvet-rise 600ms cubic-bezier(0.22, 1, 0.36, 1) both;
+.animate-brand-rise {
+  animation: brand-rise 600ms cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
-.animate-velvet-fade {
-  animation: velvet-fade 800ms ease-out both;
+.animate-brand-fade {
+  animation: brand-fade 800ms ease-out both;
 }
 
-.animate-velvet-scale-in {
-  animation: velvet-scale-in 500ms cubic-bezier(0.22, 1, 0.36, 1) both;
+.animate-brand-scale-in {
+  animation: brand-scale-in 500ms cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
 /* Respect reduced motion */
 @media (prefers-reduced-motion: reduce) {
-  .animate-velvet-rise,
-  .animate-velvet-fade,
-  .animate-velvet-scale-in,
+  .animate-brand-rise,
+  .animate-brand-fade,
+  .animate-brand-scale-in,
   .shimmer {
     animation: none;
   }

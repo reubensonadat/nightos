@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { WelcomeScreen } from "./screens/WelcomeScreen";
 import { MenuScreen } from "./screens/MenuScreen";
 import { CartScreen } from "./screens/CartScreen";
@@ -53,7 +53,16 @@ type WaiterScreen =
 type Mode = "customer" | "waiter" | "kitchen" | "manager";
 
 function App() {
-  const [mode, setMode] = useState<Mode>("customer");
+  // Sync mode from URL hash on mount
+  const getModeFromPath = (): Mode => {
+    const path = window.location.pathname.replace(/^\/+/, "").split("/")[0];
+    if (path === "waiter") return "waiter";
+    if (path === "kitchen") return "kitchen";
+    if (path === "manager") return "manager";
+    return "customer";
+  };
+
+  const [mode, setMode] = useState<Mode>(getModeFromPath);
   const [screen, setScreen] = useState<CustomerScreen>("welcome");
   const activeOrder = useTabStore((s) => s.activeOrder);
   const setActiveOrder = useTabStore((s) => s.setActiveOrder);
@@ -68,6 +77,19 @@ function App() {
   const [managerName, setManagerName] = useState("");
   const [managerPage, setManagerPage] = useState<ManagerPage>("ops");
 
+  // Sync URL when mode changes
+  useEffect(() => {
+    const paths: Record<Mode, string> = {
+      customer: "/",
+      waiter: "/waiter",
+      kitchen: "/kitchen",
+      manager: "/manager",
+    };
+    if (window.location.pathname !== paths[mode]) {
+      window.history.replaceState(null, "", paths[mode]);
+    }
+  }, [mode]);
+
   /* ── Mode switchers ── */
   const switchToWaiter = () => {
     setMode("waiter");
@@ -81,6 +103,7 @@ function App() {
   const switchToManager = () => {
     setMode("manager");
     setManagerAuthed(false);
+    setManagerPage("ops");
   };
 
   const switchToCustomer = () => {
@@ -109,7 +132,6 @@ function App() {
           {screen === "welcome" && (
             <WelcomeScreen
               onEnter={() => setScreen("menu")}
-              onViewReservations={() => setScreen("reservations")}
               onStaffPortal={switchToWaiter}
               onKitchenDisplay={switchToKitchen}
               onManagerPortal={switchToManager}
@@ -119,7 +141,6 @@ function App() {
           {screen === "menu" && (
             <MenuScreen
               onBack={() => setScreen("welcome")}
-              onViewCart={() => setScreen("cart")}
             />
           )}
 
