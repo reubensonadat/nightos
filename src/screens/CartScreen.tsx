@@ -14,8 +14,10 @@ import { PaperAirplaneIcon } from "@heroicons/react/24/solid";
 import { formatGHS } from "../data/menu";
 import { getLineUnitPrice, useCart } from "../context/CartContext";
 import type { OrderSummary } from "./OrderTrackingScreen";
+import { db } from "../lib/api";
 
 type Props = {
+    venueId: string;
     onBack?: () => void;
     onContinueShopping?: () => void;
     onOrderSent?: (order: OrderSummary) => void;
@@ -30,7 +32,7 @@ function estimatePrepMinutes(itemCount: number): string {
     return `${min}–${min + 4} min`;
 }
 
-export function CartScreen({ onBack, onContinueShopping, onOrderSent }: Props) {
+export function CartScreen({ venueId, onBack, onContinueShopping, onOrderSent }: Props) {
     const { lines, itemCount, subtotal, setQty, remove, clear } = useCart();
     const [orderNotes, setOrderNotes] = useState("");
     const [sending, setSending] = useState(false);
@@ -46,30 +48,66 @@ export function CartScreen({ onBack, onContinueShopping, onOrderSent }: Props) {
         };
     }, [subtotal]);
 
-    const handleSendToKitchen = () => {
+    const handleSendToKitchen = async () => {
         setSending(true);
-        window.setTimeout(() => {
-            // Build order summary BEFORE clearing the cart
-            const orderNumber = `VL-${Math.floor(1000 + Math.random() * 9000)}`;
-            const order: OrderSummary = {
-                orderNumber,
-                items: lines.map((line) => {
+
+        // Try to submit to Supabase — gracefully fall back to mock
+        let orderNumber = `VL-${Math.floor(1000 + Math.random() * 9000)}`;
+
+        try {
+            const station = lines.some((l) => l.item.category === "Small Plates")
+                ? 'kitchen'
+                : 'bar';
+
+            const { data: submission, error: subErr } = await db.createOrderSubmission(
+                '00000000-0000-0000-0000-000000000000', // billId — updated once bill context exists
+                venueId,
+                station,
+                orderNotes || undefined,
+            );
+
+            if (!subErr && submission) {
+                orderNumber = submission.id.slice(0, 8).toUpperCase();
+
+                for (const line of lines) {
                     const unitPrice = getLineUnitPrice(line);
-                    return {
-                        name: line.item.name,
-                        qty: line.qty,
-                        image: line.item.image,
-                        lineTotal: unitPrice * line.qty,
-                    };
-                }),
-                total,
-                itemCount,
-                sentAt: Date.now(),
-            };
-            // Clear cart and notify parent — parent routes to tracking
-            clear();
-            onOrderSent?.(order);
-        }, 1200);
+                    await db.createOrderItem(
+                        submission.id,
+                        submission.bill_id,
+                        line.item.id,
+                        line.item.name,
+                        line.qty,
+                        unitPrice,
+                        line.modifiers.map((m) => ({ group_id: m.groupId, option_id: m.option.id, option_name: m.option.name, price_delta: m.option.priceDelta ?? 0 })),
+                        line.modifiers.reduce((s, m) => s + (m.option.priceDelta ?? 0) * line.qty, 0),
+                        unitPrice * line.qty,
+                        line.notes,
+                    );
+                }
+            }
+        } catch {
+            // fall through to mock
+        }
+
+        const order: OrderSummary = {
+            orderNumber,
+            items: lines.map((line) => {
+                const unitPrice = getLineUnitPrice(line);
+                return {
+                    name: line.item.name,
+                    qty: line.qty,
+                    image: line.item.image,
+                    lineTotal: unitPrice * line.qty,
+                };
+            }),
+            total,
+            itemCount,
+            sentAt: Date.now(),
+            venueId,
+        };
+
+        clear();
+        onOrderSent?.(order);
     };
 
     // ── Empty state ──

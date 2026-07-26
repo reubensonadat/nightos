@@ -1,82 +1,26 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useCallback } from "react";
 import { ArrowPathIcon, SpeakerWaveIcon } from "@heroicons/react/24/outline";
 import { OrderCard, type KitchenOrder, type OrderStatus } from "../../components/OrderCard";
+import { useOrders } from "../../hooks/useOrders";
+import { db } from "../../lib/api";
 
 /* ────────────────────────── Mock initial orders ────────────────────────── */
 
-const now = new Date();
+const MOCK_NOW = new Date();
 
 function minutesAgo(mins: number): string {
-    const d = new Date(now);
+    const d = new Date(MOCK_NOW);
     d.setMinutes(d.getMinutes() - mins);
     return d.toISOString();
 }
 
-const INITIAL_ORDERS: KitchenOrder[] = [
-    {
-        id: "o-101",
-        tableNumber: 2,
-        station: "Bar",
-        status: "pending",
-        placedAt: minutesAgo(2),
-        server: "Kojo",
-        items: [
-            { name: "Velvet Old Fashioned", quantity: 2 },
-            { name: "Hibiscus Spritz", quantity: 1, notes: "No ice" },
-        ],
-    },
-    {
-        id: "o-102",
-        tableNumber: 6,
-        station: "Kitchen",
-        status: "pending",
-        placedAt: minutesAgo(4),
-        server: "Ama",
-        items: [
-            { name: "Lamb Suya Skewers", quantity: 2 },
-            { name: "Grilled Plantain", quantity: 1, notes: "Extra spicy" },
-        ],
-    },
-    {
-        id: "o-103",
-        tableNumber: 4,
-        station: "Bar",
-        status: "preparing",
-        placedAt: minutesAgo(8),
-        server: "Kojo",
-        items: [{ name: "Cocoa Espresso Martini", quantity: 1 }],
-    },
-    {
-        id: "o-104",
-        tableNumber: 8,
-        station: "Kitchen",
-        status: "preparing",
-        placedAt: minutesAgo(12),
-        server: "Kojo",
-        items: [
-            { name: "Beef Tataki", quantity: 1 },
-            { name: "Lamb Suya Skewers", quantity: 3, notes: "One well-done" },
-            { name: "Grilled Plantain", quantity: 2 },
-        ],
-    },
-    {
-        id: "o-105",
-        tableNumber: 3,
-        station: "Bar",
-        status: "ready",
-        placedAt: minutesAgo(15),
-        server: "Ama",
-        items: [{ name: "Smoky Negroni", quantity: 2 }],
-    },
-    {
-        id: "o-106",
-        tableNumber: 1,
-        station: "Kitchen",
-        status: "ready",
-        placedAt: minutesAgo(18),
-        server: "Ama",
-        items: [{ name: "Beef Tataki", quantity: 2 }],
-    },
+const MOCK_ORDERS: KitchenOrder[] = [
+    { id: "o-101", tableNumber: 2, station: "Bar", status: "pending", placedAt: minutesAgo(2), server: "Kojo", items: [{ name: "Velvet Old Fashioned", quantity: 2 }, { name: "Hibiscus Spritz", quantity: 1, notes: "No ice" }] },
+    { id: "o-102", tableNumber: 6, station: "Kitchen", status: "pending", placedAt: minutesAgo(4), server: "Ama", items: [{ name: "Lamb Suya Skewers", quantity: 2 }, { name: "Grilled Plantain", quantity: 1, notes: "Extra spicy" }] },
+    { id: "o-103", tableNumber: 4, station: "Bar", status: "preparing", placedAt: minutesAgo(8), server: "Kojo", items: [{ name: "Cocoa Espresso Martini", quantity: 1 }] },
+    { id: "o-104", tableNumber: 8, station: "Kitchen", status: "preparing", placedAt: minutesAgo(12), server: "Kojo", items: [{ name: "Beef Tataki", quantity: 1 }, { name: "Lamb Suya Skewers", quantity: 3, notes: "One well-done" }, { name: "Grilled Plantain", quantity: 2 }] },
+    { id: "o-105", tableNumber: 3, station: "Bar", status: "ready", placedAt: minutesAgo(15), server: "Ama", items: [{ name: "Smoky Negroni", quantity: 2 }] },
+    { id: "o-106", tableNumber: 1, station: "Kitchen", status: "ready", placedAt: minutesAgo(18), server: "Ama", items: [{ name: "Beef Tataki", quantity: 2 }] },
 ];
 
 /* ────────────────────────── Station filter ────────────────────────── */
@@ -119,32 +63,95 @@ const COLUMNS: Column[] = [
     },
 ];
 
+/* ────────────────────────── Convert Supabase submission to KitchenOrder ────────────────────────── */
+
+function mapStation(s: string): "Kitchen" | "Bar" {
+    if (s === "bar") return "Bar";
+    return "Kitchen";
+}
+
+function orderStatus(s: string): OrderStatus {
+    if (s === "confirmed") return "pending";
+    if (s === "preparing") return "preparing";
+    if (s === "ready" || s === "served") return "ready";
+    return "pending";
+}
+
 /* ────────────────────────── Component ────────────────────────── */
 
 type Props = {
+    venueId: string;
     onExit?: () => void;
 };
 
-export function KitchenDisplayScreen({ onExit }: Props) {
-    const [orders, setOrders] = useState<KitchenOrder[]>(INITIAL_ORDERS);
+export function KitchenDisplayScreen({ venueId, onExit }: Props) {
+    const [orders, setOrders] = useState<KitchenOrder[]>(MOCK_ORDERS);
+    const [useMock, setUseMock] = useState(true);
     const [now, setNow] = useState(Date.now());
     const [stationFilter, setStationFilter] = useState<StationFilter>("all");
-    const [lastRefresh, setLastRefresh] = useState<Date>(new Date());
+
+    const { orders: submissions, loading, refresh } = useOrders(venueId);
+
+    /* ── Convert submissions to KitchenOrders ── */
+    useEffect(() => {
+        if (!submissions || submissions.length === 0) return;
+
+        let cancelled = false;
+
+        async function mapSubmissions() {
+            const enriched: KitchenOrder[] = [];
+
+            for (const sub of submissions) {
+                if (cancelled) break;
+
+                // Fetch bill + table for table number
+                const billRes = await db.billWithTable(sub.bill_id);
+                if (cancelled || billRes.error || !billRes.data) continue;
+
+                const bill = billRes.data as any;
+                const tableNumber = bill.tables?.table_number ?? 0;
+
+                // Fetch order items
+                const itemsRes = await db.orderItemsBySubmission(sub.id);
+                if (cancelled) break;
+
+                const items = (itemsRes.data ?? []).map((oi: any) => ({
+                    name: oi.product_name,
+                    quantity: oi.quantity,
+                    ...(oi.notes ? { notes: oi.notes } : {}),
+                }));
+
+                enriched.push({
+                    id: sub.id,
+                    tableNumber,
+                    station: mapStation(sub.station),
+                    status: orderStatus(sub.status),
+                    placedAt: sub.created_at,
+                    server: bill.waiter_id?.slice(0, 8) ?? "—",
+                    items,
+                });
+            }
+
+            if (!cancelled) {
+                if (enriched.length > 0) {
+                    setOrders(enriched);
+                    setUseMock(false);
+                } else {
+                    setUseMock(true);
+                }
+            }
+        }
+
+        mapSubmissions();
+
+        return () => { cancelled = true; };
+    }, [submissions]);
 
     /* ── Auto-refresh tick: update "now" every 30s for timer accuracy ── */
     useEffect(() => {
         const interval = window.setInterval(() => {
             setNow(Date.now());
         }, 30_000);
-        return () => window.clearInterval(interval);
-    }, []);
-
-    /* ── Simulated auto-refresh of order data every 15s ── */
-    useEffect(() => {
-        const interval = window.setInterval(() => {
-            setLastRefresh(new Date());
-            // In production, this would refetch from Supabase
-        }, 15_000);
         return () => window.clearInterval(interval);
     }, []);
 
@@ -167,7 +174,6 @@ export function KitchenDisplayScreen({ onExit }: Props) {
         for (const order of filteredOrders) {
             groups[order.status].push(order);
         }
-        // Sort each column by placedAt ascending (oldest first — most urgent on top)
         for (const status of Object.keys(groups) as OrderStatus[]) {
             groups[status].sort(
                 (a, b) => new Date(a.placedAt).getTime() - new Date(b.placedAt).getTime()
@@ -176,18 +182,24 @@ export function KitchenDisplayScreen({ onExit }: Props) {
         return groups;
     }, [filteredOrders]);
 
-    /* ── Order status mutations ── */
-    const advanceOrder = (orderId: string) => {
+    /* ── Order status mutations (push to Supabase) ── */
+    const advanceOrder = useCallback(async (orderId: string) => {
         setOrders((prev) =>
             prev.map((o) => (o.id === orderId ? { ...o, status: "preparing" } : o))
         );
-    };
+        if (!useMock) {
+            await db.updateOrderSubmissionStatus(orderId, 'preparing');
+        }
+    }, [useMock]);
 
-    const markReady = (orderId: string) => {
+    const markReady = useCallback(async (orderId: string) => {
         setOrders((prev) =>
             prev.map((o) => (o.id === orderId ? { ...o, status: "ready" } : o))
         );
-    };
+        if (!useMock) {
+            await db.updateOrderSubmissionStatus(orderId, 'ready');
+        }
+    }, [useMock]);
 
     /* ── Header stats ── */
     const totalOrders = filteredOrders.length;
@@ -242,7 +254,7 @@ export function KitchenDisplayScreen({ onExit }: Props) {
                         <div className="flex items-center gap-2">
                             <div className="hidden sm:flex items-center gap-1.5 rounded-full bg-isabelline/10 px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-isabelline/80">
                                 <ArrowPathIcon className="h-3 w-3 animate-spin" strokeWidth={2.5} style={{ animationDuration: "3s" }} />
-                                Auto · {Math.floor((Date.now() - lastRefresh.getTime()) / 1000)}s
+                                {useMock ? "Mock" : "Live"}
                             </div>
                             {onExit && (
                                 <button

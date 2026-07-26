@@ -8,6 +8,7 @@ import {
     WifiIcon,
 } from "@heroicons/react/24/solid";
 import { formatGHS } from "../data/menu";
+import { useVenue } from "../hooks/useVenue";
 
 // Premium Unsplash hero — warm, editorial cocktail imagery
 const signatureImg =
@@ -38,6 +39,8 @@ const TODAY_LABEL = new Date().toLocaleDateString("en-GH", {
 });
 
 export function WelcomeScreen({ onEnter, onViewReservations, onStaffPortal, onKitchenDisplay, onManagerPortal }: Props) {
+    const { venue } = useVenue('velvet-lounge');
+
     // Live happy-hour countdown — gives the page a "living" feel
     const [now, setNow] = useState(new Date());
     useEffect(() => {
@@ -94,7 +97,7 @@ export function WelcomeScreen({ onEnter, onViewReservations, onStaffPortal, onKi
                         </div>
                         <div className="flex flex-col leading-tight">
                             <span className="text-[13px] font-bold tracking-tight text-isabelline">
-                                Velvet Lounge
+                                {venue.name}
                             </span>
                             <span className="text-[9px] font-semibold uppercase tracking-[0.18em] text-isabelline/50">
                                 NightOS · Table 04
@@ -134,7 +137,7 @@ export function WelcomeScreen({ onEnter, onViewReservations, onStaffPortal, onKi
                         {getGreeting()},
                         <br />
                         <span className="italic font-serif font-bold text-khaki">
-                            Velvet
+                            {venue.name.split(' ')[0]}
                         </span>{" "}
                         awaits.
                     </h1>

@@ -25,6 +25,8 @@ export type OrderSummary = {
     total: number;
     itemCount: number;
     sentAt: number; // unix ms
+    billId?: string;
+    venueId?: string;
 };
 
 /* ────────────────────────── Tracking stages ────────────────────────── */
