@@ -2,7 +2,6 @@ import { useEffect, useState } from "react";
 import {
     ArrowRightIcon,
     ClockIcon,
-    MapPinIcon,
     MusicalNoteIcon,
     UserIcon
 } from "@heroicons/react/24/solid";
@@ -65,7 +64,6 @@ const ambientImg =
 
 type Props = {
     onEnter: () => void;
-    onViewReservations?: () => void;
     onStaffPortal?: () => void;
     onKitchenDisplay?: () => void;
     onManagerPortal?: () => void;
@@ -79,13 +77,7 @@ function getGreeting() {
     return "Good evening";
 }
 
-const TODAY_LABEL = new Date().toLocaleDateString("en-GH", {
-    weekday: "long",
-    month: "long",
-    day: "numeric",
-});
-
-export function WelcomeScreen({ onEnter, onViewReservations, onStaffPortal, onKitchenDisplay, onManagerPortal }: Props) {
+export function WelcomeScreen({ onEnter, onStaffPortal, onKitchenDisplay, onManagerPortal }: Props) {
     const { activeOrder } = useTabStore();
     const { cartItemCount } = useTabComputed();
     const showTabPill = cartItemCount > 0 || activeOrder !== null;

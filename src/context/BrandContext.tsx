@@ -39,7 +39,9 @@ function loadBrand(): BrandColors {
             const parsed = JSON.parse(saved);
             return { ...DEFAULT_BRAND, ...parsed };
         }
-    } catch {}
+    } catch (e) {
+        console.error("Failed to load brand colors", e);
+    }
     return { ...DEFAULT_BRAND };
 }
 
@@ -104,6 +106,7 @@ export function BrandProvider({ children }: { children: ReactNode }) {
     );
 }
 
+// eslint-disable-next-line react-refresh/only-export-components
 export function useBrand() {
     const ctx = useContext(BrandContext);
     if (!ctx) throw new Error("useBrand must be used within a BrandProvider");

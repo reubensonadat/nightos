@@ -1,7 +1,6 @@
 import { useMemo, useState } from "react";
 import {
     ArrowLeftIcon,
-    ArrowRightIcon,
     HeartIcon,
     MagnifyingGlassIcon,
     PlusIcon,
@@ -19,10 +18,9 @@ import { ItemDetailsSheet } from "../components/ItemDetailsSheet";
 
 type Props = {
     onBack?: () => void;
-    onViewCart?: () => void;
 };
 
-export function MenuScreen({ onBack, onViewCart }: Props) {
+export function MenuScreen({ onBack }: Props) {
     const [active, setActive] = useState<MenuCategory>("Signatures");
     const [query, setQuery] = useState("");
     const [activeItemId, setActiveItemId] = useState<string | null>(null);

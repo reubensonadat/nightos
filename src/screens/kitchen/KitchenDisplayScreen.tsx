@@ -127,7 +127,7 @@ type Props = {
 
 export function KitchenDisplayScreen({ onExit }: Props) {
     const [orders, setOrders] = useState<KitchenOrder[]>(INITIAL_ORDERS);
-    const [now, setNow] = useState(Date.now());
+    const [now, setNow] = useState(() => Date.now());
     const [stationFilter, setStationFilter] = useState<StationFilter>("all");
     const [lastRefresh, setLastRefresh] = useState<Date>(new Date());
 
@@ -242,7 +242,7 @@ export function KitchenDisplayScreen({ onExit }: Props) {
                         <div className="flex items-center gap-2">
                             <div className="hidden sm:flex items-center gap-1.5 rounded-full bg-isabelline/10 px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-isabelline/80">
                                 <ArrowPathIcon className="h-3 w-3 animate-spin" strokeWidth={2.5} style={{ animationDuration: "3s" }} />
-                                Auto · {Math.floor((Date.now() - lastRefresh.getTime()) / 1000)}s
+                                Auto · {Math.floor((now - lastRefresh.getTime()) / 1000)}s
                             </div>
                             {onExit && (
                                 <button

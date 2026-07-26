@@ -92,7 +92,7 @@ type Props = {
 };
 
 export function OrderTrackingScreen({ order, onBackToMenu, onPayBill }: Props) {
-    const [now, setNow] = useState(Date.now());
+    const [now, setNow] = useState(() => Date.now());
     const [summaryOpen, setSummaryOpen] = useState(false);
     const [requested, setRequested] = useState(false);
 
