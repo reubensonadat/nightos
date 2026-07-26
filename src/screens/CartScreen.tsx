@@ -11,7 +11,7 @@ import {
 } from "@heroicons/react/24/outline";
 import { PaperAirplaneIcon } from "@heroicons/react/24/solid";
 import { formatGHS } from "../data/menu";
-import { getLineUnitPrice, useCart } from "../context/CartContext";
+import { getLineUnitPrice, useTabStore, useTabComputed } from "../store/useTabStore";
 import type { OrderSummary } from "./OrderTrackingScreen";
 
 type Props = {
@@ -30,7 +30,8 @@ function estimatePrepMinutes(itemCount: number): string {
 }
 
 export function CartScreen({ onBack, onContinueShopping, onOrderSent }: Props) {
-    const { lines, itemCount, subtotal, setQty, remove, clear } = useCart();
+    const { lines, setQty, remove, clearCart } = useTabStore();
+    const { cartItemCount: itemCount, cartSubtotal: subtotal } = useTabComputed();
     const [orderNotes, setOrderNotes] = useState("");
     const [sending, setSending] = useState(false);
 
@@ -48,25 +49,27 @@ export function CartScreen({ onBack, onContinueShopping, onOrderSent }: Props) {
     const handleSendToKitchen = () => {
         setSending(true);
         window.setTimeout(() => {
-            // Build order summary BEFORE clearing the cart
-            const orderNumber = `VL-${Math.floor(1000 + Math.random() * 9000)}`;
+            const existingOrder = useTabStore.getState().activeOrder;
+            
+            const newItems = lines.map((line) => {
+                const unitPrice = getLineUnitPrice(line);
+                return {
+                    name: line.item.name,
+                    qty: line.qty,
+                    image: line.item.image,
+                    lineTotal: unitPrice * line.qty,
+                };
+            });
+
             const order: OrderSummary = {
-                orderNumber,
-                items: lines.map((line) => {
-                    const unitPrice = getLineUnitPrice(line);
-                    return {
-                        name: line.item.name,
-                        qty: line.qty,
-                        image: line.item.image,
-                        lineTotal: unitPrice * line.qty,
-                    };
-                }),
-                total,
-                itemCount,
-                sentAt: Date.now(),
+                orderNumber: existingOrder ? existingOrder.orderNumber : `VL-${Math.floor(1000 + Math.random() * 9000)}`,
+                items: existingOrder ? [...existingOrder.items, ...newItems] : newItems,
+                total: existingOrder ? existingOrder.total + total : total,
+                itemCount: existingOrder ? existingOrder.itemCount + itemCount : itemCount,
+                sentAt: existingOrder ? existingOrder.sentAt : Date.now(),
             };
             // Clear cart and notify parent — parent routes to tracking
-            clear();
+            clearCart();
             onOrderSent?.(order);
         }, 1200);
     };

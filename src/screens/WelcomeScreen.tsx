@@ -7,6 +7,7 @@ import {
     UserIcon
 } from "@heroicons/react/24/solid";
 import { formatGHS } from "../data/menu";
+import { useTabStore, useTabComputed } from "../store/useTabStore";
 
 function TableIcon(props: React.SVGProps<SVGSVGElement>) {
     return (
@@ -85,6 +86,10 @@ const TODAY_LABEL = new Date().toLocaleDateString("en-GH", {
 });
 
 export function WelcomeScreen({ onEnter, onViewReservations, onStaffPortal, onKitchenDisplay, onManagerPortal }: Props) {
+    const { activeOrder } = useTabStore();
+    const { cartItemCount } = useTabComputed();
+    const showTabPill = cartItemCount > 0 || activeOrder !== null;
+
     // Live happy-hour countdown — gives the page a "living" feel
     const [now, setNow] = useState(new Date());
     const [staffCalled, setStaffCalled] = useState(false);
@@ -468,14 +473,14 @@ export function WelcomeScreen({ onEnter, onViewReservations, onStaffPortal, onKi
                 STICKY BOTTOM CTA — floats above everything
               ═══════════════════════════════════════════════════════════ */}
             <div
-                className="
-                    fixed inset-x-0 bottom-0 z-30
+                className={`
+                    fixed inset-x-0 z-30
                     flex justify-center
                     px-5
-                    pb-[max(env(safe-area-inset-bottom),18px)]
                     pt-3
                     bg-gradient-to-t from-isabelline via-isabelline/95 to-transparent
-                "
+                    ${showTabPill ? "bottom-[90px] pb-3" : "bottom-0 pb-[max(env(safe-area-inset-bottom),18px)]"}
+                `}
             >
                 <button
                     type="button"

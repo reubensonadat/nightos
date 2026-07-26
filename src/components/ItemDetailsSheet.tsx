@@ -8,7 +8,7 @@ import {
     ChevronRightIcon,
 } from "@heroicons/react/24/solid";
 import { formatGHS, type MenuItem, type ModifierGroup, type ModifierOption } from "../data/menu";
-import { useCart } from "../context/CartContext";
+import { useTabStore } from "../store/useTabStore";
 
 type Props = {
     item: MenuItem | null;
@@ -16,7 +16,7 @@ type Props = {
 };
 
 export function ItemDetailsSheet({ item, onClose }: Props) {
-    const { addCustom } = useCart();
+    const { addCustom } = useTabStore();
     const [qty, setQty] = useState(1);
     const [notes, setNotes] = useState("");
     /** selections: groupId -> Set<optionId>  (single-select groups still use a Set of size 1) */

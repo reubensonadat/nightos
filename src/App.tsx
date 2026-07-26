@@ -1,14 +1,14 @@
 import { useState } from "react";
-import { CartProvider } from "./context/CartContext";
 import { WelcomeScreen } from "./screens/WelcomeScreen";
 import { MenuScreen } from "./screens/MenuScreen";
 import { CartScreen } from "./screens/CartScreen";
 import {
   OrderTrackingScreen,
-  type OrderSummary,
 } from "./screens/OrderTrackingScreen";
 import { CheckoutScreen } from "./screens/CheckoutScreen";
 import { ReservationsScreen } from "./screens/ReservationsScreen";
+import { TabPill } from "./components/TabPill";
+import { useTabStore } from "./store/useTabStore";
 
 // Waiter imports
 import { StaffAuthScreen } from "./screens/waiter/StaffAuthScreen";
@@ -55,7 +55,8 @@ type Mode = "customer" | "waiter" | "kitchen" | "manager";
 function App() {
   const [mode, setMode] = useState<Mode>("customer");
   const [screen, setScreen] = useState<CustomerScreen>("welcome");
-  const [lastOrder, setLastOrder] = useState<OrderSummary | null>(null);
+  const activeOrder = useTabStore((s) => s.activeOrder);
+  const setActiveOrder = useTabStore((s) => s.setActiveOrder);
 
   // Waiter state
   const [waiterScreen, setWaiterScreen] = useState<WaiterScreen>("auth");
@@ -92,12 +93,19 @@ function App() {
   };
 
   return (
-    <CartProvider>
+    <>
       {/* ═══════════════════════════════════════════════════════════
           CUSTOMER MODE
         ═══════════════════════════════════════════════════════════ */}
       {mode === "customer" && (
         <>
+          {screen !== "cart" && screen !== "checkout" && (
+            <TabPill
+              onViewCart={() => setScreen("cart")}
+              onViewTracking={() => setScreen("tracking")}
+            />
+          )}
+
           {screen === "welcome" && (
             <WelcomeScreen
               onEnter={() => setScreen("menu")}
@@ -120,25 +128,28 @@ function App() {
               onBack={() => setScreen("menu")}
               onContinueShopping={() => setScreen("menu")}
               onOrderSent={(order) => {
-                setLastOrder(order);
+                setActiveOrder(order);
                 setScreen("tracking");
               }}
             />
           )}
 
-          {screen === "tracking" && lastOrder && (
+          {screen === "tracking" && activeOrder && (
             <OrderTrackingScreen
-              order={lastOrder}
+              order={activeOrder}
               onBackToMenu={() => setScreen("menu")}
               onPayBill={() => setScreen("checkout")}
             />
           )}
 
-          {screen === "checkout" && lastOrder && (
+          {screen === "checkout" && activeOrder && (
             <CheckoutScreen
-              total={lastOrder.total}
+              total={activeOrder.total}
               onBack={() => setScreen("tracking")}
-              onPaid={() => setScreen("welcome")}
+              onPaid={() => {
+                setActiveOrder(null);
+                setScreen("welcome");
+              }}
             />
           )}
 
@@ -243,7 +254,7 @@ function App() {
           )}
         </>
       )}
-    </CartProvider>
+    </>
   );
 }
 
