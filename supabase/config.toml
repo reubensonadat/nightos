@@ -42,7 +42,13 @@ otp_expiry = 3600
 enable_signup = true
 enable_confirmations = true
 template = "Your NightOS code is {{ .Code }}"
-max_frequency = "30s"
+max_frequency = "5s"
+hook = "http://localhost:54321/functions/v1/mnotify-sms"
+
+[auth.rate_limit]
+sms_sent = 30
+sign_in_sign_ups = 30
+token_verifications = 30
 
 [storage]
 enabled = true
