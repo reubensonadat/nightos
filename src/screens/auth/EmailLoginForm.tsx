@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import toast from 'react-hot-toast'
 import { useAuth } from '../../context/AuthContext'
 
 type Props = {
@@ -25,8 +26,10 @@ export function EmailLoginForm({ onSwitchMethod, onToggleMode }: Props) {
     setLoading(false)
     if (error) {
       setError(error.message)
+      toast.error(error.message)
       return
     }
+    toast.success('Signed in successfully.')
     navigate('/dashboard', { replace: true })
   }
 

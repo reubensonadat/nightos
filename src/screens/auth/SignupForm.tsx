@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import toast from 'react-hot-toast'
 import { useAuth } from '../../context/AuthContext'
 
 type Props = {
@@ -25,8 +26,10 @@ export function SignupForm({ onSwitchMethod, onToggleMode }: Props) {
     setLoading(false)
     if (error) {
       setError(error.message)
+      toast.error(error.message)
       return
     }
+    toast.success('Account created! Set up your venue.')
     navigate('/setup', { replace: true })
   }
 

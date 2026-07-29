@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
+import { Toaster } from "react-hot-toast";
 import { CartProvider, useCart } from "./context/CartContext";
 import { AuthProvider, useAuth } from "./context/AuthContext";
 import { NetworkProvider } from "./context/NetworkContext";
@@ -271,6 +272,15 @@ function App() {
   return (
     <NetworkProvider>
       <AuthProvider>
+        <Toaster
+          position="top-center"
+          toastOptions={{
+            duration: 3000,
+            style: { fontSize: '13px', fontWeight: 600, borderRadius: '12px', padding: '12px 16px' },
+            success: { iconTheme: { primary: '#23140C', secondary: '#FBF7F2' } },
+            error: { iconTheme: { primary: '#DC2626', secondary: '#FEF2F2' } },
+          }}
+        />
         <AppRoutes />
       </AuthProvider>
     </NetworkProvider>
