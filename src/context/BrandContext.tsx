@@ -15,12 +15,12 @@ export type BrandColors = {
 };
 
 const DEFAULT_BRAND: BrandColors = {
-    primary: "#000000",
-    secondary: "#FFFFFF",
-    accent: "#666666",
-    textSecondary: "#888888",
-    danger: "#DC2626",
-    lightBlue: "#E5E7EB",
+    primary: "#23140C",
+    secondary: "#F3F3E3",
+    accent: "#D0BA98",
+    textSecondary: "#606F69",
+    danger: "#91040C",
+    lightBlue: "#A9CFE0",
 };
 
 type BrandContextValue = {
@@ -30,7 +30,7 @@ type BrandContextValue = {
     isDefault: boolean;
 };
 
-const STORAGE_KEY = "nightos-brand-colors";
+const STORAGE_KEY = "nightos-brand-colors-v2";
 
 function loadBrand(): BrandColors {
     try {

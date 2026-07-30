@@ -10,12 +10,10 @@ import { WelcomeScreen } from "./screens/WelcomeScreen";
 import { MenuScreen } from "./screens/MenuScreen";
 import { CartScreen } from "./screens/CartScreen";
 import { CheckoutScreen } from "./screens/CheckoutScreen";
-import { ReservationsScreen } from "./screens/ReservationsScreen";
-import { type OrderSummary, OrderTrackingScreen } from "./screens/OrderTrackingScreen";
+import { type OrderSummary } from "./screens/OrderTrackingScreen";
 import { OrdersScreen } from "./screens/OrdersScreen";
 import { CustomerBottomNav } from "./components/CustomerBottomNav";
-import { TabPill } from "./components/TabPill";
-import { useTabStore, useTabComputed } from "./store/useTabStore";
+import { useTabComputed } from "./store/useTabStore";
 
 import { StaffAuthScreen } from "./screens/waiter/StaffAuthScreen";
 import { TablesDashboard, type Table } from "./screens/waiter/TablesDashboard";
@@ -54,24 +52,25 @@ type Mode = "customer" | "waiter" | "kitchen" | "manager";
 
 function CustomerShell({ venueId }: { venueId: string }) {
   const [tab, setTab] = useState<NavTab>("menu");
-  const [activeOrders, setActiveOrders] = useState<OrderSummary[]>([]);
-  const [history, setHistory] = useState<OrderSummary[]>([]);
+  const [activeOrders, setActiveOrders] = useState<OrderSummary[]>(() => {
+    try {
+      const stored = localStorage.getItem("nightos:orders");
+      if (stored) return JSON.parse(stored).active || [];
+    } catch { /* ignore */ }
+    return [];
+  });
+  const [history, setHistory] = useState<OrderSummary[]>(() => {
+    try {
+      const stored = localStorage.getItem("nightos:orders");
+      if (stored) return JSON.parse(stored).past || [];
+    } catch { /* ignore */ }
+    return [];
+  });
   const [payingOrder, setPayingOrder] = useState<OrderSummary | null>(null);
   const { cartItemCount: itemCount } = useTabComputed();
 
   useEffect(() => {
-    try {
-      const stored = localStorage.getItem("nightos:orders");
-      if (stored) {
-        const parsed = JSON.parse(stored);
-        if (parsed.active) setActiveOrders(parsed.active);
-        if (parsed.past) setHistory(parsed.past);
-      }
-    } catch {}
-  }, []);
-
-  useEffect(() => {
-    try { localStorage.setItem("nightos:orders", JSON.stringify({ active: activeOrders, past: history })); } catch {}
+    try { localStorage.setItem("nightos:orders", JSON.stringify({ active: activeOrders, past: history })); } catch { /* ignore */ }
   }, [activeOrders, history]);
 
   const handleOrderSent = useCallback((order: OrderSummary) => {
@@ -100,7 +99,7 @@ function CustomerShell({ venueId }: { venueId: string }) {
 
   return (
     <div className="min-h-svh bg-isabelline">
-      {tab === "menu" && <MenuScreen venueId={venueId} onViewCart={() => setTab("cart")} />}
+      {tab === "menu" && <MenuScreen venueId={venueId} />}
       {tab === "cart" && <CartScreen venueId={venueId} onOrderSent={handleOrderSent} />}
       {tab === "orders" && (
         <OrdersScreen
@@ -137,7 +136,6 @@ function CustomerFlow({ onSwitchMode, venueId }: { onSwitchMode: (m: Mode) => vo
 
 function AppShell() {
   const navigate = useNavigate();
-  const location = useLocation();
   const { user } = useAuth();
 
   const { venue: loadedVenue } = useVenue("velvet-lounge");
@@ -172,9 +170,6 @@ function AppShell() {
     }
   }, [mode]);
 
-  const switchToWaiter = () => { setMode("waiter"); setWaiterScreen("auth"); };
-  const switchToKitchen = () => { setMode("kitchen"); };
-  const switchToManager = () => { setMode("manager"); };
   const switchToCustomer = () => {
     setMode("customer");
     setStaffName("");

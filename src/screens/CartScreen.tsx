@@ -177,7 +177,7 @@ export function CartScreen({ venueId, onBack, onContinueShopping, onOrderSent }:
                 </div>
 
                 {/* Sticky Bottom CTA */}
-                <div className="fixed inset-x-0 bottom-0 z-40 flex justify-center px-5 pb-[max(env(safe-area-inset-bottom),18px)] pt-3 bg-gradient-to-t from-isabelline via-isabelline/95 to-transparent">
+                <div className="fixed inset-x-0 bottom-0 z-40 flex justify-center px-5 pb-[calc(80px+env(safe-area-inset-bottom))] pt-3 bg-gradient-to-t from-isabelline via-isabelline/95 to-transparent">
                     <button
                         type="button"
                         onClick={onContinueShopping}
@@ -535,7 +535,7 @@ export function CartScreen({ venueId, onBack, onContinueShopping, onOrderSent }:
             {/* ═══════════════════════════════════════════════════════════
                 STICKY BOTTOM CTA — Send to Kitchen
               ═══════════════════════════════════════════════════════════ */}
-            <div className="fixed inset-x-0 bottom-0 z-40 flex justify-center px-5 pb-[max(env(safe-area-inset-bottom),18px)] pt-3 bg-gradient-to-t from-isabelline via-isabelline/95 to-transparent">
+            <div className="fixed inset-x-0 bottom-0 z-40 flex justify-center px-5 pb-[calc(80px+env(safe-area-inset-bottom))] pt-3 bg-gradient-to-t from-isabelline via-isabelline/95 to-transparent">
                 <button
                     type="button"
                     onClick={handleSendToKitchen}

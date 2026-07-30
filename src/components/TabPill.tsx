@@ -13,7 +13,7 @@ export function TabPill({ onViewCart, onViewTracking }: Props) {
     if (totalItems === 0) return null;
 
     return (
-        <div className="fixed inset-x-0 bottom-0 z-40 flex justify-center px-5 pb-[max(env(safe-area-inset-bottom),18px)] pt-3 bg-gradient-to-t from-isabelline via-isabelline/95 to-transparent pointer-events-none">
+        <div className="fixed inset-x-0 bottom-0 z-40 flex justify-center px-5 pb-[calc(80px+env(safe-area-inset-bottom))] pt-3 bg-gradient-to-t from-isabelline via-isabelline/95 to-transparent pointer-events-none">
             <button
                 type="button"
                 onClick={cartItemCount > 0 ? onViewCart : onViewTracking}

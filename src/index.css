@@ -2,18 +2,18 @@
 
 @theme {
   /* ── Brand Color Variables — dynamically set by BrandContext ── */
-  --brand-primary: #000000;
-  --brand-secondary: #FFFFFF;
-  --brand-accent: #666666;
-  --brand-text-secondary: #888888;
-  --brand-danger: #DC2626;
-  --brand-light-blue: #E5E7EB;
+  --brand-primary: #23140C;
+  --brand-secondary: #F3F3E3;
+  --brand-accent: #D0BA98;
+  --brand-text-secondary: #606F69;
+  --brand-danger: #91040C;
+  --brand-light-blue: #A9CFE0;
 
   /* RGB variants for opacity/alpha usage */
-  --brand-primary-rgb: 0, 0, 0;
-  --brand-secondary-rgb: 255, 255, 255;
-  --brand-accent-rgb: 102, 102, 102;
-  --brand-danger-rgb: 220, 38, 38;
+  --brand-primary-rgb: 35, 20, 12;
+  --brand-secondary-rgb: 243, 243, 227;
+  --brand-accent-rgb: 208, 186, 152;
+  --brand-danger-rgb: 145, 4, 12;
 
   /* ── Tailwind color tokens mapped to brand variables ── */
   --color-brand-primary: var(--brand-primary);

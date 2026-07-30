@@ -8,6 +8,7 @@ import {
 import { CheckCircleIcon } from "@heroicons/react/24/solid";
 import { formatGHS } from "../data/menu";
 import type { OrderSummary } from "./OrderTrackingScreen";
+import { OrderTrackingScreen } from "./OrderTrackingScreen";
 
 /* ────────────────────────── Tracking stages ────────────────────────── */
 
@@ -39,9 +40,8 @@ type Props = {
 
 /* ────────────────────────── Active Order Card ────────────────────────── */
 
-function ActiveOrderCard({ order }: { order: OrderSummary }) {
+function ActiveOrderCard({ order, onClick }: { order: OrderSummary; onClick: () => void }) {
   const [now, setNow] = useState(Date.now());
-  const [summaryOpen, setSummaryOpen] = useState(false);
 
   useEffect(() => {
     const t = setInterval(() => setNow(Date.now()), 1_000);
@@ -62,7 +62,7 @@ function ActiveOrderCard({ order }: { order: OrderSummary }) {
   const etaLabel = msUntilServed <= 0 ? "Now" : msUntilServed < 60_000 ? "< 1 min" : `${Math.ceil(msUntilServed / 60_000)} min`;
 
   return (
-    <div className="overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-isabelline">
+    <button type="button" onClick={onClick} className="w-full text-left overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-isabelline transition-all hover:shadow-md active:scale-[0.99]">
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-3">
         <div>
@@ -78,87 +78,58 @@ function ActiveOrderCard({ order }: { order: OrderSummary }) {
         </span>
       </div>
 
-      {/* Timeline */}
-      <div className="px-4 pb-3">
-        <div className="relative">
-          <div aria-hidden="true" className="absolute left-[9px] top-2 bottom-2 w-px bg-licorice/10" />
-          <div aria-hidden="true" className="absolute left-[9px] top-2 w-px bg-licorice transition-all duration-700 ease-out"
-            style={{ height: `${(STAGES.indexOf(currentStage) / (STAGES.length - 1)) * 100}%` }}
-          />
-          {STAGES.map((stage) => {
-            const isPast = STAGES.indexOf(currentStage) > STAGES.indexOf(stage);
-            const isCurrent = currentStage.id === stage.id;
-            return (
-              <div key={stage.id} className="relative flex items-start gap-3 pb-3 last:pb-0">
-                <div className="relative z-10 flex shrink-0 items-center justify-center pt-0.5">
-                  <div className={`flex h-[18px] w-[18px] items-center justify-center rounded-full transition-all duration-500 ${
-                    isPast ? "bg-licorice" : isCurrent ? "bg-licorice ring-4 ring-khaki/30" : "bg-white ring-1 ring-licorice/15"
-                  }`}>
-                    {isPast ? <CheckIcon className="h-2.5 w-2.5 text-isabelline" strokeWidth={3} /> :
-                     isCurrent && !isServed ? <span className="h-1.5 w-1.5 rounded-full bg-khaki animate-pulse" /> :
-                     isCurrent && isServed ? <CheckCircleIcon className="h-3 w-3 text-khaki" /> :
-                     <span className="h-1 w-1 rounded-full bg-licorice/20" />}
-                  </div>
-                </div>
-                <div className="flex-1 min-w-0 pt-0.5">
-                  <p className={`text-[11px] font-bold tracking-tight ${isPast || isCurrent ? "text-licorice" : "text-feldgrau/50"}`}>
-                    {stage.label}
-                  </p>
-                </div>
-              </div>
-            );
-          })}
-        </div>
+
+
+      {/* Footer link to Order Tracking Screen */}
+      <div className="flex w-full items-center justify-between border-t border-isabelline px-4 py-3 bg-isabelline/10 hover:bg-isabelline/30 transition-colors">
+        <span className="text-[10px] font-semibold tracking-tight text-feldgrau">
+          {order.itemCount} {order.itemCount === 1 ? "item" : "items"}
+        </span>
+        <span className="text-[10px] font-bold tracking-wider uppercase text-khaki flex items-center gap-1">
+          Track details <ArrowRightIcon className="h-3 w-3" strokeWidth={2.5} />
+        </span>
       </div>
-
-      {/* Summary toggle */}
-      <button type="button" onClick={() => setSummaryOpen((v) => !v)}
-        className="flex w-full items-center justify-between border-t border-isabelline px-4 py-2 text-[10px] font-semibold tracking-tight text-feldgrau hover:bg-isabelline/30 transition-colors"
-      >
-        {order.itemCount} {order.itemCount === 1 ? "item" : "items"}
-        <ChevronDownIcon className={`h-3.5 w-3.5 transition-transform ${summaryOpen ? "rotate-180" : ""}`} strokeWidth={2.25} />
-      </button>
-      {summaryOpen && (
-        <div className="border-t border-isabelline px-4 py-2 animate-velvet-fade space-y-1.5">
-          {order.items.map((item, i) => (
-            <div key={i} className="flex items-center justify-between text-[11px]">
-              <span className="text-licorice">×{item.qty} {item.name}</span>
-              <span className="font-mono font-bold tabular-nums text-feldgrau">{formatGHS(item.lineTotal)}</span>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {isServed && (
-        <div className="border-t border-isabelline px-4 py-2.5">
-          <p className="text-[10px] font-medium tracking-tight text-feldgrau">
-            Served at {formatTime(order.sentAt + STAGES[3].activatesAtMs)}
-          </p>
-        </div>
-      )}
-    </div>
+    </button>
   );
 }
 
 /* ────────────────────────── History Card ────────────────────────── */
 
-function HistoryCard({ order }: { order: OrderSummary }) {
+function HistoryCard({ order, onClick }: { order: OrderSummary; onClick: () => void }) {
   return (
-    <div className="flex items-center justify-between rounded-xl bg-white px-4 py-3 shadow-sm ring-1 ring-isabelline">
+    <button type="button" onClick={onClick} className="w-full text-left flex items-center justify-between rounded-xl bg-white px-4 py-3 shadow-sm ring-1 ring-isabelline transition-all hover:shadow-md active:scale-[0.99]">
       <div className="min-w-0 flex-1">
         <p className="text-[12px] font-bold tracking-tight text-licorice">Order #{order.orderNumber}</p>
         <p className="text-[10px] text-feldgrau">{order.itemCount} {order.itemCount === 1 ? "item" : "items"} · {formatDate(order.sentAt)}</p>
       </div>
-      <span className="font-mono text-[13px] font-bold tabular-nums text-khaki">{formatGHS(order.total)}</span>
-    </div>
+      <div className="flex items-center gap-3">
+        <span className="font-mono text-[13px] font-bold tabular-nums text-khaki">{formatGHS(order.total)}</span>
+        <ArrowRightIcon className="h-4 w-4 text-feldgrau/50" />
+      </div>
+    </button>
   );
 }
 
 /* ────────────────────────── Main Screen ────────────────────────── */
 
 export function OrdersScreen({ activeOrders, history, onPayBill, onReorder }: Props) {
+  const [selectedOrder, setSelectedOrder] = useState<OrderSummary | null>(null);
+
   const hasActive = activeOrders.length > 0;
   const hasHistory = history.length > 0;
+
+  // Render the detailed Order Tracking Screen if an order is selected
+  if (selectedOrder) {
+    return (
+      <div className="absolute inset-0 z-50 bg-isabelline">
+        <OrderTrackingScreen 
+          order={selectedOrder} 
+          onBackToMenu={() => setSelectedOrder(null)} 
+          onPayBill={() => onPayBill(selectedOrder)} 
+        />
+      </div>
+    );
+  }
 
   if (!hasActive && !hasHistory) {
     return (
@@ -191,7 +162,7 @@ export function OrdersScreen({ activeOrders, history, onPayBill, onReorder }: Pr
           <div className="flex flex-col gap-3">
             {activeOrders.map((o) => (
               <div key={o.orderNumber} className="relative">
-                <ActiveOrderCard order={o} />
+                <ActiveOrderCard order={o} onClick={() => setSelectedOrder(o)} />
                 {/* Check if served, show pay button */}
                 {(() => {
                   const elapsed = Date.now() - o.sentAt;
@@ -222,7 +193,7 @@ export function OrdersScreen({ activeOrders, history, onPayBill, onReorder }: Pr
           </h2>
           <div className="flex flex-col gap-2">
             {history.map((o) => (
-              <HistoryCard key={o.orderNumber} order={o} />
+              <HistoryCard key={o.orderNumber} order={o} onClick={() => setSelectedOrder(o)} />
             ))}
           </div>
         </div>
