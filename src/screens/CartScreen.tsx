@@ -37,6 +37,20 @@ export function CartScreen({ venueId, onBack, onContinueShopping, onOrderSent }:
     const [orderNotes, setOrderNotes] = useState("");
     const [sending, setSending] = useState(false);
 
+    const session = useMemo(() => {
+        try {
+            const sessionStr = localStorage.getItem("nightos:session");
+            return sessionStr ? JSON.parse(sessionStr) : null;
+        } catch {
+            return null;
+        }
+    }, []);
+
+    const tableLabel = session?.tableLabel || "Table 04";
+    const guestName = session?.guestName || "User";
+    const customerSessionId = session?.sessionId || null;
+    const activeBillId = session?.billId || "00000000-0000-0000-0000-000000000000";
+
     // Bill math
     const { serviceCharge, vat, total } = useMemo(() => {
         const service = Math.round(subtotal * 0.1 * 100) / 100; // 10%
@@ -59,10 +73,12 @@ export function CartScreen({ venueId, onBack, onContinueShopping, onOrderSent }:
                 : 'bar';
 
             const { data: submission, error: subErr } = await db.createOrderSubmission(
-                '00000000-0000-0000-0000-000000000000', // billId — updated once bill context exists
+                activeBillId,
                 venueId,
                 station,
                 orderNotes || undefined,
+                customerSessionId,
+                guestName
             );
 
             if (!subErr && submission) {
@@ -81,6 +97,8 @@ export function CartScreen({ venueId, onBack, onContinueShopping, onOrderSent }:
                         line.modifiers.reduce((s, m) => s + (m.option.priceDelta ?? 0) * line.qty, 0),
                         unitPrice * line.qty,
                         line.notes,
+                        customerSessionId,
+                        guestName
                     );
                 }
             }
@@ -153,7 +171,7 @@ export function CartScreen({ venueId, onBack, onContinueShopping, onOrderSent }:
                                     active:scale-95
                                 "
                             >
-                                Table 4
+                                {tableLabel}
                             </button>
                         </div>
                     </div>
@@ -256,7 +274,7 @@ export function CartScreen({ venueId, onBack, onContinueShopping, onOrderSent }:
                                 active:scale-95
                             "
                         >
-                            Table 4
+                            {tableLabel}
                         </button>
                     </div>
                 </div>
@@ -485,7 +503,7 @@ export function CartScreen({ venueId, onBack, onContinueShopping, onOrderSent }:
                             Bill Summary
                         </span>
                         <span className="text-[10px] font-bold uppercase tracking-wider text-isabelline/50">
-                            Table 04
+                            {tableLabel}
                         </span>
                     </div>
 

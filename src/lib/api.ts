@@ -197,18 +197,31 @@ export type DbCustomerProfile = {
   updated_at: string;
 };
 
+export type DbCustomerSession = {
+  id: string;
+  venue_id: string;
+  table_id: string;
+  bill_id: string | null;
+  guest_name: string;
+  party_size: number;
+  session_token: string;
+  status: 'active' | 'closed';
+  created_at: string;
+  last_active_at: string;
+};
+
 export const db = {
   /* ── Venues ── */
   venueBySlug: (slug: string) =>
     cached<DbVenue>(
-      () => supabase.from('venues').select('*').eq('slug', slug).eq('is_active', true).single(),
+      async () => await supabase.from('venues').select('*').eq('slug', slug).eq('is_active', true).single(),
       `venue:slug:${slug}`,
       TTL.VENUE,
     ),
 
   venueById: (id: string) =>
     cached<DbVenue>(
-      () => supabase.from('venues').select('*').eq('id', id).single(),
+      async () => await supabase.from('venues').select('*').eq('id', id).single(),
       `venue:id:${id}`,
       TTL.VENUE,
     ),
@@ -216,8 +229,8 @@ export const db = {
   /* ── Tables ── */
   tablesByVenue: (venueId: string) =>
     cached<DbTable[]>(
-      () =>
-        supabase
+      async () =>
+        await supabase
           .from('tables')
           .select('*')
           .eq('venue_id', venueId)
@@ -227,11 +240,13 @@ export const db = {
       TTL.MENU,
     ),
 
+
+
   /* ── Menu ── */
   menuCategories: (venueId: string) =>
     cached<DbMenuCategory[]>(
-      () =>
-        supabase
+      async () =>
+        await supabase
           .from('menu_categories')
           .select('*')
           .eq('venue_id', venueId)
@@ -243,8 +258,8 @@ export const db = {
 
   products: (venueId: string) =>
     cached<DbProduct[]>(
-      () =>
-        supabase
+      async () =>
+        await supabase
           .from('products')
           .select('*')
           .eq('venue_id', venueId)
@@ -257,8 +272,8 @@ export const db = {
 
   modifierGroups: (venueId: string) =>
     cached<DbModifierGroup[]>(
-      () =>
-        supabase
+      async () =>
+        await supabase
           .from('modifier_groups')
           .select('*')
           .eq('venue_id', venueId)
@@ -270,8 +285,8 @@ export const db = {
   modifierOptions: (groupIds: string[]) => {
     if (groupIds.length === 0) return Promise.resolve({ data: [] as DbModifierOption[], error: null });
     return cached<DbModifierOption[]>(
-      () =>
-        supabase.from('modifier_options').select('*').in('group_id', groupIds).order('sort_order'),
+      async () =>
+        await supabase.from('modifier_options').select('*').in('group_id', groupIds).order('sort_order'),
       `mod_options:${groupIds.sort().join(',')}`,
       TTL.MENU,
     );
@@ -327,11 +342,20 @@ export const db = {
     venueId: string,
     station: 'kitchen' | 'bar' | 'both',
     notes?: string,
+    customerSessionId?: string | null,
+    guestName?: string | null,
   ) => {
     cacheInvalidate('orders:');
     return supabase
       .from('order_submissions')
-      .insert({ bill_id: billId, venue_id: venueId, station, notes: notes || null })
+      .insert({
+        bill_id: billId,
+        venue_id: venueId,
+        station,
+        notes: notes || null,
+        customer_session_id: customerSessionId || null,
+        guest_name: guestName || null
+      })
       .select()
       .single();
   },
@@ -347,6 +371,8 @@ export const db = {
     modifierPriceAdjustment: number,
     lineTotal: number,
     notes?: string,
+    customerSessionId?: string | null,
+    guestName?: string | null,
   ) => {
     cacheInvalidate('order_items:');
     return supabase
@@ -362,6 +388,8 @@ export const db = {
         modifier_price_adjustment: modifierPriceAdjustment,
         line_total: lineTotal,
         notes: notes || null,
+        customer_session_id: customerSessionId || null,
+        guest_name: guestName || null
       })
       .select()
       .single();
@@ -432,7 +460,7 @@ export const db = {
 
   staffByVenue: (venueId: string) =>
     cached<DbStaff[]>(
-      () => supabase.from('staff').select('*').eq('venue_id', venueId).order('name'),
+      async () => await supabase.from('staff').select('*').eq('venue_id', venueId).order('name'),
       `staff:${venueId}`,
       TTL.STAFF,
     ),
@@ -480,8 +508,8 @@ export const db = {
 
   customersByVenue: (venueId: string) =>
     cached<DbCustomerProfile[]>(
-      () =>
-        supabase
+      async () =>
+        await supabase
           .from('customer_profiles')
           .select('*')
           .eq('venue_id', venueId)
@@ -500,6 +528,30 @@ export const db = {
     supabase.functions.invoke('assign-waiter', {
       body: { bill_id: billId },
     }),
+
+  getTableById: (tableId: string) =>
+    supabase.from('tables').select('*, venues(*)').eq('id', tableId).single(),
+
+  getOrCreateTableSession: (
+    venueSlug: string,
+    tableId: string,
+    token: string,
+    guestName: string,
+    partySize: number
+  ) =>
+    supabase.rpc('get_or_create_table_session', {
+      p_venue_slug: venueSlug,
+      p_table_id: tableId,
+      p_token: token,
+      p_guest_name: guestName,
+      p_party_size: partySize,
+    }),
+
+  closeTableSession: (sessionId: string) =>
+    supabase
+      .from('customer_sessions')
+      .update({ status: 'closed' })
+      .eq('id', sessionId),
 };
 
 export type Db = typeof db;

@@ -34,7 +34,7 @@ async function fetchProducts(venueId: string): Promise<MenuItem[]> {
         price: p.price,
         category: mapCategory(p.category_id),
         image: p.images?.[0] || '',
-        tags: p.tags?.filter((t): t is MenuItem['tags'][number] =>
+        tags: p.tags?.filter((t): t is NonNullable<MenuItem['tags']>[number] =>
             ['Popular', 'New', "Chef's Pick", 'Vegetarian'].includes(t as any)
         ) || undefined,
         abv: p.abv || undefined,
@@ -53,6 +53,17 @@ export function MenuScreen({ venueId, onBack }: Props) {
     const { addQuick, toggleFavorite } = useTabStore();
     const { isFavorite } = useTabComputed();
     const [supabaseItems, setSupabaseItems] = useState<MenuItem[] | null>(null);
+
+    const session = useMemo(() => {
+        try {
+            const sessionStr = localStorage.getItem("nightos:session");
+            return sessionStr ? JSON.parse(sessionStr) : null;
+        } catch {
+            return null;
+        }
+    }, []);
+
+    const tableLabel = session?.tableLabel || "Table 04";
 
     useEffect(() => {
         if (!venueId) return;
@@ -129,7 +140,7 @@ export function MenuScreen({ venueId, onBack }: Props) {
                                 active:scale-95
                             "
                         >
-                            Table 4
+                            {tableLabel}
                         </button>
                     </div>
                 </div>
@@ -276,7 +287,7 @@ export function MenuScreen({ venueId, onBack }: Props) {
                                             type="button"
                                             onClick={(e) => {
                                                 e.stopPropagation();
-                                                addQuick(item.id);
+                                                addQuick(item);
                                             }}
                                             aria-label={`Add ${item.name} to cart`}
                                             className="relative z-20 flex h-8 w-8 items-center justify-end text-licorice transition-transform hover:opacity-70 active:scale-90"

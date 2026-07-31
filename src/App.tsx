@@ -1,12 +1,20 @@
 import { useState, useEffect, useCallback } from "react";
-import { useNavigate, useLocation } from "react-router-dom";
+import {
+  Routes,
+  Route,
+  Navigate,
+  useLocation,
+  useNavigate,
+} from "react-router-dom";
 import { AuthProvider, useAuth } from "./context/AuthContext";
 import { NetworkProvider } from "./context/NetworkContext";
+import { db } from "./lib/api";
 import { ProtectedRoute, VenueRequired } from "./screens/auth/ProtectedRoute";
 import { AuthScreen } from "./screens/auth/AuthScreen";
 import { VerifyOtpScreen } from "./screens/auth/VerifyOtpScreen";
 import { VenueSetupScreen } from "./screens/auth/VenueSetupScreen";
 import { WelcomeScreen } from "./screens/WelcomeScreen";
+import { HomeScreen } from "./screens/HomeScreen";
 import { MenuScreen } from "./screens/MenuScreen";
 import { CartScreen } from "./screens/CartScreen";
 import { CheckoutScreen } from "./screens/CheckoutScreen";
@@ -24,10 +32,7 @@ import { ShiftPerformanceScreen } from "./screens/waiter/ShiftPerformanceScreen"
 
 import { KitchenDisplayScreen } from "./screens/kitchen/KitchenDisplayScreen";
 
-import {
-  ManagerShell,
-  type ManagerPage,
-} from "./screens/manager/ManagerShell";
+import { ManagerShell, type ManagerPage } from "./screens/manager/ManagerShell";
 import { LiveOpsScreen } from "./screens/manager/LiveOpsScreen";
 import { FloorplanScreen } from "./screens/manager/FloorplanScreen";
 import { MenuManagerScreen } from "./screens/manager/MenuManagerScreen";
@@ -46,42 +51,53 @@ type WaiterScreen =
   | "invoice"
   | "shift";
 
-type Mode = "customer" | "waiter" | "kitchen" | "manager";
-
 /* ──────────────────── Customer Shell (bottom nav) ──────────────────── */
 
-function CustomerShell({ venueId }: { venueId: string }) {
-  const [tab, setTab] = useState<NavTab>("menu");
-  const [activeOrders, setActiveOrders] = useState<OrderSummary[]>(() => {
-    try {
-      const stored = localStorage.getItem("nightos:orders");
-      if (stored) return JSON.parse(stored).active || [];
-    } catch { /* ignore */ }
-    return [];
-  });
-  const [history, setHistory] = useState<OrderSummary[]>(() => {
-    try {
-      const stored = localStorage.getItem("nightos:orders");
-      if (stored) return JSON.parse(stored).past || [];
-    } catch { /* ignore */ }
-    return [];
-  });
+function CustomerShell({ venueId, tab }: { venueId: string; tab: NavTab }) {
+  const navigate = useNavigate();
+  const [activeOrders, setActiveOrders] = useState<OrderSummary[]>([]);
+  const [history, setHistory] = useState<OrderSummary[]>([]);
   const [payingOrder, setPayingOrder] = useState<OrderSummary | null>(null);
   const { cartItemCount: itemCount } = useTabComputed();
 
   useEffect(() => {
-    try { localStorage.setItem("nightos:orders", JSON.stringify({ active: activeOrders, past: history })); } catch { /* ignore */ }
+    try {
+      const stored = localStorage.getItem("nightos:orders");
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (parsed.active) setActiveOrders(parsed.active);
+        if (parsed.past) setHistory(parsed.past);
+      }
+    } catch (error) {
+      // ignore
+    }
+  }, []);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(
+        "nightos:orders",
+        JSON.stringify({ active: activeOrders, past: history }),
+      );
+    } catch (error) {
+      // ignore
+    }
   }, [activeOrders, history]);
 
-  const handleOrderSent = useCallback((order: OrderSummary) => {
-    setActiveOrders((prev) => [...prev, order]);
-    setTab("orders");
-  }, []);
+  const handleOrderSent = useCallback(
+    (order: OrderSummary) => {
+      setActiveOrders((prev) => [...prev, order]);
+      navigate("/orders");
+    },
+    [navigate],
+  );
 
   const handlePaid = useCallback(() => {
     if (!payingOrder) return;
     setHistory((prev) => [payingOrder, ...prev]);
-    setActiveOrders((prev) => prev.filter((o) => o.orderNumber !== payingOrder.orderNumber));
+    setActiveOrders((prev) =>
+      prev.filter((o) => o.orderNumber !== payingOrder.orderNumber),
+    );
     setPayingOrder(null);
   }, [payingOrder]);
 
@@ -99,8 +115,10 @@ function CustomerShell({ venueId }: { venueId: string }) {
 
   return (
     <div className="min-h-svh bg-isabelline">
-      {tab === "menu" && <MenuScreen venueId={venueId} />}
-      {tab === "cart" && <CartScreen venueId={venueId} onOrderSent={handleOrderSent} />}
+      {tab === "menu" && <MenuScreen venueId={venueId} onBack={() => navigate('/home')} />}
+      {tab === "cart" && (
+        <CartScreen venueId={venueId} onOrderSent={handleOrderSent} />
+      )}
       {tab === "orders" && (
         <OrdersScreen
           activeOrders={activeOrders}
@@ -108,158 +126,297 @@ function CustomerShell({ venueId }: { venueId: string }) {
           onPayBill={setPayingOrder}
         />
       )}
-      <CustomerBottomNav activeTab={tab} onTabChange={setTab} cartCount={itemCount} />
+      <CustomerBottomNav
+        activeTab={tab}
+        onTabChange={(newTab) => navigate(`/${newTab}`)}
+        cartCount={itemCount}
+      />
     </div>
   );
 }
 
-/* ──────────────────── Customer Flow ──────────────────── */
+/* ──────────────────── Client Wrappers & Redirects ──────────────────── */
 
-function CustomerFlow({ onSwitchMode, venueId }: { onSwitchMode: (m: Mode) => void; venueId: string }) {
-  const [inShell, setInShell] = useState(false);
+function CustomerRedirect() {
+  const navigate = useNavigate();
 
-  if (!inShell) {
-    return (
-      <WelcomeScreen
-        onEnter={() => setInShell(true)}
-        onStaffPortal={() => onSwitchMode("waiter")}
-        onKitchenDisplay={() => onSwitchMode("kitchen")}
-        onManagerPortal={() => onSwitchMode("manager")}
-      />
-    );
-  }
+  useEffect(() => {
+    const sessionStr = localStorage.getItem("nightos:session");
+    if (sessionStr) {
+      try {
+        const session = JSON.parse(sessionStr);
+        if (session?.sessionId) {
+          const ordersStr = localStorage.getItem("nightos:orders");
+          let hasOrders = false;
+          if (ordersStr) {
+            const parsedOrders = JSON.parse(ordersStr);
+            hasOrders =
+              (parsedOrders.active && parsedOrders.active.length > 0) ||
+              (parsedOrders.past && parsedOrders.past.length > 0);
+          }
+          const twentyMins = 20 * 60 * 1000;
 
-  return <CustomerShell venueId={venueId} />;
+          if (
+            !hasOrders &&
+            session.createdAt &&
+            Date.now() - session.createdAt > twentyMins
+          ) {
+            db.closeTableSession(session.sessionId).then(({ error }) => {
+              if (error) console.error(error);
+            });
+            localStorage.removeItem("nightos:session");
+            navigate(`/table/${session.tableId}`, { replace: true });
+            return;
+          }
+          navigate("/menu", { replace: true });
+          return;
+        }
+      } catch (error) {
+        // ignore
+      }
+    }
+    navigate("/table/44444444-4444-4444-4444-444444444444?token=table4token", {
+      replace: true,
+    });
+  }, [navigate]);
+
+  return <div className="min-h-svh bg-isabelline" />;
 }
 
-/* ──────────────────── App Shell ──────────────────── */
-
-function AppShell() {
+function WelcomeScreenWrapper() {
   const navigate = useNavigate();
-  const { user } = useAuth();
+  return (
+    <WelcomeScreen
+      onStaffPortal={() => navigate("/waiter")}
+      onKitchenDisplay={() => navigate("/kitchen")}
+      onManagerPortal={() => navigate("/manager")}
+    />
+  );
+}
 
-  const { venue: loadedVenue } = useVenue("velvet-lounge");
-  const venueId = loadedVenue.id;
+function HomeScreenWrapper() {
+  const navigate = useNavigate();
+  return (
+    <HomeScreen
+      onEnter={() => navigate("/menu")}
+      onStaffPortal={() => navigate("/waiter")}
+      onKitchenDisplay={() => navigate("/kitchen")}
+      onManagerPortal={() => navigate("/manager")}
+    />
+  );
+}
 
-  const getModeFromPath = (): Mode => {
-    const path = window.location.pathname.replace(/^\/+/, "").split("/")[0];
-    if (path === "waiter") return "waiter";
-    if (path === "kitchen") return "kitchen";
-    if (path === "manager") return "manager";
-    return "customer";
-  };
+function CustomerRouteWrapper({ tab }: { tab: NavTab }) {
+  const navigate = useNavigate();
+  const [session, setSession] = useState<{ venueId: string; tableId: string; sessionId: string; createdAt?: number } | null>(null);
 
-  const [mode, setMode] = useState<Mode>(getModeFromPath);
+  useEffect(() => {
+    let interval: ReturnType<typeof setInterval>;
 
+    const validateSession = () => {
+      const sessionStr = localStorage.getItem("nightos:session");
+      if (!sessionStr) {
+        navigate("/", { replace: true });
+        return false;
+      }
+      try {
+        const parsed = JSON.parse(sessionStr);
+        if (!parsed?.sessionId) {
+          navigate("/", { replace: true });
+          return false;
+        }
+
+        const ordersStr = localStorage.getItem("nightos:orders");
+        let hasOrders = false;
+        if (ordersStr) {
+          const parsedOrders = JSON.parse(ordersStr);
+          hasOrders =
+            (parsedOrders.active && parsedOrders.active.length > 0) ||
+            (parsedOrders.past && parsedOrders.past.length > 0);
+        }
+        const twentyMins = 20 * 60 * 1000;
+
+        if (
+          !hasOrders &&
+          parsed.createdAt &&
+          Date.now() - parsed.createdAt > twentyMins
+        ) {
+          db.closeTableSession(parsed.sessionId).then(({ error }) => {
+            if (error) console.error(error);
+          });
+          localStorage.removeItem("nightos:session");
+          navigate(`/table/${parsed.tableId}`, { replace: true });
+          return false;
+        }
+
+        setSession(parsed);
+        return true;
+      } catch (error) {
+        navigate("/", { replace: true });
+        return false;
+      }
+    };
+
+    if (validateSession()) {
+      interval = setInterval(validateSession, 30000);
+    }
+
+    return () => clearInterval(interval);
+  }, [navigate]);
+
+  if (!session) {
+    return <div className="min-h-svh bg-isabelline" />;
+  }
+
+  return <CustomerShell venueId={session.venueId} tab={tab} />;
+}
+
+/* ──────────────────── Waiter Sub-Flow Wrapper ──────────────────── */
+
+function WaiterWrapper() {
+  const navigate = useNavigate();
   const [waiterScreen, setWaiterScreen] = useState<WaiterScreen>("auth");
   const [staffName, setStaffName] = useState<string>("");
   const [staffVenueId, setStaffVenueId] = useState<string>("");
   const [selectedTable, setSelectedTable] = useState<Table | null>(null);
 
-  const [managerPage, setManagerPage] = useState<ManagerPage>("ops");
-
-  useEffect(() => {
-    const paths: Record<Mode, string> = {
-      customer: "/",
-      waiter: "/waiter",
-      kitchen: "/kitchen",
-      manager: "/manager",
-    };
-    if (window.location.pathname !== paths[mode]) {
-      window.history.replaceState(null, "", paths[mode]);
-    }
-  }, [mode]);
-
   const switchToCustomer = () => {
-    setMode("customer");
-    setStaffName("");
-    setStaffVenueId("");
-    setSelectedTable(null);
+    navigate("/");
   };
 
   return (
     <>
-      {mode === "customer" && (
-        <CustomerFlow onSwitchMode={setMode} venueId={venueId} />
+      {waiterScreen === "auth" && (
+        <StaffAuthScreen
+          onSignIn={(name, vId) => {
+            setStaffName(name);
+            setStaffVenueId(vId);
+            setWaiterScreen("dashboard");
+          }}
+        />
       )}
-
-      {mode === "waiter" && (
-        <>
-          {waiterScreen === "auth" && (
-            <StaffAuthScreen
-              onSignIn={(name, vId) => {
-                setStaffName(name);
-                setStaffVenueId(vId);
-                setWaiterScreen("dashboard");
-              }}
-            />
-          )}
-          {waiterScreen === "dashboard" && (
-            <TablesDashboard
-              venueId={staffVenueId}
-              staffName={staffName}
-              onSelectTable={(table) => {
-                setSelectedTable(table);
-                setWaiterScreen("order");
-              }}
-              onSignOut={switchToCustomer}
-              onViewShift={() => setWaiterScreen("shift")}
-            />
-          )}
-          {waiterScreen === "order" && selectedTable && (
-            <OrderManagementScreen
-              table={selectedTable}
-              onBack={() => setWaiterScreen("dashboard")}
-              onGoToTableOps={() => setWaiterScreen("ops")}
-              onGoToInvoice={() => setWaiterScreen("invoice")}
-            />
-          )}
-          {waiterScreen === "ops" && selectedTable && (
-            <TableOperationsScreen
-              table={selectedTable}
-              onBack={() => setWaiterScreen("order")}
-            />
-          )}
-          {waiterScreen === "invoice" && selectedTable && (
-            <InvoiceSettlementScreen
-              table={selectedTable}
-              onBack={() => setWaiterScreen("order")}
-              onSettled={() => setWaiterScreen("dashboard")}
-            />
-          )}
-          {waiterScreen === "shift" && (
-            <ShiftPerformanceScreen
-              staffName={staffName}
-              onBack={() => setWaiterScreen("dashboard")}
-            />
-          )}
-        </>
+      {waiterScreen === "dashboard" && (
+        <TablesDashboard
+          venueId={staffVenueId}
+          staffName={staffName}
+          onSelectTable={(table) => {
+            setSelectedTable(table);
+            setWaiterScreen("order");
+          }}
+          onSignOut={switchToCustomer}
+          onViewShift={() => setWaiterScreen("shift")}
+        />
       )}
-
-      {mode === "kitchen" && (
-        <KitchenDisplayScreen venueId={venueId} onExit={switchToCustomer} />
+      {waiterScreen === "order" && selectedTable && (
+        <OrderManagementScreen
+          table={selectedTable}
+          onBack={() => setWaiterScreen("dashboard")}
+          onGoToTableOps={() => setWaiterScreen("ops")}
+          onGoToInvoice={() => setWaiterScreen("invoice")}
+        />
       )}
-
-      {mode === "manager" && (
-        <ProtectedRoute>
-          <VenueRequired>
-            <ManagerShell
-              managerName={user?.email?.split("@")[0] || "Manager"}
-              activePage={managerPage}
-              onPageChange={setManagerPage}
-              onSignOut={() => navigate("/login")}
-            >
-              {managerPage === "ops" && <LiveOpsScreen />}
-              {managerPage === "floorplan" && <FloorplanScreen />}
-              {managerPage === "menu" && <MenuManagerScreen />}
-              {managerPage === "staff" && <StaffManagerScreen />}
-              {managerPage === "finance" && <FinancialReportsScreen />}
-              {managerPage === "crm" && <CrmScreen />}
-            </ManagerShell>
-          </VenueRequired>
-        </ProtectedRoute>
+      {waiterScreen === "ops" && selectedTable && (
+        <TableOperationsScreen
+          table={selectedTable}
+          onBack={() => setWaiterScreen("order")}
+        />
+      )}
+      {waiterScreen === "invoice" && selectedTable && (
+        <InvoiceSettlementScreen
+          table={selectedTable}
+          onBack={() => setWaiterScreen("order")}
+          onSettled={() => setWaiterScreen("dashboard")}
+        />
+      )}
+      {waiterScreen === "shift" && (
+        <ShiftPerformanceScreen
+          staffName={staffName}
+          onBack={() => setWaiterScreen("dashboard")}
+        />
       )}
     </>
+  );
+}
+
+/* ──────────────────── Kitchen Wrapper ──────────────────── */
+
+function KitchenWrapper() {
+  const navigate = useNavigate();
+  const { venue: loadedVenue } = useVenue("velvet-lounge");
+  return (
+    <KitchenDisplayScreen
+      venueId={loadedVenue.id}
+      onExit={() => navigate("/")}
+    />
+  );
+}
+
+/* ──────────────────── Manager Wrapper ──────────────────── */
+
+function ManagerWrapper() {
+  const navigate = useNavigate();
+  const { user } = useAuth();
+  const [managerPage, setManagerPage] = useState<ManagerPage>("ops");
+
+  return (
+    <ProtectedRoute>
+      <VenueRequired>
+        <ManagerShell
+          managerName={user?.email?.split("@")[0] || "Manager"}
+          activePage={managerPage}
+          onPageChange={setManagerPage}
+          onSignOut={() => navigate("/login")}
+        >
+          {managerPage === "ops" && <LiveOpsScreen />}
+          {managerPage === "floorplan" && <FloorplanScreen />}
+          {managerPage === "menu" && <MenuManagerScreen />}
+          {managerPage === "staff" && <StaffManagerScreen />}
+          {managerPage === "finance" && <FinancialReportsScreen />}
+          {managerPage === "crm" && <CrmScreen />}
+        </ManagerShell>
+      </VenueRequired>
+    </ProtectedRoute>
+  );
+}
+
+/* ──────────────────── App Routes & Core ──────────────────── */
+
+function AppRoutes() {
+  const location = useLocation();
+
+  const isAuthRoute =
+    location.pathname === "/login" || location.pathname === "/signup";
+  const isVerifyRoute = location.pathname === "/verify-otp";
+  const isSetupRoute = location.pathname === "/setup";
+
+  if (isAuthRoute) {
+    return (
+      <AuthScreen
+        initialMode={location.pathname === "/signup" ? "signup" : "login"}
+      />
+    );
+  }
+  if (isVerifyRoute) return <VerifyOtpScreen />;
+  if (isSetupRoute) return <VenueSetupScreen />;
+
+  return (
+    <Routes>
+      {/* Customer Routes */}
+      <Route path="/" element={<CustomerRedirect />} />
+      <Route path="/table/:tableId" element={<WelcomeScreenWrapper />} />
+      <Route path="/home" element={<HomeScreenWrapper />} />
+      <Route path="/menu" element={<CustomerRouteWrapper tab="menu" />} />
+      <Route path="/cart" element={<CustomerRouteWrapper tab="cart" />} />
+      <Route path="/orders" element={<CustomerRouteWrapper tab="orders" />} />
+
+      {/* Staff Routes */}
+      <Route path="/waiter" element={<WaiterWrapper />} />
+      <Route path="/kitchen" element={<KitchenWrapper />} />
+      <Route path="/manager" element={<ManagerWrapper />} />
+
+      {/* Fallback */}
+      <Route path="*" element={<Navigate to="/" replace />} />
+    </Routes>
   );
 }
 
@@ -271,22 +428,6 @@ function App() {
       </AuthProvider>
     </NetworkProvider>
   );
-}
-
-function AppRoutes() {
-  const location = useLocation();
-
-  const isAuthRoute = location.pathname === "/login" || location.pathname === "/signup";
-  const isVerifyRoute = location.pathname === "/verify-otp";
-  const isSetupRoute = location.pathname === "/setup";
-
-  if (isAuthRoute) {
-    return <AuthScreen initialMode={location.pathname === "/signup" ? "signup" : "login"} />;
-  }
-  if (isVerifyRoute) return <VerifyOtpScreen />;
-  if (isSetupRoute) return <VenueSetupScreen />;
-
-  return <AppShell />;
 }
 
 export default App;

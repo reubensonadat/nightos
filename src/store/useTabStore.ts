@@ -21,8 +21,8 @@ type TabState = {
     activeOrder: OrderSummary | null;
     
     // Actions
-    addQuick: (itemId: string) => void;
-    addCustom: (itemId: string, modifiers: SelectedModifier[], notes: string, qty: number) => void;
+    addQuick: (item: MenuItem) => void;
+    addCustom: (item: MenuItem, modifiers: SelectedModifier[], notes: string, qty: number) => void;
     remove: (lineId: string) => void;
     setQty: (lineId: string, qty: number) => void;
     clearCart: () => void;
@@ -51,10 +51,9 @@ export const useTabStore = create<TabState>((set) => ({
     favorites: new Set(),
     activeOrder: null,
 
-    addQuick: (itemId: string) => {
-        const item = MENU.find((m) => m.id === itemId);
+    addQuick: (item: MenuItem) => {
         if (!item) return;
-        const lineId = makeLineId(itemId, [], "");
+        const lineId = makeLineId(item.id, [], "");
         set((state) => {
             const existing = state.lines.find((l) => l.lineId === lineId);
             if (existing) {
@@ -68,10 +67,9 @@ export const useTabStore = create<TabState>((set) => ({
         });
     },
 
-    addCustom: (itemId: string, modifiers: SelectedModifier[], notes: string, qty: number) => {
-        const item = MENU.find((m) => m.id === itemId);
+    addCustom: (item: MenuItem, modifiers: SelectedModifier[], notes: string, qty: number) => {
         if (!item) return;
-        const lineId = makeLineId(itemId, modifiers, notes);
+        const lineId = makeLineId(item.id, modifiers, notes);
         set((state) => {
             const existing = state.lines.find((l) => l.lineId === lineId);
             if (existing) {
