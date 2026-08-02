@@ -14,14 +14,14 @@ import type { Table } from "./TablesDashboard";
 /* ────────────────────────── Mock tables for transfer/merge ────────────────────────── */
 
 const ALL_TABLES: Table[] = [
-    { id: "t01", number: 1, status: "available" },
-    { id: "t02", number: 2, status: "occupied", guests: 2, tabTotal: 245 },
-    { id: "t03", number: 3, status: "reserved", reservationTime: "7:30 PM" },
-    { id: "t04", number: 4, status: "occupied", guests: 1, tabTotal: 95 },
-    { id: "t05", number: 5, status: "available" },
-    { id: "t06", number: 6, status: "occupied", guests: 6, tabTotal: 480 },
-    { id: "t07", number: 7, status: "available" },
-    { id: "t08", number: 8, status: "occupied", guests: 3, tabTotal: 180 },
+    { id: "t01", number: 1, label: "1", status: "available" },
+    { id: "t02", number: 2, label: "2", status: "occupied", guests: 2, tabTotal: 245 },
+    { id: "t03", number: 3, label: "3", status: "reserved", reservationTime: "7:30 PM" },
+    { id: "t04", number: 4, label: "4", status: "occupied", guests: 1, tabTotal: 95 },
+    { id: "t05", number: 5, label: "5", status: "available" },
+    { id: "t06", number: 6, label: "6", status: "occupied", guests: 6, tabTotal: 480 },
+    { id: "t07", number: 7, label: "7", status: "available" },
+    { id: "t08", number: 8, label: "8", status: "occupied", guests: 3, tabTotal: 180 },
 ];
 
 type Op = "transfer" | "merge" | "split";

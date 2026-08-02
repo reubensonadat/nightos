@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { useNavigate, useLocation } from "react-router-dom";
+import { Routes, Route, useNavigate, useLocation } from "react-router-dom";
 import { Toaster } from "react-hot-toast";
 import { CartProvider, useCart } from "./context/CartContext";
 import { AuthProvider, useAuth } from "./context/AuthContext";
@@ -8,11 +8,11 @@ import { ProtectedRoute, VenueRequired } from "./screens/auth/ProtectedRoute";
 import { AuthScreen } from "./screens/auth/AuthScreen";
 import { VerifyOtpScreen } from "./screens/auth/VerifyOtpScreen";
 import { VenueSetupScreen } from "./screens/auth/VenueSetupScreen";
+import { HomeScreen } from "./screens/HomeScreen";
 import { WelcomeScreen } from "./screens/WelcomeScreen";
 import { MenuScreen } from "./screens/MenuScreen";
 import { CartScreen } from "./screens/CartScreen";
 import { CheckoutScreen } from "./screens/CheckoutScreen";
-import { ReservationsScreen } from "./screens/ReservationsScreen";
 import { type OrderSummary } from "./screens/OrderTrackingScreen";
 import { OrdersScreen } from "./screens/OrdersScreen";
 import { CustomerBottomNav } from "./components/CustomerBottomNav";
@@ -38,7 +38,7 @@ import { FinancialReportsScreen } from "./screens/manager/FinancialReportsScreen
 import { CrmScreen } from "./screens/manager/CrmScreen";
 import { useVenue } from "./hooks/useVenue";
 
-type NavTab = "menu" | "cart" | "orders";
+type NavTab = "menu" | "tab" | "orders";
 
 type WaiterScreen =
   | "auth"
@@ -53,7 +53,10 @@ type Mode = "customer" | "waiter" | "kitchen" | "manager";
 /* ──────────────────── Customer Shell (bottom nav) ──────────────────── */
 
 function CustomerShell({ venueId }: { venueId: string }) {
-  const [tab, setTab] = useState<NavTab>("menu");
+  const navigate = useNavigate();
+  const location = useLocation();
+  const tab = (location.pathname.replace(/^\/+/, "") as NavTab) || "menu";
+
   const [activeOrders, setActiveOrders] = useState<OrderSummary[]>([]);
   const [history, setHistory] = useState<OrderSummary[]>([]);
   const [payingOrder, setPayingOrder] = useState<OrderSummary | null>(null);
@@ -76,8 +79,8 @@ function CustomerShell({ venueId }: { venueId: string }) {
 
   const handleOrderSent = useCallback((order: OrderSummary) => {
     setActiveOrders((prev) => [...prev, order]);
-    setTab("orders");
-  }, []);
+    navigate("/orders");
+  }, [navigate]);
 
   const handlePaid = useCallback(() => {
     if (!payingOrder) return;
@@ -100,16 +103,20 @@ function CustomerShell({ venueId }: { venueId: string }) {
 
   return (
     <div className="min-h-svh bg-isabelline">
-      {tab === "menu" && <MenuScreen venueId={venueId} onViewCart={() => setTab("cart")} />}
-      {tab === "cart" && <CartScreen venueId={venueId} onOrderSent={handleOrderSent} />}
-      {tab === "orders" && (
-        <OrdersScreen
-          activeOrders={activeOrders}
-          history={history}
-          onPayBill={setPayingOrder}
-        />
-      )}
-      <CustomerBottomNav activeTab={tab} onTabChange={setTab} cartCount={itemCount} />
+      <Routes>
+        <Route path="menu" element={<MenuScreen venueId={venueId} onViewCart={() => navigate("/tab")} />} />
+        <Route path="tab" element={<CartScreen venueId={venueId} onOrderSent={handleOrderSent} onBack={() => navigate("/menu")} />} />
+        <Route path="orders" element={
+          <OrdersScreen
+            activeOrders={activeOrders}
+            history={history}
+            onPayBill={setPayingOrder}
+          />
+        } />
+        {/* Fallback to menu if directly accessing shell route */}
+        <Route path="*" element={<MenuScreen venueId={venueId} onViewCart={() => navigate("/tab")} />} />
+      </Routes>
+      <CustomerBottomNav activeTab={tab} onTabChange={(t) => navigate(`/${t}`)} cartCount={itemCount} />
     </div>
   );
 }
@@ -117,41 +124,32 @@ function CustomerShell({ venueId }: { venueId: string }) {
 /* ──────────────────── Customer Flow ──────────────────── */
 
 function CustomerFlow({ onSwitchMode, venueId }: { onSwitchMode: (m: Mode) => void; venueId: string }) {
-  const [inShell, setInShell] = useState(false);
+  const navigate = useNavigate();
 
-  if (!inShell) {
-    return (
-      <WelcomeScreen
-        onEnter={() => setInShell(true)}
-        onStaffPortal={() => onSwitchMode("waiter")}
-        onKitchenDisplay={() => onSwitchMode("kitchen")}
-        onManagerPortal={() => onSwitchMode("manager")}
-      />
-    );
-  }
-
-  return <CustomerShell venueId={venueId} />;
+  return (
+    <Routes>
+      <Route path="/" element={<WelcomeScreen />} />
+      <Route path="/home" element={
+        <HomeScreen
+          onEnter={() => navigate("/menu")}
+          onStaffPortal={() => onSwitchMode("waiter")}
+          onKitchenDisplay={() => onSwitchMode("kitchen")}
+          onManagerPortal={() => onSwitchMode("manager")}
+        />
+      } />
+      <Route path="/*" element={<CustomerShell venueId={venueId} />} />
+    </Routes>
+  );
 }
 
 /* ──────────────────── App Shell ──────────────────── */
 
 function AppShell() {
   const navigate = useNavigate();
-  const location = useLocation();
   const { user } = useAuth();
 
   const { venue: loadedVenue } = useVenue("velvet-lounge");
   const venueId = loadedVenue.id;
-
-  const getModeFromPath = (): Mode => {
-    const path = location.pathname.replace(/^\/+/, "").split("/")[0];
-    if (path === "waiter") return "waiter";
-    if (path === "kitchen") return "kitchen";
-    if (path === "manager") return "manager";
-    return "customer";
-  };
-
-  const [mode, setMode] = useState<Mode>(getModeFromPath);
 
   const [waiterScreen, setWaiterScreen] = useState<WaiterScreen>("auth");
   const [staffName, setStaffName] = useState<string>("");
@@ -160,35 +158,21 @@ function AppShell() {
 
   const [managerPage, setManagerPage] = useState<ManagerPage>("ops");
 
-  useEffect(() => {
-    const paths: Record<Mode, string> = {
-      customer: "/",
-      waiter: "/waiter",
-      kitchen: "/kitchen",
-      manager: "/manager",
-    };
-    if (location.pathname !== paths[mode]) {
-      navigate(paths[mode], { replace: true });
-    }
-  }, [mode, navigate, location.pathname]);
-
-  const switchToWaiter = () => { setMode("waiter"); setWaiterScreen("auth"); };
-  const switchToKitchen = () => { setMode("kitchen"); };
-  const switchToManager = () => { setMode("manager"); };
   const switchToCustomer = () => {
-    setMode("customer");
+    navigate("/");
     setStaffName("");
     setStaffVenueId("");
     setSelectedTable(null);
   };
 
+  const handleSwitchMode = (mode: Mode) => {
+    navigate(`/${mode === 'customer' ? '' : mode}`);
+  };
+
   return (
     <CartProvider>
-      {mode === "customer" && (
-        <CustomerFlow onSwitchMode={setMode} venueId={venueId} />
-      )}
-
-      {mode === "waiter" && (
+      <Routes>
+        <Route path="/waiter/*" element={
         <>
           {waiterScreen === "auth" && (
             <StaffAuthScreen
@@ -238,14 +222,13 @@ function AppShell() {
               onBack={() => setWaiterScreen("dashboard")}
             />
           )}
-        </>
-      )}
+        </>} />
 
-      {mode === "kitchen" && (
+        <Route path="/kitchen/*" element={
         <KitchenDisplayScreen venueId={venueId} onExit={switchToCustomer} />
-      )}
+        } />
 
-      {mode === "manager" && (
+        <Route path="/manager/*" element={
         <ProtectedRoute>
           <VenueRequired>
             <ManagerShell
@@ -263,7 +246,12 @@ function AppShell() {
             </ManagerShell>
           </VenueRequired>
         </ProtectedRoute>
-      )}
+        } />
+
+        <Route path="/*" element={
+          <CustomerFlow onSwitchMode={handleSwitchMode} venueId={venueId} />
+        } />
+      </Routes>
     </CartProvider>
   );
 }
@@ -288,19 +276,15 @@ function App() {
 }
 
 function AppRoutes() {
-  const location = useLocation();
-
-  const isAuthRoute = location.pathname === "/login" || location.pathname === "/signup";
-  const isVerifyRoute = location.pathname === "/verify-otp";
-  const isSetupRoute = location.pathname === "/setup";
-
-  if (isAuthRoute) {
-    return <AuthScreen initialMode={location.pathname === "/signup" ? "signup" : "login"} />;
-  }
-  if (isVerifyRoute) return <VerifyOtpScreen />;
-  if (isSetupRoute) return <VenueSetupScreen />;
-
-  return <AppShell />;
+  return (
+    <Routes>
+      <Route path="/login" element={<AuthScreen initialMode="login" />} />
+      <Route path="/signup" element={<AuthScreen initialMode="signup" />} />
+      <Route path="/verify-otp" element={<VerifyOtpScreen />} />
+      <Route path="/setup" element={<VenueSetupScreen />} />
+      <Route path="/*" element={<AppShell />} />
+    </Routes>
+  );
 }
 
 export default App;

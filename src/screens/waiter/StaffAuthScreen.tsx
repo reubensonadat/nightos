@@ -16,7 +16,7 @@ export function StaffAuthScreen({ onSignIn }: Props) {
     const [phone, setPhone] = useState("");
     const [pin, setPin] = useState("");
     const [showPin, setShowPin] = useState(false);
-    const { loading, error: staffError, signIn, staff } = useStaff();
+    const { loading, error: staffError, signIn } = useStaff();
 
     const handleSubmit = async (e: FormEvent) => {
         e.preventDefault();

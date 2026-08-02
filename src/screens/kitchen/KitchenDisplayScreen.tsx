@@ -90,7 +90,7 @@ export function KitchenDisplayScreen({ venueId, onExit }: Props) {
     const [now, setNow] = useState(Date.now());
     const [stationFilter, setStationFilter] = useState<StationFilter>("all");
 
-    const { orders: submissions, loading, refresh } = useOrders(venueId);
+    const { orders: submissions } = useOrders(venueId);
 
     /* ── Convert submissions to KitchenOrders ── */
     useEffect(() => {

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import {
     ArrowLeftIcon,
     ArrowRightIcon,
@@ -37,7 +38,7 @@ async function fetchProducts(venueId: string): Promise<MenuItem[]> {
         price: p.price,
         category: mapCategory(p.category_id),
         image: p.images?.[0] || '',
-        tags: p.tags?.filter((t): t is MenuItem['tags'][number] =>
+        tags: p.tags?.filter((t): t is NonNullable<MenuItem['tags']>[number] =>
             ['Popular', 'New', "Chef's Pick", 'Vegetarian'].includes(t as any)
         ) || undefined,
         abv: p.abv || undefined,
@@ -49,10 +50,10 @@ function mapCategory(_categoryId: string | null): MenuCategory {
     return "Signatures";
 }
 
-export function MenuScreen({ venueId, onBack, onViewCart }: Props) {
+export function MenuScreen({ venueId, onViewCart }: Props) {
+    const navigate = useNavigate();
     const [active, setActive] = useState<MenuCategory>("Signatures");
     const [query, setQuery] = useState("");
-    const [searchOpen, setSearchOpen] = useState(false);
     const [activeItemId, setActiveItemId] = useState<string | null>(null);
     const [supabaseItems, setSupabaseItems] = useState<MenuItem[] | null>(null);
     const { addQuick, subtotal, itemCount, toggleFavorite, isFavorite } =
@@ -101,80 +102,54 @@ export function MenuScreen({ venueId, onBack, onViewCart }: Props) {
               ═══════════════════════════════════════════════════════════ */}
             <header className="sticky top-0 z-30 bg-isabelline/95 backdrop-blur-xl border-b border-licorice/8">
                 {/* ── Top Bar ── */}
-                <div className="mx-auto flex w-full max-w-7xl items-center justify-between px-5 md:px-8 pt-[max(env(safe-area-inset-top),16px)] pb-3">
-                    <div className="flex items-center gap-2.5">
-                        {onBack && (
-                            <button
-                                type="button"
-                                onClick={onBack}
-                                aria-label="Back"
-                                className="flex h-9 w-9 items-center justify-center rounded-full bg-white text-licorice shadow-sm ring-1 ring-licorice/8 transition-colors hover:bg-isabelline active:scale-95"
-                            >
-                                <ArrowLeftIcon className="h-4 w-4" strokeWidth={2.25} />
-                            </button>
-                        )}
-                        <div className="flex items-center gap-2.5">
-                            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-licorice text-isabelline shadow-[0_4px_14px_rgba(35,20,12,0.25)]">
-                                <span className="font-serif text-[15px] font-bold leading-none tracking-tight">
-                                    V
-                                </span>
-                            </div>
-                            <div className="flex flex-col leading-tight">
-                                <span className="text-[13px] font-bold tracking-tight text-licorice">
-                                    Velvet Lounge
-                                </span>
-                                <span className="text-[9px] font-semibold uppercase tracking-[0.18em] text-feldgrau">
-                                    NightOS · Table 04
-                                </span>
-                            </div>
-                        </div>
-                    </div>
+                <div className="mx-auto flex w-full max-w-7xl items-center justify-between px-5 md:px-8 pt-[max(env(safe-area-inset-top),16px)] pb-3 relative">
+                    {/* Left: Back */}
+                    <button
+                        type="button"
+                        onClick={() => navigate("/home")}
+                        aria-label="Back"
+                        className="flex h-9 w-9 items-center justify-center rounded-full bg-white text-licorice shadow-sm ring-1 ring-licorice/8 transition-colors hover:bg-isabelline active:scale-95"
+                    >
+                        <ArrowLeftIcon className="h-4 w-4" strokeWidth={2.25} />
+                    </button>
 
-                    <div className="flex items-center gap-2">
-                        <div className="flex items-center gap-1.5 rounded-full bg-white px-3 py-2 shadow-sm ring-1 ring-licorice/8">
-                            <MapPinIcon className="h-3 w-3 text-dark-red" strokeWidth={2.25} />
-                            <span className="text-[10px] font-bold uppercase tracking-wider text-licorice">
-                                T·04
-                            </span>
-                        </div>
-                        <button
-                            type="button"
-                            onClick={() => setSearchOpen((v) => !v)}
-                            aria-label={searchOpen ? "Close search" : "Open search"}
-                            className="flex h-9 w-9 items-center justify-center rounded-full bg-white text-licorice shadow-sm ring-1 ring-licorice/8 transition-colors hover:bg-isabelline active:scale-95"
-                        >
-                            <MagnifyingGlassIcon className="h-4 w-4" strokeWidth={2.25} />
-                        </button>
+                    {/* Middle: Title */}
+                    <h1 className="text-[16px] font-bold tracking-tight text-licorice absolute left-1/2 -translate-x-1/2">
+                        Menu
+                    </h1>
+
+                    {/* Right: Table 4 pill */}
+                    <div className="flex items-center gap-1.5 rounded-full border border-licorice/15 bg-licorice/5 px-3 py-2">
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-licorice">
+                            Table 4
+                        </span>
                     </div>
                 </div>
 
                 {/* Search input */}
-                {searchOpen && (
-                    <div className="mx-auto w-full max-w-7xl px-5 md:px-8 pb-3 animate-velvet-fade">
-                        <div className="flex items-center gap-2 rounded-full bg-white px-4 py-2.5 shadow-sm ring-1 ring-licorice/8">
-                            <MagnifyingGlassIcon
-                                className="h-4 w-4 text-feldgrau"
-                                strokeWidth={2.25}
-                            />
-                            <input
-                                autoFocus
-                                value={query}
-                                onChange={(e) => setQuery(e.target.value)}
-                                placeholder="Search cocktails, wines, plates…"
-                                className="flex-1 bg-transparent text-[13px] text-licorice placeholder:text-feldgrau/70 focus:outline-none"
-                            />
-                            {query && (
-                                <button
-                                    type="button"
-                                    onClick={() => setQuery("")}
-                                    className="text-[10px] font-bold uppercase tracking-wider text-feldgrau hover:text-licorice"
-                                >
-                                    Clear
-                                </button>
-                            )}
-                        </div>
+                <div className="mx-auto w-full max-w-7xl px-5 md:px-8 pb-3">
+                    <div className="flex items-center gap-2 rounded-full bg-white px-4 py-2.5 shadow-sm ring-1 ring-licorice/8">
+                        <MagnifyingGlassIcon
+                            className="h-4 w-4 text-feldgrau"
+                            strokeWidth={2.25}
+                        />
+                        <input
+                            value={query}
+                            onChange={(e) => setQuery(e.target.value)}
+                            placeholder="Search cocktails, wines, plates…"
+                            className="flex-1 bg-transparent text-[13px] text-licorice placeholder:text-feldgrau/70 focus:outline-none"
+                        />
+                        {query && (
+                            <button
+                                type="button"
+                                onClick={() => setQuery("")}
+                                className="text-[10px] font-bold uppercase tracking-wider text-feldgrau hover:text-licorice"
+                            >
+                                Clear
+                            </button>
+                        )}
                     </div>
-                )}
+                </div>
 
                 {/* ── Category pills ── */}
                 <nav className="mx-auto w-full max-w-7xl px-5 md:px-8 pb-3">
@@ -190,7 +165,7 @@ export function MenuScreen({ venueId, onBack, onViewCart }: Props) {
                                         setQuery("");
                                     }}
                                     className={`shrink-0 inline-flex items-center rounded-full px-4 py-2 text-[12px] font-bold tracking-tight transition-all duration-200 ease-out ${isActive
-                                        ? "bg-licorice text-isabelline shadow-[0_4px_14px_rgba(35,20,12,0.25)]"
+                                        ? "bg-licorice text-isabelline"
                                         : "bg-white text-feldgrau ring-1 ring-licorice/8 hover:text-licorice hover:ring-licorice/15"
                                         }`}
                                 >
@@ -209,10 +184,10 @@ export function MenuScreen({ venueId, onBack, onViewCart }: Props) {
                 {/* ── Editorial Title Section ── */}
                 <div className="mb-6">
                     <p className="text-[10px] font-bold uppercase tracking-[0.22em] text-khaki">
-                        {searchOpen && query ? "Searching" : "Chapter"}
+                        {query ? "Searching" : "Chapter"}
                     </p>
                     <h1 className="mt-1.5 text-[2rem] font-black leading-[1.05] tracking-[-0.04em] text-licorice">
-                        {searchOpen && query ? (
+                        {query ? (
                             <>"{query}"</>
                         ) : (
                             <>
@@ -224,52 +199,12 @@ export function MenuScreen({ venueId, onBack, onViewCart }: Props) {
                             </>
                         )}
                     </h1>
-                    {!searchOpen && (
+                    {!query && (
                         <p className="mt-2 max-w-[300px] text-[12.5px] leading-[1.55] tracking-tight text-feldgrau">
                             Curated by Chef Ama — tap any dish to read more.
                         </p>
                     )}
                 </div>
-                {/* ── Featured hero card — refined, no sparkles/stars ── */}
-                {showFeatured && featuredItem && (
-                    <button
-                        type="button"
-                        onClick={() => setActiveItemId(featuredItem.id)}
-                        className="group block w-full text-left mb-5 animate-velvet-rise"
-                    >
-                        <div className="relative overflow-hidden rounded-3xl bg-white shadow-[0_20px_50px_rgba(35,20,12,0.15)] ring-1 ring-isabelline transition-all duration-200 ease-out group-hover:shadow-[0_24px_60px_rgba(35,20,12,0.20)] group-active:scale-[0.99]">
-                            <div className="relative h-44 w-full overflow-hidden">
-                                <img
-                                    src={featuredItem.image}
-                                    alt={featuredItem.name}
-                                    className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
-                                />
-                                <div
-                                    aria-hidden="true"
-                                    className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-white"
-                                />
-                            </div>
-                            <div className="px-5 pb-5 pt-4">
-                                <p className="text-[9px] font-bold uppercase tracking-[0.22em] text-khaki">
-                                    Signature of the Night
-                                </p>
-                                <div className="mt-1.5 flex items-start justify-between gap-3">
-                                    <div className="min-w-0">
-                                        <h3 className="text-[20px] font-bold leading-tight tracking-[-0.035em] text-licorice">
-                                            {featuredItem.name}
-                                        </h3>
-                                        <p className="mt-1.5 text-[12px] leading-[1.55] tracking-tight text-feldgrau line-clamp-2">
-                                            {featuredItem.description}
-                                        </p>
-                                    </div>
-                                    <span className="shrink-0 font-mono text-[17px] font-bold tabular-nums text-licorice">
-                                        {formatGHS(featuredItem.price)}
-                                    </span>
-                                </div>
-                            </div>
-                        </div>
-                    </button>
-                )}
 
                 {/* Empty state */}
                 {visibleItems.length === 0 && (
@@ -376,27 +311,27 @@ export function MenuScreen({ venueId, onBack, onViewCart }: Props) {
                 FLOATING CART SUMMARY
               ═══════════════════════════════════════════════════════════ */}
             {itemCount > 0 && (
-                <div className="fixed inset-x-0 bottom-0 z-40 flex justify-center px-5 pb-[max(env(safe-area-inset-bottom),18px)] pt-3 bg-gradient-to-t from-isabelline via-isabelline/95 to-transparent">
+                <div className="fixed inset-x-0 bottom-0 z-40 flex justify-center px-5 md:px-8 pb-[calc(72px+env(safe-area-inset-bottom))] pt-3 bg-gradient-to-t from-isabelline via-isabelline/95 to-transparent">
                     <button
                         type="button"
                         onClick={onViewCart}
-                        className="animate-velvet-rise flex w-full max-w-md md:max-w-2xl items-center justify-between gap-3 rounded-full bg-licorice px-5 py-3.5 shadow-[0_20px_50px_rgba(35,20,12,0.25)] ring-1 ring-licorice/80 transition-all duration-200 ease-out hover:bg-licorice/95 hover:shadow-[0_24px_60px_rgba(35,20,12,0.30)] active:scale-[0.985] focus:outline-none focus-visible:ring-2 focus-visible:ring-khaki"
+                        className="animate-velvet-rise flex w-full max-w-md md:max-w-2xl items-center justify-between gap-3 rounded-full bg-licorice px-6 py-4 shadow-[0_20px_50px_rgba(35,20,12,0.25)] ring-1 ring-licorice/80 transition-all duration-200 ease-out hover:bg-licorice/95 hover:shadow-[0_24px_60px_rgba(35,20,12,0.30)] active:scale-[0.985] focus:outline-none focus-visible:ring-2 focus-visible:ring-khaki"
                         aria-label={`View cart — ${itemCount} items, ${formatGHS(subtotal)}`}
                     >
                         <div className="flex items-center gap-3">
-                            <span className="flex h-7 w-7 items-center justify-center rounded-full bg-isabelline/15 text-[12px] font-bold text-isabelline ring-1 ring-isabelline/20">
+                            <span className="flex h-9 w-9 items-center justify-center rounded-full bg-isabelline/15 text-[14px] font-bold text-isabelline ring-1 ring-isabelline/20">
                                 {itemCount}
                             </span>
                             <div className="flex flex-col items-start leading-tight">
-                                <span className="text-[10px] font-bold uppercase tracking-wider text-khaki">
+                                <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-khaki">
                                     Your tab
                                 </span>
-                                <span className="font-mono text-[14px] font-bold tabular-nums text-isabelline">
+                                <span className="text-[15px] font-bold tracking-tight text-isabelline">
                                     {formatGHS(subtotal)}
                                 </span>
                             </div>
                         </div>
-                        <span className="flex items-center gap-1.5 text-[13px] font-bold tracking-tight text-isabelline">
+                        <span className="flex items-center gap-1.5 text-[15px] font-bold tracking-tight text-isabelline group-hover:translate-x-0.5 transition-transform duration-200">
                             View Cart
                             <ArrowRightIcon className="h-4 w-4" strokeWidth={2.25} />
                         </span>

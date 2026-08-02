@@ -5,7 +5,6 @@ import {
     PaintBrushIcon,
 } from "@heroicons/react/24/outline";
 import { useBrand, type BrandColors } from "../../context/BrandContext";
-import clsx from "clsx";
 
 const COLOR_LABELS: Record<keyof BrandColors, string> = {
     primary: "Primary (text, dark backgrounds)",
@@ -32,7 +31,6 @@ export function BrandSettingsScreen() {
     };
 
     /* ── Preview computed from draft ── */
-    const isLight = isLightColor(draft.primary);
     const previewBg = {
         backgroundColor: draft.secondary,
         color: draft.primary,

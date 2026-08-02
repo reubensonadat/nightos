@@ -1,7 +1,7 @@
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import './index.css'
-import { HashRouter } from 'react-router-dom'
+import { BrowserRouter } from 'react-router-dom'
 import { BrandProvider } from './context/BrandContext'
 import App from './App.tsx'
 
@@ -10,10 +10,10 @@ if (skeleton) skeleton.remove()
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <HashRouter>
+    <BrowserRouter>
       <BrandProvider>
         <App />
       </BrandProvider>
-    </HashRouter>
+    </BrowserRouter>
   </StrictMode>,
 )

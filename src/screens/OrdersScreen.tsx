@@ -1,10 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
 import {
+  ArrowLeftIcon,
   ArrowRightIcon,
   CheckIcon,
   ChevronDownIcon,
-  ClockIcon,
+  ClipboardDocumentListIcon,
 } from "@heroicons/react/24/outline";
+import { useNavigate } from "react-router-dom";
 import { CheckCircleIcon } from "@heroicons/react/24/solid";
 import { formatGHS } from "../data/menu";
 import type { OrderSummary } from "./OrderTrackingScreen";
@@ -156,26 +158,49 @@ function HistoryCard({ order }: { order: OrderSummary }) {
 
 /* ────────────────────────── Main Screen ────────────────────────── */
 
-export function OrdersScreen({ activeOrders, history, onPayBill, onReorder }: Props) {
+export function OrdersScreen({ activeOrders, history, onPayBill, onReorder: _onReorder }: Props) {
+  const navigate = useNavigate();
   const hasActive = activeOrders.length > 0;
   const hasHistory = history.length > 0;
 
-  if (!hasActive && !hasHistory) {
-    return (
-      <div className="flex flex-col items-center justify-center px-6 py-20 text-center">
-        <div className="flex h-14 w-14 items-center justify-center rounded-full bg-isabelline ring-1 ring-licorice/8">
-          <ClipboardIcon className="h-6 w-6 text-feldgrau" strokeWidth={1.5} />
-        </div>
-        <h2 className="mt-4 text-[18px] font-bold tracking-tight text-licorice">No orders yet</h2>
-        <p className="mt-1.5 max-w-[260px] text-[12px] leading-[1.5] text-feldgrau">
-          Your orders and history will appear here once you place one.
-        </p>
-      </div>
-    );
-  }
-
   return (
-    <div className="px-5 md:px-8 pt-6 pb-[calc(80px+env(safe-area-inset-bottom))] mx-auto w-full max-w-3xl">
+    <main className="relative min-h-svh w-full overflow-x-hidden bg-isabelline font-sans text-licorice antialiased">
+      {/* ── Top Bar ── */}
+      <header className="sticky top-0 z-30 bg-isabelline/95 backdrop-blur-xl border-b border-licorice/8">
+        <div className="mx-auto flex w-full max-w-7xl items-center justify-between px-5 md:px-8 pt-[max(env(safe-area-inset-top),16px)] pb-3 relative">
+          <button
+            type="button"
+            onClick={() => navigate("/tab")}
+            aria-label="Back"
+            className="flex h-9 w-9 items-center justify-center rounded-full bg-white text-licorice shadow-sm ring-1 ring-licorice/8 transition-colors hover:bg-isabelline active:scale-95"
+          >
+            <ArrowLeftIcon className="h-4 w-4" strokeWidth={2.25} />
+          </button>
+
+          <h1 className="text-[16px] font-bold tracking-tight text-licorice absolute left-1/2 -translate-x-1/2">
+            Orders
+          </h1>
+
+          <div className="flex items-center gap-1.5 rounded-full border border-licorice/15 bg-licorice/5 px-3 py-2">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-licorice">
+              Table 4
+            </span>
+          </div>
+        </div>
+      </header>
+
+      {!hasActive && !hasHistory ? (
+        <div className="mx-auto flex w-full max-w-7xl flex-col items-center justify-center px-5 md:px-8 py-20 text-center">
+          <div className="flex h-14 w-14 items-center justify-center rounded-full bg-isabelline ring-1 ring-licorice/8">
+            <ClipboardDocumentListIcon className="h-6 w-6 text-feldgrau" />
+          </div>
+          <h2 className="mt-4 text-[18px] font-bold tracking-tight text-licorice">No orders yet</h2>
+          <p className="mt-1.5 max-w-[260px] text-[12px] leading-[1.5] text-feldgrau">
+            Your orders and history will appear here once you place one.
+          </p>
+        </div>
+      ) : (
+        <div className="mx-auto w-full max-w-7xl px-5 md:px-8 pt-6 pb-[calc(80px+env(safe-area-inset-bottom))]">
       {/* ── Active Orders ── */}
       {hasActive && (
         <div className="mb-8">
@@ -227,7 +252,9 @@ export function OrdersScreen({ activeOrders, history, onPayBill, onReorder }: Pr
           </div>
         </div>
       )}
-    </div>
+      </div>
+      )}
+    </main>
   );
 }
 
