@@ -108,7 +108,7 @@ export function ItemDetailsSheet({ item, onClose }: Props) {
         });
         // Tiny delay so the user perceives the press feedback
         window.setTimeout(() => {
-            addCustom(item, selectedModifiers, notes, qty);
+            addCustom(item.id, selectedModifiers, notes, qty);
             onClose();
         }, 150);
     };

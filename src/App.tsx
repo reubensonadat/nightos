@@ -141,43 +141,7 @@ function CustomerRedirect() {
   const navigate = useNavigate();
 
   useEffect(() => {
-    const sessionStr = localStorage.getItem("nightos:session");
-    if (sessionStr) {
-      try {
-        const session = JSON.parse(sessionStr);
-        if (session?.sessionId) {
-          const ordersStr = localStorage.getItem("nightos:orders");
-          let hasOrders = false;
-          if (ordersStr) {
-            const parsedOrders = JSON.parse(ordersStr);
-            hasOrders =
-              (parsedOrders.active && parsedOrders.active.length > 0) ||
-              (parsedOrders.past && parsedOrders.past.length > 0);
-          }
-          const twentyMins = 20 * 60 * 1000;
-
-          if (
-            !hasOrders &&
-            session.createdAt &&
-            Date.now() - session.createdAt > twentyMins
-          ) {
-            db.closeTableSession(session.sessionId).then(({ error }) => {
-              if (error) console.error(error);
-            });
-            localStorage.removeItem("nightos:session");
-            navigate(`/table/${session.tableId}`, { replace: true });
-            return;
-          }
-          navigate("/menu", { replace: true });
-          return;
-        }
-      } catch (error) {
-        // ignore
-      }
-    }
-    navigate("/table/44444444-4444-4444-4444-444444444444?token=table4token", {
-      replace: true,
-    });
+    navigate("/home", { replace: true });
   }, [navigate]);
 
   return <div className="min-h-svh bg-isabelline" />;
@@ -186,11 +150,7 @@ function CustomerRedirect() {
 function WelcomeScreenWrapper() {
   const navigate = useNavigate();
   return (
-    <WelcomeScreen
-      onStaffPortal={() => navigate("/waiter")}
-      onKitchenDisplay={() => navigate("/kitchen")}
-      onManagerPortal={() => navigate("/manager")}
-    />
+    <WelcomeScreen />
   );
 }
 
@@ -207,68 +167,8 @@ function HomeScreenWrapper() {
 }
 
 function CustomerRouteWrapper({ tab }: { tab: NavTab }) {
-  const navigate = useNavigate();
-  const [session, setSession] = useState<{ venueId: string; tableId: string; sessionId: string; createdAt?: number } | null>(null);
-
-  useEffect(() => {
-    let interval: ReturnType<typeof setInterval>;
-
-    const validateSession = () => {
-      const sessionStr = localStorage.getItem("nightos:session");
-      if (!sessionStr) {
-        navigate("/", { replace: true });
-        return false;
-      }
-      try {
-        const parsed = JSON.parse(sessionStr);
-        if (!parsed?.sessionId) {
-          navigate("/", { replace: true });
-          return false;
-        }
-
-        const ordersStr = localStorage.getItem("nightos:orders");
-        let hasOrders = false;
-        if (ordersStr) {
-          const parsedOrders = JSON.parse(ordersStr);
-          hasOrders =
-            (parsedOrders.active && parsedOrders.active.length > 0) ||
-            (parsedOrders.past && parsedOrders.past.length > 0);
-        }
-        const twentyMins = 20 * 60 * 1000;
-
-        if (
-          !hasOrders &&
-          parsed.createdAt &&
-          Date.now() - parsed.createdAt > twentyMins
-        ) {
-          db.closeTableSession(parsed.sessionId).then(({ error }) => {
-            if (error) console.error(error);
-          });
-          localStorage.removeItem("nightos:session");
-          navigate(`/table/${parsed.tableId}`, { replace: true });
-          return false;
-        }
-
-        setSession(parsed);
-        return true;
-      } catch (error) {
-        navigate("/", { replace: true });
-        return false;
-      }
-    };
-
-    if (validateSession()) {
-      interval = setInterval(validateSession, 30000);
-    }
-
-    return () => clearInterval(interval);
-  }, [navigate]);
-
-  if (!session) {
-    return <div className="min-h-svh bg-isabelline" />;
-  }
-
-  return <CustomerShell venueId={session.venueId} tab={tab} />;
+  // Hardcoded for now as token checking was removed
+  return <CustomerShell venueId="velvet-lounge" tab={tab} />;
 }
 
 /* ──────────────────── Waiter Sub-Flow Wrapper ──────────────────── */

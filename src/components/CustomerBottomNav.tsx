@@ -1,6 +1,6 @@
 import { ShoppingBagIcon, Squares2X2Icon, ClipboardDocumentListIcon } from "@heroicons/react/24/outline";
 
-type Tab = 'menu' | 'tab' | 'orders';
+type Tab = 'menu' | 'cart' | 'orders';
 
 type Props = {
   activeTab: Tab;
@@ -10,7 +10,7 @@ type Props = {
 
 const TABS: { id: Tab; label: string; icon: typeof Squares2X2Icon }[] = [
   { id: 'menu', label: 'Menu', icon: Squares2X2Icon },
-  { id: 'tab', label: 'Tab', icon: ShoppingBagIcon },
+  { id: 'cart', label: 'Cart', icon: ShoppingBagIcon },
   { id: 'orders', label: 'Orders', icon: ClipboardDocumentListIcon },
 ];
 
@@ -31,7 +31,7 @@ export function CustomerBottomNav({ activeTab, onTabChange, cartCount }: Props) 
             >
               <span className="relative">
                 <Icon className="h-5 w-5" strokeWidth={isActive ? 2.5 : 1.75} />
-                {id === 'tab' && cartCount > 0 && (
+                {id === 'cart' && cartCount > 0 && (
                   <span className="absolute -right-2 -top-1.5 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-dark-red px-1 text-[8px] font-bold leading-none text-white shadow-sm">
                     {cartCount > 99 ? '99+' : cartCount}
                   </span>

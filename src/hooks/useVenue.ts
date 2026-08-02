@@ -36,10 +36,10 @@ export function useVenue(slug?: string) {
 
     let cancelled = false;
 
-    async function load() {
+    async function load(currentSlug: string) {
       setLoading(true);
       setError(null);
-      const { data, error: err } = await db.venueBySlug(venueSlug);
+      const { data, error: err } = await db.venueBySlug(currentSlug);
       if (cancelled) return;
       if (err || !data) {
         setError('Could not load venue');
@@ -50,7 +50,7 @@ export function useVenue(slug?: string) {
       setLoading(false);
     }
 
-    load();
+    load(venueSlug);
     return () => {
       cancelled = true;
     };
