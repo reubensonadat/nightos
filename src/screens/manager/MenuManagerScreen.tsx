@@ -227,7 +227,7 @@ export function MenuManagerScreen() {
 }
 
 function ItemModal({ item, onSave, onClose, onDelete }: { item: InventoryItem | null; onSave: (item: InventoryItem) => void; onClose: () => void; onDelete?: () => void }) {
-    const [draft, setDraft] = useState<InventoryItem>(() => item ?? {
+    const [draft, setDraft] = useState<InventoryItem>(item ?? {
         id: `inv-${Date.now()}`, name: "", category: "Spirits", stock: 10, reorderThreshold: 5, unitCost: 0, sellingPrice: 0, available: true, lastRestocked: "Today",
     });
     const marginPct = draft.sellingPrice > 0 ? ((draft.sellingPrice - draft.unitCost) / draft.sellingPrice) * 100 : 0;

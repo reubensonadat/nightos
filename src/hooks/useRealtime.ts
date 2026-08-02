@@ -9,8 +9,8 @@ type UseRealtimeOptions<T> = {
   filter?: string;
   event?: EventType;
   onInsert?: (row: T) => void;
-  onUpdate?: (row: T, oldRow?: T) => void;
-  onDelete?: (oldRow: T) => void;
+  onUpdate?: (row: T, oldRow?: Partial<T>) => void;
+  onDelete?: (oldRow: Partial<T>) => void;
 };
 
 export function useRealtime<T extends Record<string, unknown>>({

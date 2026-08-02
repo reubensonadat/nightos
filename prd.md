@@ -12,7 +12,7 @@ Before answering any query, review the project constraints and business logic pr
 - Deliver code that is production-ready, modular, and typed.
 - Prioritize clean architecture and maintainability.
 - When providing code, explain the "why" behind your architectural decisions only if it introduces a new concept or deviates from the standard pattern.
-- **Tech Stack Boundary:** Strictly adhere to the established stack: React, Tailwind CSS, and Supabase. Use Zustand for state management. Do not introduce new libraries without explicit permission.
+- **Tech Stack Boundary:** Strictly adhere to the established stack: React, Tailwind CSS, and Supabase. Use React Context + hooks (React state) for state management, never Zustand or other global stores. Do not introduce new libraries without explicit permission.
 - **Output Preferences:** When modifying existing code, only output the specific functions or components being changed. Do not rewrite the entire file unless explicitly requested.
 - **Error Handling:** Assume the network is unreliable. Every database query, state mutation, and payment execution must include robust error handling, loading states, and edge-case mitigation. Never fail silently.
 - **Security:** Always respect Row Level Security (RLS) policies. Ensure transactional integrity for order splicing and payments.
@@ -30,7 +30,7 @@ Before answering any query, review the project constraints and business logic pr
 
 ## 2. Technology Stack
 * **Frontend**: React 18, TypeScript, Vite, Tailwind CSS, and React Router v6.
-* **State & Data**: Zustand (global state) and React Query (data fetching and real-time sync).
+* **State & Data**: React Context + hooks (React state) and React Query (data fetching and real-time sync).
 * **Backend & Database**: Supabase (Postgres database, Auth, Realtime, Storage, and Edge Functions).
 * **Payments**: Paystack Popup SDK (`@paystack/inline-js`) for client-side modals, Paystack Webhooks for backend processing.
 * **Infrastructure**: Cloudflare Pages (frontend hosting), GitHub (version control).

@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
+import toast from 'react-hot-toast'
 import { useAuth } from '../../context/AuthContext'
 import { authDb } from '../../lib/db/auth'
 
@@ -74,7 +75,9 @@ export function PhoneAuthForm({ isLogin, onSwitchMethod, onToggleMode }: Props) 
     setLoading(false)
     if (error) {
       setError(error.message)
+      toast.error(error.message)
     } else {
+      toast.success('Code sent! Check your phone.')
       sessionStorage.setItem(
         OTP_STORAGE_KEY,
         JSON.stringify({ phone: formattedPhone, mode: isLogin ? 'login' : 'signup', sentAt: Date.now() }),

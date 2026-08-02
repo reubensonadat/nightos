@@ -195,4 +195,14 @@ export function BrandSettingsScreen() {
         </div>
     );
 }
-
+
+/* ── Helper to determine if a hex color is light ── */
+function isLightColor(hex: string): boolean {
+    const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+    if (!result) return true;
+    const r = parseInt(result[1], 16);
+    const g = parseInt(result[2], 16);
+    const b = parseInt(result[3], 16);
+    const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+    return luminance > 0.5;
+}

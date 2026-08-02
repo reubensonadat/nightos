@@ -3,6 +3,7 @@ import {
     ArrowLeftIcon,
     ArrowRightIcon,
     ClockIcon,
+    MapPinIcon,
     MinusIcon,
     PencilSquareIcon,
     PlusIcon,
@@ -11,7 +12,7 @@ import {
 } from "@heroicons/react/24/outline";
 import { PaperAirplaneIcon } from "@heroicons/react/24/solid";
 import { formatGHS } from "../data/menu";
-import { getLineUnitPrice, useTabStore, useTabComputed } from "../store/useTabStore";
+import { getLineUnitPrice, useCart } from "../context/CartContext";
 import type { OrderSummary } from "./OrderTrackingScreen";
 import { db } from "../lib/api";
 
@@ -32,24 +33,9 @@ function estimatePrepMinutes(itemCount: number): string {
 }
 
 export function CartScreen({ venueId, onBack, onContinueShopping, onOrderSent }: Props) {
-    const { lines, setQty, remove, clearCart } = useTabStore();
-    const { cartItemCount: itemCount, cartSubtotal: subtotal } = useTabComputed();
+    const { lines, itemCount, subtotal, setQty, remove, clear } = useCart();
     const [orderNotes, setOrderNotes] = useState("");
     const [sending, setSending] = useState(false);
-
-    const session = useMemo(() => {
-        try {
-            const sessionStr = localStorage.getItem("nightos:session");
-            return sessionStr ? JSON.parse(sessionStr) : null;
-        } catch {
-            return null;
-        }
-    }, []);
-
-    const tableLabel = session?.tableLabel || "Table 04";
-    const guestName = session?.guestName || "User";
-    const customerSessionId = session?.sessionId || null;
-    const activeBillId = session?.billId || "00000000-0000-0000-0000-000000000000";
 
     // Bill math
     const { serviceCharge, vat, total } = useMemo(() => {
@@ -64,6 +50,7 @@ export function CartScreen({ venueId, onBack, onContinueShopping, onOrderSent }:
 
     const handleSendToKitchen = async () => {
         setSending(true);
+
         // Try to submit to Supabase — gracefully fall back to mock
         let orderNumber = `VL-${Math.floor(1000 + Math.random() * 9000)}`;
 
@@ -73,12 +60,10 @@ export function CartScreen({ venueId, onBack, onContinueShopping, onOrderSent }:
                 : 'bar';
 
             const { data: submission, error: subErr } = await db.createOrderSubmission(
-                activeBillId,
+                '00000000-0000-0000-0000-000000000000', // billId — updated once bill context exists
                 venueId,
                 station,
                 orderNotes || undefined,
-                customerSessionId,
-                guestName
             );
 
             if (!subErr && submission) {
@@ -97,8 +82,6 @@ export function CartScreen({ venueId, onBack, onContinueShopping, onOrderSent }:
                         line.modifiers.reduce((s, m) => s + (m.option.priceDelta ?? 0) * line.qty, 0),
                         unitPrice * line.qty,
                         line.notes,
-                        customerSessionId,
-                        guestName
                     );
                 }
             }
@@ -123,7 +106,7 @@ export function CartScreen({ venueId, onBack, onContinueShopping, onOrderSent }:
             venueId,
         };
 
-        clearCart();
+        clear();
         onOrderSent?.(order);
     };
 
@@ -132,7 +115,7 @@ export function CartScreen({ venueId, onBack, onContinueShopping, onOrderSent }:
         return (
             <main className="relative min-h-svh w-full overflow-x-hidden bg-isabelline font-sans text-licorice antialiased">
                 {/* Dark hero */}
-                <div className="relative overflow-hidden bg-gradient-to-b from-licorice via-licorice to-licorice/95 px-5 pt-[max(env(safe-area-inset-top),20px)] pb-20">
+                <div className="relative overflow-hidden bg-gradient-to-b from-licorice via-licorice to-licorice/95 pt-[max(env(safe-area-inset-top),20px)] pb-20">
                     <div
                         aria-hidden="true"
                         className="pointer-events-none absolute inset-0"
@@ -141,45 +124,28 @@ export function CartScreen({ venueId, onBack, onContinueShopping, onOrderSent }:
                         <div className="absolute top-20 -left-16 h-48 w-48 rounded-full bg-light-blue mix-blend-screen blur-[70px] opacity-15" />
                     </div>
 
-                    <div className="relative z-10 flex items-center justify-between h-9">
-                        <div className="flex items-center">
-                            <button
-                                type="button"
-                                onClick={onBack}
-                                aria-label="Back"
-                                className="flex h-9 w-9 items-center justify-center rounded-full border border-isabelline/15 bg-isabelline/5 text-isabelline transition-colors hover:bg-isabelline/10 active:scale-95"
-                            >
-                                <ArrowLeftIcon className="h-4 w-4" strokeWidth={2.25} />
-                            </button>
-                        </div>
+                    <div className="relative z-10 mx-auto flex w-full max-w-7xl items-center justify-between px-5 md:px-8">
+                        <button
+                            type="button"
+                            onClick={onBack}
+                            aria-label="Back"
+                            className="flex h-9 w-9 items-center justify-center rounded-full border border-isabelline/15 bg-isabelline/5 text-isabelline transition-colors hover:bg-isabelline/10 active:scale-95"
+                        >
+                            <ArrowLeftIcon className="h-4 w-4" strokeWidth={2.25} />
+                        </button>
+                        
+                        <h1 className="text-[16px] font-bold tracking-tight text-isabelline absolute left-1/2 -translate-x-1/2">
+                            Your Tab
+                        </h1>
 
-                        <div className="absolute inset-x-0 top-0 flex items-center justify-center pointer-events-none h-9">
-                            <span className="text-[18px] font-bold tracking-tight text-isabelline pointer-events-auto">
-                                Your Order
+                        <div className="flex items-center gap-1.5 rounded-full border border-isabelline/15 bg-isabelline/5 px-3 py-2">
+                            <span className="text-[10px] font-bold uppercase tracking-wider text-isabelline">
+                                Table 4
                             </span>
-                        </div>
-
-                        <div className="flex items-center">
-                            <button
-                                type="button"
-                                className="
-                                    rounded-full border border-isabelline/20 bg-transparent
-                                    px-3 py-1.5
-                                    text-[11px] font-bold uppercase tracking-wider text-isabelline
-                                    backdrop-blur-md transition-all
-                                    hover:border-isabelline/40 hover:bg-isabelline/5
-                                    active:scale-95
-                                "
-                            >
-                                {tableLabel}
-                            </button>
                         </div>
                     </div>
 
-                    <div className="relative z-10 mt-8 text-center">
-                        <p className="text-[11px] font-bold uppercase tracking-[0.22em] text-khaki">
-                            Your Tab
-                        </p>
+                    <div className="relative z-10 mt-8 mx-auto w-full max-w-7xl px-5 md:px-8 text-center">
                         <h1 className="mt-2 text-[2rem] font-black leading-tight tracking-[-0.04em] text-isabelline">
                             Nothing here
                             <br />
@@ -194,20 +160,19 @@ export function CartScreen({ venueId, onBack, onContinueShopping, onOrderSent }:
                     </div>
                 </div>
 
-                {/* Sticky Bottom CTA */}
-                <div className="fixed inset-x-0 bottom-0 z-40 flex justify-center px-5 pb-[calc(80px+env(safe-area-inset-bottom))] pt-3 bg-gradient-to-t from-isabelline via-isabelline/95 to-transparent">
+                {/* Overlapping CTA */}
+                <div className="fixed inset-x-0 bottom-[88px] z-40 flex justify-center px-5 md:px-8">
                     <button
                         type="button"
                         onClick={onContinueShopping}
                         className="
-                            group flex w-full max-w-md md:max-w-2xl items-center justify-between
+                            group flex w-full max-w-md md:max-w-2xl mx-auto items-center justify-between
                             gap-3 rounded-full bg-licorice px-6 py-4
                             shadow-[0_20px_50px_rgba(35,20,12,0.25)]
                             ring-1 ring-licorice/80
                             transition-all duration-200 ease-out
-                            hover:bg-licorice/95 hover:shadow-[0_24px_60px_rgba(35,20,12,0.30)]
+                            hover:bg-licorice/95
                             active:scale-[0.985]
-                            focus:outline-none focus-visible:ring-2 focus-visible:ring-khaki
                         "
                     >
                         <span className="flex flex-col items-start leading-tight">
@@ -233,7 +198,7 @@ export function CartScreen({ venueId, onBack, onContinueShopping, onOrderSent }:
             {/* ═══════════════════════════════════════════════════════════
                 DARK LICORICE HERO
               ═══════════════════════════════════════════════════════════ */}
-            <header className="relative overflow-hidden bg-gradient-to-b from-licorice via-licorice to-licorice/95 px-5 pt-[max(env(safe-area-inset-top),20px)] pb-20">
+            <header className="relative overflow-hidden bg-gradient-to-b from-licorice via-licorice to-licorice/95 pt-[max(env(safe-area-inset-top),20px)] pb-20">
                 {/* Blur orbs */}
                 <div
                     aria-hidden="true"
@@ -244,43 +209,29 @@ export function CartScreen({ venueId, onBack, onContinueShopping, onOrderSent }:
                 </div>
 
                 {/* Top bar */}
-                <div className="relative z-10 flex items-center justify-between h-9">
-                    <div className="flex items-center">
-                        <button
-                            type="button"
-                            onClick={onBack}
-                            aria-label="Back"
-                            className="flex h-9 w-9 items-center justify-center rounded-full border border-isabelline/15 bg-isabelline/5 text-isabelline transition-colors hover:bg-isabelline/10 active:scale-95"
-                        >
-                            <ArrowLeftIcon className="h-4 w-4" strokeWidth={2.25} />
-                        </button>
-                    </div>
+                <div className="relative z-10 mx-auto flex w-full max-w-7xl items-center justify-between px-5 md:px-8">
+                    <button
+                        type="button"
+                        onClick={onBack}
+                        aria-label="Back"
+                        className="flex h-9 w-9 items-center justify-center rounded-full border border-isabelline/15 bg-isabelline/5 text-isabelline transition-colors hover:bg-isabelline/10 active:scale-95"
+                    >
+                        <ArrowLeftIcon className="h-4 w-4" strokeWidth={2.25} />
+                    </button>
 
-                    <div className="absolute inset-x-0 top-0 flex items-center justify-center pointer-events-none h-9">
-                        <span className="text-[18px] font-bold tracking-tight text-isabelline pointer-events-auto">
-                            Your Order
+                    <h1 className="text-[16px] font-bold tracking-tight text-isabelline absolute left-1/2 -translate-x-1/2">
+                        Your Tab
+                    </h1>
+
+                    <div className="flex items-center gap-1.5 rounded-full border border-isabelline/15 bg-isabelline/5 px-3 py-2">
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-isabelline">
+                            Table 4
                         </span>
-                    </div>
-
-                    <div className="flex items-center">
-                        <button
-                            type="button"
-                            className="
-                                rounded-full border border-isabelline/20 bg-transparent
-                                px-3 py-1.5
-                                text-[11px] font-bold uppercase tracking-wider text-isabelline
-                                backdrop-blur-md transition-all
-                                hover:border-isabelline/40 hover:bg-isabelline/5
-                                active:scale-95
-                            "
-                        >
-                            {tableLabel}
-                        </button>
                     </div>
                 </div>
 
                 {/* Hero summary */}
-                <div className="relative z-10 mt-7">
+                <div className="relative z-10 mt-7 mx-auto w-full max-w-7xl px-5 md:px-8">
                     <p className="text-[11px] font-bold uppercase tracking-[0.22em] text-khaki">
                         {itemCount} {itemCount === 1 ? "item" : "items"} ready
                     </p>
@@ -295,7 +246,7 @@ export function CartScreen({ venueId, onBack, onContinueShopping, onOrderSent }:
                 </div>
 
                 {/* Widget strip — quiet, just two pills */}
-                <div className="relative z-10 mt-5 flex flex-wrap gap-2">
+                <div className="relative z-10 mt-5 mx-auto flex w-full max-w-7xl flex-wrap gap-2 px-5 md:px-8">
                     <div className="inline-flex items-center gap-1.5 rounded-2xl border border-khaki/30 bg-khaki/10 px-3 py-2 backdrop-blur-md">
                         <ClockIcon className="h-3.5 w-3.5 text-khaki" strokeWidth={2.25} />
                         <div className="flex flex-col leading-tight">
@@ -324,7 +275,7 @@ export function CartScreen({ venueId, onBack, onContinueShopping, onOrderSent }:
             {/* ═══════════════════════════════════════════════════════════
                 OVERLAPPING CONTENT
               ═══════════════════════════════════════════════════════════ */}
-            <section className="relative z-20 mx-auto w-full max-w-3xl -mt-12 px-5 md:px-8 pb-[calc(140px+env(safe-area-inset-bottom))]">
+            <section className="relative z-20 mx-auto w-full max-w-7xl -mt-12 px-5 md:px-8 pb-[calc(140px+env(safe-area-inset-bottom))]">
                 {/* ── Cart line items ── */}
                 <div className="flex flex-col gap-3">
                     {lines.map((line, idx) => {
@@ -503,7 +454,7 @@ export function CartScreen({ venueId, onBack, onContinueShopping, onOrderSent }:
                             Bill Summary
                         </span>
                         <span className="text-[10px] font-bold uppercase tracking-wider text-isabelline/50">
-                            {tableLabel}
+                            Table 04
                         </span>
                     </div>
 
@@ -553,7 +504,7 @@ export function CartScreen({ venueId, onBack, onContinueShopping, onOrderSent }:
             {/* ═══════════════════════════════════════════════════════════
                 STICKY BOTTOM CTA — Send to Kitchen
               ═══════════════════════════════════════════════════════════ */}
-            <div className="fixed inset-x-0 bottom-0 z-40 flex justify-center px-5 pb-[calc(80px+env(safe-area-inset-bottom))] pt-3 bg-gradient-to-t from-isabelline via-isabelline/95 to-transparent">
+            <div className="fixed inset-x-0 bottom-0 z-40 flex justify-center px-5 md:px-8 pb-[calc(72px+env(safe-area-inset-bottom))] pt-3 bg-gradient-to-t from-isabelline via-isabelline/95 to-transparent">
                 <button
                     type="button"
                     onClick={handleSendToKitchen}

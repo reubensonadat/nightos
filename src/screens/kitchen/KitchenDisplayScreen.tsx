@@ -87,7 +87,7 @@ type Props = {
 export function KitchenDisplayScreen({ venueId, onExit }: Props) {
     const [orders, setOrders] = useState<KitchenOrder[]>(MOCK_ORDERS);
     const [useMock, setUseMock] = useState(true);
-    const [now, setNow] = useState(() => Date.now());
+    const [now, setNow] = useState(Date.now());
     const [stationFilter, setStationFilter] = useState<StationFilter>("all");
 
     const { orders: submissions } = useOrders(venueId);

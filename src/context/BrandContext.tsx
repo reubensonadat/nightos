@@ -6,12 +6,12 @@ import { createContext, useContext, useState, useEffect, useCallback, type React
    ═══════════════════════════════════════════════════════════════════════════ */
 
 export type BrandColors = {
-    primary: string;       // Main brand (was licorice #23140C) → default #000000
-    secondary: string;     // Surface/bg (was isabelline #F3F3E3) → default #FFFFFF
-    accent: string;        // Accent (was khaki #D0BA98) → default #666666
-    textSecondary: string; // Secondary text (was feldgrau #606F69) → default #888888
-    danger: string;        // Danger/error (was dark-red #91040C) → default #DC2626
-    lightBlue: string;     // Light blue accent (was #A9CFE0) → default #E5E7EB
+    primary: string;       // Main brand (licorice)
+    secondary: string;     // Surface/bg (isabelline)
+    accent: string;        // Accent (khaki)
+    textSecondary: string; // Secondary text (feldgrau)
+    danger: string;        // Danger/error (dark-red)
+    lightBlue: string;     // Light blue accent
 };
 
 const DEFAULT_BRAND: BrandColors = {
@@ -39,9 +39,7 @@ function loadBrand(): BrandColors {
             const parsed = JSON.parse(saved);
             return { ...DEFAULT_BRAND, ...parsed };
         }
-    } catch (e) {
-        console.error("Failed to load brand colors", e);
-    }
+    } catch {}
     return { ...DEFAULT_BRAND };
 }
 
@@ -106,7 +104,6 @@ export function BrandProvider({ children }: { children: ReactNode }) {
     );
 }
 
-// eslint-disable-next-line react-refresh/only-export-components
 export function useBrand() {
     const ctx = useContext(BrandContext);
     if (!ctx) throw new Error("useBrand must be used within a BrandProvider");

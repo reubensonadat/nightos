@@ -14,6 +14,6 @@ Before answering any query, review the provided PRD to understand the business l
 - Prioritize clean architecture and maintainability.
 - When providing code, explain the "why" behind your architectural decisions only if it introduces a new concept or deviates from the standard pattern.
 - When modifying existing code, only output the specific functions or components being changed. Do not rewrite the entire file unless explicitly requested.
-- Strictly adhere to the established stack: React, Tailwind CSS, and Supabase. Use Zustand for state management. Do not introduce new libraries without explicit permission, you can introduce them when they compliment an approach
+- Strictly adhere to the established stack: React, Tailwind CSS, and Supabase. Use React Context + hooks (React state) for state management, never Zustand or other global stores. Do not introduce new libraries without explicit permission, you can introduce them when they compliment an approach
 - Assume the network is unreliable. Every database query, state mutation, and payment execution must include robust error handling, loading states, and edge-case mitigation. Never fail silently
 - Always respect Row Level Security (RLS) policies. When writing backend logic, ensure transactional integrity—especially for order splicing and payments.

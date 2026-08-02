@@ -8,7 +8,7 @@ import {
     ChevronRightIcon,
 } from "@heroicons/react/24/solid";
 import { formatGHS, type MenuItem, type ModifierGroup, type ModifierOption } from "../data/menu";
-import { useTabStore } from "../store/useTabStore";
+import { useCart } from "../context/CartContext";
 
 type Props = {
     item: MenuItem | null;
@@ -16,7 +16,7 @@ type Props = {
 };
 
 export function ItemDetailsSheet({ item, onClose }: Props) {
-    const { addCustom } = useTabStore();
+    const { addCustom } = useCart();
     const [qty, setQty] = useState(1);
     const [notes, setNotes] = useState("");
     /** selections: groupId -> Set<optionId>  (single-select groups still use a Set of size 1) */
@@ -27,7 +27,6 @@ export function ItemDetailsSheet({ item, onClose }: Props) {
     // Reset state whenever a new item is opened
     useEffect(() => {
         if (item) {
-            // eslint-disable-next-line react-hooks/set-state-in-effect
             setQty(1);
             setNotes("");
             setSelections({});
@@ -436,7 +435,7 @@ export function ItemDetailsSheet({ item, onClose }: Props) {
                     className="
                         shrink-0 border-t border-licorice/8
                         bg-isabelline
-                        px-5 md:px-8 pt-3 pb-[max(env(safe-area-inset-bottom),16px)]
+                        px-5 md:px-8 pt-3 pb-[calc(72px+env(safe-area-inset-bottom))]
                     "
                 >
                     <div className="flex items-center gap-3">

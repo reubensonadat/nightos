@@ -1,8 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import {
     ArrowLeftIcon,
+    ArrowRightIcon,
     HeartIcon,
     MagnifyingGlassIcon,
+    MapPinIcon,
     PlusIcon,
 } from "@heroicons/react/24/outline";
 import { HeartIcon as HeartIconSolid } from "@heroicons/react/24/solid";
@@ -13,7 +16,7 @@ import {
     type MenuCategory,
     type MenuItem,
 } from "../data/menu";
-import { useTabStore, useTabComputed } from "../store/useTabStore";
+import { useCart } from "../context/CartContext";
 import { ItemDetailsSheet } from "../components/ItemDetailsSheet";
 import { db } from "../lib/api";
 import type { DbProduct } from "../lib/api";
@@ -21,6 +24,7 @@ import type { DbProduct } from "../lib/api";
 type Props = {
     venueId?: string;
     onBack?: () => void;
+    onViewCart?: () => void;
 };
 
 async function fetchProducts(venueId: string): Promise<MenuItem[]> {
@@ -46,24 +50,14 @@ function mapCategory(_categoryId: string | null): MenuCategory {
     return "Signatures";
 }
 
-export function MenuScreen({ venueId, onBack }: Props) {
+export function MenuScreen({ venueId, onViewCart }: Props) {
+    const navigate = useNavigate();
     const [active, setActive] = useState<MenuCategory>("Signatures");
     const [query, setQuery] = useState("");
     const [activeItemId, setActiveItemId] = useState<string | null>(null);
-    const { addQuick, toggleFavorite } = useTabStore();
-    const { isFavorite } = useTabComputed();
     const [supabaseItems, setSupabaseItems] = useState<MenuItem[] | null>(null);
-
-    const session = useMemo(() => {
-        try {
-            const sessionStr = localStorage.getItem("nightos:session");
-            return sessionStr ? JSON.parse(sessionStr) : null;
-        } catch {
-            return null;
-        }
-    }, []);
-
-    const tableLabel = session?.tableLabel || "Table 04";
+    const { addQuick, subtotal, itemCount, toggleFavorite, isFavorite } =
+        useCart();
 
     useEffect(() => {
         if (!venueId) return;
@@ -109,51 +103,37 @@ export function MenuScreen({ venueId, onBack }: Props) {
             <header className="sticky top-0 z-30 bg-isabelline/95 backdrop-blur-xl border-b border-licorice/8">
                 {/* ── Top Bar ── */}
                 <div className="mx-auto flex w-full max-w-7xl items-center justify-between px-5 md:px-8 pt-[max(env(safe-area-inset-top),16px)] pb-3 relative">
-                    <div className="flex items-center">
-                        {onBack && (
-                            <button
-                                type="button"
-                                onClick={onBack}
-                                aria-label="Back"
-                                className="flex h-9 w-9 items-center justify-center rounded-full bg-white text-licorice shadow-sm ring-1 ring-licorice/8 transition-colors hover:bg-isabelline active:scale-95"
-                            >
-                                <ArrowLeftIcon className="h-4 w-4" strokeWidth={2.25} />
-                            </button>
-                        )}
-                    </div>
+                    {/* Left: Back */}
+                    <button
+                        type="button"
+                        onClick={() => navigate("/home")}
+                        aria-label="Back"
+                        className="flex h-9 w-9 items-center justify-center rounded-full bg-white text-licorice shadow-sm ring-1 ring-licorice/8 transition-colors hover:bg-isabelline active:scale-95"
+                    >
+                        <ArrowLeftIcon className="h-4 w-4" strokeWidth={2.25} />
+                    </button>
 
-                    <div className="absolute inset-x-0 top-[max(env(safe-area-inset-top),16px)] bottom-3 flex items-center justify-center pointer-events-none">
-                        <span className="text-[18px] font-bold tracking-tight text-licorice pointer-events-auto">
-                            Menu
+                    {/* Middle: Title */}
+                    <h1 className="text-[16px] font-bold tracking-tight text-licorice absolute left-1/2 -translate-x-1/2">
+                        Menu
+                    </h1>
+
+                    {/* Right: Table 4 pill */}
+                    <div className="flex items-center gap-1.5 rounded-full border border-licorice/15 bg-licorice/5 px-3 py-2">
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-licorice">
+                            Table 4
                         </span>
-                    </div>
-
-                    <div className="flex items-center">
-                        <button
-                            type="button"
-                            className="
-                                rounded-full border border-licorice/20 bg-transparent
-                                px-3 py-1.5
-                                text-[11px] font-bold uppercase tracking-wider text-licorice
-                                transition-all
-                                hover:border-licorice/40 hover:bg-licorice/5
-                                active:scale-95
-                            "
-                        >
-                            {tableLabel}
-                        </button>
                     </div>
                 </div>
 
                 {/* Search input */}
-                <div className="mx-auto w-full max-w-7xl px-5 md:px-8 pb-3 animate-velvet-fade">
+                <div className="mx-auto w-full max-w-7xl px-5 md:px-8 pb-3">
                     <div className="flex items-center gap-2 rounded-full bg-white px-4 py-2.5 shadow-sm ring-1 ring-licorice/8">
                         <MagnifyingGlassIcon
                             className="h-4 w-4 text-feldgrau"
                             strokeWidth={2.25}
                         />
                         <input
-                            autoFocus
                             value={query}
                             onChange={(e) => setQuery(e.target.value)}
                             placeholder="Search cocktails, wines, plates…"
@@ -185,7 +165,7 @@ export function MenuScreen({ venueId, onBack }: Props) {
                                         setQuery("");
                                     }}
                                     className={`shrink-0 inline-flex items-center rounded-full px-4 py-2 text-[12px] font-bold tracking-tight transition-all duration-200 ease-out ${isActive
-                                        ? "bg-licorice text-isabelline shadow-[0_4px_14px_rgba(35,20,12,0.25)]"
+                                        ? "bg-licorice text-isabelline"
                                         : "bg-white text-feldgrau ring-1 ring-licorice/8 hover:text-licorice hover:ring-licorice/15"
                                         }`}
                                 >
@@ -207,7 +187,17 @@ export function MenuScreen({ venueId, onBack }: Props) {
                         {query ? "Searching" : "Chapter"}
                     </p>
                     <h1 className="mt-1.5 text-[2rem] font-black leading-[1.05] tracking-[-0.04em] text-licorice">
-                        {query ? `"${query}"` : active}
+                        {query ? (
+                            <>"{query}"</>
+                        ) : (
+                            <>
+                                {active}
+                                <br />
+                                <span className="italic font-serif font-bold text-khaki">
+                                    tonight
+                                </span>
+                            </>
+                        )}
                     </h1>
                     {!query && (
                         <p className="mt-2 max-w-[300px] text-[12.5px] leading-[1.55] tracking-tight text-feldgrau">
@@ -215,7 +205,6 @@ export function MenuScreen({ venueId, onBack }: Props) {
                         </p>
                     )}
                 </div>
-
 
                 {/* Empty state */}
                 {visibleItems.length === 0 && (
@@ -287,7 +276,7 @@ export function MenuScreen({ venueId, onBack }: Props) {
                                             type="button"
                                             onClick={(e) => {
                                                 e.stopPropagation();
-                                                addQuick(item);
+                                                addQuick(item.id);
                                             }}
                                             aria-label={`Add ${item.name} to cart`}
                                             className="relative z-20 flex h-8 w-8 items-center justify-end text-licorice transition-transform hover:opacity-70 active:scale-90"
@@ -317,6 +306,38 @@ export function MenuScreen({ venueId, onBack }: Props) {
                     })}
                 </div>
             </section>
+
+            {/* ═══════════════════════════════════════════════════════════
+                FLOATING CART SUMMARY
+              ═══════════════════════════════════════════════════════════ */}
+            {itemCount > 0 && (
+                <div className="fixed inset-x-0 bottom-0 z-40 flex justify-center px-5 md:px-8 pb-[calc(72px+env(safe-area-inset-bottom))] pt-3 bg-gradient-to-t from-isabelline via-isabelline/95 to-transparent">
+                    <button
+                        type="button"
+                        onClick={onViewCart}
+                        className="animate-velvet-rise flex w-full max-w-md md:max-w-2xl items-center justify-between gap-3 rounded-full bg-licorice px-6 py-4 shadow-[0_20px_50px_rgba(35,20,12,0.25)] ring-1 ring-licorice/80 transition-all duration-200 ease-out hover:bg-licorice/95 hover:shadow-[0_24px_60px_rgba(35,20,12,0.30)] active:scale-[0.985] focus:outline-none focus-visible:ring-2 focus-visible:ring-khaki"
+                        aria-label={`View cart — ${itemCount} items, ${formatGHS(subtotal)}`}
+                    >
+                        <div className="flex items-center gap-3">
+                            <span className="flex h-9 w-9 items-center justify-center rounded-full bg-isabelline/15 text-[14px] font-bold text-isabelline ring-1 ring-isabelline/20">
+                                {itemCount}
+                            </span>
+                            <div className="flex flex-col items-start leading-tight">
+                                <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-khaki">
+                                    Your tab
+                                </span>
+                                <span className="text-[15px] font-bold tracking-tight text-isabelline">
+                                    {formatGHS(subtotal)}
+                                </span>
+                            </div>
+                        </div>
+                        <span className="flex items-center gap-1.5 text-[15px] font-bold tracking-tight text-isabelline group-hover:translate-x-0.5 transition-transform duration-200">
+                            View Cart
+                            <ArrowRightIcon className="h-4 w-4" strokeWidth={2.25} />
+                        </span>
+                    </button>
+                </div>
+            )}
 
             {/* ── Item Details Bottom Sheet ── */}
             <ItemDetailsSheet item={activeItem} onClose={() => setActiveItemId(null)} />

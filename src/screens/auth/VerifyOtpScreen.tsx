@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
+import toast from 'react-hot-toast'
 import { useAuth } from '../../context/AuthContext'
 
 const OTP_STORAGE_KEY = 'nightos:otp_pending'
@@ -99,7 +100,9 @@ export function VerifyOtpScreen() {
 
     if (error) {
       setError(error.message)
+      toast.error(error.message)
     } else {
+      toast.success('Verified! Welcome back.')
       sessionStorage.removeItem(OTP_STORAGE_KEY)
       navigate('/dashboard', { replace: true })
     }
@@ -113,7 +116,9 @@ export function VerifyOtpScreen() {
     setResending(false)
     if (error) {
       setError(error.message)
+      toast.error(error.message)
     } else {
+      toast.success('Code resent. Check your phone.')
       sessionStorage.setItem(
         OTP_STORAGE_KEY,
         JSON.stringify({ phone, mode, sentAt: Date.now() }),
