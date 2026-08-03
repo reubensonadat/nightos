@@ -1,27 +1,8 @@
-import { useEffect, useMemo, useState, useCallback } from "react";
+import { useEffect, useMemo, useState, useCallback, useRef } from "react";
+import { useRealtime } from "../../hooks/useRealtime";
 import { ArrowPathIcon, SpeakerWaveIcon } from "@heroicons/react/24/outline";
 import { OrderCard, type KitchenOrder, type OrderStatus } from "../../components/OrderCard";
-import { useOrders } from "../../hooks/useOrders";
-import { db } from "../../lib/api";
-
-/* ────────────────────────── Mock initial orders ────────────────────────── */
-
-const MOCK_NOW = new Date();
-
-function minutesAgo(mins: number): string {
-    const d = new Date(MOCK_NOW);
-    d.setMinutes(d.getMinutes() - mins);
-    return d.toISOString();
-}
-
-const MOCK_ORDERS: KitchenOrder[] = [
-    { id: "o-101", tableNumber: 2, station: "Bar", status: "pending", placedAt: minutesAgo(2), server: "Kojo", items: [{ name: "Velvet Old Fashioned", quantity: 2 }, { name: "Hibiscus Spritz", quantity: 1, notes: "No ice" }] },
-    { id: "o-102", tableNumber: 6, station: "Kitchen", status: "pending", placedAt: minutesAgo(4), server: "Ama", items: [{ name: "Lamb Suya Skewers", quantity: 2 }, { name: "Grilled Plantain", quantity: 1, notes: "Extra spicy" }] },
-    { id: "o-103", tableNumber: 4, station: "Bar", status: "preparing", placedAt: minutesAgo(8), server: "Kojo", items: [{ name: "Cocoa Espresso Martini", quantity: 1 }] },
-    { id: "o-104", tableNumber: 8, station: "Kitchen", status: "preparing", placedAt: minutesAgo(12), server: "Kojo", items: [{ name: "Beef Tataki", quantity: 1 }, { name: "Lamb Suya Skewers", quantity: 3, notes: "One well-done" }, { name: "Grilled Plantain", quantity: 2 }] },
-    { id: "o-105", tableNumber: 3, station: "Bar", status: "ready", placedAt: minutesAgo(15), server: "Ama", items: [{ name: "Smoky Negroni", quantity: 2 }] },
-    { id: "o-106", tableNumber: 1, station: "Kitchen", status: "ready", placedAt: minutesAgo(18), server: "Ama", items: [{ name: "Beef Tataki", quantity: 2 }] },
-];
+import { db, type DbKitchenOrderRow } from "../../lib/api";
 
 /* ────────────────────────── Station filter ────────────────────────── */
 
@@ -63,7 +44,7 @@ const COLUMNS: Column[] = [
     },
 ];
 
-/* ────────────────────────── Convert Supabase submission to KitchenOrder ────────────────────────── */
+/* ────────────────────────── Convert DB row to KitchenOrder ────────────────────────── */
 
 function mapStation(s: string): "Kitchen" | "Bar" {
     if (s === "bar") return "Bar";
@@ -71,81 +52,97 @@ function mapStation(s: string): "Kitchen" | "Bar" {
 }
 
 function orderStatus(s: string): OrderStatus {
-    if (s === "confirmed") return "pending";
     if (s === "preparing") return "preparing";
-    if (s === "ready" || s === "served") return "ready";
+    if (s === "ready") return "ready";
     return "pending";
+}
+
+function rowToOrder(row: DbKitchenOrderRow, waiterNames: Record<string, string>): KitchenOrder {
+    const bill = Array.isArray(row.bills) ? row.bills[0] : row.bills;
+    const table = Array.isArray(bill?.tables) ? bill?.tables[0] : bill?.tables;
+    return {
+        id: row.id,
+        tableNumber: table?.table_number ?? 0,
+        station: mapStation(row.station),
+        status: orderStatus(row.status),
+        placedAt: row.created_at,
+        server: bill?.waiter_id
+            ? waiterNames[bill.waiter_id] ?? "—"
+            : "—",
+        items: (row.order_items ?? []).map((oi) => ({
+            name: oi.product_name,
+            quantity: oi.quantity,
+            ...(oi.notes ? { notes: oi.notes } : {}),
+        })),
+    };
 }
 
 /* ────────────────────────── Component ────────────────────────── */
 
 type Props = {
     venueId: string;
+    staffId: string;
+    staffName: string;
     onExit?: () => void;
+    onSignOut?: () => void;
 };
 
-export function KitchenDisplayScreen({ venueId, onExit }: Props) {
-    const [orders, setOrders] = useState<KitchenOrder[]>(MOCK_ORDERS);
-    const [useMock, setUseMock] = useState(true);
+export function KitchenDisplayScreen({ venueId, staffId, staffName, onExit, onSignOut }: Props) {
+    const [orders, setOrders] = useState<KitchenOrder[]>([]);
     const [now, setNow] = useState(Date.now());
     const [stationFilter, setStationFilter] = useState<StationFilter>("all");
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
 
-    const { orders: submissions, loading, refresh } = useOrders(venueId);
-
-    /* ── Convert submissions to KitchenOrders ── */
-    useEffect(() => {
-        if (!submissions || submissions.length === 0) return;
-
-        let cancelled = false;
-
-        async function mapSubmissions() {
-            const enriched: KitchenOrder[] = [];
-
-            for (const sub of submissions) {
-                if (cancelled) break;
-
-                // Fetch bill + table for table number
-                const billRes = await db.billWithTable(sub.bill_id);
-                if (cancelled || billRes.error || !billRes.data) continue;
-
-                const bill = billRes.data as any;
-                const tableNumber = bill.tables?.table_number ?? 0;
-
-                // Fetch order items
-                const itemsRes = await db.orderItemsBySubmission(sub.id);
-                if (cancelled) break;
-
-                const items = (itemsRes.data ?? []).map((oi: any) => ({
-                    name: oi.product_name,
-                    quantity: oi.quantity,
-                    ...(oi.notes ? { notes: oi.notes } : {}),
-                }));
-
-                enriched.push({
-                    id: sub.id,
-                    tableNumber,
-                    station: mapStation(sub.station),
-                    status: orderStatus(sub.status),
-                    placedAt: sub.created_at,
-                    server: bill.waiter_id?.slice(0, 8) ?? "—",
-                    items,
-                });
-            }
-
-            if (!cancelled) {
-                if (enriched.length > 0) {
-                    setOrders(enriched);
-                    setUseMock(false);
-                } else {
-                    setUseMock(true);
-                }
-            }
+    /* ── Load real orders ── */
+    const load = useCallback(async () => {
+        const { data: rows, error: dbError } = await db.kitchenOrders(venueId);
+        if (dbError || !rows) {
+            setError("Couldn't load orders — check your connection.");
+            setLoading(false);
+            return;
         }
+        setError(null);
 
-        mapSubmissions();
+        // waiter names for the cards
+        const waiterIds = Array.from(
+            new Set(rows.map((r) => (Array.isArray(r.bills) ? r.bills[0] : r.bills)?.waiter_id).filter((id): id is string => !!id)),
+        );
+        const { data: staffRows } = await db.staffNamesByIds(waiterIds);
 
-        return () => { cancelled = true; };
-    }, [submissions]);
+        const waiterNames: Record<string, string> = {};
+        for (const s of staffRows ?? []) waiterNames[s.id] = s.name;
+
+        setOrders(rows.map((r) => rowToOrder(r, waiterNames)));
+        setLoading(false);
+    }, [venueId]);
+
+    useEffect(() => {
+        load();
+    }, [load]);
+
+    // Live updates — no polling. A new/updated submission (or its items)
+    // reloads the board; the debounce covers the submission+items pair.
+    const reloadTimer = useRef<number | null>(null);
+    const scheduleReload = useCallback(() => {
+        if (reloadTimer.current !== null) window.clearTimeout(reloadTimer.current);
+        reloadTimer.current = window.setTimeout(() => {
+            reloadTimer.current = null;
+            load();
+        }, 500);
+    }, [load]);
+
+    useRealtime({
+        table: 'order_submissions',
+        filter: `venue_id=eq.${venueId}`,
+        onInsert: scheduleReload,
+        onUpdate: scheduleReload,
+        onDelete: scheduleReload,
+    });
+    useRealtime({
+        table: 'order_items',
+        onInsert: scheduleReload,
+    });
 
     /* ── Auto-refresh tick: update "now" every 30s for timer accuracy ── */
     useEffect(() => {
@@ -182,24 +179,26 @@ export function KitchenDisplayScreen({ venueId, onExit }: Props) {
         return groups;
     }, [filteredOrders]);
 
-    /* ── Order status mutations (push to Supabase) ── */
-    const advanceOrder = useCallback(async (orderId: string) => {
-        setOrders((prev) =>
-            prev.map((o) => (o.id === orderId ? { ...o, status: "preparing" } : o))
-        );
-        if (!useMock) {
-            await db.updateOrderSubmissionStatus(orderId, 'preparing');
-        }
-    }, [useMock]);
-
-    const markReady = useCallback(async (orderId: string) => {
-        setOrders((prev) =>
-            prev.map((o) => (o.id === orderId ? { ...o, status: "ready" } : o))
-        );
-        if (!useMock) {
-            await db.updateOrderSubmissionStatus(orderId, 'ready');
-        }
-    }, [useMock]);
+    /* ── Status mutations (validated server-side) ── */
+    const changeStatus = useCallback(
+        async (orderId: string, status: 'preparing' | 'ready' | 'served') => {
+            const prev = orders;
+            setOrders((o) =>
+                o.map((x) =>
+                    x.id === orderId && status !== 'served' ? { ...x, status } : x
+                )
+            );
+            if (status === 'served') setOrders((o) => o.filter((x) => x.id !== orderId));
+            const { data: ok, error: dbError } = await db.setOrderStatus(orderId, status, staffId);
+            if (dbError || !ok) {
+                setOrders(prev);
+                setError("Status change failed — try again.");
+            } else {
+                setError(null);
+            }
+        },
+        [orders, staffId]
+    );
 
     /* ── Header stats ── */
     const totalOrders = filteredOrders.length;
@@ -227,7 +226,7 @@ export function KitchenDisplayScreen({ venueId, onExit }: Props) {
                                     Kitchen Display
                                 </span>
                                 <span className="text-[9px] font-semibold uppercase tracking-[0.18em] text-isabelline/60">
-                                    Velvet Lounge · NightOS
+                                    Velvet Lounge · {staffName}
                                 </span>
                             </div>
                         </div>
@@ -254,8 +253,17 @@ export function KitchenDisplayScreen({ venueId, onExit }: Props) {
                         <div className="flex items-center gap-2">
                             <div className="hidden sm:flex items-center gap-1.5 rounded-full bg-isabelline/10 px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-isabelline/80">
                                 <ArrowPathIcon className="h-3 w-3 animate-spin" strokeWidth={2.5} style={{ animationDuration: "3s" }} />
-                                {useMock ? "Mock" : "Live"}
+                                Live
                             </div>
+                            {onSignOut && (
+                                <button
+                                    type="button"
+                                    onClick={onSignOut}
+                                    className="rounded-full bg-isabelline/10 px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-isabelline/80 transition-colors hover:bg-isabelline/20"
+                                >
+                                    Switch staff
+                                </button>
+                            )}
                             {onExit && (
                                 <button
                                     type="button"
@@ -308,62 +316,78 @@ export function KitchenDisplayScreen({ venueId, onExit }: Props) {
                 THREE-COLUMN QUEUE
               ═══════════════════════════════════════════════════════════ */}
             <section className="mx-auto w-full max-w-[1400px] px-6 py-6">
-                <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-                    {COLUMNS.map((col) => {
-                        const colOrders = ordersByStatus[col.status];
-                        const count =
-                            col.status === "pending"
-                                ? pendingCount
-                                : col.status === "preparing"
-                                    ? preparingCount
-                                    : readyCount;
-                        return (
-                            <div key={col.status} className="flex flex-col">
-                                {/* Column header */}
-                                <div className="mb-3 flex items-center justify-between rounded-xl bg-white px-4 py-2.5 shadow-sm ring-1 ring-isabelline">
-                                    <div className="flex items-center gap-2.5">
-                                        <span className={`h-2.5 w-2.5 rounded-full ${col.accent}`} />
-                                        <h2 className="text-[13px] font-bold tracking-tight text-licorice">
-                                            {col.label}
-                                        </h2>
-                                    </div>
-                                    <span className={`inline-flex items-center justify-center rounded-full px-2 py-0.5 text-[10px] font-bold tabular-nums ${col.countBg}`}>
-                                        {count}
-                                    </span>
-                                </div>
+                {error && (
+                    <div className="mb-4 rounded-xl bg-dark-red/8 px-4 py-3 text-[12px] font-semibold tracking-tight text-dark-red ring-1 ring-dark-red/20">
+                        {error}
+                    </div>
+                )}
 
-                                {/* Cards */}
-                                <div className="flex flex-col gap-3">
-                                    {colOrders.length === 0 ? (
-                                        <div className="flex flex-col items-center justify-center rounded-2xl border-2 border-dashed border-licorice/10 px-6 py-12 text-center">
-                                            <span className="h-1.5 w-1.5 rounded-full bg-licorice/20" />
-                                            <p className="mt-3 text-[11px] font-bold uppercase tracking-wider text-feldgrau/60">
-                                                No orders
-                                            </p>
-                                            <p className="mt-1 text-[10px] tracking-tight text-feldgrau/50">
-                                                {col.status === "pending"
-                                                    ? "New orders appear here"
-                                                    : col.status === "preparing"
-                                                        ? "Tap Start on a pending order"
-                                                        : "Completed orders queue here"}
-                                            </p>
+                {loading && orders.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center py-24 text-center">
+                        <div className="h-8 w-8 animate-spin rounded-full border-2 border-licorice/20 border-t-licorice" />
+                        <p className="mt-4 text-[11px] font-bold uppercase tracking-wider text-feldgrau/60">
+                            Loading orders…
+                        </p>
+                    </div>
+                ) : (
+                    <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+                        {COLUMNS.map((col) => {
+                            const colOrders = ordersByStatus[col.status];
+                            const count =
+                                col.status === "pending"
+                                    ? pendingCount
+                                    : col.status === "preparing"
+                                        ? preparingCount
+                                        : readyCount;
+                            return (
+                                <div key={col.status} className="flex flex-col">
+                                    {/* Column header */}
+                                    <div className="mb-3 flex items-center justify-between rounded-xl bg-white px-4 py-2.5 shadow-sm ring-1 ring-isabelline">
+                                        <div className="flex items-center gap-2.5">
+                                            <span className={`h-2.5 w-2.5 rounded-full ${col.accent}`} />
+                                            <h2 className="text-[13px] font-bold tracking-tight text-licorice">
+                                                {col.label}
+                                            </h2>
                                         </div>
-                                    ) : (
-                                        colOrders.map((order) => (
-                                            <OrderCard
-                                                key={order.id}
-                                                order={order}
-                                                now={now}
-                                                onAdvance={advanceOrder}
-                                                onMarkReady={markReady}
-                                            />
-                                        ))
-                                    )}
+                                        <span className={`inline-flex items-center justify-center rounded-full px-2 py-0.5 text-[10px] font-bold tabular-nums ${col.countBg}`}>
+                                            {count}
+                                        </span>
+                                    </div>
+
+                                    {/* Cards */}
+                                    <div className="flex flex-col gap-3">
+                                        {colOrders.length === 0 ? (
+                                            <div className="flex flex-col items-center justify-center rounded-2xl border-2 border-dashed border-licorice/10 px-6 py-12 text-center">
+                                                <span className="h-1.5 w-1.5 rounded-full bg-licorice/20" />
+                                                <p className="mt-3 text-[11px] font-bold uppercase tracking-wider text-feldgrau/60">
+                                                    No orders
+                                                </p>
+                                                <p className="mt-1 text-[10px] tracking-tight text-feldgrau/50">
+                                                    {col.status === "pending"
+                                                        ? "New orders appear here as customers send them"
+                                                        : col.status === "preparing"
+                                                            ? "Tap Start on a pending order"
+                                                            : "Completed orders queue here"}
+                                                </p>
+                                            </div>
+                                        ) : (
+                                            colOrders.map((order) => (
+                                                <OrderCard
+                                                    key={order.id}
+                                                    order={order}
+                                                    now={now}
+                                                    onAdvance={(id) => changeStatus(id, "preparing")}
+                                                    onMarkReady={(id) => changeStatus(id, "ready")}
+                                                    onMarkServed={(id) => changeStatus(id, "served")}
+                                                />
+                                            ))
+                                        )}
+                                    </div>
                                 </div>
-                            </div>
-                        );
-                    })}
-                </div>
+                            );
+                        })}
+                    </div>
+                )}
             </section>
 
             {/* ═══════════════════════════════════════════════════════════

@@ -55,7 +55,7 @@ export function AdminLoginScreen({ onSignIn }: LoginProps) {
                     </div>
                     <div className="flex flex-col leading-tight">
                         <span className="text-[14px] font-bold tracking-tight text-licorice">Velvet Lounge</span>
-                        <span className="text-[9px] font-semibold uppercase tracking-[0.18em] text-feldgrau">Manager Portal · NightOS</span>
+                        <span className="text-[9px] font-semibold uppercase tracking-[0.18em] text-feldgrau">Manager Portal · Bysen</span>
                     </div>
                 </div>
             </div>
@@ -149,7 +149,7 @@ export function AdminLoginScreen({ onSignIn }: LoginProps) {
             <div className="px-6 pb-[max(env(safe-area-inset-bottom),20px)] pt-4">
                 <div className="flex items-center justify-center gap-1.5 text-[10px] font-semibold tracking-tight text-feldgrau">
                     <ShieldCheckIcon className="h-3.5 w-3.5" strokeWidth={2} />
-                    <span>Secured by NightOS · Supabase Auth</span>
+                    <span>Secured by Bysen · Supabase Auth</span>
                 </div>
             </div>
         </main>

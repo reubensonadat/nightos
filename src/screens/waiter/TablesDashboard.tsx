@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useCallback } from "react";
+import { useState, useMemo, useEffect, useCallback, useRef } from "react";
 import {
     ArrowRightIcon,
     ArrowPathIcon,
@@ -7,6 +7,7 @@ import {
 } from "@heroicons/react/24/outline";
 import { formatGHS } from "../../data/menu";
 import { db } from "../../lib/api";
+import { useRealtime } from "../../hooks/useRealtime";
 
 /* ────────────────────────── Table types ────────────────────────── */
 
@@ -24,32 +25,6 @@ export type Table = {
     reservationGuests?: number;
     server?: string;
 };
-
-const MOCK_TABLES: Table[] = [
-    { id: "t01", number: 1, label: "1", status: "available" },
-    {
-        id: "t02", number: 2, label: "2", status: "occupied",
-        guests: 2, tabTotal: 245, seatedAt: new Date(Date.now() - 45 * 60_000).toISOString(), server: "Kojo",
-    },
-    {
-        id: "t03", number: 3, label: "3", status: "reserved",
-        reservationTime: "7:30 PM", reservationGuests: 4,
-    },
-    {
-        id: "t04", number: 4, label: "4", status: "occupied",
-        guests: 1, tabTotal: 95, seatedAt: new Date(Date.now() - 18 * 60_000).toISOString(), server: "Kojo",
-    },
-    { id: "t05", number: 5, label: "5", status: "available" },
-    {
-        id: "t06", number: 6, label: "6", status: "occupied",
-        guests: 6, tabTotal: 480, seatedAt: new Date(Date.now() - 90 * 60_000).toISOString(), server: "Ama",
-    },
-    { id: "t07", number: 7, label: "7", status: "available" },
-    {
-        id: "t08", number: 8, label: "8", status: "occupied",
-        guests: 3, tabTotal: 180, seatedAt: new Date(Date.now() - 35 * 60_000).toISOString(), server: "Kojo",
-    },
-];
 
 /* ────────────────────────── Helpers ────────────────────────── */
 
@@ -86,12 +61,9 @@ function statusDot(status: TableStatus): string {
     }
 }
 
-/** Calculate minutes since seated. */
-function minutesSince(timeStr: string): number {
-    const [h, m] = timeStr.split(":").map(Number);
-    const seated = new Date();
-    seated.setHours(h, m, 0, 0);
-    return Math.max(0, Math.floor((Date.now() - seated.getTime()) / 60_000));
+/** Minutes since an ISO timestamp. */
+function minutesSince(iso: string): number {
+    return Math.max(0, Math.floor((Date.now() - new Date(iso).getTime()) / 60_000));
 }
 
 function formatDuration(mins: number): string {
@@ -117,12 +89,14 @@ const FILTERS: { id: Filter; label: string }[] = [
 type Props = {
     venueId: string;
     staffName: string;
+    staffId: string;
+    role: string;
     onSelectTable: (table: Table) => void;
     onSignOut: () => void;
     onViewShift?: () => void;
 };
 
-function transformToTables(dbTables: any[], openBills: any[]): Table[] {
+function transformToTables(dbTables: any[], openBills: any[], waiterNames: Record<string, string>): Table[] {
     const billMap = new Map<string, any>();
     for (const b of openBills) {
         billMap.set(b.table_id, b);
@@ -132,7 +106,7 @@ function transformToTables(dbTables: any[], openBills: any[]): Table[] {
         if (bill) {
             const guestCount = bill.guest_count ?? 1;
             const seatedAt = bill.created_at;
-            // estimate duration from bill created_at
+            const waiterId = bill.waiter_id as string | null;
             return {
                 id: t.id,
                 number: t.table_number,
@@ -141,7 +115,7 @@ function transformToTables(dbTables: any[], openBills: any[]): Table[] {
                 guests: guestCount,
                 tabTotal: bill.total,
                 seatedAt,
-                server: undefined, // bill.waiter_id could be resolved
+                server: waiterId ? (waiterNames[waiterId] ?? undefined) : undefined,
             };
         }
         return {
@@ -153,11 +127,18 @@ function transformToTables(dbTables: any[], openBills: any[]): Table[] {
     });
 }
 
-export function TablesDashboard({ venueId, staffName, onSelectTable, onSignOut, onViewShift }: Props) {
-    const [tables, setTables] = useState<Table[]>(MOCK_TABLES);
+export function TablesDashboard({ venueId, staffName, staffId: _staffId, role, onSelectTable, onSignOut, onViewShift }: Props) {
+    const [tables, setTables] = useState<Table[]>([]);
     const [filter, setFilter] = useState<Filter>("all");
     const [refreshing, setRefreshing] = useState(false);
-    const [useMock, setUseMock] = useState(false);
+    const [loading, setLoading] = useState(true);
+    const reloadTimer = useRef<number | null>(null);
+    const waiterNamesRef = useRef<Record<string, string>>({});
+
+    const scheduleReload = useCallback(() => {
+        if (reloadTimer.current) window.clearTimeout(reloadTimer.current);
+        reloadTimer.current = window.setTimeout(() => fetchDataRef.current(), 500);
+    }, []);
 
     const fetchData = useCallback(async () => {
         if (!venueId) return;
@@ -167,28 +148,50 @@ export function TablesDashboard({ venueId, staffName, onSelectTable, onSignOut, 
                 db.tablesByVenue(venueId),
                 db.billsByVenue(venueId),
             ]);
-            if (tablesResult.data && tablesResult.data.length > 0) {
-                const transformed = transformToTables(tablesResult.data, billsResult.data ?? []);
-                setTables(transformed);
-                setUseMock(false);
-            } else {
-                setUseMock(true);
+            if (tablesResult.error) throw tablesResult.error;
+            const billRows = billsResult.data ?? [];
+            setTables(transformToTables(tablesResult.data ?? [], billRows, waiterNamesRef.current));
+
+            const waiterIds = [
+                ...new Set(
+                    billRows.map((b: any) => b.waiter_id).filter((id: unknown): id is string => typeof id === "string" && id.length > 0)
+                ),
+            ];
+            if (waiterIds.length > 0) {
+                const { data: staffRows } = await db.staffNamesByIds(waiterIds);
+                const names = Object.fromEntries((staffRows ?? []).map((s) => [s.id, s.name]));
+                waiterNamesRef.current = names;
+                setTables(transformToTables(tablesResult.data ?? [], billRows, names));
             }
         } catch {
-            setUseMock(true);
+            // No mock fallback — the grid shows the empty state instead.
         } finally {
             setRefreshing(false);
+            setLoading(false);
         }
     }, [venueId]);
+
+    const fetchDataRef = useRef(fetchData);
+    fetchDataRef.current = fetchData;
 
     useEffect(() => {
         fetchData();
     }, [fetchData]);
 
-    const displayTables = useMemo(
-        () => (useMock ? MOCK_TABLES : tables),
-        [useMock, tables]
-    );
+    // Live updates: bills change when customers land, order or settle.
+    useRealtime({
+        table: "bills",
+        filter: `venue_id=eq.${venueId}`,
+        onInsert: scheduleReload,
+        onUpdate: scheduleReload,
+        onDelete: scheduleReload,
+    });
+
+    useEffect(() => () => {
+        if (reloadTimer.current) window.clearTimeout(reloadTimer.current);
+    }, []);
+
+    const displayTables = tables;
 
     const filteredTables = useMemo(
         () => (filter === "all" ? displayTables : displayTables.filter((t) => t.status === filter)),
@@ -228,7 +231,7 @@ export function TablesDashboard({ venueId, staffName, onSelectTable, onSignOut, 
                                 {staffName}
                             </span>
                             <span className="text-[9px] font-semibold uppercase tracking-[0.18em] text-feldgrau">
-                                Shift · Floor
+                                {role} · Floor
                             </span>
                         </div>
                     </div>
@@ -339,7 +342,35 @@ export function TablesDashboard({ venueId, staffName, onSelectTable, onSignOut, 
                 TABLES GRID
               ═══════════════════════════════════════════════════════════ */}
             <section className="mx-auto w-full max-w-7xl px-5 md:px-8 pt-5 pb-8">
-                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 md:gap-5">
+                {loading ? (
+                    <div className="flex flex-col items-center justify-center rounded-2xl bg-white px-6 py-16 text-center shadow-sm ring-1 ring-isabelline">
+                        <span className="h-6 w-6 animate-spin rounded-full border-2 border-licorice/20 border-t-licorice" />
+                        <p className="mt-4 text-[12px] font-bold tracking-tight text-feldgrau">
+                            Loading tables…
+                        </p>
+                    </div>
+                ) : tables.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center rounded-2xl bg-white px-6 py-16 text-center shadow-sm ring-1 ring-isabelline">
+                        <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-feldgrau">
+                            No tables yet
+                        </span>
+                        <p className="mt-2 max-w-sm text-[12px] leading-relaxed tracking-tight text-feldgrau">
+                            This venue has no active tables in the database. Add tables from the
+                            manager side (or re-run{" "}
+                            <code className="rounded bg-isabelline px-1.5 py-0.5 font-mono text-[11px]">
+                                supabase/seed-velvet.sql
+                            </code>
+                            ), then refresh.
+                        </p>
+                    </div>
+                ) : filteredTables.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center rounded-2xl bg-white px-6 py-16 text-center shadow-sm ring-1 ring-isabelline">
+                        <p className="text-[12px] font-bold tracking-tight text-feldgrau">
+                            No {filter} tables right now.
+                        </p>
+                    </div>
+                ) : (
+                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 md:gap-5">
                     {filteredTables.map((table, idx) => (
                         <button
                             key={table.id}
@@ -397,6 +428,11 @@ export function TablesDashboard({ venueId, staffName, onSelectTable, onSignOut, 
                                                 {formatGHS(table.tabTotal)}
                                             </p>
                                         )}
+                                        {table.server && (
+                                            <p className="mt-1 text-[10px] font-semibold tracking-tight text-feldgrau/80">
+                                                Served by {table.server}
+                                            </p>
+                                        )}
                                     </>
                                 )}
 
@@ -442,6 +478,7 @@ export function TablesDashboard({ venueId, staffName, onSelectTable, onSignOut, 
                         </button>
                     ))}
                 </div>
+                )}
             </section>
         </main>
     );

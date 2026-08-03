@@ -13,9 +13,10 @@ export function VenueSetupScreen() {
   const [submitting, setSubmitting] = useState(false)
   const [slugChecking, setSlugChecking] = useState(false)
   const [slugTaken, setSlugTaken] = useState(false)
+  const [createError, setCreateError] = useState<string | null>(null)
 
   useEffect(() => {
-    if (venue) navigate('/dashboard', { replace: true })
+    if (venue) navigate('/manager', { replace: true })
   }, [venue, navigate])
 
   useEffect(() => {
@@ -28,8 +29,8 @@ export function VenueSetupScreen() {
     if (!slug || slug.length < 3) { setSlugTaken(false); return }
     setSlugChecking(true)
     const timer = setTimeout(async () => {
-      const { data } = await authDb.slugAvailable(slug)
-      setSlugTaken((data as any[] | null)?.length ? true : false)
+      const { count, error } = await authDb.slugAvailable(slug)
+      setSlugTaken(!error && (count ?? 0) > 0)
       setSlugChecking(false)
     }, 400)
     return () => clearTimeout(timer)
@@ -41,11 +42,18 @@ export function VenueSetupScreen() {
   const handleCreate = async () => {
     if (!user) return
     setSubmitting(true)
-    const { error } = await authDb.createVenue(user.id, name.trim(), slug)
+    setCreateError(null)
+    const { data, error } = await authDb.createVenue(user.id, name.trim(), slug)
     setSubmitting(false)
-    if (error) return
+    if (error || !data) {
+      const conflict = error?.code === '23505' || String(error?.message || '').includes('duplicate key')
+      setCreateError(conflict
+        ? 'That URL is already taken. Try a different one (e.g. add a number at the end).'
+        : `Could not create venue: ${error?.message || 'Unknown error'}`)
+      return
+    }
     await refreshVenue()
-    navigate('/dashboard', { replace: true })
+    navigate('/manager', { replace: true })
   }
 
   return (
@@ -89,7 +97,7 @@ export function VenueSetupScreen() {
               <label className="text-[10px] font-bold uppercase tracking-[0.18em] text-feldgrau">Venue URL</label>
               <div className="mt-1.5">
                 <div className="flex items-center gap-2 rounded-xl bg-white px-3.5 py-3 shadow-sm ring-1 ring-licorice/8 focus-within:ring-2 focus-within:ring-licorice/20">
-                  <span className="text-[12px] text-feldgrau">nightos.app/</span>
+                  <span className="text-[12px] text-feldgrau">bysen.app/</span>
                   <input type="text" value={slug}
                     onChange={(e) => setSlug(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ''))}
                     placeholder="velvet-lounge"
@@ -109,6 +117,9 @@ export function VenueSetupScreen() {
                 )}
               </div>
             </div>
+            {createError && (
+              <p className="text-[11px] text-red-600">{createError}</p>
+            )}
             <div className="flex gap-2">
               <button onClick={() => setStep(0)}
                 className="flex-1 rounded-full bg-white px-5 py-3.5 text-[13px] font-bold text-licorice ring-1 ring-licorice/8 hover:bg-isabelline transition-all">

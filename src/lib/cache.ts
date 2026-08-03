@@ -69,7 +69,7 @@ export const TTL = {
 } as const;
 
 export async function cached<T>(
-  queryFn: () => Promise<{ data: T | null; error: unknown }>,
+  queryFn: () => PromiseLike<{ data: T | null; error: unknown }>,
   key: string,
   ttl: number,
 ): Promise<{ data: T | null; error: unknown }> {

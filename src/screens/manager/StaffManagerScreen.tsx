@@ -1,30 +1,43 @@
-import { useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
     CheckIcon,
-    ClockIcon,
     MagnifyingGlassIcon,
+    PhoneIcon,
     PlusIcon,
     ShieldCheckIcon,
-    StarIcon,
     XMarkIcon,
 } from "@heroicons/react/24/outline";
-import { formatGHS } from "../../data/menu";
-import { STAFF, type StaffMember } from "../../data/managerData";
+import toast from "react-hot-toast";
+import { db } from "../../lib/api";
+import { useVenue } from "../../hooks/useVenue";
+import { normalizeGhanaPhone } from "../../lib/utils";
 import clsx from "clsx";
 
-/* ────────────────────────── Constants ────────────────────────── */
+/* ═══════════════════════════════════════════════════════════════════════════
+   STAFF & ROLES — fully real: rows come from the staff table, PIN status is
+   read from the DB, and Add/Activate go through owner RPCs.
+   ═══════════════════════════════════════════════════════════════════════════ */
 
-const ROLE_COLORS: Record<StaffMember["role"], string> = {
-    Manager: "bg-licorice text-isabelline",
-    Waiter: "bg-khaki/20 text-khaki",
-    Kitchen: "bg-light-blue/20 text-licorice",
-    Bartender: "bg-feldgrau/20 text-feldgrau",
-};
+type StaffRow = NonNullable<Awaited<ReturnType<typeof db.staffList>>["data"]>[number];
 
-const SHIFT_LABELS: Record<string, { dot: string; text: string; label: string }> = {
-    on: { dot: "bg-emerald-400", text: "text-emerald-600", label: "On Shift" },
-    break: { dot: "bg-amber-400", text: "text-amber-600", label: "On Break" },
-    off: { dot: "bg-feldgrau/30", text: "text-feldgrau", label: "Off Duty" },
+const ROLE_OPTIONS = [
+    { value: "manager", label: "Manager" },
+    { value: "supervisor", label: "Supervisor" },
+    { value: "waiter", label: "Waiter" },
+    { value: "kitchen", label: "Kitchen" },
+    { value: "bar", label: "Bartender" },
+    { value: "cashier", label: "Cashier" },
+    { value: "owner", label: "Owner" },
+] as const;
+
+const ROLE_COLORS: Record<string, string> = {
+    manager: "bg-licorice text-isabelline",
+    supervisor: "bg-feldgrau/20 text-feldgrau",
+    waiter: "bg-khaki/20 text-khaki",
+    kitchen: "bg-light-blue/20 text-licorice",
+    bar: "bg-khaki/20 text-khaki",
+    cashier: "bg-light-blue/20 text-licorice",
+    owner: "bg-licorice text-isabelline",
 };
 
 const ROLE_PERMISSIONS: Record<string, string[]> = {
@@ -34,58 +47,119 @@ const ROLE_PERMISSIONS: Record<string, string[]> = {
     Bartender: ["View bar queue", "Update drink status", "View menu"],
 };
 
-/* ────────────────────────── Component ────────────────────────── */
+function roleLabel(role: string): string {
+    return ROLE_OPTIONS.find((r) => r.value === role)?.label ?? role;
+}
 
 export function StaffManagerScreen() {
-    const [staff, setStaff] = useState<StaffMember[]>(STAFF);
+    const { venue } = useVenue("velvet-lounge");
+    const [staff, setStaff] = useState<StaffRow[]>([]);
+    const [shiftStaffIds, setShiftStaffIds] = useState<Set<string>>(new Set());
+    const [loading, setLoading] = useState(true);
     const [search, setSearch] = useState("");
-    const [roleFilter, setRoleFilter] = useState<StaffMember["role"] | "All">("All");
+    const [roleFilter, setRoleFilter] = useState<string>("all");
     const [creating, setCreating] = useState(false);
-    const [selectedStaff, setSelectedStaff] = useState<StaffMember | null>(null);
+    const [selectedStaff, setSelectedStaff] = useState<StaffRow | null>(null);
 
-    const filtered = staff.filter((s) => {
-        if (roleFilter !== "All" && s.role !== roleFilter) return false;
-        if (search.trim()) {
-            const q = search.toLowerCase();
-            return s.name.toLowerCase().includes(q) || s.email.toLowerCase().includes(q);
+    const load = useCallback(async () => {
+        if (!venue.id) return;
+        const [{ data: rows }, { data: shifts }] = await Promise.all([
+            db.staffList(venue.id),
+            db.activeShiftsByVenue(venue.id),
+        ]);
+        setStaff(rows ?? []);
+        setShiftStaffIds(new Set((shifts ?? []).map((sh) => sh.staff_id)));
+        setLoading(false);
+    }, [venue.id]);
+
+    useEffect(() => {
+        load();
+    }, [load]);
+
+    const filtered = useMemo(
+        () =>
+            staff.filter((s) => {
+                if (roleFilter !== "all" && s.role !== roleFilter) return false;
+                if (search.trim()) {
+                    const q = search.toLowerCase();
+                    return (
+                        s.name.toLowerCase().includes(q) ||
+                        s.phone.toLowerCase().includes(q) ||
+                        (s.email ?? "").toLowerCase().includes(q)
+                    );
+                }
+                return true;
+            }),
+        [staff, roleFilter, search],
+    );
+
+    const toggleActive = async (id: string, active: boolean) => {
+        const prev = staff;
+        setStaff((cur) => cur.map((s) => (s.id === id ? { ...s, is_active: !s.is_active } : s)));
+        const { data: ok, error } = await db.setStaffActive(id, !active, venue.id);
+        if (error || !ok) {
+            setStaff(prev);
+            toast.error("Could not update this staff member.");
         }
-        return true;
-    });
-
-    const toggleActive = (id: string) => {
-        setStaff((prev) => prev.map((s) => (s.id === id ? { ...s, active: !s.active } : s)));
     };
 
-    const addStaff = (newStaff: StaffMember) => {
-        setStaff((prev) => [newStaff, ...prev]);
+    const addStaff = async (input: {
+        name: string;
+        phone: string;
+        role: string;
+        email?: string;
+        hourlyRate: number;
+        maxTables: number;
+    }) => {
+        const { data, error } = await db.createStaff({
+            venueId: venue.id,
+            name: input.name,
+            phone: input.phone,
+            role: input.role,
+            email: input.email || null,
+            hourlyRate: input.hourlyRate,
+            maxTables: input.maxTables,
+        });
+        if (error || !data?.ok) {
+            const reason =
+                data?.error === "phone_exists"
+                    ? "A staff member with this phone already exists."
+                    : data?.error === "not_owner"
+                      ? "Your account isn't linked to this venue as owner."
+                      : "Could not add staff.";
+            toast.error(reason);
+            return false;
+        }
+        toast.success(`${input.name} added — they'll set their own PIN on first sign-in.`);
         setCreating(false);
+        await load();
+        return true;
     };
 
-    /* ── Stats ── */
     const totalCount = staff.length;
-    const onShift = staff.filter((s) => s.currentShift === "on").length;
-    const totalHoursThisWeek = staff.reduce((s, m) => s + m.hoursThisWeek, 0);
-    const totalPayroll = staff.reduce((s, m) => s + m.hoursThisWeek * m.hourlyRate, 0);
+    const onShift = shiftStaffIds.size;
+    const pinsSet = staff.filter((s) => s.pin_set).length;
+    const activeCount = staff.filter((s) => s.is_active).length;
 
     return (
         <div className="mx-auto w-full max-w-7xl space-y-6">
-            {/* ── Stats row (enhanced) ── */}
+            {/* ── Stats row (real) ── */}
             <div className="grid grid-cols-2 gap-3 md:grid-cols-4 md:gap-4">
                 <div className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-isabelline">
                     <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-feldgrau">Total Staff</p>
-                    <p className="mt-1 font-mono text-[22px] font-black tabular-nums text-licorice">{totalCount}</p>
+                    <p className="mt-1 font-mono text-[22px] font-black tabular-nums text-licorice">{loading ? "…" : totalCount}</p>
                 </div>
                 <div className="rounded-2xl bg-licorice p-4 text-isabelline shadow-[0_8px_24px_rgba(35,20,12,0.15)]">
                     <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-isabelline/60">On Shift Now</p>
-                    <p className="mt-1 font-mono text-[22px] font-black tabular-nums text-khaki">{onShift}</p>
+                    <p className="mt-1 font-mono text-[22px] font-black tabular-nums text-khaki">{loading ? "…" : onShift}</p>
                 </div>
                 <div className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-isabelline">
-                    <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-feldgrau">Hours This Week</p>
-                    <p className="mt-1 font-mono text-[22px] font-black tabular-nums text-licorice">{totalHoursThisWeek}</p>
+                    <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-feldgrau">Active</p>
+                    <p className="mt-1 font-mono text-[22px] font-black tabular-nums text-licorice">{loading ? "…" : activeCount}</p>
                 </div>
                 <div className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-isabelline">
-                    <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-feldgrau">Payroll (week)</p>
-                    <p className="mt-1 font-mono text-[22px] font-black tabular-nums text-khaki">{formatGHS(totalPayroll)}</p>
+                    <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-feldgrau">PINs Set</p>
+                    <p className="mt-1 font-mono text-[22px] font-black tabular-nums text-khaki">{loading ? "…" : `${pinsSet}/${totalCount}`}</p>
                 </div>
             </div>
 
@@ -97,28 +171,35 @@ export function StaffManagerScreen() {
                         type="text"
                         value={search}
                         onChange={(e) => setSearch(e.target.value)}
-                        placeholder="Search staff by name or email…"
+                        placeholder="Search by name, phone or email…"
                         className="min-w-0 flex-1 bg-transparent text-[12px] text-licorice placeholder:text-feldgrau/50 focus:outline-none"
                     />
                 </div>
 
                 <div className="no-scrollbar flex items-center gap-1 overflow-x-auto rounded-full bg-isabelline p-1">
-                    {(["All", "Manager", "Waiter", "Kitchen", "Bartender"] as const).map((r) => {
-                        const isActive = r === roleFilter;
-                        return (
-                            <button
-                                key={r}
-                                type="button"
-                                onClick={() => setRoleFilter(r)}
-                                className={clsx(
-                                    "shrink-0 rounded-full px-3 py-1.5 text-[10px] font-bold tracking-tight transition-all",
-                                    isActive ? "bg-licorice text-isabelline shadow-sm" : "text-feldgrau hover:text-licorice"
-                                )}
-                            >
-                                {r}
-                            </button>
-                        );
-                    })}
+                    <button
+                        type="button"
+                        onClick={() => setRoleFilter("all")}
+                        className={clsx(
+                            "shrink-0 rounded-full px-3 py-1.5 text-[10px] font-bold tracking-tight transition-all",
+                            roleFilter === "all" ? "bg-licorice text-isabelline shadow-sm" : "text-feldgrau hover:text-licorice",
+                        )}
+                    >
+                        All
+                    </button>
+                    {ROLE_OPTIONS.map((r) => (
+                        <button
+                            key={r.value}
+                            type="button"
+                            onClick={() => setRoleFilter(r.value)}
+                            className={clsx(
+                                "shrink-0 rounded-full px-3 py-1.5 text-[10px] font-bold tracking-tight transition-all",
+                                roleFilter === r.value ? "bg-licorice text-isabelline shadow-sm" : "text-feldgrau hover:text-licorice",
+                            )}
+                        >
+                            {r.label}
+                        </button>
+                    ))}
                 </div>
 
                 <button
@@ -133,156 +214,144 @@ export function StaffManagerScreen() {
 
             {/* ── Staff table ── */}
             <div className="overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-isabelline">
-                {/* Desktop table */}
-                <table className="hidden md:table w-full">
-                    <thead className="border-b border-isabelline bg-isabelline/50">
-                        <tr className="text-left">
-                            <th className="px-4 py-2.5 text-[9px] font-bold uppercase tracking-[0.18em] text-feldgrau">Name</th>
-                            <th className="px-4 py-2.5 text-[9px] font-bold uppercase tracking-[0.18em] text-feldgrau">Role</th>
-                            <th className="px-4 py-2.5 text-[9px] font-bold uppercase tracking-[0.18em] text-feldgrau">Performance</th>
-                            <th className="px-4 py-2.5 text-[9px] font-bold uppercase tracking-[0.18em] text-feldgrau">This Week</th>
-                            <th className="px-4 py-2.5 text-[9px] font-bold uppercase tracking-[0.18em] text-feldgrau">Status</th>
-                            <th className="px-4 py-2.5 text-[9px] font-bold uppercase tracking-[0.18em] text-feldgrau text-right">Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody className="divide-y divide-isabelline">
-                        {filtered.map((s) => {
-                            const shift = SHIFT_LABELS[s.currentShift || "off"];
-                            return (
-                                <tr
+                {loading ? (
+                    <div className="flex items-center justify-center py-16">
+                        <div className="h-6 w-6 animate-spin rounded-full border-2 border-licorice/20 border-t-licorice" />
+                    </div>
+                ) : filtered.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center px-6 py-16 text-center">
+                        <h3 className="text-[14px] font-bold tracking-tight text-licorice">No staff found</h3>
+                        <p className="mt-1 text-[12px] tracking-tight text-feldgrau">
+                            Add your first staff member — they'll set their own PIN on first sign-in.
+                        </p>
+                    </div>
+                ) : (
+                    <>
+                        {/* Desktop table */}
+                        <table className="hidden md:table w-full">
+                            <thead className="border-b border-isabelline bg-isabelline/50">
+                                <tr className="text-left">
+                                    <th className="px-4 py-2.5 text-[9px] font-bold uppercase tracking-[0.18em] text-feldgrau">Name</th>
+                                    <th className="px-4 py-2.5 text-[9px] font-bold uppercase tracking-[0.18em] text-feldgrau">Role</th>
+                                    <th className="px-4 py-2.5 text-[9px] font-bold uppercase tracking-[0.18em] text-feldgrau">PIN</th>
+                                    <th className="px-4 py-2.5 text-[9px] font-bold uppercase tracking-[0.18em] text-feldgrau">Status</th>
+                                    <th className="px-4 py-2.5 text-[9px] font-bold uppercase tracking-[0.18em] text-feldgrau text-right">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-isabelline">
+                                {filtered.map((s) => (
+                                    <tr
+                                        key={s.id}
+                                        className="hover:bg-isabelline/30 transition-colors cursor-pointer"
+                                        onClick={() => setSelectedStaff(s)}
+                                    >
+                                        <td className="px-4 py-2.5">
+                                            <div className="flex items-center gap-2.5">
+                                                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-khaki/20 text-khaki">
+                                                    <span className="font-serif text-[13px] font-bold leading-none">{s.name.charAt(0)}</span>
+                                                </div>
+                                                <div className="min-w-0">
+                                                    <p className="truncate text-[12px] font-bold tracking-tight text-licorice">{s.name}</p>
+                                                    <p className="truncate text-[10px] tracking-tight text-feldgrau">{s.phone}</p>
+                                                </div>
+                                            </div>
+                                        </td>
+                                        <td className="px-4 py-2.5">
+                                            <span className={clsx("inline-flex items-center rounded-full px-2.5 py-0.5 text-[9px] font-bold uppercase tracking-wider", ROLE_COLORS[s.role] ?? "bg-isabelline text-feldgrau")}>
+                                                {roleLabel(s.role)}
+                                            </span>
+                                        </td>
+                                        <td className="px-4 py-2.5">
+                                            {s.pin_set ? (
+                                                <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider text-emerald-600">
+                                                    <CheckIcon className="h-2.5 w-2.5" strokeWidth={2.5} />
+                                                    Set
+                                                </span>
+                                            ) : (
+                                                <span className="rounded-full bg-amber-50 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider text-amber-600">
+                                                    First login
+                                                </span>
+                                            )}
+                                        </td>
+                                        <td className="px-4 py-2.5">
+                                            <div className="flex items-center gap-2">
+                                                <button
+                                                    type="button"
+                                                    onClick={(e) => { e.stopPropagation(); toggleActive(s.id, s.is_active); }}
+                                                    aria-label={s.is_active ? "Deactivate" : "Activate"}
+                                                    className={clsx(
+                                                        "relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors",
+                                                        s.is_active ? "bg-khaki" : "bg-feldgrau/20",
+                                                    )}
+                                                >
+                                                    <span className={clsx(
+                                                        "inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow transition-transform",
+                                                        s.is_active ? "translate-x-5" : "translate-x-1",
+                                                    )} />
+                                                </button>
+                                                <span className={clsx(
+                                                    "inline-flex items-center gap-1 text-[9px] font-bold uppercase tracking-wider",
+                                                    shiftStaffIds.has(s.id) ? "text-emerald-600" : "text-feldgrau",
+                                                )}>
+                                                    <span className={clsx("h-1.5 w-1.5 rounded-full", shiftStaffIds.has(s.id) ? "bg-emerald-400" : "bg-feldgrau/30")} />
+                                                    {shiftStaffIds.has(s.id) ? "On Shift" : "Off Duty"}
+                                                </span>
+                                            </div>
+                                        </td>
+                                        <td className="px-4 py-2.5 text-right">
+                                            {s.role === "waiter" && s.is_active && (
+                                                <span className="text-[9px] font-semibold tracking-tight text-feldgrau">
+                                                    max {s.max_tables} tables
+                                                </span>
+                                            )}
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+
+                        {/* Mobile cards */}
+                        <div className="md:hidden divide-y divide-isabelline">
+                            {filtered.map((s) => (
+                                <div
                                     key={s.id}
-                                    className="hover:bg-isabelline/30 transition-colors cursor-pointer"
+                                    className="px-4 py-3 cursor-pointer active:bg-isabelline/50"
                                     onClick={() => setSelectedStaff(s)}
                                 >
-                                    <td className="px-4 py-2.5">
-                                        <div className="flex items-center gap-2.5">
-                                            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-khaki/20 text-khaki">
-                                                <span className="font-serif text-[13px] font-bold leading-none">{s.name.charAt(0)}</span>
-                                            </div>
-                                            <div className="min-w-0">
+                                    <div className="flex items-center gap-3">
+                                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-khaki/20 text-khaki">
+                                            <span className="font-serif text-[14px] font-bold leading-none">{s.name.charAt(0)}</span>
+                                        </div>
+                                        <div className="min-w-0 flex-1">
+                                            <div className="flex items-center gap-2">
                                                 <p className="truncate text-[12px] font-bold tracking-tight text-licorice">{s.name}</p>
-                                                <p className="truncate text-[10px] tracking-tight text-feldgrau">{s.email} · {s.phone}</p>
+                                                <span className={clsx("inline-flex items-center rounded-full px-2 py-0.5 text-[8px] font-bold uppercase tracking-wider", ROLE_COLORS[s.role] ?? "bg-isabelline text-feldgrau")}>
+                                                    {roleLabel(s.role)}
+                                                </span>
                                             </div>
-                                        </div>
-                                    </td>
-                                    <td className="px-4 py-2.5">
-                                        <span className={clsx("inline-flex items-center rounded-full px-2.5 py-0.5 text-[9px] font-bold uppercase tracking-wider", ROLE_COLORS[s.role])}>
-                                            {s.role}
-                                        </span>
-                                    </td>
-                                    <td className="px-4 py-2.5">
-                                        <div className="flex items-center gap-3 text-[11px]">
-                                            {(s.role === "Waiter" || s.role === "Bartender") && (
-                                                <>
-                                                    <div>
-                                                        <p className="text-[9px] font-bold uppercase tracking-wider text-feldgrau">Sales</p>
-                                                        <p className="font-mono font-bold tabular-nums text-licorice">{formatGHS(s.totalSales)}</p>
-                                                    </div>
-                                                    <div>
-                                                        <p className="text-[9px] font-bold uppercase tracking-wider text-feldgrau">Rating</p>
-                                                        <p className="font-mono font-bold tabular-nums text-khaki">
-                                                            <StarIcon className="h-3 w-3 inline" strokeWidth={2} /> {s.rating}
-                                                        </p>
-                                                    </div>
-                                                </>
-                                            )}
-                                            {s.role === "Manager" && (
-                                                <span className="text-[10px] italic tracking-tight text-feldgrau">Management</span>
-                                            )}
-                                            {(s.role === "Kitchen") && (
-                                                <span className="text-[10px] italic tracking-tight text-feldgrau">Kitchen support</span>
-                                            )}
-                                        </div>
-                                    </td>
-                                    <td className="px-4 py-2.5">
-                                        <div className="text-[11px]">
-                                            <p className="font-bold tabular-nums text-licorice">{s.shiftsThisWeek} shifts</p>
-                                            <p className="text-[10px] text-feldgrau">{s.hoursThisWeek}h ({formatGHS(s.hoursThisWeek * s.hourlyRate)})</p>
-                                        </div>
-                                    </td>
-                                    <td className="px-4 py-2.5">
-                                        <div className="flex items-center gap-2">
-                                            <button
-                                                type="button"
-                                                onClick={(e) => { e.stopPropagation(); toggleActive(s.id); }}
-                                                aria-label={s.active ? "Deactivate" : "Activate"}
-                                                className={clsx(
-                                                    "relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors",
-                                                    s.active ? "bg-khaki" : "bg-feldgrau/20"
-                                                )}
-                                            >
+                                            <div className="mt-0.5 flex items-center gap-2 text-[10px]">
                                                 <span className={clsx(
-                                                    "inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow transition-transform",
-                                                    s.active ? "translate-x-5" : "translate-x-1"
-                                                )} />
-                                            </button>
-                                            <span className={clsx(
-                                                "inline-flex items-center gap-1 text-[9px] font-bold uppercase tracking-wider",
-                                                shift.text
-                                            )}>
-                                                <span className={clsx("h-1.5 w-1.5 rounded-full", shift.dot)} />
-                                                {shift.label}
-                                            </span>
-                                        </div>
-                                    </td>
-                                    <td className="px-4 py-2.5 text-right">
-                                        {s.role === "Waiter" && s.active && (
-                                            <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[8px] font-bold uppercase tracking-wider text-emerald-600">
-                                                <StarIcon className="h-2.5 w-2.5" strokeWidth={2.5} />
-                                                {s.tablesServed} tables
-                                            </span>
-                                        )}
-                                    </td>
-                                </tr>
-                            );
-                        })}
-                    </tbody>
-                </table>
-
-                {/* Mobile cards */}
-                <div className="md:hidden divide-y divide-isabelline">
-                    {filtered.map((s) => {
-                        const shift = SHIFT_LABELS[s.currentShift || "off"];
-                        return (
-                            <div
-                                key={s.id}
-                                className="px-4 py-3 cursor-pointer active:bg-isabelline/50"
-                                onClick={() => setSelectedStaff(s)}
-                            >
-                                <div className="flex items-center gap-3">
-                                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-khaki/20 text-khaki">
-                                        <span className="font-serif text-[14px] font-bold leading-none">{s.name.charAt(0)}</span>
-                                    </div>
-                                    <div className="min-w-0 flex-1">
-                                        <div className="flex items-center gap-2">
-                                            <p className="truncate text-[12px] font-bold tracking-tight text-licorice">{s.name}</p>
-                                            <span className={clsx("inline-flex items-center rounded-full px-2 py-0.5 text-[8px] font-bold uppercase tracking-wider", ROLE_COLORS[s.role])}>
-                                                {s.role}
-                                            </span>
-                                        </div>
-                                        <div className="mt-0.5 flex items-center gap-2 text-[10px]">
-                                            <span className={clsx("inline-flex items-center gap-1", shift.text)}>
-                                                <span className={clsx("h-1.5 w-1.5 rounded-full", shift.dot)} />
-                                                {shift.label}
-                                            </span>
-                                            <span className="text-feldgrau">·</span>
-                                            <span className="text-feldgrau">{s.hoursThisWeek}h this week</span>
+                                                    "inline-flex items-center gap-1",
+                                                    shiftStaffIds.has(s.id) ? "text-emerald-600" : "text-feldgrau",
+                                                )}>
+                                                    <span className={clsx("h-1.5 w-1.5 rounded-full", shiftStaffIds.has(s.id) ? "bg-emerald-400" : "bg-feldgrau/30")} />
+                                                    {shiftStaffIds.has(s.id) ? "On Shift" : "Off Duty"}
+                                                </span>
+                                                <span className="text-feldgrau">·</span>
+                                                <span className={clsx("text-[9px] font-bold", s.pin_set ? "text-emerald-600" : "text-amber-600")}>
+                                                    {s.pin_set ? "PIN set" : "No PIN yet"}
+                                                </span>
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
-                                {(s.role === "Waiter" || s.role === "Bartender") && (
-                                    <div className="mt-2 flex items-center gap-3 pl-13 text-[10px]">
-                                        <span className="text-feldgrau">Sales: <span className="font-bold tabular-nums text-licorice">{formatGHS(s.totalSales)}</span></span>
-                                        <span className="text-khaki"><StarIcon className="h-2.5 w-2.5 inline" strokeWidth={2} /> {s.rating}</span>
-                                    </div>
-                                )}
-                            </div>
-                        );
-                    })}
-                </div>
+                            ))}
+                        </div>
+                    </>
+                )}
             </div>
 
-            {/* ── Role permissions reference ── */}
+            {/* ── Role permissions reference (static product info) ── */}
             <div className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-isabelline">
                 <div className="flex items-center gap-2">
                     <ShieldCheckIcon className="h-4 w-4 text-feldgrau" strokeWidth={2} />
@@ -290,9 +359,9 @@ export function StaffManagerScreen() {
                 </div>
                 <h3 className="mt-0.5 text-[16px] font-bold tracking-tight text-licorice">Access matrix</h3>
                 <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-4">
-                    {(Object.keys(ROLE_PERMISSIONS) as StaffMember["role"][]).map((role) => (
+                    {(Object.keys(ROLE_PERMISSIONS)).map((role) => (
                         <div key={role} className="rounded-xl bg-isabelline p-3">
-                            <span className={clsx("inline-flex items-center rounded-full px-2.5 py-0.5 text-[9px] font-bold uppercase tracking-wider", ROLE_COLORS[role])}>
+                            <span className="inline-flex items-center rounded-full px-2.5 py-0.5 text-[9px] font-bold uppercase tracking-wider bg-licorice text-isabelline">
                                 {role}
                             </span>
                             <ul className="mt-2 space-y-1">
@@ -310,33 +379,35 @@ export function StaffManagerScreen() {
 
             {/* ── Staff Detail Drawer ── */}
             {selectedStaff && (
-                <StaffDetailDrawer staff={selectedStaff} onClose={() => setSelectedStaff(null)} onToggleActive={toggleActive} />
+                <StaffDetailDrawer
+                    staff={selectedStaff}
+                    onShift={shiftStaffIds.has(selectedStaff.id)}
+                    onClose={() => setSelectedStaff(null)}
+                    onToggleActive={toggleActive}
+                />
             )}
 
             {/* ── Add Staff Modal ── */}
-            {creating && (
-                <AddStaffModal onAdd={addStaff} onClose={() => setCreating(false)} />
-            )}
+            {creating && <AddStaffModal onAdd={addStaff} onClose={() => setCreating(false)} />}
         </div>
     );
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
-   STAFF DETAIL DRAWER
+   STAFF DETAIL DRAWER (real fields only)
    ═══════════════════════════════════════════════════════════════════════════ */
 
 function StaffDetailDrawer({
     staff,
+    onShift,
     onClose,
     onToggleActive,
 }: {
-    staff: StaffMember;
+    staff: StaffRow;
+    onShift: boolean;
     onClose: () => void;
-    onToggleActive: (id: string) => void;
+    onToggleActive: (id: string, active: boolean) => void;
 }) {
-    const shift = SHIFT_LABELS[staff.currentShift || "off"];
-    const weeklyEarnings = staff.hoursThisWeek * staff.hourlyRate;
-
     return (
         <div className="fixed inset-0 z-50 flex items-end md:items-center justify-end md:justify-center">
             <div className="absolute inset-0 bg-licorice/50 backdrop-blur-sm" onClick={onClose} />
@@ -349,7 +420,6 @@ function StaffDetailDrawer({
                 </div>
 
                 <div className="px-5 py-4">
-                    {/* Header */}
                     <div className="flex items-center gap-3">
                         <div className="flex h-14 w-14 items-center justify-center rounded-full bg-khaki/20 text-khaki">
                             <span className="font-serif text-[20px] font-bold">{staff.name.charAt(0)}</span>
@@ -357,83 +427,79 @@ function StaffDetailDrawer({
                         <div className="min-w-0 flex-1">
                             <h3 className="truncate text-[16px] font-bold tracking-tight text-licorice">{staff.name}</h3>
                             <div className="mt-0.5 flex items-center gap-2">
-                                <span className={clsx("inline-flex items-center rounded-full px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider", ROLE_COLORS[staff.role])}>
-                                    {staff.role}
+                                <span className={clsx("inline-flex items-center rounded-full px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider", ROLE_COLORS[staff.role] ?? "bg-isabelline text-feldgrau")}>
+                                    {roleLabel(staff.role)}
                                 </span>
-                                <span className={clsx("inline-flex items-center gap-1 text-[10px]", shift.text)}>
-                                    <span className={clsx("h-1.5 w-1.5 rounded-full", shift.dot)} />
-                                    {shift.label}
+                                <span className={clsx("inline-flex items-center gap-1 text-[10px]", onShift ? "text-emerald-600" : "text-feldgrau")}>
+                                    <span className={clsx("h-1.5 w-1.5 rounded-full", onShift ? "bg-emerald-400" : "bg-feldgrau/30")} />
+                                    {onShift ? "On Shift" : "Off Duty"}
                                 </span>
                             </div>
                         </div>
                     </div>
 
-                    {/* Stats grid */}
                     <div className="mt-4 grid grid-cols-3 gap-2 rounded-xl bg-isabelline p-3">
                         <div className="text-center">
-                            <p className="font-mono text-[16px] font-black tabular-nums text-licorice">{staff.shiftsThisWeek}</p>
-                            <p className="text-[9px] font-bold uppercase tracking-wider text-feldgrau">Shifts</p>
+                            <p className={clsx("font-mono text-[16px] font-black tabular-nums", staff.pin_set ? "text-emerald-600" : "text-amber-600")}>
+                                {staff.pin_set ? "Set" : "—"}
+                            </p>
+                            <p className="text-[9px] font-bold uppercase tracking-wider text-feldgrau">PIN</p>
                         </div>
                         <div className="border-x border-licorice/8 text-center">
-                            <p className="font-mono text-[16px] font-black tabular-nums text-licorice">{staff.hoursThisWeek}h</p>
-                            <p className="text-[9px] font-bold uppercase tracking-wider text-feldgrau">Hours</p>
+                            <p className="font-mono text-[16px] font-black tabular-nums text-licorice">{staff.max_tables}</p>
+                            <p className="text-[9px] font-bold uppercase tracking-wider text-feldgrau">Max Tables</p>
                         </div>
                         <div className="text-center">
-                            <p className="font-mono text-[16px] font-black tabular-nums text-khaki">{formatGHS(weeklyEarnings)}</p>
-                            <p className="text-[9px] font-bold uppercase tracking-wider text-feldgrau">Earnings</p>
+                            <p className="font-mono text-[16px] font-black tabular-nums text-khaki">
+                                {staff.hourly_rate > 0 ? `GH₵${staff.hourly_rate}` : "—"}
+                            </p>
+                            <p className="text-[9px] font-bold uppercase tracking-wider text-feldgrau">Hourly</p>
                         </div>
                     </div>
 
-                    {/* Details */}
                     <div className="mt-4 space-y-2 text-[11px]">
                         <div className="flex justify-between border-b border-isabelline pb-1.5">
-                            <span className="font-medium tracking-tight text-feldgrau">Email</span>
-                            <span className="font-bold tracking-tight text-licorice">{staff.email}</span>
-                        </div>
-                        <div className="flex justify-between border-b border-isabelline pb-1.5">
                             <span className="font-medium tracking-tight text-feldgrau">Phone</span>
-                            <span className="font-bold tracking-tight text-licorice">{staff.phone}</span>
+                            <span className="flex items-center gap-1 font-bold tracking-tight text-licorice">
+                                <PhoneIcon className="h-3 w-3" strokeWidth={2} />
+                                {staff.phone}
+                            </span>
                         </div>
-                        <div className="flex justify-between border-b border-isabelline pb-1.5">
-                            <span className="font-medium tracking-tight text-feldgrau">Hourly Rate</span>
-                            <span className="font-mono font-bold tabular-nums text-licorice">{formatGHS(staff.hourlyRate)}/hr</span>
-                        </div>
-                        <div className="flex justify-between border-b border-isabelline pb-1.5">
-                            <span className="font-medium tracking-tight text-feldgrau">Joined</span>
-                            <span className="font-bold tracking-tight text-licorice">{staff.joinedAt}</span>
-                        </div>
-                        {staff.totalSales > 0 && (
+                        {staff.email && (
                             <div className="flex justify-between border-b border-isabelline pb-1.5">
-                                <span className="font-medium tracking-tight text-feldgrau">Total Sales</span>
-                                <span className="font-mono font-bold tabular-nums text-licorice">{formatGHS(staff.totalSales)}</span>
+                                <span className="font-medium tracking-tight text-feldgrau">Email</span>
+                                <span className="font-bold tracking-tight text-licorice">{staff.email}</span>
                             </div>
                         )}
-                        {staff.tablesServed > 0 && (
-                            <div className="flex justify-between">
-                                <span className="font-medium tracking-tight text-feldgrau">Tables Served</span>
-                                <span className="font-mono font-bold tabular-nums text-licorice">{staff.tablesServed}</span>
+                        {staff.area_assignment && (
+                            <div className="flex justify-between border-b border-isabelline pb-1.5">
+                                <span className="font-medium tracking-tight text-feldgrau">Area</span>
+                                <span className="font-bold tracking-tight text-licorice">{staff.area_assignment}</span>
                             </div>
+                        )}
+                        <div className="flex justify-between border-b border-isabelline pb-1.5">
+                            <span className="font-medium tracking-tight text-feldgrau">Joined</span>
+                            <span className="font-bold tracking-tight text-licorice">
+                                {new Date(staff.created_at).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}
+                            </span>
+                        </div>
+                        {!staff.pin_set && (
+                            <p className="rounded-lg bg-amber-50 px-3 py-2 text-[11px] font-semibold tracking-tight text-amber-700">
+                                No PIN yet — they'll set it themselves on their first sign-in.
+                            </p>
                         )}
                     </div>
 
-                    {/* Actions */}
-                    <div className="mt-4 grid grid-cols-2 gap-2">
+                    <div className="mt-4">
                         <button
                             type="button"
-                            onClick={() => { onToggleActive(staff.id); onClose(); }}
+                            onClick={() => { onToggleActive(staff.id, staff.is_active); onClose(); }}
                             className={clsx(
-                                "inline-flex items-center justify-center gap-1 rounded-full px-3 py-2 text-[10px] font-bold tracking-tight transition-all active:scale-95",
-                                staff.active ? "bg-isabelline text-feldgrau ring-1 ring-licorice/8" : "bg-licorice text-isabelline"
+                                "w-full inline-flex items-center justify-center gap-1 rounded-full px-3 py-2 text-[11px] font-bold tracking-tight transition-all active:scale-95",
+                                staff.is_active ? "bg-isabelline text-feldgrau ring-1 ring-licorice/8" : "bg-licorice text-isabelline",
                             )}
                         >
-                            {staff.active ? "Deactivate" : "Activate"}
-                        </button>
-                        <button
-                            type="button"
-                            className="inline-flex items-center justify-center gap-1 rounded-full bg-licorice px-3 py-2 text-[10px] font-bold tracking-tight text-isabelline shadow-sm active:scale-95"
-                        >
-                            <ClockIcon className="h-3.5 w-3.5" strokeWidth={2} />
-                            View Schedule
+                            {staff.is_active ? "Deactivate" : "Activate"}
                         </button>
                     </div>
                 </div>
@@ -443,34 +509,43 @@ function StaffDetailDrawer({
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
-   ADD STAFF MODAL
+   ADD STAFF MODAL (writes to the staff table via the owner RPC)
    ═══════════════════════════════════════════════════════════════════════════ */
 
-function AddStaffModal({ onAdd, onClose }: { onAdd: (staff: StaffMember) => void; onClose: () => void }) {
+function AddStaffModal({ onAdd, onClose }: {
+    onAdd: (input: { name: string; phone: string; role: string; email?: string; hourlyRate: number; maxTables: number }) => Promise<boolean>;
+    onClose: () => void;
+}) {
     const [name, setName] = useState("");
     const [email, setEmail] = useState("");
     const [phone, setPhone] = useState("");
-    const [role, setRole] = useState<StaffMember["role"]>("Waiter");
+    const [role, setRole] = useState("waiter");
     const [hourlyRate, setHourlyRate] = useState(25);
+    const [maxTables, setMaxTables] = useState(6);
+    const [saving, setSaving] = useState(false);
+    const [error, setError] = useState<string | null>(null);
 
-    const handleAdd = () => {
-        if (!name.trim() || !email.trim()) return;
-        onAdd({
-            id: `s-${Date.now()}`,
+    const phoneValid = !phone.trim() || !!normalizeGhanaPhone(phone);
+
+    const handleAdd = async () => {
+        if (!name.trim()) return;
+        const normalized = normalizeGhanaPhone(phone);
+        if (!normalized) {
+            setError("Enter a valid Ghana phone number, e.g. 024 000 0000.");
+            return;
+        }
+        setError(null);
+        setSaving(true);
+        const ok = await onAdd({
             name: name.trim(),
-            email: email.trim(),
-            phone: phone.trim() || "+233 24 000 0000",
+            phone: normalized,
             role,
-            active: true,
-            joinedAt: new Date().toISOString().split("T")[0],
+            email: email.trim() || undefined,
             hourlyRate,
-            tablesServed: 0,
-            totalSales: 0,
-            rating: 5.0,
-            shiftsThisWeek: 0,
-            hoursThisWeek: 0,
-            currentShift: "off",
+            maxTables,
         });
+        setSaving(false);
+        if (!ok) setError("Could not add this staff member. They may already exist.");
     };
 
     return (
@@ -480,7 +555,7 @@ function AddStaffModal({ onAdd, onClose }: { onAdd: (staff: StaffMember) => void
                 <div className="flex items-center justify-between border-b border-isabelline px-5 py-3">
                     <div>
                         <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-feldgrau">New Staff</p>
-                        <h3 className="text-[14px] font-bold tracking-tight text-licorice">Create staff account</h3>
+                        <h3 className="text-[14px] font-bold tracking-tight text-licorice">Add to your team</h3>
                     </div>
                     <button type="button" onClick={onClose} aria-label="Close" className="flex h-8 w-8 items-center justify-center rounded-full bg-isabelline text-licorice">
                         <XMarkIcon className="h-4 w-4" strokeWidth={2.25} />
@@ -494,40 +569,52 @@ function AddStaffModal({ onAdd, onClose }: { onAdd: (staff: StaffMember) => void
                             className="mt-1 w-full rounded-lg bg-isabelline px-3 py-2 text-[12px] text-licorice placeholder:text-feldgrau/50 ring-1 ring-licorice/8 focus:outline-none focus:ring-2 focus:ring-licorice/20" />
                     </div>
                     <div>
+                        <label className="text-[10px] font-bold uppercase tracking-[0.18em] text-feldgrau">Phone *</label>
+                        <input type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="024 000 0000"
+                            className="mt-1 w-full rounded-lg bg-isabelline px-3 py-2 text-[12px] text-licorice placeholder:text-feldgrau/50 ring-1 ring-licorice/8 focus:outline-none focus:ring-2 focus:ring-licorice/20" />
+                        {!phoneValid && (
+                            <p className="mt-1 text-[10px] font-semibold text-red-600">Enter a valid Ghana number (024…, 233… or +233…).</p>
+                        )}
+                    </div>
+                    <div>
                         <label className="text-[10px] font-bold uppercase tracking-[0.18em] text-feldgrau">Email</label>
                         <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="kojo@velvetlounge.gh"
                             className="mt-1 w-full rounded-lg bg-isabelline px-3 py-2 text-[12px] text-licorice placeholder:text-feldgrau/50 ring-1 ring-licorice/8 focus:outline-none focus:ring-2 focus:ring-licorice/20" />
                     </div>
                     <div className="grid grid-cols-2 gap-3">
                         <div>
-                            <label className="text-[10px] font-bold uppercase tracking-[0.18em] text-feldgrau">Phone</label>
-                            <input type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+233 24 000 0000"
-                                className="mt-1 w-full rounded-lg bg-isabelline px-3 py-2 text-[12px] text-licorice placeholder:text-feldgrau/50 ring-1 ring-licorice/8 focus:outline-none focus:ring-2 focus:ring-licorice/20" />
+                            <label className="text-[10px] font-bold uppercase tracking-[0.18em] text-feldgrau">Hourly Rate (GHS)</label>
+                            <input type="number" min={0} value={hourlyRate} onChange={(e) => setHourlyRate(parseInt(e.target.value) || 0)}
+                                className="mt-1 w-full rounded-lg bg-isabelline px-3 py-2 font-mono text-[12px] tabular-nums text-licorice ring-1 ring-licorice/8 focus:outline-none focus:ring-2 focus:ring-licorice/20" />
                         </div>
                         <div>
-                            <label className="text-[10px] font-bold uppercase tracking-[0.18em] text-feldgrau">Hourly Rate (GHS)</label>
-                            <input type="number" value={hourlyRate} onChange={(e) => setHourlyRate(parseInt(e.target.value) || 0)}
+                            <label className="text-[10px] font-bold uppercase tracking-[0.18em] text-feldgrau">Max Tables</label>
+                            <input type="number" min={1} max={20} value={maxTables} onChange={(e) => setMaxTables(parseInt(e.target.value) || 1)}
                                 className="mt-1 w-full rounded-lg bg-isabelline px-3 py-2 font-mono text-[12px] tabular-nums text-licorice ring-1 ring-licorice/8 focus:outline-none focus:ring-2 focus:ring-licorice/20" />
                         </div>
                     </div>
                     <div>
                         <label className="text-[10px] font-bold uppercase tracking-[0.18em] text-feldgrau">Role</label>
                         <div className="mt-1 grid grid-cols-4 gap-2">
-                            {(["Manager", "Waiter", "Kitchen", "Bartender"] as const).map((r) => (
+                            {ROLE_OPTIONS.filter((r) => r.value !== "owner").map((r) => (
                                 <button
-                                    key={r}
+                                    key={r.value}
                                     type="button"
-                                    onClick={() => setRole(r)}
+                                    onClick={() => setRole(r.value)}
                                     className={clsx(
                                         "rounded-lg py-2 text-[10px] font-bold tracking-tight transition-all active:scale-95",
-                                        role === r ? "bg-licorice text-isabelline shadow-sm" : "bg-isabelline text-feldgrau ring-1 ring-licorice/8"
+                                        role === r.value ? "bg-licorice text-isabelline shadow-sm" : "bg-isabelline text-feldgrau ring-1 ring-licorice/8",
                                     )}
                                 >
-                                    {r}
+                                    {r.label}
                                 </button>
                             ))}
                         </div>
                     </div>
+
+                    {error && (
+                        <p className="rounded-lg bg-red-50 px-3 py-2 text-[11px] font-semibold tracking-tight text-red-700">{error}</p>
+                    )}
                 </div>
 
                 <div className="flex items-center justify-end gap-2 border-t border-isabelline px-5 py-3">
@@ -537,11 +624,15 @@ function AddStaffModal({ onAdd, onClose }: { onAdd: (staff: StaffMember) => void
                     <button
                         type="button"
                         onClick={handleAdd}
-                        disabled={!name.trim() || !email.trim()}
+                        disabled={!name.trim() || !phone.trim() || !phoneValid || saving}
                         className="inline-flex items-center gap-1 rounded-full bg-licorice px-4 py-2 text-[11px] font-bold tracking-tight text-isabelline shadow-sm disabled:opacity-40"
                     >
-                        <CheckIcon className="h-3.5 w-3.5" strokeWidth={2.5} />
-                        Create
+                        {saving ? "Adding…" : (
+                            <>
+                                <CheckIcon className="h-3.5 w-3.5" strokeWidth={2.5} />
+                                Add Staff
+                            </>
+                        )}
                     </button>
                 </div>
             </div>

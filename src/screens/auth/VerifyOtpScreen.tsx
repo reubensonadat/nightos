@@ -104,7 +104,7 @@ export function VerifyOtpScreen() {
     } else {
       toast.success('Verified! Welcome back.')
       sessionStorage.removeItem(OTP_STORAGE_KEY)
-      navigate('/dashboard', { replace: true })
+      navigate('/manager', { replace: true })
     }
   }
 
@@ -135,7 +135,7 @@ export function VerifyOtpScreen() {
       <div className="w-full max-w-md">
         <div className="mb-8 text-center">
           <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-licorice text-isabelline">
-            <span className="font-serif text-[22px] font-bold">N</span>
+            <span className="font-serif text-[22px] font-bold">B</span>
           </div>
           <h1 className="mt-4 text-xl font-bold tracking-tight text-licorice">Verify your number</h1>
           <p className="text-[12px] tracking-tight text-feldgrau mt-1">

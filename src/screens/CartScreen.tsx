@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import {
     ArrowLeftIcon,
     ArrowRightIcon,
@@ -8,9 +8,9 @@ import {
     PencilSquareIcon,
     PlusIcon,
     TrashIcon,
-    UserIcon,
 } from "@heroicons/react/24/outline";
 import { PaperAirplaneIcon } from "@heroicons/react/24/solid";
+import toast from "react-hot-toast";
 import { formatGHS } from "../data/menu";
 import { getLineUnitPrice, useCart } from "../context/CartContext";
 import type { OrderSummary } from "./OrderTrackingScreen";
@@ -18,6 +18,12 @@ import { db } from "../lib/api";
 
 type Props = {
     venueId: string;
+    venueName?: string;
+    tableLabel?: string;
+    tableId?: string;
+    billId?: string | null;
+    customerSessionId?: string | null;
+    sessionToken?: string | null;
     onBack?: () => void;
     onContinueShopping?: () => void;
     onOrderSent?: (order: OrderSummary) => void;
@@ -32,27 +38,53 @@ function estimatePrepMinutes(itemCount: number): string {
     return `${min}–${min + 4} min`;
 }
 
-export function CartScreen({ venueId, onBack, onContinueShopping, onOrderSent }: Props) {
+export function CartScreen({ venueId, venueName, tableLabel, billId, customerSessionId, sessionToken, onBack, onContinueShopping, onOrderSent }: Props) {
     const { lines, itemCount, subtotal, setQty, remove, clear } = useCart();
     const [orderNotes, setOrderNotes] = useState("");
     const [sending, setSending] = useState(false);
 
+    // Venue-driven bill math (falls back to 10% / 12.5% only until the venue loads)
+    const [venueFees, setVenueFees] = useState<{ serviceChargePct: number; vatPct: number }>({
+        serviceChargePct: 10,
+        vatPct: 12.5,
+    });
+
+    useEffect(() => {
+        let active = true;
+        db.venueById(venueId).then(({ data, error }) => {
+            if (!active || error || !data) return;
+            setVenueFees({
+                serviceChargePct: data.service_charge_pct ?? 10,
+                vatPct: data.vat_pct ?? 12.5,
+            });
+        });
+        return () => {
+            active = false;
+        };
+    }, [venueId]);
+
     // Bill math
     const { serviceCharge, vat, total } = useMemo(() => {
-        const service = Math.round(subtotal * 0.1 * 100) / 100; // 10%
-        const tax = Math.round(subtotal * 0.125 * 100) / 100; // 12.5% VAT
+        const service = Math.round(subtotal * (venueFees.serviceChargePct / 100) * 100) / 100;
+        const tax = Math.round(subtotal * (venueFees.vatPct / 100) * 100) / 100;
         return {
             serviceCharge: service,
             vat: tax,
             total: subtotal + service + tax,
         };
-    }, [subtotal]);
+    }, [subtotal, venueFees]);
 
     const handleSendToKitchen = async () => {
-        setSending(true);
+        if (!billId || !customerSessionId) {
+            toast.error("Something went wrong — please rescan the table QR code.");
+            return;
+        }
+        if (lines.length === 0) {
+            toast.error("Your cart is empty.");
+            return;
+        }
 
-        // Try to submit to Supabase — gracefully fall back to mock
-        let orderNumber = `VL-${Math.floor(1000 + Math.random() * 9000)}`;
+        setSending(true);
 
         try {
             const station = lines.some((l) => l.item.category === "Small Plates")
@@ -60,54 +92,67 @@ export function CartScreen({ venueId, onBack, onContinueShopping, onOrderSent }:
                 : 'bar';
 
             const { data: submission, error: subErr } = await db.createOrderSubmission(
-                '00000000-0000-0000-0000-000000000000', // billId — updated once bill context exists
+                billId,
                 venueId,
                 station,
                 orderNotes || undefined,
+                customerSessionId,
+                undefined,
+                sessionToken,
             );
 
-            if (!subErr && submission) {
-                orderNumber = submission.id.slice(0, 8).toUpperCase();
-
-                for (const line of lines) {
-                    const unitPrice = getLineUnitPrice(line);
-                    await db.createOrderItem(
-                        submission.id,
-                        submission.bill_id,
-                        line.item.id,
-                        line.item.name,
-                        line.qty,
-                        unitPrice,
-                        line.modifiers.map((m) => ({ group_id: m.groupId, option_id: m.option.id, option_name: m.option.name, price_delta: m.option.priceDelta ?? 0 })),
-                        line.modifiers.reduce((s, m) => s + (m.option.priceDelta ?? 0) * line.qty, 0),
-                        unitPrice * line.qty,
-                        line.notes,
-                    );
-                }
+            if (subErr || !submission) {
+                throw subErr || new Error("Failed to submit order");
             }
-        } catch {
-            // fall through to mock
-        }
 
-        const order: OrderSummary = {
-            orderNumber,
-            items: lines.map((line) => {
+            for (const line of lines) {
                 const unitPrice = getLineUnitPrice(line);
-                return {
-                    name: line.item.name,
-                    qty: line.qty,
-                    image: line.item.image,
-                    lineTotal: unitPrice * line.qty,
-                };
-            }),
-            total,
-            itemCount,
-            sentAt: Date.now(),
-            venueId,
-        };
+                const { error: itemErr } = await db.createOrderItem(
+                    submission.id,
+                    submission.bill_id,
+                    line.item.id,
+                    line.item.name,
+                    line.qty,
+                    unitPrice,
+                    line.modifiers.map((m) => ({ group_id: m.groupId, option_id: m.option.id, option_name: m.option.name, price_delta: m.option.priceDelta ?? 0 })),
+                    line.modifiers.reduce((s, m) => s + (m.option.priceDelta ?? 0) * line.qty, 0),
+                    unitPrice * line.qty,
+                    line.notes,
+                    customerSessionId,
+                    sessionToken,
+                );
+                if (itemErr) throw itemErr;
+            }
 
-        clear();
-        onOrderSent?.(order);
+            const orderNumber = submission.id.slice(0, 8).toUpperCase();
+
+            const order: OrderSummary = {
+                orderNumber,
+                items: lines.map((line) => {
+                    const unitPrice = getLineUnitPrice(line);
+                    return {
+                        name: line.item.name,
+                        qty: line.qty,
+                        image: line.item.image,
+                        lineTotal: unitPrice * line.qty,
+                    };
+                }),
+                total,
+                itemCount,
+                sentAt: Date.now(),
+                venueId,
+                submissionId: submission.id,
+                status: "confirmed",
+            };
+
+            clear();
+            toast.success(`Order ${orderNumber} sent to ${station === 'kitchen' ? 'the kitchen' : 'the bar'}`);
+            onOrderSent?.(order);
+        } catch (err) {
+            console.error("Failed to send order:", err);
+            toast.error("Couldn't send your order. Please try again.");
+            setSending(false);
+        }
     };
 
     // ── Empty state ──
@@ -136,7 +181,7 @@ export function CartScreen({ venueId, onBack, onContinueShopping, onOrderSent }:
                         <div className="flex items-center gap-1.5 rounded-full border border-isabelline/15 bg-isabelline/5 px-2.5 py-1.5">
                             <MapPinIcon className="h-3 w-3 text-khaki" strokeWidth={2.25} />
                             <span className="text-[10px] font-bold uppercase tracking-wider text-isabelline">
-                                T·04
+                                T·{tableLabel ?? "—"}
                             </span>
                         </div>
                     </div>
@@ -223,7 +268,7 @@ export function CartScreen({ venueId, onBack, onContinueShopping, onOrderSent }:
                                 Your Order
                             </span>
                             <span className="text-[9px] font-semibold uppercase tracking-[0.18em] text-isabelline/50">
-                                Velvet Lounge
+                                {venueName ?? "Velvet Lounge"}
                             </span>
                         </div>
                     </div>
@@ -232,7 +277,7 @@ export function CartScreen({ venueId, onBack, onContinueShopping, onOrderSent }:
                         <div className="flex items-center gap-1.5 rounded-full border border-isabelline/15 bg-isabelline/5 px-2.5 py-1.5">
                             <MapPinIcon className="h-3 w-3 text-khaki" strokeWidth={2.25} />
                             <span className="text-[10px] font-bold uppercase tracking-wider text-isabelline">
-                                T·04
+                                T·{tableLabel ?? "—"}
                             </span>
                         </div>
                     </div>
@@ -267,13 +312,13 @@ export function CartScreen({ venueId, onBack, onContinueShopping, onOrderSent }:
                         </div>
                     </div>
                     <div className="inline-flex items-center gap-1.5 rounded-2xl border border-isabelline/15 bg-isabelline/5 px-3 py-2 backdrop-blur-md">
-                        <UserIcon className="h-3.5 w-3.5 text-isabelline/70" strokeWidth={2.25} />
+                        <MapPinIcon className="h-3.5 w-3.5 text-isabelline/70" strokeWidth={2.25} />
                         <div className="flex flex-col leading-tight">
                             <span className="text-[9px] font-bold uppercase tracking-wider text-isabelline/60">
-                                Server
+                                Table
                             </span>
                             <span className="text-[11px] font-bold text-isabelline">
-                                Kojo
+                                {tableLabel ?? "—"}
                             </span>
                         </div>
                     </div>
@@ -283,7 +328,7 @@ export function CartScreen({ venueId, onBack, onContinueShopping, onOrderSent }:
             {/* ═══════════════════════════════════════════════════════════
                 OVERLAPPING CONTENT
               ═══════════════════════════════════════════════════════════ */}
-            <section className="relative z-20 mx-auto w-full max-w-3xl -mt-12 px-5 md:px-8 pb-[calc(140px+env(safe-area-inset-bottom))]">
+            <section className="relative z-20 mx-auto w-full max-w-3xl -mt-12 px-5 md:px-8 pb-[calc(220px+env(safe-area-inset-bottom))]">
                 {/* ── Cart line items ── */}
                 <div className="flex flex-col gap-3">
                     {lines.map((line, idx) => {
@@ -462,7 +507,7 @@ export function CartScreen({ venueId, onBack, onContinueShopping, onOrderSent }:
                             Bill Summary
                         </span>
                         <span className="text-[10px] font-bold uppercase tracking-wider text-isabelline/50">
-                            Table 04
+                            Table {tableLabel ?? "—"}
                         </span>
                     </div>
 
@@ -476,7 +521,7 @@ export function CartScreen({ venueId, onBack, onContinueShopping, onOrderSent }:
                         </div>
                         <div className="flex items-center justify-between text-[12px]">
                             <span className="tracking-tight text-isabelline/70">
-                                Service charge <span className="text-isabelline/40">(10%)</span>
+                                Service charge <span className="text-isabelline/40">({venueFees.serviceChargePct}%)</span>
                             </span>
                             <span className="font-mono font-bold tabular-nums text-isabelline">
                                 {formatGHS(serviceCharge)}
@@ -484,7 +529,7 @@ export function CartScreen({ venueId, onBack, onContinueShopping, onOrderSent }:
                         </div>
                         <div className="flex items-center justify-between text-[12px]">
                             <span className="tracking-tight text-isabelline/70">
-                                VAT <span className="text-isabelline/40">(12.5%)</span>
+                                VAT <span className="text-isabelline/40">({venueFees.vatPct}%)</span>
                             </span>
                             <span className="font-mono font-bold tabular-nums text-isabelline">
                                 {formatGHS(vat)}
@@ -512,7 +557,7 @@ export function CartScreen({ venueId, onBack, onContinueShopping, onOrderSent }:
             {/* ═══════════════════════════════════════════════════════════
                 STICKY BOTTOM CTA — Send to Kitchen
               ═══════════════════════════════════════════════════════════ */}
-            <div className="fixed inset-x-0 bottom-0 z-40 flex justify-center px-5 pb-[max(env(safe-area-inset-bottom),18px)] pt-3 bg-gradient-to-t from-isabelline via-isabelline/95 to-transparent">
+            <div className="fixed inset-x-0 bottom-[calc(60px+env(safe-area-inset-bottom))] z-40 flex justify-center px-5 pb-[max(env(safe-area-inset-bottom),18px)] pt-3 bg-gradient-to-t from-isabelline via-isabelline/95 to-transparent">
                 <button
                     type="button"
                     onClick={handleSendToKitchen}

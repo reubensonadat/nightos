@@ -41,7 +41,7 @@ otp_expiry = 3600
 [auth.sms]
 enable_signup = true
 enable_confirmations = true
-template = "Your NightOS code is {{ .Code }}"
+template = "Your Bysen code is {{ .Code }}"
 max_frequency = "60s"
 hook = "http://localhost:54321/functions/v1/mnotify-sms"   # local dev; set production URL in Supabase Dashboard
 

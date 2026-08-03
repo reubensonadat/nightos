@@ -1,68 +1,178 @@
-import { useState, useMemo } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useRealtime } from "../../hooks/useRealtime";
 import {
     ArrowLeftIcon,
     CheckIcon,
-    MinusIcon,
-    PencilSquareIcon,
     PlusIcon,
-    TrashIcon,
+    XMarkIcon,
 } from "@heroicons/react/24/outline";
-import { MENU, formatGHS, type MenuItem, type MenuCategory } from "../../data/menu";
+import toast from "react-hot-toast";
+import { formatGHS } from "../../data/menu";
+import { db, type DbOrderSubmission, type DbOrderItem, type DbProduct, type DbMenuCategory } from "../../lib/api";
 import type { Table } from "./TablesDashboard";
 
 /* ────────────────────────── Types ────────────────────────── */
 
 type OrderLine = {
     lineId: string;
-    menuItem: MenuItem;
+    menuItem: WItem;
     quantity: number;
     notes?: string;
 };
 
-type Tab = "order" | "add";
+/** Product from the DB, joined with its category name. */
+type WItem = {
+    id: string;
+    name: string;
+    categoryId: string;
+    category: string;
+    price: number;
+    image: string | null;
+};
 
-/* ────────────────────────── Component ────────────────────────── */
+type Tab = "order" | "add";
 
 type Props = {
     table: Table;
+    staffId: string;
+    venueId: string;
     onBack: () => void;
     onGoToTableOps: () => void;
     onGoToInvoice: () => void;
 };
 
-export function OrderManagementScreen({ table, onBack, onGoToTableOps, onGoToInvoice }: Props) {
-    const [tab, setTab] = useState<Tab>("order");
-    const [order, setOrder] = useState<OrderLine[]>([
-        // Seed with a mock existing order for occupied tables
-        ...(table.status === "occupied"
-            ? [
-                {
-                    lineId: "l1",
-                    menuItem: MENU[0], // First signature item
-                    quantity: 2,
-                    notes: "One with no ice",
-                },
-                {
-                    lineId: "l2",
-                    menuItem: MENU.find((m) => m.category === "Small Plates") ?? MENU[0],
-                    quantity: 1,
-                },
-            ]
-            : []),
-    ]);
-    const [activeCategory, setActiveCategory] = useState<MenuCategory>("Signatures");
-    const [editingNoteId, setEditingNoteId] = useState<string | null>(null);
-    const [noteDraft, setNoteDraft] = useState("");
-    const [sentFlash, setSentFlash] = useState(false);
+const STATUS_META: Record<string, { label: string; cls: string }> = {
+    pending: { label: "Pending", cls: "bg-amber-50 text-amber-700 ring-amber-200" },
+    confirmed: { label: "Confirmed", cls: "bg-sky-50 text-sky-700 ring-sky-200" },
+    preparing: { label: "Preparing", cls: "bg-blue-50 text-blue-700 ring-blue-200" },
+    ready: { label: "Ready", cls: "bg-indigo-50 text-indigo-700 ring-indigo-200" },
+    served: { label: "Served", cls: "bg-emerald-50 text-emerald-700 ring-emerald-200" },
+    cancelled: { label: "Cancelled", cls: "bg-red-50 text-red-600 ring-red-200" },
+};
 
-    const categories = useMemo(
-        () => Array.from(new Set(MENU.map((m) => m.category))) as MenuCategory[],
-        []
-    );
+function statusMeta(status: string) {
+    return STATUS_META[status] ?? { label: status, cls: "bg-isabelline text-feldgrau ring-licorice/10" };
+}
+
+function timeAgo(iso: string): string {
+    const mins = Math.floor((Date.now() - new Date(iso).getTime()) / 60_000);
+    if (mins < 1) return "just now";
+    if (mins < 60) return `${mins} min ago`;
+    const h = Math.floor(mins / 60);
+    return `${h}h ${mins % 60}m ago`;
+}
+
+export function OrderManagementScreen({ table, staffId, venueId, onBack, onGoToTableOps, onGoToInvoice }: Props) {
+    const [tab, setTab] = useState<Tab>("order");
+
+    // ── Real bill + submissions for this table ──
+    const [billId, setBillId] = useState<string | null>(null);
+    const [submissions, setSubmissions] = useState<DbOrderSubmission[]>([]);
+    const [itemsBySubmission, setItemsBySubmission] = useState<Record<string, DbOrderItem[]>>({});
+    const [loading, setLoading] = useState(true);
+    const [cancellingId, setCancellingId] = useState<string | null>(null);
+
+    const load = useCallback(async () => {
+        setLoading(true);
+        try {
+            const { data: bill } = await db.openBillForTable(table.id);
+            if (bill) {
+                setBillId(bill.id);
+                const { data: subs } = await db.submissionsByBill(bill.id);
+                const list = subs ?? [];
+                setSubmissions(list);
+                const itemMap: Record<string, DbOrderItem[]> = {};
+                await Promise.all(
+                    list.map(async (s) => {
+                        const { data: its } = await db.orderItemsBySubmission(s.id);
+                        itemMap[s.id] = its ?? [];
+                    }),
+                );
+                setItemsBySubmission(itemMap);
+            } else {
+                setBillId(null);
+                setSubmissions([]);
+                setItemsBySubmission({});
+            }
+
+            const [{ data: cats }, { data: prods }] = await Promise.all([
+                db.menuCategories(venueId),
+                db.products(venueId),
+            ]);
+            const catList = cats ?? [];
+            setCategories(catList);
+            setProducts(prods ?? []);
+            if (catList.length > 0) {
+                setActiveCategory((prev) => {
+                    const stillExists = prev && catList.some((c) => c.id === prev);
+                    return stillExists ? prev : catList[0].id;
+                });
+            }
+        } catch {
+            toast.error("Failed to load this table's orders");
+        } finally {
+            setLoading(false);
+        }
+    }, [table.id, venueId]);
+
+    useEffect(() => {
+        load();
+    }, [load]);
+
+    // Live refresh — customer submissions and items land here instantly.
+    const reloadTimer = useRef<number | null>(null);
+    const scheduleReload = useCallback(() => {
+        if (reloadTimer.current !== null) window.clearTimeout(reloadTimer.current);
+        reloadTimer.current = window.setTimeout(() => {
+            reloadTimer.current = null;
+            load();
+        }, 500);
+    }, [load]);
+
+    useRealtime({
+        table: 'order_submissions',
+        filter: `venue_id=eq.${venueId}`,
+        onInsert: scheduleReload,
+        onUpdate: scheduleReload,
+        onDelete: scheduleReload,
+    });
+    useRealtime({
+        table: 'order_items',
+        onInsert: scheduleReload,
+    });
+
+    // ── Waiter-composed order (Add Items tab) ──
+    const [order, setOrder] = useState<OrderLine[]>([]);
+    const [activeCategory, setActiveCategory] = useState<string>("");
+    const [sending, setSending] = useState(false);
+
+    // Real menu (products + categories from the DB)
+    const [categories, setCategories] = useState<DbMenuCategory[]>([]);
+    const [products, setProducts] = useState<DbProduct[]>([]);
+
+    const catNameById = useMemo(() => {
+        const m: Record<string, string> = {};
+        for (const c of categories) m[c.id] = c.name;
+        return m;
+    }, [categories]);
+
+    const menuItems = useMemo<WItem[]>(() => {
+        return products
+            .filter((p) => p.category_id && catNameById[p.category_id])
+            .map((p) => ({
+                id: p.id,
+                name: p.name,
+                categoryId: p.category_id as string,
+                category: catNameById[p.category_id as string],
+                price: p.price,
+                image: p.images?.[0] ?? null,
+            }))
+            .sort((a, b) => a.category.localeCompare(b.category));
+    }, [products, catNameById]);
 
     const filteredMenu = useMemo(
-        () => MENU.filter((m) => m.category === activeCategory),
-        [activeCategory]
+        () => menuItems.filter((m) => m.categoryId === activeCategory),
+        [menuItems, activeCategory]
     );
 
     const subtotal = useMemo(
@@ -77,9 +187,9 @@ export function OrderManagementScreen({ table, onBack, onGoToTableOps, onGoToInv
 
     /* ── Order mutations ── */
 
-    const addToOrder = (item: MenuItem) => {
+    const addToOrder = (item: WItem) => {
         setOrder((prev) => {
-            const existing = prev.find((line) => line.menuItem.id === item.id && !line.notes);
+            const existing = prev.find((line) => line.menuItem.id === item.id);
             if (existing) {
                 return prev.map((line) =>
                     line.lineId === existing.lineId ? { ...line, quantity: line.quantity + 1 } : line
@@ -92,49 +202,76 @@ export function OrderManagementScreen({ table, onBack, onGoToTableOps, onGoToInv
         });
     };
 
-    const incrementQty = (lineId: string) => {
-        setOrder((prev) =>
-            prev.map((line) =>
-                line.lineId === lineId ? { ...line, quantity: line.quantity + 1 } : line
-            )
-        );
+    const sendToKitchen = async () => {
+        if (order.length === 0 || sending) return;
+        setSending(true);
+        try {
+            // Ensure there is an open bill for the table first.
+            let bill = (await db.openBillForTable(table.id)).data;
+            if (!bill) {
+                const { data: created } = await db.createBill(venueId, table.id, 1);
+                bill = created ?? null;
+            }
+            if (!bill) {
+                toast.error("Could not open a bill for this table");
+                return;
+            }
+            setBillId(bill.id);
+
+            const notes = order.map((l) => l.notes).filter(Boolean).join("; ") || undefined;
+            const { data: submission } = await db.createOrderSubmission(
+                bill.id,
+                bill.venue_id,
+                "kitchen",
+                notes,
+            );
+            if (!submission) {
+                toast.error("Could not create the order");
+                return;
+            }
+            for (const line of order) {
+                await db.createOrderItem(
+                    submission.id,
+                    bill.id,
+                    line.menuItem.id,
+                    line.menuItem.name,
+                    line.quantity,
+                    line.menuItem.price,
+                    [],
+                    0,
+                    line.menuItem.price * line.quantity,
+                    line.notes,
+                );
+            }
+            setOrder([]);
+            toast.success(`Sent ${order.length} ${order.length === 1 ? "item" : "items"} to kitchen`);
+            await load();
+        } catch {
+            toast.error("Failed to send order to kitchen");
+        } finally {
+            setSending(false);
+        }
     };
 
-    const decrementQty = (lineId: string) => {
-        setOrder((prev) =>
-            prev
-                .map((line) =>
-                    line.lineId === lineId ? { ...line, quantity: line.quantity - 1 } : line
-                )
-                .filter((line) => line.quantity > 0)
-        );
+    const cancelSubmission = async (submissionId: string) => {
+        if (cancellingId) return;
+        setCancellingId(submissionId);
+        try {
+            const { data: ok, error } = await db.setOrderStatus(submissionId, "cancelled", staffId);
+            if (error || !ok) {
+                toast.error(error ? String((error as { message?: string }).message ?? error) : "Could not cancel");
+                return;
+            }
+            toast.success("Order cancelled");
+            await load();
+        } catch {
+            toast.error("Failed to cancel order");
+        } finally {
+            setCancellingId(null);
+        }
     };
 
-    const removeLine = (lineId: string) => {
-        setOrder((prev) => prev.filter((line) => line.lineId !== lineId));
-    };
-
-    const startEditNote = (line: OrderLine) => {
-        setEditingNoteId(line.lineId);
-        setNoteDraft(line.notes ?? "");
-    };
-
-    const saveNote = () => {
-        if (!editingNoteId) return;
-        setOrder((prev) =>
-            prev.map((line) =>
-                line.lineId === editingNoteId ? { ...line, notes: noteDraft.trim() || undefined } : line
-            )
-        );
-        setEditingNoteId(null);
-        setNoteDraft("");
-    };
-
-    const sendToKitchen = () => {
-        if (order.length === 0) return;
-        setSentFlash(true);
-        window.setTimeout(() => setSentFlash(false), 2500);
-    };
+    const canCancel = (status: string) => status !== "served" && status !== "cancelled";
 
     return (
         <main className="relative min-h-svh w-full overflow-x-hidden bg-isabelline font-sans text-licorice antialiased flex flex-col">
@@ -193,9 +330,9 @@ export function OrderManagementScreen({ table, onBack, onGoToTableOps, onGoToInv
                                 }`}
                         >
                             Current Order
-                            {itemCount > 0 && (
+                            {submissions.length > 0 && (
                                 <span className="ml-1.5 inline-flex items-center justify-center rounded-full bg-khaki/30 px-1.5 py-0.5 text-[8px] font-bold tabular-nums">
-                                    {itemCount}
+                                    {submissions.length}
                                 </span>
                             )}
                         </button>
@@ -208,6 +345,11 @@ export function OrderManagementScreen({ table, onBack, onGoToTableOps, onGoToInv
                                 }`}
                         >
                             Add Items
+                            {itemCount > 0 && (
+                                <span className="ml-1.5 inline-flex items-center justify-center rounded-full bg-khaki/30 px-1.5 py-0.5 text-[8px] font-bold tabular-nums">
+                                    {itemCount}
+                                </span>
+                            )}
                         </button>
                     </div>
                 </nav>
@@ -217,147 +359,101 @@ export function OrderManagementScreen({ table, onBack, onGoToTableOps, onGoToInv
                 CONTENT
               ═══════════════════════════════════════════════════════════ */}
             <section className="mx-auto w-full max-w-7xl flex-1 px-5 md:px-8 pt-5 pb-[120px]">
-                {/* ── CURRENT ORDER TAB ── */}
+                {/* ── CURRENT ORDER TAB (real submissions) ── */}
                 {tab === "order" && (
                     <div className="animate-velvet-fade">
-                        {order.length === 0 ? (
+                        {loading ? (
+                            <div className="flex items-center justify-center py-20">
+                                <div className="h-6 w-6 animate-spin rounded-full border-2 border-licorice/20 border-t-licorice" />
+                            </div>
+                        ) : submissions.length === 0 ? (
                             <div className="flex flex-col items-center justify-center rounded-2xl bg-white px-6 py-16 text-center shadow-sm ring-1 ring-isabelline">
                                 <span className="h-1.5 w-1.5 rounded-full bg-khaki" />
                                 <h3 className="mt-4 text-[15px] font-bold tracking-tight text-licorice">
-                                    No items yet
+                                    Nothing ordered yet
                                 </h3>
                                 <p className="mt-1.5 text-[12px] leading-[1.5] tracking-tight text-feldgrau">
-                                    Switch to <strong>Add Items</strong> to start the order.
+                                    {billId
+                                        ? "Orders from the table will appear here live."
+                                        : "Switch to Add Items to take this table's order."}
                                 </p>
-                                <button
-                                    type="button"
-                                    onClick={() => setTab("add")}
-                                    className="mt-5 inline-flex items-center gap-1.5 rounded-full bg-licorice px-4 py-2 text-[11px] font-bold tracking-tight text-isabelline shadow-[0_4px_12px_rgba(35,20,12,0.18)] active:scale-95"
-                                >
-                                    <PlusIcon className="h-3.5 w-3.5" strokeWidth={2.5} />
-                                    Add Items
-                                </button>
+                                {!billId && (
+                                    <button
+                                        type="button"
+                                        onClick={() => setTab("add")}
+                                        className="mt-5 inline-flex items-center gap-1.5 rounded-full bg-licorice px-4 py-2 text-[11px] font-bold tracking-tight text-isabelline shadow-[0_4px_12px_rgba(35,20,12,0.18)] active:scale-95"
+                                    >
+                                        <PlusIcon className="h-3.5 w-3.5" strokeWidth={2.5} />
+                                        Add Items
+                                    </button>
+                                )}
                             </div>
                         ) : (
-                            <div className="flex flex-col gap-2.5">
-                                {order.map((line, idx) => (
-                                    <div
-                                        key={line.lineId}
-                                        className="animate-velvet-rise overflow-hidden rounded-2xl bg-white shadow-[0_4px_14px_rgba(35,20,12,0.05)] ring-1 ring-isabelline"
-                                        style={{ animationDelay: `${Math.min(idx * 30, 180)}ms` }}
-                                    >
-                                        <div className="flex items-start gap-3 px-3.5 py-3">
-                                            {/* Item image */}
-                                            <div className="h-14 w-14 shrink-0 overflow-hidden rounded-xl bg-isabelline">
-                                                <img
-                                                    src={line.menuItem.image}
-                                                    alt={line.menuItem.name}
-                                                    className="h-full w-full object-cover"
-                                                />
-                                            </div>
-
-                                            {/* Details */}
-                                            <div className="flex-1 min-w-0">
-                                                <div className="flex items-start justify-between gap-2">
-                                                    <div className="min-w-0">
-                                                        <h4 className="truncate text-[13px] font-bold tracking-tight text-licorice">
-                                                            {line.menuItem.name}
-                                                        </h4>
-                                                        <p className="mt-0.5 text-[10px] font-semibold uppercase tracking-wider text-feldgrau">
-                                                            {line.menuItem.category}
-                                                        </p>
-                                                    </div>
-                                                    <p className="font-mono text-[12px] font-bold tabular-nums text-licorice">
-                                                        {formatGHS(line.menuItem.price * line.quantity)}
-                                                    </p>
+                            <div className="flex flex-col gap-3">
+                                {submissions.map((sub, idx) => {
+                                    const items = itemsBySubmission[sub.id] ?? [];
+                                    const meta = statusMeta(sub.status);
+                                    return (
+                                        <div
+                                            key={sub.id}
+                                            className="animate-velvet-rise overflow-hidden rounded-2xl bg-white shadow-[0_4px_14px_rgba(35,20,12,0.05)] ring-1 ring-isabelline"
+                                            style={{ animationDelay: `${Math.min(idx * 30, 180)}ms` }}
+                                        >
+                                            <div className="flex items-center justify-between gap-2 px-3.5 py-2.5">
+                                                <div className="flex items-center gap-2">
+                                                    <span className="text-[10px] font-bold uppercase tracking-wider text-feldgrau">
+                                                        {sub.station === "bar" ? "Bar ticket" : "Kitchen ticket"}
+                                                    </span>
+                                                    {sub.guest_name && (
+                                                        <span className="text-[10px] font-semibold text-feldgrau/60">
+                                                            · {sub.guest_name}
+                                                        </span>
+                                                    )}
                                                 </div>
+                                                <div className="flex items-center gap-2">
+                                                    <span className={`rounded-full px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider ring-1 ${meta.cls}`}>
+                                                        {meta.label}
+                                                    </span>
+                                                    <span className="text-[9.5px] text-feldgrau/50">{timeAgo(sub.created_at)}</span>
+                                                </div>
+                                            </div>
 
-                                                {/* Notes */}
-                                                {editingNoteId === line.lineId ? (
-                                                    <div className="mt-2">
-                                                        <input
-                                                            type="text"
-                                                            autoFocus
-                                                            value={noteDraft}
-                                                            onChange={(e) => setNoteDraft(e.target.value)}
-                                                            onKeyDown={(e) => {
-                                                                if (e.key === "Enter") saveNote();
-                                                                if (e.key === "Escape") setEditingNoteId(null);
-                                                            }}
-                                                            placeholder="e.g. no ice, allergy: nuts"
-                                                            className="w-full rounded-lg bg-isabelline px-2.5 py-1.5 text-[11px] text-licorice placeholder:text-feldgrau/50 ring-1 ring-licorice/10 focus:outline-none focus:ring-2 focus:ring-licorice/20"
-                                                        />
-                                                        <div className="mt-1.5 flex gap-2">
-                                                            <button
-                                                                type="button"
-                                                                onClick={saveNote}
-                                                                className="text-[10px] font-bold uppercase tracking-wider text-khaki hover:text-licorice"
-                                                            >
-                                                                Save
-                                                            </button>
-                                                            <button
-                                                                type="button"
-                                                                onClick={() => setEditingNoteId(null)}
-                                                                className="text-[10px] font-bold uppercase tracking-wider text-feldgrau hover:text-dark-red"
-                                                            >
-                                                                Cancel
-                                                            </button>
-                                                        </div>
+                                            <div className="px-3.5 pb-2.5">
+                                                {items.map((it) => (
+                                                    <div key={it.id} className="flex items-center justify-between py-1 text-[12px]">
+                                                        <span className="text-licorice">
+                                                            <span className="font-mono font-bold text-feldgrau">×{it.quantity}</span>{" "}
+                                                            {it.product_name}
+                                                            {it.notes && (
+                                                                <span className="text-feldgrau/60"> — {it.notes}</span>
+                                                            )}
+                                                        </span>
+                                                        <span className="font-mono font-bold tabular-nums text-licorice">
+                                                            {formatGHS(it.line_total)}
+                                                        </span>
                                                     </div>
-                                                ) : line.notes ? (
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => startEditNote(line)}
-                                                        className="mt-1.5 inline-flex items-center gap-1 rounded-md bg-khaki/12 px-2 py-0.5 text-[10px] font-medium tracking-tight text-khaki hover:bg-khaki/20"
-                                                    >
-                                                        <PencilSquareIcon className="h-2.5 w-2.5" strokeWidth={2.5} />
-                                                        {line.notes}
-                                                    </button>
-                                                ) : (
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => startEditNote(line)}
-                                                        className="mt-1.5 inline-flex items-center gap-1 text-[10px] font-semibold tracking-tight text-feldgrau hover:text-licorice"
-                                                    >
-                                                        <PlusIcon className="h-2.5 w-2.5" strokeWidth={2.5} />
-                                                        Add note
-                                                    </button>
-                                                )}
+                                                ))}
                                             </div>
-                                        </div>
 
-                                        {/* Bottom row: qty controls + remove */}
-                                        <div className="flex items-center justify-between border-t border-isabelline px-3.5 py-2">
-                                            <button
-                                                type="button"
-                                                onClick={() => removeLine(line.lineId)}
-                                                className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-feldgrau transition-colors hover:text-dark-red"
-                                            >
-                                                <TrashIcon className="h-3 w-3" strokeWidth={2.25} />
-                                                Remove
-                                            </button>
-                                            <div className="flex items-center gap-1.5 rounded-full bg-isabelline p-1">
-                                                <button
-                                                    type="button"
-                                                    onClick={() => decrementQty(line.lineId)}
-                                                    className="flex h-7 w-7 items-center justify-center rounded-full bg-white text-licorice shadow-sm transition-all active:scale-90"
-                                                >
-                                                    <MinusIcon className="h-3 w-3" strokeWidth={2.5} />
-                                                </button>
-                                                <span className="w-6 text-center font-mono text-[12px] font-bold tabular-nums text-licorice">
-                                                    {line.quantity}
-                                                </span>
-                                                <button
-                                                    type="button"
-                                                    onClick={() => incrementQty(line.lineId)}
-                                                    className="flex h-7 w-7 items-center justify-center rounded-full bg-licorice text-isabelline transition-all active:scale-90"
-                                                >
-                                                    <PlusIcon className="h-3 w-3" strokeWidth={2.5} />
-                                                </button>
-                                            </div>
+                                            {canCancel(sub.status) && (
+                                                <div className="flex items-center justify-between border-t border-isabelline px-3.5 py-2">
+                                                    <span className="text-[10px] text-feldgrau/60">
+                                                        Customers can't cancel — staff only.
+                                                    </span>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => cancelSubmission(sub.id)}
+                                                        disabled={cancellingId !== null}
+                                                        className="inline-flex items-center gap-1 rounded-full bg-red-50 px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-red-600 ring-1 ring-red-200 transition-all hover:bg-red-100 active:scale-95 disabled:opacity-50"
+                                                    >
+                                                        <XMarkIcon className="h-3 w-3" strokeWidth={2.5} />
+                                                        {cancellingId === sub.id ? "Cancelling…" : "Cancel Order"}
+                                                    </button>
+                                                </div>
+                                            )}
                                         </div>
-                                    </div>
-                                ))}
+                                    );
+                                })}
                             </div>
                         )}
                     </div>
@@ -368,25 +464,41 @@ export function OrderManagementScreen({ table, onBack, onGoToTableOps, onGoToInv
                     <div className="animate-velvet-fade">
                         {/* Category pills */}
                         <div className="no-scrollbar -mx-5 mb-4 flex gap-2 overflow-x-auto px-5">
-                            {categories.map((cat) => {
-                                const isActive = cat === activeCategory;
-                                return (
-                                    <button
-                                        key={cat}
-                                        type="button"
-                                        onClick={() => setActiveCategory(cat)}
-                                        className={`shrink-0 rounded-full px-3.5 py-2 text-[11px] font-bold tracking-tight transition-all duration-200 ${isActive
-                                            ? "bg-licorice text-isabelline shadow-[0_4px_14px_rgba(35,20,12,0.25)]"
-                                            : "bg-white text-feldgrau ring-1 ring-licorice/8 hover:text-licorice"
-                                            }`}
-                                    >
-                                        {cat}
-                                    </button>
-                                );
-                            })}
+                            {categories.length === 0 ? (
+                                <span className="text-[12px] text-feldgrau">
+                                    No menu categories — add some in the Manager portal.
+                                </span>
+                            ) : (
+                                categories.map((cat) => {
+                                    const isActive = cat.id === activeCategory;
+                                    return (
+                                        <button
+                                            key={cat.id}
+                                            type="button"
+                                            onClick={() => setActiveCategory(cat.id)}
+                                            className={`shrink-0 rounded-full px-3.5 py-2 text-[11px] font-bold tracking-tight transition-all duration-200 ${isActive
+                                                ? "bg-licorice text-isabelline shadow-[0_4px_14px_rgba(35,20,12,0.25)]"
+                                                : "bg-white text-feldgrau ring-1 ring-licorice/8 hover:text-licorice"
+                                                }`}
+                                        >
+                                            {cat.name}
+                                        </button>
+                                    );
+                                })
+                            )}
                         </div>
 
                         {/* Items grid */}
+                        {filteredMenu.length === 0 ? (
+                            <div className="flex flex-col items-center justify-center rounded-2xl bg-white px-6 py-14 text-center shadow-sm ring-1 ring-isabelline">
+                                <h3 className="text-[14px] font-bold tracking-tight text-licorice">
+                                    No items in this category yet
+                                </h3>
+                                <p className="mt-1.5 text-[12px] leading-[1.5] tracking-tight text-feldgrau">
+                                    Add products in the Manager portal under Menu.
+                                </p>
+                            </div>
+                        ) : (
                         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 md:gap-5">
                             {filteredMenu.map((item, idx) => (
                                 <button
@@ -407,11 +519,19 @@ export function OrderManagementScreen({ table, onBack, onGoToTableOps, onGoToInv
                                     style={{ animationDelay: `${Math.min(idx * 30, 200)}ms` }}
                                 >
                                     <div className="relative h-24 w-full overflow-hidden bg-isabelline">
-                                        <img
-                                            src={item.image}
-                                            alt={item.name}
-                                            className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
-                                        />
+                                        {item.image ? (
+                                            <img
+                                                src={item.image}
+                                                alt={item.name}
+                                                className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+                                            />
+                                        ) : (
+                                            <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-licorice/85 to-licorice">
+                                                <span className="font-serif text-[22px] font-bold text-isabelline/80">
+                                                    {item.name.charAt(0)}
+                                                </span>
+                                            </div>
+                                        )}
                                         <div className="absolute right-2 top-2 flex h-7 w-7 items-center justify-center rounded-full bg-licorice text-isabelline shadow-[0_4px_12px_rgba(35,20,12,0.25)] opacity-0 transition-opacity group-hover:opacity-100">
                                             <PlusIcon className="h-3.5 w-3.5" strokeWidth={2.5} />
                                         </div>
@@ -432,52 +552,55 @@ export function OrderManagementScreen({ table, onBack, onGoToTableOps, onGoToInv
                                 </button>
                             ))}
                         </div>
+                        )}
                     </div>
                 )}
             </section>
 
             {/* ═══════════════════════════════════════════════════════════
-                BOTTOM ACTION BAR
+                BOTTOM ACTION BAR (Add Items only)
               ═══════════════════════════════════════════════════════════ */}
-            <div className="fixed inset-x-0 bottom-0 z-40 bg-isabelline/95 backdrop-blur-xl border-t border-licorice/8">
-                <div className="mx-auto flex w-full max-w-7xl items-center gap-3 px-5 md:px-8 pt-3 pb-[max(env(safe-area-inset-bottom),16px)]">
-                    {/* Subtotal */}
-                    <div className="flex flex-col">
-                        <span className="text-[9px] font-bold uppercase tracking-wider text-feldgrau">
-                            Subtotal
-                        </span>
-                        <span className="font-mono text-[16px] font-black tabular-nums text-licorice">
-                            {formatGHS(subtotal)}
-                        </span>
-                    </div>
+            {tab === "add" && order.length > 0 && (
+                <div className="fixed inset-x-0 bottom-0 z-40 bg-isabelline/95 backdrop-blur-xl border-t border-licorice/8">
+                    <div className="mx-auto flex w-full max-w-7xl items-center gap-3 px-5 md:px-8 pt-3 pb-[max(env(safe-area-inset-bottom),16px)]">
+                        {/* Subtotal */}
+                        <div className="flex flex-col">
+                            <span className="text-[9px] font-bold uppercase tracking-wider text-feldgrau">
+                                Subtotal
+                            </span>
+                            <span className="font-mono text-[16px] font-black tabular-nums text-licorice">
+                                {formatGHS(subtotal)}
+                            </span>
+                        </div>
 
-                    {/* Send to Kitchen */}
-                    <button
-                        type="button"
-                        onClick={sendToKitchen}
-                        disabled={order.length === 0 || sentFlash}
-                        className={`
-                            ml-auto inline-flex items-center justify-center gap-1.5
-                            rounded-full px-5 py-3
-                            text-[12px] font-bold tracking-tight
-                            transition-all duration-200 active:scale-[0.98]
-                            ${sentFlash
-                                ? "bg-khaki/20 text-khaki"
-                                : "bg-licorice text-isabelline shadow-[0_12px_28px_rgba(35,20,12,0.20)] hover:bg-licorice/95 disabled:opacity-40 disabled:shadow-none"
-                            }
-                        `}
-                    >
-                        {sentFlash ? (
-                            <>
-                                <CheckIcon className="h-4 w-4" strokeWidth={2.5} />
-                                Sent to Kitchen
-                            </>
-                        ) : (
-                            <>Send to Kitchen</>
-                        )}
-                    </button>
+                        {/* Send to Kitchen */}
+                        <button
+                            type="button"
+                            onClick={sendToKitchen}
+                            disabled={order.length === 0 || sending}
+                            className={`
+                                ml-auto inline-flex items-center justify-center gap-1.5
+                                rounded-full px-5 py-3
+                                text-[12px] font-bold tracking-tight
+                                transition-all duration-200 active:scale-[0.98]
+                                bg-licorice text-isabelline shadow-[0_12px_28px_rgba(35,20,12,0.20)] hover:bg-licorice/95 disabled:opacity-40 disabled:shadow-none
+                            `}
+                        >
+                            {sending ? (
+                                <>
+                                    <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-isabelline/30 border-t-isabelline" />
+                                    Sending…
+                                </>
+                            ) : (
+                                <>
+                                    <CheckIcon className="h-4 w-4" strokeWidth={2.5} />
+                                    Send to Kitchen
+                                </>
+                            )}
+                        </button>
+                    </div>
                 </div>
-            </div>
+            )}
         </main>
     );
 }

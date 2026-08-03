@@ -1,11 +1,9 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import {
     ArrowLeftIcon,
     ArrowRightIcon,
-    BellIcon,
     CheckIcon,
     ChevronDownIcon,
-    PhoneIcon,
 } from "@heroicons/react/24/outline";
 import { CheckCircleIcon } from "@heroicons/react/24/solid";
 import { formatGHS } from "../data/menu";
@@ -19,6 +17,9 @@ export type OrderItem = {
     lineTotal: number;
 };
 
+/** Real order_submissions.status — mirrors the kitchen's queue. */
+export type OrderStatusDb = "confirmed" | "preparing" | "ready" | "served" | "cancelled";
+
 export type OrderSummary = {
     orderNumber: string;
     items: OrderItem[];
@@ -27,62 +28,55 @@ export type OrderSummary = {
     sentAt: number; // unix ms
     billId?: string;
     venueId?: string;
+    /** Real submission row this order maps to (for live status). */
+    submissionId?: string;
+    status?: OrderStatusDb;
+    /** Set when the venue (waiter) cancelled the submission. */
+    cancelled?: boolean;
 };
 
-/* ────────────────────────── Tracking stages ────────────────────────── */
+/* ────────────────────────── Tracking stages (real status) ────────────────────────── */
 
-type StageId = "received" | "preparing" | "on_the_way" | "served";
+export type StageId = "received" | "preparing" | "on_the_way" | "served";
 
 type Stage = {
     id: StageId;
     label: string;
     description: string;
-    /** Delay (ms) after order sent before this stage activates. */
-    activatesAtMs: number;
+    /** Real order_submissions.status that activates this stage. */
+    status: OrderStatusDb;
 };
 
-const STAGES: Stage[] = [
+export const STAGES: Stage[] = [
     {
         id: "received",
         label: "Order Received",
-        description: "Sent to the kitchen",
-        activatesAtMs: 0,
+        description: "Sent to the kitchen — they have the ticket",
+        status: "confirmed",
     },
     {
         id: "preparing",
         label: "In Preparation",
         description: "The team is crafting your order",
-        activatesAtMs: 3_000,
+        status: "preparing",
     },
     {
         id: "on_the_way",
-        label: "On Its Way",
-        description: "Kojo is bringing it to Table 04",
-        activatesAtMs: 8_000,
+        label: "Ready — On Its Way",
+        description: "Your order is ready and being brought to you",
+        status: "ready",
     },
     {
         id: "served",
         label: "Served",
         description: "Enjoy — your order has arrived",
-        activatesAtMs: 15_000,
+        status: "served",
     },
 ];
 
-/* ────────────────────────── Helpers ────────────────────────── */
-
-function formatTime(ts: number): string {
-    return new Date(ts).toLocaleTimeString("en-GH", {
-        hour: "numeric",
-        minute: "2-digit",
-        hour12: true,
-    });
-}
-
-function formatEta(msFromNow: number): string {
-    if (msFromNow <= 0) return "Now";
-    const mins = Math.ceil(msFromNow / 60_000);
-    if (mins <= 1) return "< 1 min";
-    return `${mins} min`;
+export function statusStage(status?: OrderStatusDb): Stage {
+    const stage = STAGES.find((s) => s.status === status);
+    return stage ?? STAGES[0];
 }
 
 /* ────────────────────────── Component ────────────────────────── */
@@ -94,47 +88,15 @@ type Props = {
 };
 
 export function OrderTrackingScreen({ order, onBackToMenu, onPayBill }: Props) {
-    const [now, setNow] = useState(Date.now());
     const [summaryOpen, setSummaryOpen] = useState(false);
-    const [requested, setRequested] = useState(false);
 
-    // Live ticker — updates every second for smooth ETA countdown
-    useEffect(() => {
-        const t = setInterval(() => setNow(Date.now()), 1_000);
-        return () => clearInterval(t);
-    }, []);
-
-    const elapsed = now - order.sentAt;
-
-    // Determine current stage
-    const currentStage = useMemo<Stage>(() => {
-        const active = [...STAGES]
-            .reverse()
-            .find((s) => elapsed >= s.activatesAtMs);
-        return active ?? STAGES[0];
-    }, [elapsed]);
-
+    // Live status comes from the real order_submissions row — no fake timers.
+    const currentStage = useMemo(() => statusStage(order.status), [order.status]);
+    const currentIndex = STAGES.indexOf(currentStage);
     const isServed = currentStage.id === "served";
 
-    // ETA to served
-    const servedStage = STAGES[STAGES.length - 1];
-    const msUntilServed = servedStage.activatesAtMs - elapsed;
-    const etaLabel = formatEta(msUntilServed);
-
-    // Status headline
-    const statusHeadline = isServed
-        ? "Served"
-        : currentStage.id === "on_the_way"
-            ? "On its way"
-            : currentStage.label;
-
-    const statusSub = isServed
-        ? "Your order is at the table."
-        : currentStage.id === "on_the_way"
-            ? "Kojo is walking over."
-            : currentStage.id === "preparing"
-                ? `Ready in ${etaLabel}.`
-                : "The kitchen has your ticket.";
+    const statusHeadline = currentStage.label;
+    const statusSub = currentStage.description;
 
     return (
         <main className="relative min-h-svh w-full overflow-x-hidden bg-isabelline font-sans text-licorice antialiased">
@@ -189,7 +151,7 @@ export function OrderTrackingScreen({ order, onBackToMenu, onPayBill }: Props) {
                             <>
                                 <br />
                                 <span className="italic font-serif font-bold text-khaki">
-                                    {etaLabel}
+                                    live
                                 </span>
                             </>
                         )}
@@ -211,17 +173,13 @@ export function OrderTrackingScreen({ order, onBackToMenu, onPayBill }: Props) {
                             aria-hidden="true"
                             className="absolute left-[11px] top-3 w-px bg-licorice transition-all duration-700 ease-out"
                             style={{
-                                height: `${(STAGES.indexOf(currentStage) / (STAGES.length - 1)) * 100}%`,
+                                height: `${(currentIndex / (STAGES.length - 1)) * 100}%`,
                             }}
                         />
 
                         {STAGES.map((stage, idx) => {
-                            const stageElapsed = elapsed >= stage.activatesAtMs;
-                            const isCurrent = currentStage.id === stage.id;
-                            const isPast = STAGES.indexOf(currentStage) > idx;
-                            const stageTime = new Date(
-                                order.sentAt + stage.activatesAtMs
-                            ).getTime();
+                            const isCurrent = idx === currentIndex;
+                            const isPast = idx < currentIndex;
 
                             return (
                                 <div
@@ -259,14 +217,12 @@ export function OrderTrackingScreen({ order, onBackToMenu, onPayBill }: Props) {
                                     <div className="flex-1 min-w-0 pt-0.5">
                                         <div className="flex items-baseline justify-between gap-2">
                                             <h3
-                                                className={`text-[14px] font-bold leading-tight tracking-tight transition-colors ${stageElapsed ? "text-licorice" : "text-feldgrau/60"}`}
+                                                className={`text-[14px] font-bold leading-tight tracking-tight transition-colors ${isPast || isCurrent ? "text-licorice" : "text-feldgrau/60"}`}
                                             >
                                                 {stage.label}
                                             </h3>
-                                            <span className="shrink-0 font-mono text-[10px] font-semibold tabular-nums text-feldgrau">
-                                                {stageElapsed
-                                                    ? formatTime(stageTime)
-                                                    : `~ ${formatEta(stage.activatesAtMs - elapsed)}`}
+                                            <span className="shrink-0 font-mono text-[10px] font-semibold uppercase tracking-wider tabular-nums text-feldgrau">
+                                                {isPast ? "done" : isCurrent ? "now" : ""}
                                             </span>
                                         </div>
                                         <p className="mt-0.5 text-[11.5px] leading-[1.4] tracking-tight text-feldgrau">
@@ -278,59 +234,6 @@ export function OrderTrackingScreen({ order, onBackToMenu, onPayBill }: Props) {
                         })}
                     </div>
                 </div>
-
-                {/* ── Server Card with Request + Call ── */}
-                {!isServed && (
-                    <div className="mb-4 overflow-hidden rounded-2xl bg-white shadow-[0_4px_16px_rgba(35,20,12,0.04)] ring-1 ring-isabelline">
-                        <div className="flex items-center gap-3 px-4 py-3.5">
-                            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-khaki font-serif text-[16px] font-bold text-licorice">
-                                K
-                            </div>
-                            <div className="flex-1 min-w-0">
-                                <p className="text-[13px] font-bold tracking-tight text-licorice">
-                                    Kojo · Server
-                                </p>
-                                <p className="text-[11px] tracking-tight text-feldgrau">
-                                    Looking after Table 04 tonight
-                                </p>
-                            </div>
-                            <button
-                                type="button"
-                                onClick={() => setRequested(true)}
-                                disabled={requested}
-                                aria-label={requested ? "Kojo has been notified" : "Request Kojo"}
-                                className={`
-                                    flex h-9 w-9 shrink-0 items-center justify-center rounded-full
-                                    transition-all active:scale-95
-                                    ${requested
-                                        ? "bg-khaki/20 text-khaki"
-                                        : "bg-isabelline text-licorice ring-1 ring-licorice/8 hover:bg-khaki/15"
-                                    }
-                                `}
-                            >
-                                {requested ? (
-                                    <CheckIcon className="h-4 w-4" strokeWidth={2.5} />
-                                ) : (
-                                    <BellIcon className="h-4 w-4" strokeWidth={2.25} />
-                                )}
-                            </button>
-                            <button
-                                type="button"
-                                aria-label="Call Kojo"
-                                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-licorice text-isabelline shadow-[0_4px_12px_rgba(35,20,12,0.18)] transition-all hover:bg-licorice/95 active:scale-95"
-                            >
-                                <PhoneIcon className="h-4 w-4" strokeWidth={2.25} />
-                            </button>
-                        </div>
-                        {requested && (
-                            <div className="border-t border-isabelline px-4 py-2.5 animate-velvet-fade">
-                                <p className="text-[11px] font-semibold tracking-tight text-khaki">
-                                    ✓ Kojo has been notified — on the way to Table 04
-                                </p>
-                            </div>
-                        )}
-                    </div>
-                )}
 
                 {/* ── Order Summary (collapsible) ── */}
                 <div className="overflow-hidden rounded-2xl bg-white shadow-[0_4px_16px_rgba(35,20,12,0.04)] ring-1 ring-isabelline">

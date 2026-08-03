@@ -16,7 +16,7 @@ const TABS: { id: Tab; label: string; icon: typeof Squares2X2Icon }[] = [
 
 export function CustomerBottomNav({ activeTab, onTabChange, cartCount }: Props) {
   return (
-    <nav className="fixed inset-x-0 bottom-0 z-50 border-t border-licorice/8 bg-white/95 backdrop-blur-xl pb-[env(safe-area-inset-bottom)]">
+    <nav className="fixed inset-x-0 bottom-0 z-10 border-t border-licorice/8 bg-white pb-[env(safe-area-inset-bottom)]">
       <div className="mx-auto flex max-w-lg items-center justify-around px-2 pt-1.5">
         {TABS.map(({ id, label, icon: Icon }) => {
           const isActive = id === activeTab;

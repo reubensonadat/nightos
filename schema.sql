@@ -322,6 +322,21 @@ CREATE POLICY "Venue members can update bills" ON public.bills FOR UPDATE USING 
 CREATE POLICY "Venue owner can manage bills" ON public.bills FOR ALL
     USING (auth.uid() = (SELECT owner_id FROM public.venues WHERE id = venue_id));
 
+CREATE TABLE IF NOT EXISTS public.customer_sessions (
+    id uuid NOT NULL DEFAULT gen_random_uuid(),
+    venue_id uuid NOT NULL REFERENCES public.venues(id) ON DELETE CASCADE,
+    table_id uuid NOT NULL REFERENCES public.tables(id) ON DELETE CASCADE,
+    bill_id uuid REFERENCES public.bills(id) ON DELETE SET NULL,
+    guest_name text NOT NULL DEFAULT 'Guest',
+    party_size integer NOT NULL DEFAULT 1,
+    session_token text NOT NULL DEFAULT gen_random_uuid()::text UNIQUE,
+    status text NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'closed', 'expired')),
+    created_at timestamptz NOT NULL DEFAULT now(),
+    last_active_at timestamptz NOT NULL DEFAULT now(),
+    CONSTRAINT customer_sessions_pkey PRIMARY KEY (id)
+);
+ALTER TABLE public.customer_sessions ENABLE ROW LEVEL security;
+
 CREATE TABLE IF NOT EXISTS public.order_submissions (
     id uuid NOT NULL DEFAULT gen_random_uuid(),
     bill_id uuid NOT NULL REFERENCES public.bills(id) ON DELETE CASCADE,
@@ -333,6 +348,7 @@ CREATE TABLE IF NOT EXISTS public.order_submissions (
     notes text,
     created_at timestamptz NOT NULL DEFAULT now(),
     updated_at timestamptz NOT NULL DEFAULT now(),
+    customer_session_id uuid REFERENCES public.customer_sessions(id) ON DELETE SET NULL,
     CONSTRAINT order_submissions_pkey PRIMARY KEY (id)
 );
 ALTER TABLE public.order_submissions ENABLE ROW LEVEL security;
@@ -353,6 +369,7 @@ CREATE TABLE IF NOT EXISTS public.order_items (
     notes text,
     guest_name text,
     created_at timestamptz NOT NULL DEFAULT now(),
+    customer_session_id uuid REFERENCES public.customer_sessions(id) ON DELETE SET NULL,
     CONSTRAINT order_items_pkey PRIMARY KEY (id)
 );
 ALTER TABLE public.order_items ENABLE ROW LEVEL security;
@@ -370,6 +387,8 @@ CREATE TABLE IF NOT EXISTS public.payments (
     collected_by uuid REFERENCES public.staff(id),
     status text NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'success', 'failed', 'refunded')),
     paystack_data jsonb,
+    platform_fee numeric(10,2) NOT NULL DEFAULT 0,
+    fee_settled boolean NOT NULL DEFAULT false,
     created_at timestamptz NOT NULL DEFAULT now(),
     CONSTRAINT payments_pkey PRIMARY KEY (id)
 );
@@ -579,31 +598,53 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
+-- Assign waiter to bill — load-based, weighted by PEOPLE not just tables.
+-- Load score = guests on the waiter's open bills + 0.5 per open table
+-- (task-switching cost). A waiter with 6 tables of 1-2 people (≈9 people)
+-- ranks below a waiter with 3 tables of 5 people (15 people), so the big
+-- party lands with the lightest-load waiter. Hard limits: max_tables,
+-- active shift, area match.
 CREATE OR REPLACE FUNCTION public.assign_waiter_to_bill(p_bill_id uuid)
 RETURNS uuid AS $$
 DECLARE
     v_venue_id uuid;
     v_table_id uuid;
     v_table_area text;
-    v_guest_count integer;
     v_best_waiter_id uuid;
 BEGIN
-    SELECT venue_id, table_id, guest_count INTO v_venue_id, v_table_id, v_guest_count FROM public.bills WHERE id = p_bill_id;
+    SELECT venue_id, table_id INTO v_venue_id, v_table_id
+    FROM public.bills WHERE id = p_bill_id;
+
     SELECT area INTO v_table_area FROM public.tables WHERE id = v_table_id;
+
     SELECT s.id INTO v_best_waiter_id
     FROM public.staff s
-    LEFT JOIN public.bills b ON b.waiter_id = s.id AND b.status IN ('open', 'settling') AND b.id != p_bill_id
-    WHERE s.venue_id = v_venue_id AND s.role = 'waiter' AND s.is_active = true
-        AND EXISTS (SELECT 1 FROM public.staff_shifts ss WHERE ss.staff_id = s.id AND ss.status = 'active')
+    LEFT JOIN public.bills b
+        ON b.waiter_id = s.id
+        AND b.status IN ('open', 'settling')
+        AND b.id != p_bill_id
+    WHERE s.venue_id = v_venue_id
+        AND s.role = 'waiter'
+        AND s.is_active = true
+        AND EXISTS (
+            SELECT 1 FROM public.staff_shifts ss
+            WHERE ss.staff_id = s.id AND ss.status = 'active'
+        )
         AND (s.area_assignment IS NULL OR s.area_assignment = v_table_area)
-        AND (SELECT COUNT(*) FROM public.bills WHERE waiter_id = s.id AND status IN ('open', 'settling')) < s.max_tables
+        AND (
+            SELECT COUNT(*) FROM public.bills
+            WHERE waiter_id = s.id
+              AND status IN ('open', 'settling')
+              AND id != p_bill_id
+        ) < s.max_tables
     GROUP BY s.id, s.max_tables
-    HAVING COALESCE(SUM(b.guest_count), 0) < 20
-    ORDER BY COALESCE(SUM(b.guest_count), 0) ASC
+    ORDER BY COALESCE(SUM(b.guest_count), 0) + 0.5 * COUNT(b.id) ASC
     LIMIT 1;
+
     IF v_best_waiter_id IS NOT NULL THEN
         UPDATE public.bills SET waiter_id = v_best_waiter_id WHERE id = p_bill_id;
     END IF;
+
     RETURN v_best_waiter_id;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;

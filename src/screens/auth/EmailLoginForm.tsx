@@ -6,13 +6,14 @@ import { useAuth } from '../../context/AuthContext'
 type Props = {
   onSwitchMethod: () => void
   onToggleMode: () => void
+  initialEmail?: string
 }
 
-export function EmailLoginForm({ onSwitchMethod, onToggleMode }: Props) {
+export function EmailLoginForm({ onSwitchMethod, onToggleMode, initialEmail = '' }: Props) {
   const navigate = useNavigate()
   const { signIn } = useAuth()
 
-  const [email, setEmail] = useState('')
+  const [email, setEmail] = useState(initialEmail)
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -25,12 +26,17 @@ export function EmailLoginForm({ onSwitchMethod, onToggleMode }: Props) {
     const { error } = await signIn(email, password)
     setLoading(false)
     if (error) {
-      setError(error.message)
+      const invalid = /invalid login credentials/i.test(error.message)
+      setError(
+        invalid
+          ? "Email or password is incorrect. If you've never signed up, create a venue instead."
+          : error.message,
+      )
       toast.error(error.message)
       return
     }
     toast.success('Signed in successfully.')
-    navigate('/dashboard', { replace: true })
+    navigate('/manager', { replace: true })
   }
 
   return (

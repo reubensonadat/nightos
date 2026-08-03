@@ -45,9 +45,9 @@ export function useRealtime<T extends Record<string, unknown>>({
           filter,
         },
         (payload: RealtimePostgresChangesPayload<T>) => {
-          if (payload.eventType === 'INSERT') onInsertRef.current?.(payload.new);
-          else if (payload.eventType === 'UPDATE') onUpdateRef.current?.(payload.new, payload.old);
-          else if (payload.eventType === 'DELETE') onDeleteRef.current?.(payload.old);
+          if (payload.eventType === 'INSERT') onInsertRef.current?.(payload.new as T);
+          else if (payload.eventType === 'UPDATE') onUpdateRef.current?.(payload.new as T, payload.old as T);
+          else if (payload.eventType === 'DELETE') onDeleteRef.current?.(payload.old as T);
         },
       )
       .subscribe();

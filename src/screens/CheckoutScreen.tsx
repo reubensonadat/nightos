@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
     ArrowLeftIcon,
     BanknotesIcon,
@@ -9,9 +9,10 @@ import {
     WalletIcon,
 } from "@heroicons/react/24/outline";
 import { CheckCircleIcon } from "@heroicons/react/24/solid";
+import toast from "react-hot-toast";
 import { formatGHS } from "../data/menu";
 import { PaystackButton } from "../components/PaystackButton";
-import { db } from "../lib/api";
+import { db, type DbBill, type DbVenue } from "../lib/api";
 
 /* ────────────────────────── Payment methods ────────────────────────── */
 
@@ -57,75 +58,128 @@ const PAYMENT_OPTIONS: PaymentOption[] = [
     },
 ];
 
-/* ────────────────────────── Tip presets ────────────────────────── */
-
-const TIP_PRESETS = [
-    { percent: 0, label: "No thanks" },
-    { percent: 10, label: "10%" },
-    { percent: 15, label: "15%" },
-    { percent: 20, label: "20%" },
-] as const;
-
 /* ────────────────────────── Component ────────────────────────── */
 
 type Props = {
     total: number;
     billId?: string;
     venueId?: string;
+    sessionToken?: string | null;
     onBack: () => void;
     onPaid: () => void;
 };
 
-export function CheckoutScreen({ total, billId, venueId, onBack, onPaid }: Props) {
-    const [tipPercent, setTipPercent] = useState<number>(15);
+export function CheckoutScreen({ total, billId, venueId, sessionToken, onBack, onPaid }: Props) {
+    const [bill, setBill] = useState<DbBill | null>(null);
+    const [venue, setVenue] = useState<DbVenue | null>(null);
+    const [tableLabel, setTableLabel] = useState<string | null>(null);
     const [method, setMethod] = useState<PaymentMethod>("momo");
     const [paying, setPaying] = useState(false);
     const [paid, setPaid] = useState(false);
 
-    // Reverse-engineer the breakdown for display
-    // total = subtotal * (1 + 0.10 + 0.125) = subtotal * 1.225
-    const { subtotal, serviceCharge, vat } = useMemo(() => {
+    useEffect(() => {
+        if (!billId) return;
+        let cancelled = false;
+        db.billWithTable(billId)
+            .then(
+                ({ data }) => {
+                    if (cancelled) return;
+                    if (data) {
+                        setBill(data as DbBill);
+                        const t = (data as { tables?: { table_label?: string } | null }).tables;
+                        if (t?.table_label) setTableLabel(t.table_label);
+                    }
+                },
+                () => {},
+            );
+        if (venueId) {
+            db.venueById(venueId)
+                .then(
+                    ({ data }) => {
+                        if (!cancelled && data) setVenue(data);
+                    },
+                    () => {},
+                );
+        }
+        return () => {
+            cancelled = true;
+        };
+    }, [billId, venueId]);
+
+    const isPrepay = venue?.payment_model === 'PREPAY' || bill?.payment_model === 'PREPAY';
+
+    const { subtotal, serviceCharge, vat, convenienceFee, billTotal, payAmount } = useMemo(() => {
+        if (bill) {
+            const remainingAmount = Math.max(0, Math.round((bill.total - bill.amount_paid) * 100) / 100);
+            const fee = remainingAmount > 0 && isPrepay ? bill.convenience_fee : 0;
+            return {
+                subtotal: bill.subtotal,
+                serviceCharge: bill.service_charge,
+                vat: bill.vat,
+                convenienceFee: fee,
+                billTotal: bill.total,
+                payAmount: Math.round((remainingAmount + fee) * 100) / 100,
+            };
+        }
+        // Fallback while the bill loads (legacy prop math, never used for charging)
         const sub = total / 1.225;
-        const service = sub * 0.1;
-        const tax = sub * 0.125;
         return {
             subtotal: Math.round(sub * 100) / 100,
-            serviceCharge: Math.round(service * 100) / 100,
-            vat: Math.round(tax * 100) / 100,
+            serviceCharge: Math.round(sub * 0.1 * 100) / 100,
+            vat: Math.round(sub * 0.125 * 100) / 100,
+            convenienceFee: 0,
+            billTotal: total,
+            payAmount: total,
         };
-    }, [total]);
-
-    const tipAmount = useMemo(
-        () => Math.round(total * (tipPercent / 100) * 100) / 100,
-        [total, tipPercent]
-    );
-    const grandTotal = total + tipAmount;
+    }, [bill, total, isPrepay]);
 
     const handlePay = async () => {
+        if (!billId || !venueId) {
+            toast.error("Something went wrong — please try again.");
+            return;
+        }
         setPaying(true);
 
         try {
-            if (billId && venueId) {
-                await db.createPayment(
-                    billId,
-                    venueId,
-                    grandTotal,
-                    method === 'card' ? 'card' : method === 'momo' ? 'mobile_money' : 'cash',
-                    undefined,
-                    undefined,
-                );
-            }
-        } catch {
-            // fall through
-        }
+            const { error } = await db.createPayment(
+                billId,
+                venueId,
+                payAmount,
+                method === 'card' ? 'card' : method === 'momo' ? 'mobile_money' : method === 'bank' ? 'bank_transfer' : method === 'wallet' ? 'digital_wallet' : 'cash',
+                undefined,
+                undefined,
+                sessionToken,
+            );
+            if (error) throw error;
 
-        window.setTimeout(() => {
+            if (payAmount >= billTotal) {
+                await db.updateBill(billId, { status: 'paid', closed_at: new Date().toISOString() }, sessionToken);
+            }
             setPaying(false);
             setPaid(true);
-            window.setTimeout(() => {
-                onPaid();
-            }, 1800);
-        }, 1200);
+            window.setTimeout(onPaid, 1800);
+        } catch (err) {
+            console.error("Payment failed:", err);
+            toast.error("Payment failed. Please try again.");
+            setPaying(false);
+        }
+    };
+
+    const handlePaystackSuccess = async (reference: string) => {
+        if (!billId) return;
+        try {
+            const { data, error } = await db.verifyPayment(reference, billId);
+            if (error || !data || (data as { success?: boolean }).success !== true) {
+                toast.error("Payment couldn't be verified. We'll check it and update your bill.");
+                setPaying(false);
+                return;
+            }
+            setPaid(true);
+            window.setTimeout(onPaid, 1800);
+        } catch {
+            toast.error("Payment couldn't be verified. We'll check it and update your bill.");
+            setPaying(false);
+        }
     };
 
     // ── Success state ──
@@ -157,7 +211,7 @@ export function CheckoutScreen({ total, billId, venueId, onBack, onPaid }: Props
                         </span>
                     </h1>
                     <p className="mx-auto mt-3 max-w-[300px] text-[13px] leading-[1.55] tracking-tight text-feldgrau">
-                        {formatGHS(grandTotal)} paid via{" "}
+                        {formatGHS(payAmount)} paid via{" "}
                         {PAYMENT_OPTIONS.find((p) => p.id === method)?.label}.
                         Your receipt has been sent.
                     </p>
@@ -188,7 +242,7 @@ export function CheckoutScreen({ total, billId, venueId, onBack, onPaid }: Props
                             Checkout
                         </span>
                         <span className="text-[9px] font-semibold uppercase tracking-[0.18em] text-feldgrau">
-                            Table 04
+                            {tableLabel ? `Table ${tableLabel}` : venue?.name || "Bysen"}
                         </span>
                     </div>
 
@@ -222,7 +276,7 @@ export function CheckoutScreen({ total, billId, venueId, onBack, onPaid }: Props
                             Bill Summary
                         </span>
                         <span className="text-[10px] font-bold uppercase tracking-wider text-feldgrau">
-                            Velvet Lounge
+                            {venue?.name || "Velvet Lounge"}
                         </span>
                     </div>
 
@@ -237,7 +291,7 @@ export function CheckoutScreen({ total, billId, venueId, onBack, onPaid }: Props
                         <div className="flex items-center justify-between text-[12px]">
                             <span className="tracking-tight text-feldgrau">
                                 Service charge{" "}
-                                <span className="text-feldgrau/60">(10%)</span>
+                                <span className="text-feldgrau/60">({venue?.service_charge_pct ?? 10}%)</span>
                             </span>
                             <span className="font-mono font-bold tabular-nums text-licorice">
                                 {formatGHS(serviceCharge)}
@@ -245,68 +299,33 @@ export function CheckoutScreen({ total, billId, venueId, onBack, onPaid }: Props
                         </div>
                         <div className="flex items-center justify-between text-[12px]">
                             <span className="tracking-tight text-feldgrau">
-                                VAT <span className="text-feldgrau/60">(12.5%)</span>
+                                VAT <span className="text-feldgrau/60">({venue?.vat_pct ?? 12.5}%)</span>
                             </span>
                             <span className="font-mono font-bold tabular-nums text-licorice">
                                 {formatGHS(vat)}
                             </span>
                         </div>
+                        {convenienceFee > 0 && (
+                            <div className="flex items-center justify-between text-[12px]">
+                                <span className="tracking-tight text-feldgrau">
+                                    Convenience fee{" "}
+                                    <span className="text-feldgrau/60">(prepaid)</span>
+                                </span>
+                                <span className="font-mono font-bold tabular-nums text-licorice">
+                                    {formatGHS(convenienceFee)}
+                                </span>
+                            </div>
+                        )}
                     </div>
 
                     {/* Bill Total */}
                     <div className="flex items-end justify-between border-t border-isabelline px-4 py-3">
                         <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-feldgrau">
-                            Bill Total
+                            {bill && bill.amount_paid > 0 ? "Amount Due" : "Bill Total"}
                         </span>
                         <span className="font-mono text-[18px] font-bold tabular-nums text-licorice">
-                            {formatGHS(total)}
+                            {formatGHS(bill ? billTotal : total)}
                         </span>
-                    </div>
-                </div>
-
-                {/* ── Tip Section ── */}
-                <div className="mb-5 rounded-2xl bg-white p-4 shadow-[0_4px_16px_rgba(35,20,12,0.04)] ring-1 ring-isabelline">
-                    <div className="flex items-center justify-between">
-                        <div>
-                            <span className="text-[12px] font-bold tracking-tight text-licorice">
-                                Add a tip
-                            </span>
-                            <p className="mt-0.5 text-[10.5px] tracking-tight text-feldgrau">
-                                100% goes to your server
-                            </p>
-                        </div>
-                        {tipPercent > 0 && (
-                            <span className="font-mono text-[13px] font-bold tabular-nums text-khaki">
-                                +{formatGHS(tipAmount)}
-                            </span>
-                        )}
-                    </div>
-
-                    {/* Tip presets */}
-                    <div className="mt-3 grid grid-cols-4 gap-2">
-                        {TIP_PRESETS.map((preset) => {
-                            const isActive = tipPercent === preset.percent;
-                            return (
-                                <button
-                                    key={preset.percent}
-                                    type="button"
-                                    onClick={() => setTipPercent(preset.percent)}
-                                    className={`
-                                        flex flex-col items-center justify-center
-                                        rounded-xl py-2.5
-                                        text-[12px] font-bold tracking-tight
-                                        transition-all duration-150 ease-out
-                                        active:scale-95
-                                        ${isActive
-                                            ? "bg-licorice text-isabelline shadow-[0_4px_12px_rgba(35,20,12,0.18)]"
-                                            : "bg-isabelline text-feldgrau ring-1 ring-licorice/8 hover:text-licorice hover:ring-licorice/15"
-                                        }
-                                    `}
-                                >
-                                    {preset.label}
-                                </button>
-                            );
-                        })}
                     </div>
                 </div>
 
@@ -379,16 +398,18 @@ export function CheckoutScreen({ total, billId, venueId, onBack, onPaid }: Props
                     <div className="flex items-end justify-between">
                         <div>
                             <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-khaki">
-                                Grand Total
+                                You Pay
                             </p>
                             <p className="mt-0.5 text-[10px] font-medium tracking-tight text-isabelline/50">
-                                {tipPercent > 0
-                                    ? `Includes ${tipPercent}% tip`
-                                    : "No tip added"}
+                                {isPrepay && convenienceFee > 0
+                                    ? "Includes prepaid convenience fee"
+                                    : isPrepay
+                                        ? "Prepay your bill — pay before ordering"
+                                        : "Pay at the table when you're done"}
                             </p>
                         </div>
                         <span className="font-mono text-[22px] font-black tabular-nums text-isabelline">
-                            {formatGHS(grandTotal)}
+                            {formatGHS(payAmount)}
                         </span>
                     </div>
                 </div>
@@ -400,20 +421,10 @@ export function CheckoutScreen({ total, billId, venueId, onBack, onPaid }: Props
             <div className="fixed inset-x-0 bottom-0 z-40 flex justify-center px-5 pb-[max(env(safe-area-inset-bottom),18px)] pt-3 bg-gradient-to-t from-isabelline via-isabelline/95 to-transparent">
                 {billId && venueId && (method === 'card' || method === 'momo') ? (
                     <PaystackButton
-                        amount={grandTotal}
+                        amount={payAmount}
                         billId={billId}
                         venueId={venueId}
-                        onSuccess={async (ref) => {
-                            try {
-                                const { error } = await db.verifyPayment(ref, billId);
-                                if (error) {
-                                    await db.createPayment(billId, venueId, grandTotal, method === 'card' ? 'card' : 'mobile_money', ref);
-                                }
-                            } catch {
-                                await db.createPayment(billId, venueId, grandTotal, method === 'card' ? 'card' : 'mobile_money', ref);
-                            }
-                            setPaid(true);
-                        }}
+                        onSuccess={handlePaystackSuccess}
                         onClose={() => setPaying(false)}
                         className="
                             group flex w-full max-w-md md:max-w-2xl items-center justify-between
@@ -431,7 +442,7 @@ export function CheckoutScreen({ total, billId, venueId, onBack, onPaid }: Props
                                 Pay with {PAYMENT_OPTIONS.find((p) => p.id === method)?.label}
                             </span>
                             <span className="text-[15px] font-bold tracking-tight text-isabelline">
-                                Pay {formatGHS(grandTotal)}
+                                Pay {formatGHS(payAmount)}
                             </span>
                         </span>
                         <span className="flex h-9 w-9 items-center justify-center rounded-full bg-isabelline text-licorice">
@@ -462,7 +473,7 @@ export function CheckoutScreen({ total, billId, venueId, onBack, onPaid }: Props
                             <span className="text-[15px] font-bold tracking-tight text-isabelline">
                                 {paying
                                     ? `Paying via ${PAYMENT_OPTIONS.find((p) => p.id === method)?.label}`
-                                    : `Pay ${formatGHS(grandTotal)}`}
+                                    : `Pay ${formatGHS(payAmount)}`}
                             </span>
                         </span>
                         <span className="flex h-9 w-9 items-center justify-center rounded-full bg-isabelline text-licorice">

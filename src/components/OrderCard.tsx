@@ -31,6 +31,7 @@ type Props = {
     now: number;
     onAdvance: (orderId: string) => void;
     onMarkReady: (orderId: string) => void;
+    onMarkServed?: (orderId: string) => void;
 };
 
 /* ────────────────────────── Helpers ────────────────────────── */
@@ -80,7 +81,7 @@ const STATUS_LABEL: Record<OrderStatus, string> = {
 
 /* ────────────────────────── Component ────────────────────────── */
 
-export function OrderCard({ order, now, onAdvance, onMarkReady }: Props) {
+export function OrderCard({ order, now, onAdvance, onMarkReady, onMarkServed }: Props) {
     const elapsed = minutesSince(order.placedAt, now);
     const urgency = getUrgency(elapsed);
     const styles = URGENCY_STYLES[urgency];
@@ -205,12 +206,31 @@ export function OrderCard({ order, now, onAdvance, onMarkReady }: Props) {
                     </button>
                 )}
 
-                {order.status === "ready" && (
-                    <div className="flex items-center justify-center gap-1.5 rounded-xl bg-khaki/15 px-4 py-2.5 text-[12px] font-bold tracking-tight text-khaki">
-                        <CheckIcon className="h-3.5 w-3.5" strokeWidth={2.5} />
-                        Ready for pickup
-                    </div>
-                )}
+                {order.status === "ready" &&
+                    (onMarkServed ? (
+                        <button
+                            type="button"
+                            onClick={() => onMarkServed(order.id)}
+                            aria-label="Mark as served"
+                            className="
+                                flex w-full items-center justify-center gap-1.5
+                                rounded-xl bg-feldgrau px-4 py-2.5
+                                text-[12px] font-bold tracking-tight text-isabelline
+                                shadow-[0_4px_12px_rgba(58,66,63,0.25)]
+                                transition-all duration-150
+                                hover:brightness-110
+                                active:scale-[0.98]
+                            "
+                        >
+                            <CheckIcon className="h-3.5 w-3.5" strokeWidth={2.5} />
+                            Mark Served
+                        </button>
+                    ) : (
+                        <div className="flex items-center justify-center gap-1.5 rounded-xl bg-khaki/15 px-4 py-2.5 text-[12px] font-bold tracking-tight text-khaki">
+                            <CheckIcon className="h-3.5 w-3.5" strokeWidth={2.5} />
+                            Ready for pickup
+                        </div>
+                    ))}
             </div>
         </article>
     );

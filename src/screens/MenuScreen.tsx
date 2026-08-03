@@ -6,22 +6,20 @@ import {
     MagnifyingGlassIcon,
     MapPinIcon,
     PlusIcon,
+    UserIcon,
 } from "@heroicons/react/24/outline";
 import { HeartIcon as HeartIconSolid } from "@heroicons/react/24/solid";
-import {
-    CATEGORIES,
-    MENU,
-    formatGHS,
-    type MenuCategory,
-    type MenuItem,
-} from "../data/menu";
+import { formatGHS } from "../data/menu";
+import type { MenuCategory, MenuItem } from "../data/menu";
 import { useCart } from "../context/CartContext";
 import { ItemDetailsSheet } from "../components/ItemDetailsSheet";
-import { db } from "../lib/api";
-import type { DbProduct } from "../lib/api";
+import { db, type DbProduct } from "../lib/api";
 
 type Props = {
     venueId?: string;
+    venueName?: string | null;
+    tableLabel?: string | null;
+    waiterName?: string | null;
     onBack?: () => void;
     onViewCart?: () => void;
 };
@@ -29,46 +27,58 @@ type Props = {
 async function fetchProducts(venueId: string): Promise<MenuItem[]> {
     const { data, error } = await db.products(venueId);
     if (error || !data) return [];
+
+    // Fetch categories for mapping
+    const { data: categories } = await db.menuCategories(venueId);
+    const categoryMap = new Map(categories?.map(c => [c.id, c.name]) || []);
+
     return data.map((p: DbProduct) => ({
         id: p.id,
         name: p.name,
         description: p.description || '',
         longDescription: p.long_description || undefined,
         price: p.price,
-        category: mapCategory(p.category_id),
+        category: p.category_id ? categoryMap.get(p.category_id) || "Other" : "Other",
         image: p.images?.[0] || '',
-        tags: p.tags?.filter((t): t is MenuItem['tags'][number] =>
-            ['Popular', 'New', "Chef's Pick", 'Vegetarian'].includes(t as any)
-        ) || undefined,
+        tags: ((p.tags ?? []) as string[]).filter((t) =>
+            ['Popular', 'New', "Chef's Pick", 'Vegetarian'].includes(t)
+        ) as MenuItem['tags'] | undefined,
         abv: p.abv || undefined,
         origin: p.origin || undefined,
     }));
 }
 
-function mapCategory(_categoryId: string | null): MenuCategory {
-    return "Signatures";
-}
-
-export function MenuScreen({ venueId, onBack, onViewCart }: Props) {
+export function MenuScreen({ venueId, venueName, tableLabel, waiterName, onBack, onViewCart }: Props) {
     const [active, setActive] = useState<MenuCategory>("Signatures");
     const [query, setQuery] = useState("");
     const [searchOpen, setSearchOpen] = useState(false);
     const [activeItemId, setActiveItemId] = useState<string | null>(null);
-    const [supabaseItems, setSupabaseItems] = useState<MenuItem[] | null>(null);
+    const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
+    const [loading, setLoading] = useState(true);
     const { addQuick, subtotal, itemCount, toggleFavorite, isFavorite } =
         useCart();
 
     useEffect(() => {
-        if (!venueId) return;
+        if (!venueId) {
+            setLoading(false);
+            return;
+        }
+        setLoading(true);
         fetchProducts(venueId).then(items => {
-            if (items.length > 0) setSupabaseItems(items);
+            setMenuItems(items);
+            setLoading(false);
         });
     }, [venueId]);
 
-    const items = supabaseItems ?? MENU;
-    const categories: MenuCategory[] = supabaseItems
-        ? [...new Set(supabaseItems.map(i => i.category))]
-        : CATEGORIES;
+    const items = menuItems;
+    const categories: MenuCategory[] = [...new Set(items.map(i => i.category))];
+
+    // Ensure active category still exists after data loads
+    useEffect(() => {
+        if (categories.length > 0 && !categories.includes(active)) {
+            setActive(categories[0]);
+        }
+    }, [categories, active]);
 
     const visibleItems = useMemo<MenuItem[]>(() => {
         const q = query.trim().toLowerCase();
@@ -87,12 +97,7 @@ export function MenuScreen({ venueId, onBack, onViewCart }: Props) {
         ? items.find((m) => m.id === activeItemId) ?? null
         : null;
 
-    // Featured item — only shown on Signatures, no search
-    const featuredItem = items.find((m) => m.id === "sig-hibiscus-spritz");
-    const showFeatured = active === "Signatures" && !query && featuredItem;
-    const gridItems = showFeatured
-        ? visibleItems.filter((i) => i.id !== featuredItem!.id)
-        : visibleItems;
+    const gridItems = visibleItems;
 
     return (
         <main className="relative min-h-svh w-full overflow-x-hidden bg-isabelline font-sans text-licorice antialiased">
@@ -101,7 +106,7 @@ export function MenuScreen({ venueId, onBack, onViewCart }: Props) {
               ═══════════════════════════════════════════════════════════ */}
             <header className="sticky top-0 z-30 bg-isabelline/95 backdrop-blur-xl border-b border-licorice/8">
                 {/* ── Top Bar ── */}
-                <div className="mx-auto flex w-full max-w-7xl items-center justify-between px-5 md:px-8 pt-[max(env(safe-area-inset-top),16px)] pb-3">
+                <div className="mx-auto flex w-full max-w-7xl items-center justify-between px-5 md:px-8 pt-[max(env(safe-area-inset-top),14px)] pb-2">
                     <div className="flex items-center gap-2.5">
                         {onBack && (
                             <button
@@ -121,22 +126,32 @@ export function MenuScreen({ venueId, onBack, onViewCart }: Props) {
                             </div>
                             <div className="flex flex-col leading-tight">
                                 <span className="text-[13px] font-bold tracking-tight text-licorice">
-                                    Velvet Lounge
+                                    {venueName || "Velvet Lounge"}
                                 </span>
                                 <span className="text-[9px] font-semibold uppercase tracking-[0.18em] text-feldgrau">
-                                    NightOS · Table 04
+                                    Bysen{tableLabel ? ` · Table ${tableLabel}` : ""}
                                 </span>
                             </div>
                         </div>
                     </div>
 
                     <div className="flex items-center gap-2">
-                        <div className="flex items-center gap-1.5 rounded-full bg-white px-3 py-2 shadow-sm ring-1 ring-licorice/8">
-                            <MapPinIcon className="h-3 w-3 text-dark-red" strokeWidth={2.25} />
-                            <span className="text-[10px] font-bold uppercase tracking-wider text-licorice">
-                                T·04
-                            </span>
-                        </div>
+                        {tableLabel && (
+                            <div className="flex items-center gap-1.5 rounded-full bg-white px-3 py-2 shadow-sm ring-1 ring-licorice/8">
+                                <MapPinIcon className="h-3 w-3 text-dark-red" strokeWidth={2.25} />
+                                <span className="text-[10px] font-bold uppercase tracking-wider text-licorice">
+                                    T·{tableLabel}
+                                </span>
+                            </div>
+                        )}
+                        {waiterName && (
+                            <div className="flex items-center gap-1.5 rounded-full bg-white px-3 py-2 shadow-sm ring-1 ring-licorice/8">
+                                <UserIcon className="h-3 w-3 text-khaki" strokeWidth={2.25} />
+                                <span className="text-[10px] font-bold uppercase tracking-wider text-licorice">
+                                    {waiterName}
+                                </span>
+                            </div>
+                        )}
                         <button
                             type="button"
                             onClick={() => setSearchOpen((v) => !v)}
@@ -205,7 +220,7 @@ export function MenuScreen({ venueId, onBack, onViewCart }: Props) {
             {/* ═══════════════════════════════════════════════════════════
                 CONTENT — editorial title + cards, flows naturally
               ═══════════════════════════════════════════════════════════ */}
-            <section className="mx-auto w-full max-w-7xl px-5 md:px-8 pt-6 pb-[calc(120px+env(safe-area-inset-bottom))]">
+            <section className="mx-auto w-full max-w-7xl px-5 md:px-8 pt-6 pb-[calc(200px+env(safe-area-inset-bottom))]">
                 {/* ── Editorial Title Section ── */}
                 <div className="mb-6">
                     <p className="text-[10px] font-bold uppercase tracking-[0.22em] text-khaki">
@@ -226,52 +241,23 @@ export function MenuScreen({ venueId, onBack, onViewCart }: Props) {
                     </h1>
                     {!searchOpen && (
                         <p className="mt-2 max-w-[300px] text-[12.5px] leading-[1.55] tracking-tight text-feldgrau">
-                            Curated by Chef Ama — tap any dish to read more.
+                            Tap any item to read more.
                         </p>
                     )}
                 </div>
-                {/* ── Featured hero card — refined, no sparkles/stars ── */}
-                {showFeatured && featuredItem && (
-                    <button
-                        type="button"
-                        onClick={() => setActiveItemId(featuredItem.id)}
-                        className="group block w-full text-left mb-5 animate-velvet-rise"
-                    >
-                        <div className="relative overflow-hidden rounded-3xl bg-white shadow-[0_20px_50px_rgba(35,20,12,0.15)] ring-1 ring-isabelline transition-all duration-200 ease-out group-hover:shadow-[0_24px_60px_rgba(35,20,12,0.20)] group-active:scale-[0.99]">
-                            <div className="relative h-44 w-full overflow-hidden">
-                                <img
-                                    src={featuredItem.image}
-                                    alt={featuredItem.name}
-                                    className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
-                                />
-                                <div
-                                    aria-hidden="true"
-                                    className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-white"
-                                />
-                            </div>
-                            <div className="px-5 pb-5 pt-4">
-                                <p className="text-[9px] font-bold uppercase tracking-[0.22em] text-khaki">
-                                    Signature of the Night
-                                </p>
-                                <div className="mt-1.5 flex items-start justify-between gap-3">
-                                    <div className="min-w-0">
-                                        <h3 className="text-[20px] font-bold leading-tight tracking-[-0.035em] text-licorice">
-                                            {featuredItem.name}
-                                        </h3>
-                                        <p className="mt-1.5 text-[12px] leading-[1.55] tracking-tight text-feldgrau line-clamp-2">
-                                            {featuredItem.description}
-                                        </p>
-                                    </div>
-                                    <span className="shrink-0 font-mono text-[17px] font-bold tabular-nums text-licorice">
-                                        {formatGHS(featuredItem.price)}
-                                    </span>
-                                </div>
-                            </div>
-                        </div>
-                    </button>
-                )}
-
                 {/* Empty state */}
+                {loading ? (
+                    <div className="mt-4 flex flex-col items-center justify-center rounded-2xl bg-white px-6 py-12 text-center shadow-[0_4px_16px_rgba(35,20,12,0.04)] ring-1 ring-isabelline">
+                        <span className="h-6 w-6 animate-spin rounded-full border-2 border-khaki/30 border-t-khaki" />
+                        <h3 className="mt-4 text-[15px] font-bold tracking-tight text-licorice">
+                            Loading the menu…
+                        </h3>
+                        <p className="mt-1.5 text-[12px] leading-[1.5] tracking-tight text-feldgrau">
+                            One moment while we get things ready.
+                        </p>
+                    </div>
+                ) : (
+                <>
                 {visibleItems.length === 0 && (
                     <div className="mt-4 flex flex-col items-center justify-center rounded-2xl bg-white px-6 py-12 text-center shadow-[0_4px_16px_rgba(35,20,12,0.04)] ring-1 ring-isabelline">
                         <span className="h-1.5 w-1.5 rounded-full bg-khaki" />
@@ -341,7 +327,7 @@ export function MenuScreen({ venueId, onBack, onViewCart }: Props) {
                                             type="button"
                                             onClick={(e) => {
                                                 e.stopPropagation();
-                                                addQuick(item.id);
+                                                addQuick(item);
                                             }}
                                             aria-label={`Add ${item.name} to cart`}
                                             className="relative z-20 flex h-8 w-8 items-center justify-end text-licorice transition-transform hover:opacity-70 active:scale-90"
@@ -370,13 +356,15 @@ export function MenuScreen({ venueId, onBack, onViewCart }: Props) {
                         );
                     })}
                 </div>
+                </>
+            )}
             </section>
 
             {/* ═══════════════════════════════════════════════════════════
                 FLOATING CART SUMMARY
               ═══════════════════════════════════════════════════════════ */}
             {itemCount > 0 && (
-                <div className="fixed inset-x-0 bottom-0 z-40 flex justify-center px-5 pb-[max(env(safe-area-inset-bottom),18px)] pt-3 bg-gradient-to-t from-isabelline via-isabelline/95 to-transparent">
+                <div className="fixed inset-x-0 bottom-[calc(60px+env(safe-area-inset-bottom))] z-40 flex justify-center px-5 pb-[max(env(safe-area-inset-bottom),18px)] pt-3 bg-gradient-to-t from-isabelline via-isabelline/95 to-transparent">
                     <button
                         type="button"
                         onClick={onViewCart}

@@ -1,33 +1,15 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
     ArrowLeftIcon,
     BanknotesIcon,
     CheckCircleIcon,
     CreditCardIcon,
     DevicePhoneMobileIcon,
-    PrinterIcon,
-    ShareIcon,
+    ExclamationTriangleIcon,
 } from "@heroicons/react/24/outline";
 import { formatGHS } from "../../data/menu";
+import { db } from "../../lib/api";
 import type { Table } from "./TablesDashboard";
-
-/* ────────────────────────── Mock bill data ────────────────────────── */
-
-type BillItem = {
-    name: string;
-    quantity: number;
-    price: number;
-};
-
-const MOCK_BILL: BillItem[] = [
-    { name: "Velvet Old Fashioned", quantity: 2, price: 65 },
-    { name: "Lamb Suya Skewers", quantity: 1, price: 45 },
-    { name: "Hibiscus Spritz", quantity: 1, price: 35 },
-    { name: "Cocoa Espresso Martini", quantity: 1, price: 55 },
-];
-
-const VAT_RATE = 0.05; // 5% VAT
-const SERVICE_RATE = 0.10; // 10% service charge
 
 /* ────────────────────────── Payment methods ────────────────────────── */
 
@@ -39,44 +21,99 @@ const PAYMENT_METHODS: { id: PaymentMethod; label: string; icon: typeof Banknote
     { id: "momo", label: "MoMo", icon: DevicePhoneMobileIcon },
 ];
 
-/* ────────────────────────── Quick cash amounts ────────────────────────── */
-
 const QUICK_CASH = [50, 100, 200, 500];
+
+type BillItem = {
+    id: string;
+    product_name: string;
+    quantity: number;
+    line_total: number;
+};
 
 /* ────────────────────────── Component ────────────────────────── */
 
 type Props = {
     table: Table;
+    staffId: string;
     onBack: () => void;
     onSettled: () => void;
 };
 
-export function InvoiceSettlementScreen({ table, onBack, onSettled }: Props) {
+export function InvoiceSettlementScreen({ table, staffId, onBack, onSettled }: Props) {
     const [method, setMethod] = useState<PaymentMethod>("cash");
     const [cashReceived, setCashReceived] = useState<string>("");
     const [settled, setSettled] = useState(false);
+    const [settling, setSettling] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+    const [fee, setFee] = useState<number | null>(null);
+    const [bill, setBill] = useState<{
+        id: string;
+        subtotal: number;
+        service_charge: number;
+        vat: number;
+        total: number;
+        status: string;
+    } | null>(null);
+    const [items, setItems] = useState<BillItem[]>([]);
+    const [loading, setLoading] = useState(true);
     const [invoiceNo] = useState(() => `VL-${Date.now().toString(36).slice(-6).toUpperCase()}`);
 
-    // Calculate bill
-    const subtotal = MOCK_BILL.reduce((sum, item) => sum + item.price * item.quantity, 0);
-    const vat = subtotal * VAT_RATE;
-    const service = subtotal * SERVICE_RATE;
-    const total = subtotal + vat + service;
+    /* ── Load the real open bill for this table ── */
+    useEffect(() => {
+        let cancelled = false;
+        const load = async () => {
+            const { data: billRow } = await db.openBillForTable(table.id);
+            if (cancelled) return;
+            if (!billRow || billRow.status !== 'open') {
+                setBill(null);
+                setLoading(false);
+                return;
+            }
+            const { data: itemRows } = await db.billItems(billRow.id);
+            if (cancelled) return;
+            setBill({
+                id: billRow.id,
+                subtotal: Number(billRow.subtotal),
+                service_charge: Number(billRow.service_charge),
+                vat: Number(billRow.vat),
+                total: Number(billRow.total),
+                status: billRow.status,
+            });
+            setItems((itemRows ?? []).map((r) => ({
+                id: r.id,
+                product_name: r.product_name,
+                quantity: r.quantity,
+                line_total: Number(r.line_total),
+            })));
+            setLoading(false);
+        };
+        load();
+        return () => {
+            cancelled = true;
+        };
+    }, [table.id]);
 
+    const total = bill?.total ?? 0;
     const received = parseFloat(cashReceived) || 0;
     const change = received - total;
-    const canSettle =
-        method === "cash"
-            ? received >= total
-            : true; // Card and MoMo always "succeed" in mock
+    const canSettle = method === "cash" && received >= total && !!bill;
 
-    const handleSettle = () => {
-        if (!canSettle) return;
+    const handleSettle = async () => {
+        if (!canSettle || !bill) return;
+        setSettling(true);
+        setError(null);
+        const { data, error: dbError } = await db.recordCashPayment(bill.id, total, staffId);
+        setSettling(false);
+        if (dbError || !data?.ok) {
+            setError(dbError ? "Couldn't record the payment — check your connection." : "That bill is no longer open.");
+            return;
+        }
+        setFee(data.fee ?? null);
         setSettled(true);
     };
 
     /* ── Settled success state ── */
-    if (settled) {
+    if (settled && bill) {
         return (
             <main className="relative min-h-svh w-full overflow-x-hidden bg-isabelline font-sans text-licorice antialiased">
                 <header className="sticky top-0 z-30 bg-isabelline/95 backdrop-blur-xl border-b border-licorice/8">
@@ -112,7 +149,7 @@ export function InvoiceSettlementScreen({ table, onBack, onSettled }: Props) {
                             <span className="italic font-serif font-bold text-khaki">settled</span>
                         </h1>
                         <p className="mt-2 text-[12px] leading-[1.5] tracking-tight text-feldgrau">
-                            Invoice generated for Table {String(table.number).padStart(2, "0")}.
+                            Cash confirmed for Table {String(table.number).padStart(2, "0")}.
                         </p>
                     </div>
 
@@ -140,16 +177,21 @@ export function InvoiceSettlementScreen({ table, onBack, onSettled }: Props) {
                         </div>
 
                         <div className="px-5 py-4">
-                            {MOCK_BILL.map((item) => (
+                            {items.length === 0 && (
+                                <p className="text-[12px] tracking-tight text-feldgrau">
+                                    No line items recorded.
+                                </p>
+                            )}
+                            {items.map((item) => (
                                 <div
-                                    key={item.name}
+                                    key={item.id}
                                     className="flex items-center justify-between py-1.5 text-[12px]"
                                 >
                                     <span className="tracking-tight text-licorice">
-                                        {item.quantity}× {item.name}
+                                        {item.quantity}× {item.product_name}
                                     </span>
                                     <span className="font-mono font-bold tabular-nums text-licorice">
-                                        {formatGHS(item.price * item.quantity)}
+                                        {formatGHS(item.line_total)}
                                     </span>
                                 </div>
                             ))}
@@ -157,15 +199,15 @@ export function InvoiceSettlementScreen({ table, onBack, onSettled }: Props) {
                             <div className="mt-3 space-y-1 border-t border-isabelline pt-3 text-[11px]">
                                 <div className="flex justify-between text-feldgrau">
                                     <span>Subtotal</span>
-                                    <span className="font-mono tabular-nums">{formatGHS(subtotal)}</span>
+                                    <span className="font-mono tabular-nums">{formatGHS(bill.subtotal)}</span>
                                 </div>
                                 <div className="flex justify-between text-feldgrau">
-                                    <span>VAT (5%)</span>
-                                    <span className="font-mono tabular-nums">{formatGHS(vat)}</span>
+                                    <span>Service charge</span>
+                                    <span className="font-mono tabular-nums">{formatGHS(bill.service_charge)}</span>
                                 </div>
                                 <div className="flex justify-between text-feldgrau">
-                                    <span>Service (10%)</span>
-                                    <span className="font-mono tabular-nums">{formatGHS(service)}</span>
+                                    <span>VAT</span>
+                                    <span className="font-mono tabular-nums">{formatGHS(bill.vat)}</span>
                                 </div>
                             </div>
 
@@ -174,42 +216,62 @@ export function InvoiceSettlementScreen({ table, onBack, onSettled }: Props) {
                                     Total
                                 </span>
                                 <span className="font-mono text-[18px] font-black tabular-nums text-licorice">
-                                    {formatGHS(total)}
+                                    {formatGHS(bill.total)}
                                 </span>
                             </div>
 
                             <div className="mt-3 rounded-lg bg-khaki/12 px-3 py-2 text-[10px] font-bold uppercase tracking-wider text-khaki">
-                                Paid via {method === "cash" ? "Cash" : method === "card" ? "Card" : "Mobile Money"}
+                                Paid via Cash
                             </div>
-                        </div>
-                    </div>
 
-                    {/* Actions */}
-                    <div className="mt-5 grid grid-cols-2 gap-2">
-                        <button
-                            type="button"
-                            className="inline-flex items-center justify-center gap-1.5 rounded-full bg-white px-4 py-3 text-[11px] font-bold tracking-tight text-licorice shadow-sm ring-1 ring-licorice/8 transition-all hover:bg-isabelline active:scale-[0.98]"
-                        >
-                            <PrinterIcon className="h-3.5 w-3.5" strokeWidth={2.25} />
-                            Print
-                        </button>
-                        <button
-                            type="button"
-                            className="inline-flex items-center justify-center gap-1.5 rounded-full bg-white px-4 py-3 text-[11px] font-bold tracking-tight text-licorice shadow-sm ring-1 ring-licorice/8 transition-all hover:bg-isabelline active:scale-[0.98]"
-                        >
-                            <ShareIcon className="h-3.5 w-3.5" strokeWidth={2.25} />
-                            Share
-                        </button>
+                            {fee !== null && (
+                                <div className="mt-2 rounded-lg bg-isabelline px-3 py-2 text-[10.5px] font-semibold tracking-tight text-feldgrau">
+                                    Platform fee {formatGHS(fee)} — added to your monthly outstanding balance.
+                                </div>
+                            )}
+                        </div>
                     </div>
 
                     <button
                         type="button"
                         onClick={onSettled}
-                        className="mt-3 w-full rounded-full bg-licorice py-3.5 text-[13px] font-bold tracking-tight text-isabelline shadow-[0_12px_28px_rgba(35,20,12,0.20)] transition-all hover:bg-licorice/95 active:scale-[0.985]"
+                        className="mt-5 w-full rounded-full bg-licorice py-3.5 text-[13px] font-bold tracking-tight text-isabelline shadow-[0_12px_28px_rgba(35,20,12,0.20)] transition-all hover:bg-licorice/95 active:scale-[0.985]"
                     >
                         Back to Tables
                     </button>
                 </section>
+            </main>
+        );
+    }
+
+    /* ── Loading / no bill state ── */
+    if (loading) {
+        return (
+            <main className="relative min-h-svh w-full overflow-x-hidden bg-isabelline font-sans text-licorice antialiased flex items-center justify-center">
+                <div className="h-8 w-8 animate-spin rounded-full border-2 border-licorice/20 border-t-licorice" />
+            </main>
+        );
+    }
+
+    if (!bill) {
+        return (
+            <main className="relative min-h-svh w-full overflow-x-hidden bg-isabelline font-sans text-licorice antialiased flex flex-col items-center justify-center px-8 text-center">
+                <div className="flex h-14 w-14 items-center justify-center rounded-full bg-isabelline ring-1 ring-licorice/8">
+                    <ExclamationTriangleIcon className="h-6 w-6 text-feldgrau" strokeWidth={1.75} />
+                </div>
+                <h1 className="mt-4 text-[18px] font-bold tracking-tight text-licorice">
+                    No open bill
+                </h1>
+                <p className="mt-1.5 max-w-[260px] text-[12px] leading-[1.5] text-feldgrau">
+                    Table {String(table.number).padStart(2, "0")} has no open bill to settle.
+                </p>
+                <button
+                    type="button"
+                    onClick={onBack}
+                    className="mt-6 rounded-full bg-licorice px-6 py-3 text-[12px] font-bold tracking-tight text-isabelline transition-all hover:bg-licorice/95 active:scale-[0.985]"
+                >
+                    Back
+                </button>
             </main>
         );
     }
@@ -256,21 +318,26 @@ export function InvoiceSettlementScreen({ table, onBack, onSettled }: Props) {
                                 Bill Summary
                             </p>
                             <p className="font-mono text-[10px] font-bold tabular-nums text-isabelline/60">
-                                {MOCK_BILL.length} items
+                                {items.length} items
                             </p>
                         </div>
 
                         <div className="mt-3 space-y-1.5">
-                            {MOCK_BILL.map((item) => (
+                            {items.length === 0 && (
+                                <p className="text-[11.5px] tracking-tight text-isabelline/70">
+                                    No items yet — ask the customer to order first.
+                                </p>
+                            )}
+                            {items.map((item) => (
                                 <div
-                                    key={item.name}
+                                    key={item.id}
                                     className="flex items-start justify-between gap-2 text-[11.5px]"
                                 >
                                     <span className="min-w-0 flex-1 truncate tracking-tight text-isabelline/90">
-                                        {item.quantity}× {item.name}
+                                        {item.quantity}× {item.product_name}
                                     </span>
                                     <span className="shrink-0 font-mono font-bold tabular-nums">
-                                        {formatGHS(item.price * item.quantity)}
+                                        {formatGHS(item.line_total)}
                                     </span>
                                 </div>
                             ))}
@@ -281,15 +348,15 @@ export function InvoiceSettlementScreen({ table, onBack, onSettled }: Props) {
                         <div className="space-y-0.5 text-[10.5px]">
                             <div className="flex justify-between text-isabelline/60">
                                 <span>Subtotal</span>
-                                <span className="font-mono tabular-nums">{formatGHS(subtotal)}</span>
+                                <span className="font-mono tabular-nums">{formatGHS(bill.subtotal)}</span>
                             </div>
                             <div className="flex justify-between text-isabelline/60">
-                                <span>VAT (5%)</span>
-                                <span className="font-mono tabular-nums">{formatGHS(vat)}</span>
+                                <span>Service charge</span>
+                                <span className="font-mono tabular-nums">{formatGHS(bill.service_charge)}</span>
                             </div>
                             <div className="flex justify-between text-isabelline/60">
-                                <span>Service (10%)</span>
-                                <span className="font-mono tabular-nums">{formatGHS(service)}</span>
+                                <span>VAT</span>
+                                <span className="font-mono tabular-nums">{formatGHS(bill.vat)}</span>
                             </div>
                         </div>
                     </div>
@@ -398,31 +465,32 @@ export function InvoiceSettlementScreen({ table, onBack, onSettled }: Props) {
                     <div className="mt-5 animate-velvet-fade rounded-2xl bg-white p-5 text-center shadow-sm ring-1 ring-isabelline">
                         <CreditCardIcon className="mx-auto h-8 w-8 text-feldgrau" strokeWidth={1.5} />
                         <p className="mt-2 text-[12px] font-bold tracking-tight text-licorice">
-                            Tap, insert, or swipe
+                            Online payment
                         </p>
                         <p className="mt-1 text-[11px] leading-[1.5] tracking-tight text-feldgrau">
-                            Use the POS terminal to process the card payment. Confirm here once approved.
+                            Card & MoMo are paid on the customer's phone — the platform takes its fee
+                            automatically at checkout. Cash is settled here.
                         </p>
                     </div>
                 )}
 
                 {/* MoMo-specific UI */}
                 {method === "momo" && (
-                    <div className="mt-5 animate-velvet-fade rounded-2xl bg-white p-5 shadow-sm ring-1 ring-isabelline">
+                    <div className="mt-5 animate-velvet-fade rounded-2xl bg-white p-5 text-center shadow-sm ring-1 ring-isabelline">
                         <DevicePhoneMobileIcon className="mx-auto h-8 w-8 text-feldgrau" strokeWidth={1.5} />
-                        <p className="mt-2 text-center text-[12px] font-bold tracking-tight text-licorice">
+                        <p className="mt-2 text-[12px] font-bold tracking-tight text-licorice">
                             Mobile Money
                         </p>
-                        <p className="mt-1 text-center text-[11px] leading-[1.5] tracking-tight text-feldgrau">
-                            Generate a payment prompt or scan the customer's QR code to collect.
+                        <p className="mt-1 text-[11px] leading-[1.5] tracking-tight text-feldgrau">
+                            The customer pays from their own phone after checkout. Cash is settled here.
                         </p>
-                        <button
-                            type="button"
-                            className="mt-4 w-full rounded-full bg-isabelline py-2.5 text-[11px] font-bold tracking-tight text-licorice ring-1 ring-licorice/8 transition-all hover:bg-khaki/15 active:scale-[0.98]"
-                        >
-                            Send Payment Prompt
-                        </button>
                     </div>
+                )}
+
+                {error && (
+                    <p className="mt-4 rounded-lg bg-dark-red/8 px-3 py-2 text-[11px] font-semibold tracking-tight text-dark-red">
+                        {error}
+                    </p>
                 )}
             </section>
 
@@ -443,7 +511,7 @@ export function InvoiceSettlementScreen({ table, onBack, onSettled }: Props) {
                     <button
                         type="button"
                         onClick={handleSettle}
-                        disabled={!canSettle}
+                        disabled={!canSettle || settling}
                         className="
                             inline-flex shrink-0 items-center justify-center gap-1.5
                             rounded-full bg-licorice px-5 py-3
@@ -456,7 +524,17 @@ export function InvoiceSettlementScreen({ table, onBack, onSettled }: Props) {
                             disabled:opacity-40 disabled:shadow-none
                         "
                     >
-                        Settle Bill
+                        {settling ? (
+                            <>
+                                <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none">
+                                    <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" strokeOpacity="0.25" />
+                                    <path d="M22 12a10 10 0 0 1-10 10" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
+                                </svg>
+                                Recording…
+                            </>
+                        ) : method === "cash"
+                            ? "Settle Cash"
+                            : "Paid on customer's phone"}
                     </button>
                 </div>
             </div>

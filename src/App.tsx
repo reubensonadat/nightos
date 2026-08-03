@@ -1,6 +1,8 @@
-import { useState, useEffect, useCallback } from "react";
-import { useNavigate, useLocation } from "react-router-dom";
+import { useState, useEffect, useCallback, useMemo } from "react";
+import { useNavigate, useLocation, useSearchParams } from "react-router-dom";
+import toast from "react-hot-toast";
 import { Toaster } from "react-hot-toast";
+import { useRealtime } from "./hooks/useRealtime";
 import { CartProvider, useCart } from "./context/CartContext";
 import { AuthProvider, useAuth } from "./context/AuthContext";
 import { NetworkProvider } from "./context/NetworkContext";
@@ -8,14 +10,15 @@ import { ProtectedRoute, VenueRequired } from "./screens/auth/ProtectedRoute";
 import { AuthScreen } from "./screens/auth/AuthScreen";
 import { VerifyOtpScreen } from "./screens/auth/VerifyOtpScreen";
 import { VenueSetupScreen } from "./screens/auth/VenueSetupScreen";
-import { WelcomeScreen } from "./screens/WelcomeScreen";
+import { LandingScreen } from "./screens/LandingScreen";
 import { MenuScreen } from "./screens/MenuScreen";
 import { CartScreen } from "./screens/CartScreen";
 import { CheckoutScreen } from "./screens/CheckoutScreen";
-import { ReservationsScreen } from "./screens/ReservationsScreen";
 import { type OrderSummary } from "./screens/OrderTrackingScreen";
 import { OrdersScreen } from "./screens/OrdersScreen";
 import { CustomerBottomNav } from "./components/CustomerBottomNav";
+import { PartyPrompt } from "./components/PartyPrompt";
+import { ClockIcon } from "@heroicons/react/24/outline";
 
 import { StaffAuthScreen } from "./screens/waiter/StaffAuthScreen";
 import { TablesDashboard, type Table } from "./screens/waiter/TablesDashboard";
@@ -36,7 +39,11 @@ import { MenuManagerScreen } from "./screens/manager/MenuManagerScreen";
 import { StaffManagerScreen } from "./screens/manager/StaffManagerScreen";
 import { FinancialReportsScreen } from "./screens/manager/FinancialReportsScreen";
 import { CrmScreen } from "./screens/manager/CrmScreen";
+import { ReservationsScreen } from "./screens/ReservationsScreen";
 import { useVenue } from "./hooks/useVenue";
+import { useQrTable } from "./hooks/useQrTable";
+import { useCustomerSession } from "./hooks/useCustomerSession";
+import { db, type DbTable, type DbStaffSession } from "./lib/api";
 
 type NavTab = "menu" | "cart" | "orders";
 
@@ -52,12 +59,55 @@ type Mode = "customer" | "waiter" | "kitchen" | "manager";
 
 /* ──────────────────── Customer Shell (bottom nav) ──────────────────── */
 
-function CustomerShell({ venueId }: { venueId: string }) {
-  const [tab, setTab] = useState<NavTab>("menu");
+function CustomerShell({ venueId, tableId, tableLabel }: { venueId: string; tableId: string | null; tableLabel?: string | null }) {
+  const [tab, setTab] = useState<NavTab>(() => {
+    const saved = localStorage.getItem("nightos:customer:tab");
+    return saved === "cart" || saved === "orders" ? saved : "menu";
+  });
   const [activeOrders, setActiveOrders] = useState<OrderSummary[]>([]);
   const [history, setHistory] = useState<OrderSummary[]>([]);
   const [payingOrder, setPayingOrder] = useState<OrderSummary | null>(null);
+  const [venueName, setVenueName] = useState<string | null>(null);
   const { itemCount } = useCart();
+
+  const { session, bill, waiter, loading: sessionLoading, error: sessionError, updateParty } = useCustomerSession(venueId, tableId);
+
+  // One-time "how many of you?" prompt per session (QR tables only)
+  const [partyPromptOpen, setPartyPromptOpen] = useState(false);
+  useEffect(() => {
+    if (!tableId || !session || partyPromptOpen) return;
+    try {
+      if (localStorage.getItem(`nightos:party:${session.id}`) === "1") return;
+    } catch {}
+    setPartyPromptOpen(true);
+  }, [tableId, session, partyPromptOpen]);
+
+  const handlePartyConfirm = useCallback(
+    async (partySize: number, guestName?: string) => {
+      const { error } = await updateParty(partySize, guestName);
+      if (error) {
+        toast.error(String(error));
+        return;
+      }
+      try { localStorage.setItem(`nightos:party:${session?.id ?? ''}`, "1"); } catch {}
+      setPartyPromptOpen(false);
+    },
+    [updateParty, session],
+  );
+
+  useEffect(() => {
+    let cancelled = false;
+    db.venueById(venueId)
+      .then(
+        ({ data }) => {
+          if (!cancelled && data) setVenueName(data.name);
+        },
+        () => {},
+      );
+    return () => {
+      cancelled = true;
+    };
+  }, [venueId]);
 
   useEffect(() => {
     try {
@@ -71,8 +121,55 @@ function CustomerShell({ venueId }: { venueId: string }) {
   }, []);
 
   useEffect(() => {
+    try { localStorage.setItem("nightos:customer:tab", tab); } catch {}
+  }, [tab]);
+
+  useEffect(() => {
     try { localStorage.setItem("nightos:orders", JSON.stringify({ active: activeOrders, past: history })); } catch {}
   }, [activeOrders, history]);
+
+  // Live status: realtime streams pending→ready (anon kitchen policy);
+  // the 12s refresh below is a small reconciliation for served/cancelled
+  // transitions, which header-token RLS can't deliver over websockets.
+  const activeSubmissionIds = useMemo(
+    () => activeOrders.filter((o) => o.submissionId).map((o) => o.submissionId as string),
+    [activeOrders],
+  );
+  const refreshStatuses = useCallback(async () => {
+    if (activeSubmissionIds.length === 0) return;
+    const { data, error } = await db.orderSubmissionStatuses(activeSubmissionIds, session?.session_token);
+    if (error || !data) return;
+    const statusMap = new Map(data.map((d) => [d.id, d.status]));
+    setActiveOrders((prev) => {
+      const stillActive = prev.filter((o) => o.submissionId && statusMap.get(o.submissionId) !== "cancelled");
+      const newlyCancelled = prev
+        .filter((o) => o.submissionId && statusMap.get(o.submissionId) === "cancelled")
+        .map((o) => ({ ...o, status: "cancelled" as const, cancelled: true }));
+      if (newlyCancelled.length > 0) {
+        queueMicrotask(() => setHistory((h) => [...newlyCancelled, ...h]));
+      }
+      return stillActive.map((o) => {
+        const next = o.submissionId ? statusMap.get(o.submissionId) : undefined;
+        return next && next !== o.status ? { ...o, status: next as OrderSummary['status'] } : o;
+      });
+    });
+  }, [activeSubmissionIds, session?.session_token]);
+
+  useEffect(() => {
+    refreshStatuses();
+    const t = window.setInterval(refreshStatuses, 12_000);
+    return () => window.clearInterval(t);
+  }, [refreshStatuses]);
+
+  // Realtime: the customer's own submissions (events pass RLS for
+  // pending/confirmed/preparing/ready statuses).
+  useRealtime({
+    table: 'order_submissions',
+    filter: bill?.id ? `bill_id=eq.${bill.id}` : undefined,
+    onInsert: refreshStatuses,
+    onUpdate: refreshStatuses,
+    onDelete: refreshStatuses,
+  });
 
   const handleOrderSent = useCallback((order: OrderSummary) => {
     setActiveOrders((prev) => [...prev, order]);
@@ -90,18 +187,85 @@ function CustomerShell({ venueId }: { venueId: string }) {
     return (
       <CheckoutScreen
         total={payingOrder.total}
-        billId={payingOrder.billId || ""}
+        billId={bill?.id || payingOrder.billId || ""}
         venueId={payingOrder.venueId || venueId}
+        sessionToken={session?.session_token}
         onBack={() => setPayingOrder(null)}
         onPaid={handlePaid}
       />
     );
   }
 
+  if (tableId && session && session.status === "expired") {
+    return (
+      <div className="min-h-svh bg-isabelline flex items-center justify-center px-8">
+        <div className="text-center max-w-sm">
+          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-ink/5">
+            <ClockIcon className="h-7 w-7 text-ink/50" />
+          </div>
+          <p className="text-ink font-semibold text-lg">Session expired</p>
+          <p className="text-ink/60 text-sm mt-1 leading-relaxed">
+            This table's session at {venueName ?? "Velvet Lounge"} ({tableLabel ?? "this table"}) ended because no
+            order was placed within 20 minutes. Re-scan the QR code on the table to start a fresh session.
+          </p>
+          <button
+            onClick={() => window.location.reload()}
+            className="mt-6 px-6 py-3 bg-ink text-parchment rounded-full text-sm font-semibold"
+          >
+            Re-scan
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (tableId && (sessionLoading || sessionError || !session || !bill)) {
+    if (sessionError) {
+      return (
+        <div className="min-h-svh bg-isabelline flex items-center justify-center px-8">
+          <div className="text-center">
+            <p className="text-ink font-semibold text-lg">Couldn't start your session</p>
+            <p className="text-ink/60 text-sm mt-1">Please check your connection and try again.</p>
+            <button
+              onClick={() => window.location.reload()}
+              className="mt-6 px-6 py-3 bg-ink text-parchment rounded-full text-sm font-semibold"
+            >
+              Retry
+            </button>
+          </div>
+        </div>
+      );
+    }
+    return (
+      <div className="min-h-svh bg-isabelline flex items-center justify-center">
+        <div className="w-8 h-8 border-2 border-ink/20 border-t-ink rounded-full animate-spin" />
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-svh bg-isabelline">
-      {tab === "menu" && <MenuScreen venueId={venueId} onViewCart={() => setTab("cart")} />}
-      {tab === "cart" && <CartScreen venueId={venueId} onOrderSent={handleOrderSent} />}
+      {tab === "menu" && (
+        <MenuScreen
+          venueId={venueId}
+          venueName={venueName}
+          tableLabel={tableLabel}
+          waiterName={waiter?.name ?? null}
+          onViewCart={() => setTab("cart")}
+        />
+      )}
+      {tab === "cart" && (
+        <CartScreen
+          venueId={venueId}
+          venueName={venueName ?? undefined}
+          tableLabel={tableLabel ?? undefined}
+          billId={bill?.id}
+          customerSessionId={session?.id}
+          sessionToken={session?.session_token}
+          onBack={() => setTab("menu")}
+          onOrderSent={handleOrderSent}
+        />
+      )}
       {tab === "orders" && (
         <OrdersScreen
           activeOrders={activeOrders}
@@ -110,27 +274,87 @@ function CustomerShell({ venueId }: { venueId: string }) {
         />
       )}
       <CustomerBottomNav activeTab={tab} onTabChange={setTab} cartCount={itemCount} />
+
+      {partyPromptOpen && (
+        <PartyPrompt
+          venueName={venueName ?? "Velvet Lounge"}
+          tableLabel={tableLabel}
+          initialSize={session?.party_size ?? 1}
+          onConfirm={handlePartyConfirm}
+        />
+      )}
     </div>
   );
 }
 
 /* ──────────────────── Customer Flow ──────────────────── */
 
-function CustomerFlow({ onSwitchMode, venueId }: { onSwitchMode: (m: Mode) => void; venueId: string }) {
-  const [inShell, setInShell] = useState(false);
+type CustomerFlowProps = {
+  onSwitchMode: (m: Mode) => void;
+  venueId: string;
+  qrTable: DbTable | null;
+  qrLoading: boolean;
+  qrError: boolean;
+};
 
-  if (!inShell) {
+function CustomerFlow({ onSwitchMode, venueId, qrTable, qrLoading, qrError }: CustomerFlowProps) {
+  // Per-visit only (never persisted): the "Customer" card on the landing hub
+  const [inShell, setInShell] = useState(false);
+  const [showReservations, setShowReservations] = useState(false);
+
+  if (qrLoading) {
     return (
-      <WelcomeScreen
-        onEnter={() => setInShell(true)}
-        onStaffPortal={() => onSwitchMode("waiter")}
-        onKitchenDisplay={() => onSwitchMode("kitchen")}
-        onManagerPortal={() => onSwitchMode("manager")}
+      <div className="min-h-svh bg-isabelline flex items-center justify-center">
+        <div className="w-8 h-8 border-2 border-ink/20 border-t-ink rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  if (qrError) {
+    return (
+      <div className="min-h-svh bg-isabelline flex items-center justify-center px-8">
+        <div className="text-center">
+          <p className="text-ink font-semibold text-lg">Invalid QR code</p>
+          <p className="text-ink/60 text-sm mt-1">This table code isn't recognised.</p>
+          <button
+            onClick={() => window.location.reload()}
+            className="mt-6 px-6 py-3 bg-ink text-parchment rounded-full text-sm font-semibold"
+          >
+            Try again
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (qrTable) {
+    return (
+      <CustomerShell
+        venueId={qrTable.venue_id}
+        tableId={qrTable.id}
+        tableLabel={qrTable.table_label}
       />
     );
   }
 
-  return <CustomerShell venueId={venueId} />;
+  // No QR table → the landing hub: what Bysen is, and a doorway into
+  // every part of the system (customers never see this — their QR goes
+  // straight to the shell above).
+  if (showReservations) {
+    return <ReservationsScreen onBack={() => setShowReservations(false)} />;
+  }
+  if (inShell) {
+    return <CustomerShell venueId={venueId} tableId={null} />;
+  }
+  return (
+    <LandingScreen
+      onEnterCustomer={() => setInShell(true)}
+      onViewReservations={() => setShowReservations(true)}
+      onStaffPortal={() => onSwitchMode("waiter")}
+      onKitchenDisplay={() => onSwitchMode("kitchen")}
+      onManagerPortal={() => onSwitchMode("manager")}
+    />
+  );
 }
 
 /* ──────────────────── App Shell ──────────────────── */
@@ -138,10 +362,14 @@ function CustomerFlow({ onSwitchMode, venueId }: { onSwitchMode: (m: Mode) => vo
 function AppShell() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { user } = useAuth();
+  const [searchParams] = useSearchParams();
+  const { user, signOut } = useAuth();
 
-  const { venue: loadedVenue } = useVenue("velvet-lounge");
+  const { venue: loadedVenue, loading: venueLoading, error: venueError } = useVenue("velvet-lounge");
   const venueId = loadedVenue.id;
+
+  const qrToken = searchParams.get("table");
+  const { table: qrTable, loading: qrLoading, error: qrError } = useQrTable(qrToken);
 
   const getModeFromPath = (): Mode => {
     const path = location.pathname.replace(/^\/+/, "").split("/")[0];
@@ -151,14 +379,61 @@ function AppShell() {
     return "customer";
   };
 
-  const [mode, setMode] = useState<Mode>(getModeFromPath);
+  const [mode, setMode] = useState<Mode>(() => {
+    try {
+      const saved = localStorage.getItem("nightos:mode") as Mode | null;
+      if (saved === "waiter" || saved === "kitchen" || saved === "manager" || saved === "customer") {
+        return saved;
+      }
+    } catch {}
+    return getModeFromPath();
+  });
+
+  // Keep the current mode across refreshes so a reload doesn't kick you out
+  useEffect(() => {
+    try { localStorage.setItem("nightos:mode", mode); } catch {}
+  }, [mode]);
+
+  // Back button safety: never let the browser leave the app's first entry
+  useEffect(() => {
+    const onPopState = (e: PopStateEvent) => {
+      if (e.state === null) {
+        window.history.pushState(null, "", window.location.href);
+      }
+    };
+    window.addEventListener("popstate", onPopState);
+    return () => window.removeEventListener("popstate", onPopState);
+  }, []);
 
   const [waiterScreen, setWaiterScreen] = useState<WaiterScreen>("auth");
-  const [staffName, setStaffName] = useState<string>("");
-  const [staffVenueId, setStaffVenueId] = useState<string>("");
+  const [staffSession, setStaffSession] = useState<DbStaffSession | null>(null);
   const [selectedTable, setSelectedTable] = useState<Table | null>(null);
 
   const [managerPage, setManagerPage] = useState<ManagerPage>("ops");
+
+  // Restore a staff session (no Supabase auth — plain localStorage)
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem("nightos:staff-session");
+      if (raw) {
+        const parsed = JSON.parse(raw) as DbStaffSession;
+        if (parsed && parsed.id && parsed.venue_id) setStaffSession(parsed);
+      }
+    } catch {}
+  }, []);
+
+  useEffect(() => {
+    if (staffSession) setWaiterScreen("dashboard");
+    else setWaiterScreen("auth");
+  }, [staffSession]);
+
+  const persistStaffSession = (s: DbStaffSession | null) => {
+    setStaffSession(s);
+    try {
+      if (s) localStorage.setItem("nightos:staff-session", JSON.stringify(s));
+      else localStorage.removeItem("nightos:staff-session");
+    } catch {}
+  };
 
   useEffect(() => {
     const paths: Record<Mode, string> = {
@@ -172,48 +447,77 @@ function AppShell() {
     }
   }, [mode, navigate, location.pathname]);
 
-  const switchToWaiter = () => { setMode("waiter"); setWaiterScreen("auth"); };
-  const switchToKitchen = () => { setMode("kitchen"); };
-  const switchToManager = () => { setMode("manager"); };
   const switchToCustomer = () => {
     setMode("customer");
-    setStaffName("");
-    setStaffVenueId("");
     setSelectedTable(null);
   };
+
+  const handleStaffSignOut = () => {
+    persistStaffSession(null);
+    setSelectedTable(null);
+  };
+
+  const handleManagerSignOut = async () => {
+    await signOut();
+    setMode("customer");
+    navigate("/", { replace: true });
+  };
+
+  if (!venueLoading && venueError) {
+    return (
+      <div className="min-h-svh bg-isabelline flex items-center justify-center px-8">
+        <div className="max-w-md text-center">
+          <p className="text-ink font-semibold text-lg">Venue not found</p>
+          <p className="text-ink/60 text-sm mt-2 leading-relaxed">
+            The venue <strong>velvet-lounge</strong> doesn't exist in your database yet. Open the Supabase SQL
+            Editor and run <code className="rounded bg-ink/5 px-1.5 py-0.5 font-mono text-xs">supabase/seed-velvet.sql</code>,
+            then reload this page.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <CartProvider>
       {mode === "customer" && (
-        <CustomerFlow onSwitchMode={setMode} venueId={venueId} />
+        <CustomerFlow
+          onSwitchMode={setMode}
+          venueId={venueId}
+          qrTable={qrTable}
+          qrLoading={qrLoading}
+          qrError={qrError}
+        />
       )}
 
       {mode === "waiter" && (
         <>
-          {waiterScreen === "auth" && (
+          {waiterScreen === "auth" && !staffSession && (
             <StaffAuthScreen
-              onSignIn={(name, vId) => {
-                setStaffName(name);
-                setStaffVenueId(vId);
-                setWaiterScreen("dashboard");
+              onSignIn={(session) => {
+                persistStaffSession(session);
               }}
             />
           )}
-          {waiterScreen === "dashboard" && (
+          {waiterScreen === "dashboard" && staffSession && (
             <TablesDashboard
-              venueId={staffVenueId}
-              staffName={staffName}
+              venueId={staffSession.venue_id}
+              staffName={staffSession.name}
+              staffId={staffSession.id}
+              role={staffSession.role}
               onSelectTable={(table) => {
                 setSelectedTable(table);
                 setWaiterScreen("order");
               }}
-              onSignOut={switchToCustomer}
+              onSignOut={handleStaffSignOut}
               onViewShift={() => setWaiterScreen("shift")}
             />
           )}
           {waiterScreen === "order" && selectedTable && (
             <OrderManagementScreen
               table={selectedTable}
+              staffId={staffSession?.id ?? ""}
+              venueId={staffSession?.venue_id ?? venueId}
               onBack={() => setWaiterScreen("dashboard")}
               onGoToTableOps={() => setWaiterScreen("ops")}
               onGoToInvoice={() => setWaiterScreen("invoice")}
@@ -222,19 +526,23 @@ function AppShell() {
           {waiterScreen === "ops" && selectedTable && (
             <TableOperationsScreen
               table={selectedTable}
+              venueId={staffSession?.venue_id ?? venueId}
+              staffId={staffSession?.id ?? ""}
               onBack={() => setWaiterScreen("order")}
             />
           )}
           {waiterScreen === "invoice" && selectedTable && (
             <InvoiceSettlementScreen
               table={selectedTable}
+              staffId={staffSession?.id ?? ""}
               onBack={() => setWaiterScreen("order")}
               onSettled={() => setWaiterScreen("dashboard")}
             />
           )}
           {waiterScreen === "shift" && (
             <ShiftPerformanceScreen
-              staffName={staffName}
+              staffId={staffSession?.id ?? ""}
+              staffName={staffSession?.name ?? ""}
               onBack={() => setWaiterScreen("dashboard")}
             />
           )}
@@ -242,7 +550,17 @@ function AppShell() {
       )}
 
       {mode === "kitchen" && (
-        <KitchenDisplayScreen venueId={venueId} onExit={switchToCustomer} />
+        staffSession ? (
+          <KitchenDisplayScreen
+            venueId={staffSession.venue_id}
+            staffId={staffSession.id}
+            staffName={staffSession.name}
+            onExit={switchToCustomer}
+            onSignOut={handleStaffSignOut}
+          />
+        ) : (
+          <StaffAuthScreen onSignIn={persistStaffSession} />
+        )
       )}
 
       {mode === "manager" && (
@@ -252,7 +570,7 @@ function AppShell() {
               managerName={user?.email?.split("@")[0] || "Manager"}
               activePage={managerPage}
               onPageChange={setManagerPage}
-              onSignOut={() => navigate("/login")}
+              onSignOut={handleManagerSignOut}
             >
               {managerPage === "ops" && <LiveOpsScreen />}
               {managerPage === "floorplan" && <FloorplanScreen />}

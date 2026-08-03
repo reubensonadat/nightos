@@ -1,5 +1,8 @@
-import { createContext, useContext, useMemo, useState, type ReactNode } from "react";
-import { MENU, type MenuItem, type ModifierOption } from "../data/menu";
+import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
+import type { MenuItem, ModifierOption } from "../data/menu";
+
+const CART_STORAGE_KEY = "nightos:cart";
+const FAVORITES_STORAGE_KEY = "nightos:favorites";
 
 export type SelectedModifier = {
     groupId: string;
@@ -21,9 +24,9 @@ type CartContextValue = {
     itemCount: number;
     subtotal: number;
     favorites: Set<string>;
-    addQuick: (itemId: string) => void;
+    addQuick: (item: MenuItem) => void;
     addCustom: (
-        itemId: string,
+        item: MenuItem,
         modifiers: SelectedModifier[],
         notes: string,
         qty: number
@@ -53,9 +56,47 @@ function lineUnitPrice(line: CartLine): number {
     return line.item.price + delta;
 }
 
+function loadLines(): CartLine[] {
+    try {
+        const raw = localStorage.getItem(CART_STORAGE_KEY);
+        if (!raw) return [];
+        // Lines carry their full item snapshot (prices, name, image) so the
+        // cart survives refresh without re-fetching the menu from the DB.
+        const parsed: CartLine[] = JSON.parse(raw);
+        return parsed.filter(
+            (line) => line && line.item && typeof line.item.id === 'string' && line.qty > 0,
+        );
+    } catch {
+        return [];
+    }
+}
+
+function loadFavorites(): Set<string> {
+    try {
+        const raw = localStorage.getItem(FAVORITES_STORAGE_KEY);
+        return raw ? new Set<string>(JSON.parse(raw)) : new Set();
+    } catch {
+        return new Set();
+    }
+}
+
 export function CartProvider({ children }: { children: ReactNode }) {
-    const [lines, setLines] = useState<CartLine[]>([]);
-    const [favorites, setFavorites] = useState<Set<string>>(new Set());
+    const [lines, setLines] = useState<CartLine[]>(loadLines);
+    const [favorites, setFavorites] = useState<Set<string>>(loadFavorites);
+
+    // Cart stays in localStorage — no DB calls while browsing/adding.
+    // The DB is only touched when the order is sent to the kitchen.
+    useEffect(() => {
+        try {
+            localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(lines));
+        } catch {}
+    }, [lines]);
+
+    useEffect(() => {
+        try {
+            localStorage.setItem(FAVORITES_STORAGE_KEY, JSON.stringify([...favorites]));
+        } catch {}
+    }, [favorites]);
 
     const value = useMemo<CartContextValue>(() => {
         const itemCount = lines.reduce((sum, l) => sum + l.qty, 0);
@@ -66,10 +107,8 @@ export function CartProvider({ children }: { children: ReactNode }) {
             itemCount,
             subtotal,
             favorites,
-            addQuick: (itemId: string) => {
-                const item = MENU.find((m) => m.id === itemId);
-                if (!item) return;
-                const lineId = makeLineId(itemId, [], "");
+            addQuick: (item: MenuItem) => {
+                const lineId = makeLineId(item.id, [], "");
                 setLines((prev) => {
                     const existing = prev.find((l) => l.lineId === lineId);
                     if (existing) {
@@ -81,14 +120,12 @@ export function CartProvider({ children }: { children: ReactNode }) {
                 });
             },
             addCustom: (
-                itemId: string,
+                item: MenuItem,
                 modifiers: SelectedModifier[],
                 notes: string,
                 qty: number
             ) => {
-                const item = MENU.find((m) => m.id === itemId);
-                if (!item) return;
-                const lineId = makeLineId(itemId, modifiers, notes);
+                const lineId = makeLineId(item.id, modifiers, notes);
                 setLines((prev) => {
                     const existing = prev.find((l) => l.lineId === lineId);
                     if (existing) {

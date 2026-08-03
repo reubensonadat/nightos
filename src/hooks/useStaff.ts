@@ -1,121 +1,106 @@
-import { useState } from 'react';
-import { db, type DbStaff } from '../lib/api';
+import { useCallback, useState } from 'react';
+import { db, type DbStaffLookup, type DbStaffSession } from '../lib/api';
+import { normalizeGhanaPhone } from '../lib/utils';
 
-const MOCK_VENUE_ID = '00000000-0000-0000-0000-000000000000';
-
-const MOCK_STAFF: Record<string, DbStaff> = {
-  '+233000000000': {
-    id: 'mock-s1',
-    venue_id: MOCK_VENUE_ID,
-    name: 'Akosua Owusu',
-    phone: '+233000000000',
-    email: 'akosua@velvetlounge.gh',
-    role: 'manager',
-    pin: '000000',
-    is_active: true,
-    max_tables: 0,
-    area_assignment: null,
-    hourly_rate: 45,
-    created_at: new Date().toISOString(),
-  },
-  '+233000000001': {
-    id: 'mock-s2',
-    venue_id: MOCK_VENUE_ID,
-    name: 'Kojo Mensah',
-    phone: '+233000000001',
-    email: 'kojo@velvetlounge.gh',
-    role: 'waiter',
-    pin: '000000',
-    is_active: true,
-    max_tables: 6,
-    area_assignment: 'Main Floor',
-    hourly_rate: 25,
-    created_at: new Date().toISOString(),
-  },
-  '+233000000002': {
-    id: 'mock-s3',
-    venue_id: MOCK_VENUE_ID,
-    name: 'Kwame Asante',
-    phone: '+233000000002',
-    email: 'kwame@velvetlounge.gh',
-    role: 'kitchen',
-    pin: '000000',
-    is_active: true,
-    max_tables: 0,
-    area_assignment: null,
-    hourly_rate: 28,
-    created_at: new Date().toISOString(),
-  },
-  '+233000000003': {
-    id: 'mock-s4',
-    venue_id: MOCK_VENUE_ID,
-    name: 'Kwesi Adjei',
-    phone: '+233000000003',
-    email: 'kwesi@velvetlounge.gh',
-    role: 'bar',
-    pin: '000000',
-    is_active: true,
-    max_tables: 0,
-    area_assignment: 'Bar',
-    hourly_rate: 28,
-    created_at: new Date().toISOString(),
-  },
-};
+const SESSION_KEY = 'nightos:staff-session';
 
 type StaffState = {
-  staff: DbStaff | null;
+  /** Currently signed-in staff member (restored from localStorage). */
+  staff: DbStaffSession | null;
   loading: boolean;
   error: string | null;
-  signIn: (phone: string, pin: string) => Promise<DbStaff | null>;
+  /**
+   * Step 1 — check the phone number. Returns null when no staff record
+   * exists; otherwise tells the UI whether a PIN has been set already.
+   */
+  lookup: (phone: string) => Promise<DbStaffLookup | null>;
+  /** Step 2a — first-time PIN setup (only works when no PIN exists yet). */
+  setPin: (phone: string, pin: string) => Promise<boolean>;
+  /** Step 2b — sign in with phone + own PIN. */
+  signIn: (phone: string, pin: string) => Promise<DbStaffSession | null>;
   signOut: () => void;
 };
 
+function readStoredSession(): DbStaffSession | null {
+  try {
+    const raw = localStorage.getItem(SESSION_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (parsed && parsed.id && parsed.venue_id) return parsed as DbStaffSession;
+  } catch {
+    /* corrupted storage — treat as signed out */
+  }
+  return null;
+}
+
 export function useStaff(): StaffState {
-  const [staff, setStaff] = useState<DbStaff | null>(null);
+  const [staff, setStaff] = useState<DbStaffSession | null>(() => readStoredSession());
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const signIn = async (phone: string, pin: string): Promise<DbStaff | null> => {
+  const lookup = useCallback(async (phone: string): Promise<DbStaffLookup | null> => {
+    const normalized = normalizeGhanaPhone(phone);
+    if (!normalized) {
+      setError('Enter a valid Ghana phone number, e.g. 024 000 0000.');
+      return null;
+    }
     setLoading(true);
     setError(null);
-
-    let staffMember: DbStaff | null = null;
-
-    const { data, error: dbError } = await db.staffByPhone(phone);
-    if (data && !dbError) staffMember = data;
-
-    if (!staffMember) {
-      const mock = MOCK_STAFF[phone];
-      if (mock && mock.pin === pin) staffMember = mock;
-    }
-
-    if (!staffMember) {
-      setError('Staff not found');
-      setLoading(false);
-      return null;
-    }
-
-    if (!staffMember.is_active) {
-      setError('Account is deactivated');
-      setLoading(false);
-      return null;
-    }
-
-    if (staffMember.pin !== pin) {
-      setError('Invalid PIN');
-      setLoading(false);
-      return null;
-    }
-
-    setStaff(staffMember);
+    const { data, error: dbError } = await db.staffLookup(normalized);
     setLoading(false);
-    return staffMember;
-  };
+    if (dbError || !data) {
+      setError('Staff not found — ask the manager to add you.');
+      return null;
+    }
+    return data;
+  }, []);
 
-  const signOut = () => {
+  const setPin = useCallback(async (phone: string, pin: string): Promise<boolean> => {
+    const normalized = normalizeGhanaPhone(phone);
+    if (!normalized) return false;
+    setLoading(true);
+    setError(null);
+    const { data, error: dbError } = await db.setStaffPin(normalized, pin);
+    setLoading(false);
+    if (dbError || data === false) {
+      setError('Could not set your PIN. It must be 4–6 digits, and it can only be set once.');
+      return false;
+    }
+    return true;
+  }, []);
+
+  const signIn = useCallback(async (phone: string, pin: string): Promise<DbStaffSession | null> => {
+    const normalized = normalizeGhanaPhone(phone);
+    if (!normalized) {
+      setError('Enter a valid Ghana phone number, e.g. 024 000 0000.');
+      return null;
+    }
+    setLoading(true);
+    setError(null);
+    const { data, error: dbError } = await db.staffSignIn(normalized, pin);
+    setLoading(false);
+    if (dbError || !data) {
+      setError('Wrong phone or PIN. Try again.');
+      return null;
+    }
+    setStaff(data);
+    try {
+      localStorage.setItem(SESSION_KEY, JSON.stringify(data));
+    } catch {
+      /* storage unavailable — session stays in memory only */
+    }
+    return data;
+  }, []);
+
+  const signOut = useCallback(() => {
     setStaff(null);
     setError(null);
-  };
+    try {
+      localStorage.removeItem(SESSION_KEY);
+    } catch {
+      /* ignore */
+    }
+  }, []);
 
-  return { staff, loading, error, signIn, signOut };
+  return { staff, loading, error, lookup, setPin, signIn, signOut };
 }

@@ -6,9 +6,10 @@ import { useAuth } from '../../context/AuthContext'
 type Props = {
   onSwitchMethod: () => void
   onToggleMode: () => void
+  onPrefillSignIn?: (email: string) => void
 }
 
-export function SignupForm({ onSwitchMethod, onToggleMode }: Props) {
+export function SignupForm({ onSwitchMethod, onToggleMode, onPrefillSignIn }: Props) {
   const navigate = useNavigate()
   const { signUp } = useAuth()
 
@@ -16,16 +17,24 @@ export function SignupForm({ onSwitchMethod, onToggleMode }: Props) {
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [alreadyRegistered, setAlreadyRegistered] = useState(false)
   const [loading, setLoading] = useState(false)
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError(null)
+    setAlreadyRegistered(false)
     setLoading(true)
     const { error } = await signUp(email, password)
     setLoading(false)
     if (error) {
-      setError(error.message)
+      const already = /already registered/i.test(error.message)
+      setAlreadyRegistered(already)
+      setError(
+        already
+          ? 'An account with this email already exists. Sign in with that email instead.'
+          : error.message,
+      )
       toast.error(error.message)
       return
     }
@@ -37,7 +46,7 @@ export function SignupForm({ onSwitchMethod, onToggleMode }: Props) {
     <div>
       <div className="mb-6 text-center">
         <h2 className="text-xl font-bold tracking-tight text-licorice">Create your venue</h2>
-        <p className="text-[12px] tracking-tight text-feldgrau mt-1">Join NightOS and start managing in 5 minutes.</p>
+        <p className="text-[12px] tracking-tight text-feldgrau mt-1">Join Bysen and start managing in 5 minutes.</p>
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-4">
@@ -64,7 +73,18 @@ export function SignupForm({ onSwitchMethod, onToggleMode }: Props) {
         </div>
 
         {error && (
-          <div className="rounded-md border border-red-100 bg-red-50 px-4 py-3 text-[12px] text-red-700">{error}</div>
+          <div className="rounded-md border border-red-100 bg-red-50 px-4 py-3 text-[12px] text-red-700">
+            {error}
+            {alreadyRegistered && onPrefillSignIn && (
+              <button
+                type="button"
+                onClick={() => onPrefillSignIn(email)}
+                className="mt-2 block w-full rounded-lg border border-red-200 bg-white px-3 py-2 text-[12px] font-semibold text-red-700 hover:bg-red-50"
+              >
+                Sign in with this email
+              </button>
+            )}
+          </div>
         )}
 
         <button type="submit" disabled={loading}

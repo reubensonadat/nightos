@@ -22,7 +22,7 @@ export function useOrders(venueId: string | null, station?: string) {
       setState({ orders: [], loading: false, error: 'Failed to fetch orders' });
       return;
     }
-    setState({ orders: data, loading: false, error: null });
+    setState({ orders: data ?? [], loading: false, error: null });
   }, [venueId, station]);
 
   useEffect(() => {

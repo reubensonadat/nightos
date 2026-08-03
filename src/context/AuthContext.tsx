@@ -1,7 +1,7 @@
 import { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { authDb } from '../lib/db/auth'
-import type { DbVenue, DbStaff } from '../lib/api'
+import type { DbVenue } from '../lib/api'
 
 type AuthUser = import('@supabase/supabase-js').User
 type Session = import('@supabase/supabase-js').Session

@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import toast from 'react-hot-toast'
 import { useAuth } from '../../context/AuthContext'
-import { authDb } from '../../lib/db/auth'
+import { normalizeGhanaPhone } from '../../lib/utils'
 
 const OTP_STORAGE_KEY = 'nightos:otp_pending'
 const OTP_COOLDOWN_SECONDS = 60
@@ -39,42 +39,35 @@ export function PhoneAuthForm({ isLogin, onSwitchMethod, onToggleMode }: Props) 
     return () => clearTimeout(t)
   }, [cooldown])
 
-  const formatPhone = (raw: string): string => {
-    let f = raw.trim()
-    if (f.startsWith('0')) f = '+233' + f.slice(1)
-    else if (f.startsWith('233')) f = '+' + f
-    else if (!f.startsWith('+')) f = '+' + f
-    return f
-  }
-
+  // +233 normalization only for now — international formats come later.
   const handleSendOtp = async (e: React.FormEvent) => {
     e.preventDefault()
     if (cooldown > 0) return
     setError(null)
     setLoading(true)
 
-    const formattedPhone = formatPhone(phone)
-
-    const { data: phoneExists } = await authDb.checkPhoneExists(formattedPhone)
-    const { data: staffData } = await authDb.venueByStaffPhone(formattedPhone)
-    const isStaff = !!staffData
-
-    if (isLogin && !phoneExists && !isStaff) {
-      setError("This phone number doesn't exist. Create a venue first.")
+    const formattedPhone = normalizeGhanaPhone(phone)
+    if (!formattedPhone) {
+      setError('Enter a valid Ghana phone number, e.g. 024 123 4567 or +233 24 123 4567.')
       setLoading(false)
       return
     }
 
-    if (!isLogin && phoneExists) {
-      setError('An account with this phone already exists. Sign in instead.')
-      setLoading(false)
-      return
-    }
-
+    // No existence gate: OTP sends either way, and Supabase creates the
+    // account on first successful verify. Sign-in and sign-up are the
+    // same path for phone numbers.
     const { error } = await signInWithPhone(formattedPhone)
     setLoading(false)
     if (error) {
-      setError(error.message)
+      const raw = error.message
+      const hasRealDetail = /mnotify|api key|sender|balance|recipient/i.test(raw)
+      setError(
+        hasRealDetail
+          ? raw
+          : /SMS|provider|hook|configure|settings/i.test(raw)
+            ? "SMS isn't set up on this Supabase project yet. Use 'Continue with Email' for now, or configure the mnotify-sms hook and MNOTIFY_API_KEY in Supabase."
+            : raw,
+      )
       toast.error(error.message)
     } else {
       toast.success('Code sent! Check your phone.')
@@ -93,7 +86,7 @@ export function PhoneAuthForm({ isLogin, onSwitchMethod, onToggleMode }: Props) 
           {isLogin ? 'Sign in' : 'Create your venue'}
         </h2>
         <p className="text-[12px] tracking-tight text-feldgrau mt-1">
-          {isLogin ? 'Enter your phone number to continue.' : 'Join NightOS in 5 minutes.'}
+          {isLogin ? 'Enter your phone number to continue.' : 'Join Bysen in 5 minutes.'}
         </p>
       </div>
 

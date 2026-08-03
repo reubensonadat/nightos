@@ -75,7 +75,7 @@ export function PaystackButton({
 
     const config: Parameters<typeof window.PaystackPop.setup>[0] = {
       key: import.meta.env.VITE_PAYSTACK_PUBLIC_KEY || 'pk_test_placeholder',
-      email: email || `${billId.slice(0, 8)}@nightos.com`,
+      email: email || `${billId.slice(0, 8)}@bysen.com`,
       amount: amountPesewas,
       currency: 'GHS',
       ref,

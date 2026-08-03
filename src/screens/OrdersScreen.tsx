@@ -1,28 +1,12 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import {
   ArrowRightIcon,
   CheckIcon,
   ChevronDownIcon,
-  ClockIcon,
 } from "@heroicons/react/24/outline";
 import { CheckCircleIcon } from "@heroicons/react/24/solid";
 import { formatGHS } from "../data/menu";
-import type { OrderSummary } from "./OrderTrackingScreen";
-
-/* ────────────────────────── Tracking stages ────────────────────────── */
-
-type StageId = "received" | "preparing" | "on_the_way" | "served";
-
-const STAGES: { id: StageId; label: string; description: string; activatesAtMs: number }[] = [
-  { id: "received", label: "Order Received", description: "Sent to the kitchen", activatesAtMs: 0 },
-  { id: "preparing", label: "In Preparation", description: "The team is crafting your order", activatesAtMs: 3_000 },
-  { id: "on_the_way", label: "On Its Way", description: "Heading to your table", activatesAtMs: 8_000 },
-  { id: "served", label: "Served", description: "Enjoy — your order has arrived", activatesAtMs: 15_000 },
-];
-
-function formatTime(ts: number): string {
-  return new Date(ts).toLocaleTimeString("en-GH", { hour: "numeric", minute: "2-digit", hour12: true });
-}
+import { STAGES, statusStage, type OrderSummary } from "./OrderTrackingScreen";
 
 function formatDate(ts: number): string {
   return new Date(ts).toLocaleDateString("en-GH", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
@@ -40,26 +24,33 @@ type Props = {
 /* ────────────────────────── Active Order Card ────────────────────────── */
 
 function ActiveOrderCard({ order }: { order: OrderSummary }) {
-  const [now, setNow] = useState(Date.now());
   const [summaryOpen, setSummaryOpen] = useState(false);
 
-  useEffect(() => {
-    const t = setInterval(() => setNow(Date.now()), 1_000);
-    return () => clearInterval(t);
-  }, []);
-
-  const elapsed = now - order.sentAt;
-
-  const currentStage = useMemo(() => {
-    const active = [...STAGES].reverse().find((s) => elapsed >= s.activatesAtMs);
-    return active ?? STAGES[0];
-  }, [elapsed]);
-
+  const currentStage = useMemo(() => statusStage(order.status), [order.status]);
+  const currentIndex = STAGES.indexOf(currentStage);
   const isServed = currentStage.id === "served";
 
-  const servedStage = STAGES[STAGES.length - 1];
-  const msUntilServed = servedStage.activatesAtMs - elapsed;
-  const etaLabel = msUntilServed <= 0 ? "Now" : msUntilServed < 60_000 ? "< 1 min" : `${Math.ceil(msUntilServed / 60_000)} min`;
+  if (order.status === "cancelled" || order.cancelled) {
+    return (
+      <div className="overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-red-100">
+        <div className="flex items-center justify-between px-4 py-3">
+          <div>
+            <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-red-500">Cancelled by staff</p>
+            <p className="text-[12px] font-bold tracking-tight text-licorice">Order #{order.orderNumber}</p>
+          </div>
+          <span className="font-mono text-[15px] font-bold tabular-nums text-feldgrau/50 line-through">
+            {formatGHS(order.total)}
+          </span>
+        </div>
+        <div className="px-4 pb-4">
+          <p className="text-[11.5px] leading-relaxed text-feldgrau">
+            This order was cancelled at the venue. You haven't been charged — order again or pay only for what was
+            served.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-isabelline">
@@ -67,7 +58,7 @@ function ActiveOrderCard({ order }: { order: OrderSummary }) {
       <div className="flex items-center justify-between px-4 py-3">
         <div>
           <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-khaki">
-            {isServed ? "Served" : `${currentStage.label} · ${etaLabel}`}
+            {isServed ? "Served" : `${currentStage.label} · live`}
           </p>
           <p className="text-[12px] font-bold tracking-tight text-licorice">
             Order #{order.orderNumber}
@@ -83,11 +74,11 @@ function ActiveOrderCard({ order }: { order: OrderSummary }) {
         <div className="relative">
           <div aria-hidden="true" className="absolute left-[9px] top-2 bottom-2 w-px bg-licorice/10" />
           <div aria-hidden="true" className="absolute left-[9px] top-2 w-px bg-licorice transition-all duration-700 ease-out"
-            style={{ height: `${(STAGES.indexOf(currentStage) / (STAGES.length - 1)) * 100}%` }}
+            style={{ height: `${(currentIndex / (STAGES.length - 1)) * 100}%` }}
           />
-          {STAGES.map((stage) => {
-            const isPast = STAGES.indexOf(currentStage) > STAGES.indexOf(stage);
-            const isCurrent = currentStage.id === stage.id;
+          {STAGES.map((stage, idx) => {
+            const isPast = idx < currentIndex;
+            const isCurrent = idx === currentIndex;
             return (
               <div key={stage.id} className="relative flex items-start gap-3 pb-3 last:pb-0">
                 <div className="relative z-10 flex shrink-0 items-center justify-center pt-0.5">
@@ -128,14 +119,6 @@ function ActiveOrderCard({ order }: { order: OrderSummary }) {
           ))}
         </div>
       )}
-
-      {isServed && (
-        <div className="border-t border-isabelline px-4 py-2.5">
-          <p className="text-[10px] font-medium tracking-tight text-feldgrau">
-            Served at {formatTime(order.sentAt + STAGES[3].activatesAtMs)}
-          </p>
-        </div>
-      )}
     </div>
   );
 }
@@ -146,7 +129,14 @@ function HistoryCard({ order }: { order: OrderSummary }) {
   return (
     <div className="flex items-center justify-between rounded-xl bg-white px-4 py-3 shadow-sm ring-1 ring-isabelline">
       <div className="min-w-0 flex-1">
-        <p className="text-[12px] font-bold tracking-tight text-licorice">Order #{order.orderNumber}</p>
+        <div className="flex items-center gap-2">
+          <p className="text-[12px] font-bold tracking-tight text-licorice">Order #{order.orderNumber}</p>
+          {order.cancelled && (
+            <span className="rounded-full bg-red-50 ring-1 ring-red-200 text-red-500 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider">
+              Cancelled
+            </span>
+          )}
+        </div>
         <p className="text-[10px] text-feldgrau">{order.itemCount} {order.itemCount === 1 ? "item" : "items"} · {formatDate(order.sentAt)}</p>
       </div>
       <span className="font-mono text-[13px] font-bold tabular-nums text-khaki">{formatGHS(order.total)}</span>
@@ -156,7 +146,7 @@ function HistoryCard({ order }: { order: OrderSummary }) {
 
 /* ────────────────────────── Main Screen ────────────────────────── */
 
-export function OrdersScreen({ activeOrders, history, onPayBill, onReorder }: Props) {
+export function OrdersScreen({ activeOrders, history, onPayBill }: Props) {
   const hasActive = activeOrders.length > 0;
   const hasHistory = history.length > 0;
 
@@ -164,7 +154,7 @@ export function OrdersScreen({ activeOrders, history, onPayBill, onReorder }: Pr
     return (
       <div className="flex flex-col items-center justify-center px-6 py-20 text-center">
         <div className="flex h-14 w-14 items-center justify-center rounded-full bg-isabelline ring-1 ring-licorice/8">
-          <ClipboardIcon className="h-6 w-6 text-feldgrau" strokeWidth={1.5} />
+          <ClipboardIcon className="h-6 w-6 text-feldgrau" />
         </div>
         <h2 className="mt-4 text-[18px] font-bold tracking-tight text-licorice">No orders yet</h2>
         <p className="mt-1.5 max-w-[260px] text-[12px] leading-[1.5] text-feldgrau">
@@ -175,7 +165,7 @@ export function OrdersScreen({ activeOrders, history, onPayBill, onReorder }: Pr
   }
 
   return (
-    <div className="px-5 md:px-8 pt-6 pb-[calc(80px+env(safe-area-inset-bottom))] mx-auto w-full max-w-3xl">
+    <div className="px-5 md:px-8 pt-6 pb-[calc(150px+env(safe-area-inset-bottom))] mx-auto w-full max-w-3xl">
       {/* ── Active Orders ── */}
       {hasActive && (
         <div className="mb-8">
@@ -192,22 +182,17 @@ export function OrdersScreen({ activeOrders, history, onPayBill, onReorder }: Pr
             {activeOrders.map((o) => (
               <div key={o.orderNumber} className="relative">
                 <ActiveOrderCard order={o} />
-                {/* Check if served, show pay button */}
-                {(() => {
-                  const elapsed = Date.now() - o.sentAt;
-                  const served = elapsed >= STAGES[3].activatesAtMs;
-                  if (!served) return null;
-                  return (
-                    <div className="mt-2">
-                      <button type="button" onClick={() => onPayBill(o)}
-                        className="flex w-full items-center justify-between rounded-full bg-licorice px-5 py-3 text-[13px] font-bold text-isabelline shadow-sm transition-all hover:bg-licorice/95 active:scale-[0.985]"
-                      >
-                        <span>Pay {formatGHS(o.total)}</span>
-                        <ArrowRightIcon className="h-4 w-4" strokeWidth={2.5} />
-                      </button>
-                    </div>
-                  );
-                })()}
+                {/* Real status: only show pay when the kitchen marked it served */}
+                {statusStage(o.status).id === "served" && (
+                  <div className="mt-2">
+                    <button type="button" onClick={() => onPayBill(o)}
+                      className="flex w-full items-center justify-between rounded-full bg-licorice px-5 py-3 text-[13px] font-bold text-isabelline shadow-sm transition-all hover:bg-licorice/95 active:scale-[0.985]"
+                    >
+                      <span>Pay {formatGHS(o.total)}</span>
+                      <ArrowRightIcon className="h-4 w-4" strokeWidth={2.5} />
+                    </button>
+                  </div>
+                )}
               </div>
             ))}
           </div>
