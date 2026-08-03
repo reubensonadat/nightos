@@ -497,20 +497,6 @@ $$;
 -- Recompute a bill's subtotal / service charge / VAT / total from
 -- its order items, using the venue's fee percentages. Used after
 -- merge and split move items between bills.
--- Convenience fee (NightOS platform fee): flat GHS by subtotal tier.
-CREATE OR REPLACE FUNCTION public.compute_convenience_fee(subtotal numeric)
-RETURNS numeric(10,2)
-LANGUAGE sql IMMUTABLE AS $$
-    SELECT CASE
-        WHEN subtotal <= 50   THEN 1.00
-        WHEN subtotal <= 100  THEN 2.00
-        WHEN subtotal <= 150  THEN 3.00
-        WHEN subtotal <= 200  THEN 4.00
-        ELSE 5.00
-    END::numeric(10,2);
-$$;
-
--- Recompute a bill's subtotal, service charge, VAT and convenience fee.
 CREATE OR REPLACE FUNCTION public.recompute_bill_totals(p_bill_id uuid)
 RETURNS jsonb
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
@@ -534,12 +520,11 @@ BEGIN
 
     v_service := ROUND(v_subtotal * v_venue.service_charge_pct / 100, 2);
     v_vat := ROUND(v_subtotal * v_venue.vat_pct / 100, 2);
-    v_total := v_subtotal + v_service + v_vat + public.compute_convenience_fee(v_subtotal);
+    v_total := v_subtotal + v_service + v_vat + v_bill.convenience_fee;
 
     UPDATE public.bills
     SET subtotal = v_subtotal, service_charge = v_service,
-        vat = v_vat, convenience_fee = public.compute_convenience_fee(v_subtotal),
-        total = v_total, updated_at = now()
+        vat = v_vat, total = v_total, updated_at = now()
     WHERE id = p_bill_id;
 
     RETURN jsonb_build_object('ok', true, 'subtotal', v_subtotal, 'total', v_total);
