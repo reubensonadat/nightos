@@ -39,6 +39,7 @@ import { MenuManagerScreen } from "./screens/manager/MenuManagerScreen";
 import { StaffManagerScreen } from "./screens/manager/StaffManagerScreen";
 import { FinancialReportsScreen } from "./screens/manager/FinancialReportsScreen";
 import { CrmScreen } from "./screens/manager/CrmScreen";
+import { BrandSettingsScreen } from "./screens/manager/BrandSettingsScreen";
 import { ReservationsScreen } from "./screens/ReservationsScreen";
 import { useVenue } from "./hooks/useVenue";
 import { useQrTable } from "./hooks/useQrTable";
@@ -380,13 +381,15 @@ function AppShell() {
   };
 
   const [mode, setMode] = useState<Mode>(() => {
+    const pathMode = getModeFromPath();
+    if (pathMode !== "customer") return pathMode;
     try {
       const saved = localStorage.getItem("nightos:mode") as Mode | null;
-      if (saved === "waiter" || saved === "kitchen" || saved === "manager" || saved === "customer") {
+      if (saved === "waiter" || saved === "kitchen" || saved === "manager") {
         return saved;
       }
     } catch {}
-    return getModeFromPath();
+    return "customer";
   });
 
   // Keep the current mode across refreshes so a reload doesn't kick you out
@@ -409,7 +412,23 @@ function AppShell() {
   const [staffSession, setStaffSession] = useState<DbStaffSession | null>(null);
   const [selectedTable, setSelectedTable] = useState<Table | null>(null);
 
-  const [managerPage, setManagerPage] = useState<ManagerPage>("ops");
+  // Manager page is URL-driven: /manager/ops, /manager/floorplan, ...
+  const managerPage = useMemo<ManagerPage>(() => {
+    const seg = location.pathname.split("/")[2];
+    if (
+      seg &&
+      (seg === "ops" || seg === "floorplan" || seg === "menu" || seg === "staff" ||
+        seg === "finance" || seg === "crm" || seg === "brand")
+    ) {
+      return seg as ManagerPage;
+    }
+    return "ops";
+  }, [location.pathname]);
+
+  const goToManagerPage = useCallback(
+    (page: ManagerPage) => navigate(`/manager/${page}`),
+    [navigate],
+  );
 
   // Restore a staff session (no Supabase auth — plain localStorage)
   useEffect(() => {
@@ -442,10 +461,19 @@ function AppShell() {
       kitchen: "/kitchen",
       manager: "/manager",
     };
-    if (location.pathname !== paths[mode]) {
+    const isMatch = (p: string): boolean =>
+      mode === "manager" ? p === "/manager" || p.startsWith("/manager/") : p === paths[mode];
+    if (!isMatch(location.pathname)) {
       navigate(paths[mode], { replace: true });
     }
   }, [mode, navigate, location.pathname]);
+
+  // /manager defaults to the Live Ops sub-path
+  useEffect(() => {
+    if (mode === "manager" && (location.pathname === "/manager" || location.pathname === "/manager/")) {
+      navigate("/manager/ops", { replace: true });
+    }
+  }, [mode, location.pathname, navigate]);
 
   const switchToCustomer = () => {
     setMode("customer");
@@ -569,7 +597,7 @@ function AppShell() {
             <ManagerShell
               managerName={user?.email?.split("@")[0] || "Manager"}
               activePage={managerPage}
-              onPageChange={setManagerPage}
+              onPageChange={goToManagerPage}
               onSignOut={handleManagerSignOut}
             >
               {managerPage === "ops" && <LiveOpsScreen />}
@@ -578,6 +606,7 @@ function AppShell() {
               {managerPage === "staff" && <StaffManagerScreen />}
               {managerPage === "finance" && <FinancialReportsScreen />}
               {managerPage === "crm" && <CrmScreen />}
+              {managerPage === "brand" && <BrandSettingsScreen />}
             </ManagerShell>
           </VenueRequired>
         </ProtectedRoute>

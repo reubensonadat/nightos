@@ -5,7 +5,7 @@ export const authDb = {
     supabase
       .from('venues')
       .select(
-        'id, owner_id, name, slug, description, logo_url, address, phone, email, payment_model, service_charge_pct, vat_pct, tax_inclusive, currency, timezone, is_active, created_at, updated_at',
+        'id, owner_id, name, slug, description, logo_url, address, phone, email, payment_model, service_charge_pct, vat_pct, tax_inclusive, currency, timezone, is_active, created_at, updated_at, brand_primary, brand_secondary, brand_accent, brand_text_secondary, brand_danger, brand_light_blue',
       )
       .eq('owner_id', userId)
       .order('created_at', { ascending: true })

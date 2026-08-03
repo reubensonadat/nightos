@@ -938,6 +938,21 @@ CREATE POLICY "Owner updates customers" ON public.customer_profiles
     FOR UPDATE USING (venue_id = public.owner_venue_id())
     WITH CHECK (venue_id = public.owner_venue_id());
 
+-- ── F2. VENUE BRANDING ──────────────────────────────────────────
+-- Each restaurant carries its own brand: color palette + logo URL.
+ALTER TABLE public.venues
+    ADD COLUMN IF NOT EXISTS brand_primary text,
+    ADD COLUMN IF NOT EXISTS brand_secondary text,
+    ADD COLUMN IF NOT EXISTS brand_accent text,
+    ADD COLUMN IF NOT EXISTS brand_text_secondary text,
+    ADD COLUMN IF NOT EXISTS brand_danger text,
+    ADD COLUMN IF NOT EXISTS brand_light_blue text;
+
+DROP POLICY IF EXISTS "Owner manages own venue" ON public.venues;
+CREATE POLICY "Owner manages own venue" ON public.venues
+    FOR UPDATE USING (owner_id = auth.uid())
+    WITH CHECK (owner_id = auth.uid());
+
 -- ═══════════════════════════════════════════════════════════════
 -- DONE. Verify with:
 --   SELECT name, phone, role, pin_hash IS NOT NULL AS has_pin FROM staff ORDER BY role;

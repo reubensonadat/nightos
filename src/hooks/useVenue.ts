@@ -20,6 +20,12 @@ const DEFAULT_VENUE: DbVenue = {
   is_active: true,
   created_at: new Date().toISOString(),
   updated_at: new Date().toISOString(),
+  brand_primary: null,
+  brand_secondary: null,
+  brand_accent: null,
+  brand_text_secondary: null,
+  brand_danger: null,
+  brand_light_blue: null,
 };
 
 export function useVenue(slug?: string) {

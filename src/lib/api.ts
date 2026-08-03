@@ -33,6 +33,12 @@ export type DbVenue = {
   is_active: boolean;
   created_at: string;
   updated_at: string;
+  brand_primary: string | null;
+  brand_secondary: string | null;
+  brand_accent: string | null;
+  brand_text_secondary: string | null;
+  brand_danger: string | null;
+  brand_light_blue: string | null;
 };
 
 export type DbTable = {
@@ -300,7 +306,7 @@ export const db = {
         supabase
           .from('venues')
           .select(
-            'id, owner_id, name, slug, description, logo_url, address, phone, email, payment_model, service_charge_pct, vat_pct, tax_inclusive, currency, timezone, is_active, created_at, updated_at',
+            'id, owner_id, name, slug, description, logo_url, address, phone, email, payment_model, service_charge_pct, vat_pct, tax_inclusive, currency, timezone, is_active, created_at, updated_at, brand_primary, brand_secondary, brand_accent, brand_text_secondary, brand_danger, brand_light_blue',
           )
           .eq('slug', slug)
           .eq('is_active', true)
@@ -315,13 +321,23 @@ export const db = {
         supabase
           .from('venues')
           .select(
-            'id, owner_id, name, slug, description, logo_url, address, phone, email, payment_model, service_charge_pct, vat_pct, tax_inclusive, currency, timezone, is_active, created_at, updated_at',
+            'id, owner_id, name, slug, description, logo_url, address, phone, email, payment_model, service_charge_pct, vat_pct, tax_inclusive, currency, timezone, is_active, created_at, updated_at, brand_primary, brand_secondary, brand_accent, brand_text_secondary, brand_danger, brand_light_blue',
           )
           .eq('id', id)
           .single(),
       `venue:id:${id}`,
       TTL.VENUE,
     ),
+
+  updateVenue: (venueId: string, updates: Partial<DbVenue>) => {
+    cacheInvalidate(`venue:id:${venueId}`);
+    return supabase
+      .from('venues')
+      .update(updates)
+      .eq('id', venueId)
+      .select()
+      .single();
+  },
 
   /* ── Tables ── */
   tablesByVenue: (venueId: string) =>
