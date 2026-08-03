@@ -116,7 +116,7 @@ export function useManagerDashboard(venueId: string | null, days: 7 | 30 = 7) {
   const abortRef = useRef<AbortController | null>(null);
 
   const fetchAll = useCallback(async () => {
-    if (!venueId) return;
+    if (!venueId || venueId === '00000000-0000-0000-0000-000000000000') return;
     abortRef.current?.abort();
 
     const now = new Date();

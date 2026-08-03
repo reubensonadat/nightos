@@ -84,6 +84,7 @@ export function LiveOpsScreen() {
     }, [openBills]);
 
     const loadLive = useCallback(async () => {
+        if (!venue.id || venue.id === "00000000-0000-0000-0000-000000000000") return;
         try {
             const [bal, landedRows, billRows] = await Promise.all([
                 db.outstandingBalance(venue.id),
@@ -115,12 +116,12 @@ export function LiveOpsScreen() {
 
     useRealtime({
         table: 'customer_sessions',
-        filter: `venue_id=eq.${venue.id}`,
+        filter: venue.id === "00000000-0000-0000-0000-000000000000" ? undefined : `venue_id=eq.${venue.id}`,
         onInsert: scheduleLive,
         onUpdate: scheduleLive,
     });
-    useRealtime({ table: 'bills', filter: `venue_id=eq.${venue.id}`, onInsert: scheduleLive, onUpdate: scheduleLive });
-    useRealtime({ table: 'payments', filter: `venue_id=eq.${venue.id}`, onInsert: scheduleLive, onUpdate: scheduleLive });
+    useRealtime({ table: 'bills', filter: venue.id === "00000000-0000-0000-0000-000000000000" ? undefined : `venue_id=eq.${venue.id}`, onInsert: scheduleLive, onUpdate: scheduleLive });
+    useRealtime({ table: 'payments', filter: venue.id === "00000000-0000-0000-0000-000000000000" ? undefined : `venue_id=eq.${venue.id}`, onInsert: scheduleLive, onUpdate: scheduleLive });
 
     const hour = new Date().getHours();
     const greeting = hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening";

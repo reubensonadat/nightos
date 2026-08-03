@@ -1085,7 +1085,7 @@ export const db = {
     supabase
       .from('payments')
       .select(
-        'id, bill_id, venue_id, customer_id, amount, method, reference, status, collected_by, created_at, updated_at',
+        'id, bill_id, venue_id, payer_name, amount, method, reference, status, collected_by, created_at',
       )
       .eq('venue_id', venueId)
       .eq('status', 'success')

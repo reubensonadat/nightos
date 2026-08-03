@@ -42,7 +42,7 @@ export function FinancialReportsScreen() {
         amount: number;
         method: string;
         bill_id: string | null;
-        customer_id: string | null;
+        payer_name: string | null;
         created_at: string;
     }[]>([]);
     const [expenses, setExpenses] = useState<{
@@ -76,7 +76,7 @@ export function FinancialReportsScreen() {
     }, [timeFilter, customStart, customEnd]);
 
     const load = async () => {
-        if (!venue) return;
+        if (!venue || venue.id === "00000000-0000-0000-0000-000000000000") return;
         setLoading(true);
         setError(null);
         try {
@@ -85,7 +85,7 @@ export function FinancialReportsScreen() {
                 amount: number;
                 method: string;
                 bill_id: string | null;
-                customer_id: string | null;
+                payer_name: string | null;
                 created_at: string;
             }[] = [];
             for (let page = 0; page < 6; page++) {
@@ -137,7 +137,7 @@ export function FinancialReportsScreen() {
     }, [venue?.id, sinceIso]);
 
     useEffect(() => {
-        if (!venue) return;
+        if (!venue || venue.id === "00000000-0000-0000-0000-000000000000") return;
         const channel = supabaseChannel(`finance:${venue.id}`);
         channel
             .on("postgres_changes", { event: "*", schema: "public", table: "payments", filter: `venue_id=eq.${venue.id}` }, () => {
@@ -557,7 +557,7 @@ const supabaseRemove = (channel: ReturnType<typeof supabase.channel>) => {
    COMPUTATION — pure functions over the real rows
    ═══════════════════════════════════════════════════════════════════════════ */
 
-type PaymentRow = { id: string; amount: number; method: string; bill_id: string | null; customer_id: string | null; created_at: string };
+type PaymentRow = { id: string; amount: number; method: string; bill_id: string | null; payer_name: string | null; created_at: string };
 type ExpenseRow = { category: string; amount: number };
 type ItemRow = { product_name: string; quantity: number; line_total: number };
 type SubRow = { created_at: string };
@@ -660,14 +660,13 @@ function computeFinancials(
             ? `${hourlyDistribution[peakHour.index].formatted} is your busiest hour`
             : "No orders recorded yet";
 
-    const nameById = new Map(customers.map((c) => [c.id, c.name]));
     const recentOrders = payments
         .slice(0, 12)
         .map((p) => ({
             id: p.id,
             created_at: p.created_at,
             amount: p.amount,
-            customer_name: p.customer_id ? (nameById.get(p.customer_id) ?? null) : null,
+            customer_name: p.payer_name ?? null,
         }));
 
     const expenseMap = new Map<string, number>();
