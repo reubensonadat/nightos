@@ -50,15 +50,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return
     }
 
-    const { data: prof } = await authDb.profileById(userId)
-    if (prof) setProfile(prof)
-
     const { data: v } = await authDb.venueByOwner(userId)
     if (v) {
       setVenue(v as DbVenue)
       setRole('owner')
     } else {
-      const phoneToCheck = userPhone || prof?.phone_number
+      const phoneToCheck = userPhone
       if (phoneToCheck) {
         const { data: staffData } = await authDb.venueByStaffPhone(phoneToCheck)
         if (staffData) {
