@@ -8,6 +8,7 @@ import {
 } from "react-router-dom";
 import { AuthProvider, useAuth } from "./context/AuthContext";
 import { NetworkProvider } from "./context/NetworkContext";
+import { CartProvider } from "./context/CartContext";
 import { db } from "./lib/api";
 import { ProtectedRoute, VenueRequired } from "./screens/auth/ProtectedRoute";
 import { AuthScreen } from "./screens/auth/AuthScreen";
@@ -324,7 +325,9 @@ function App() {
   return (
     <NetworkProvider>
       <AuthProvider>
-        <AppRoutes />
+        <CartProvider>
+          <AppRoutes />
+        </CartProvider>
       </AuthProvider>
     </NetworkProvider>
   );
