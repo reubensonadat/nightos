@@ -346,7 +346,7 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 -- ── 9. QR URLS (update once deployed) ──────────────────────────
 -- UPDATE public.tables
--- SET qr_code_url = 'https://<YOUR-APP-URL>/#/?table=' || qr_code_token
+-- SET qr_code_url = 'https://<YOUR-APP-URL>/?table=' || qr_code_token
 -- WHERE venue_id = (SELECT id FROM public.venues WHERE slug = 'velvet-lounge');
 
 -- ═══════════════════════════════════════════════════════════════

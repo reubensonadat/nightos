@@ -162,7 +162,7 @@ export function FloorplanScreen() {
     const totalCapacity = tables.reduce((sum, t) => sum + t.capacity, 0);
 
     const qrUrlFor = (t: FloorTable) =>
-        `${window.location.origin}${window.location.pathname}#/?table=${encodeURIComponent(t.qr_code_token)}`;
+        `${window.location.origin}/?table=${encodeURIComponent(t.qr_code_token)}`;
 
     const handleDownloadQr = async (t: FloorTable) => {
         const url = qrUrlFor(t);
