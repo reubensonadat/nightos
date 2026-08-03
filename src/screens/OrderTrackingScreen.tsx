@@ -104,34 +104,40 @@ export function OrderTrackingScreen({ order, onBackToMenu, onPayBill }: Props) {
                 LIGHT EDITORIAL HEADER — sticky, minimal
               ═══════════════════════════════════════════════════════════ */}
             <header className="sticky top-0 z-30 bg-isabelline/95 backdrop-blur-xl border-b border-licorice/8">
-                <div className="mx-auto flex w-full max-w-3xl items-center justify-between px-5 md:px-8 pt-[max(env(safe-area-inset-top),16px)] pb-3">
-                    <button
-                        type="button"
-                        onClick={onBackToMenu}
-                        aria-label="Back to menu"
-                        className="flex h-9 w-9 items-center justify-center rounded-full bg-white text-licorice shadow-sm ring-1 ring-licorice/8 transition-colors hover:bg-isabelline active:scale-95"
-                    >
-                        <ArrowLeftIcon className="h-4 w-4" strokeWidth={2.25} />
-                    </button>
-
-                    <div className="flex flex-col items-center leading-tight">
-                        <span className="text-[13px] font-bold tracking-tight text-licorice">
-                            Order Tracking
-                        </span>
-                        <span className="text-[9px] font-semibold uppercase tracking-[0.18em] text-feldgrau">
-                            № {order.orderNumber}
-                        </span>
+                <div className="mx-auto flex w-full max-w-3xl items-center justify-between px-5 md:px-8 pt-[max(env(safe-area-inset-top),16px)] pb-3 relative">
+                    <div className="flex items-center">
+                        <button
+                            type="button"
+                            onClick={onBackToMenu}
+                            aria-label="Back to menu"
+                            className="flex h-9 w-9 items-center justify-center rounded-full bg-white text-licorice shadow-sm ring-1 ring-licorice/8 transition-colors hover:bg-isabelline active:scale-95"
+                        >
+                            <ArrowLeftIcon className="h-4 w-4" strokeWidth={2.25} />
+                        </button>
                     </div>
 
-                    <div className="flex h-9 w-9 items-center justify-center rounded-full bg-white text-feldgrau shadow-sm ring-1 ring-licorice/8">
-                        <span className="relative flex h-2 w-2">
-                            {!isServed && (
-                                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-khaki opacity-70" />
-                            )}
-                            <span
-                                className={`relative inline-flex h-2 w-2 rounded-full ${isServed ? "bg-feldgrau" : "bg-khaki"}`}
-                            />
-                        </span>
+                    <div className="absolute inset-x-0 top-[max(env(safe-area-inset-top),16px)] bottom-3 flex items-center justify-center pointer-events-none">
+                        <div className="flex flex-col items-center leading-tight pointer-events-auto">
+                            <span className="text-[18px] font-bold tracking-tight text-licorice">
+                                Order Tracking
+                            </span>
+                        </div>
+                    </div>
+
+                    <div className="flex items-center">
+                        <button
+                            type="button"
+                            className="
+                                rounded-full border border-licorice/20 bg-transparent
+                                px-3 py-1.5
+                                text-[11px] font-bold uppercase tracking-wider text-licorice
+                                transition-all
+                                hover:border-licorice/40 hover:bg-licorice/5
+                                active:scale-95
+                            "
+                        >
+                            Table 4
+                        </button>
                     </div>
                 </div>
             </header>
@@ -296,28 +302,45 @@ export function OrderTrackingScreen({ order, onBackToMenu, onPayBill }: Props) {
                 STICKY BOTTOM CTA — appears when served
               ═══════════════════════════════════════════════════════════ */}
             {isServed && (
-                <div className="fixed inset-x-0 bottom-0 z-40 flex flex-col items-center gap-2 px-5 pb-[max(env(safe-area-inset-bottom),18px)] pt-3 bg-gradient-to-t from-isabelline via-isabelline/95 to-transparent">
+                <div className="fixed inset-x-0 bottom-0 z-40 flex flex-col items-center gap-3 px-5 pb-[max(env(safe-area-inset-bottom),18px)] pt-3 bg-gradient-to-t from-isabelline via-isabelline/95 to-transparent">
                     <button
                         type="button"
                         onClick={onPayBill}
-                        className="animate-velvet-rise flex w-full max-w-md md:max-w-2xl items-center justify-between gap-3 rounded-full bg-licorice px-5 py-3.5 shadow-[0_20px_50px_rgba(35,20,12,0.25)] ring-1 ring-licorice/80 transition-all duration-200 ease-out hover:bg-licorice/95 hover:shadow-[0_24px_60px_rgba(35,20,12,0.30)] active:scale-[0.985]"
+                        className="
+                            group animate-velvet-rise flex w-full max-w-md md:max-w-2xl items-center justify-between
+                            gap-3 rounded-full bg-licorice px-6 py-4
+                            shadow-[0_8px_30px_rgba(35,20,12,0.16)]
+                            ring-1 ring-licorice/80
+                            transition-all duration-200 ease-out
+                            hover:bg-licorice/95 hover:shadow-[0_12px_40px_rgba(35,20,12,0.22)]
+                            active:scale-[0.985]
+                            focus:outline-none focus-visible:ring-2 focus-visible:ring-khaki
+                        "
                     >
                         <div className="flex flex-col items-start leading-tight">
-                            <span className="text-[10px] font-bold uppercase tracking-wider text-khaki">
+                            <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-khaki">
                                 Settle up
                             </span>
-                            <span className="text-[13px] font-bold tracking-tight text-isabelline">
+                            <span className="text-[15px] font-bold tracking-tight text-isabelline">
                                 Pay {formatGHS(order.total)}
                             </span>
                         </div>
-                        <span className="flex h-7 w-7 items-center justify-center rounded-full bg-isabelline text-licorice">
-                            <ArrowRightIcon className="h-3.5 w-3.5" strokeWidth={2.5} />
+                        <span className="flex h-9 w-9 items-center justify-center rounded-full bg-isabelline text-licorice transition-transform duration-200 group-hover:translate-x-0.5">
+                            <ArrowRightIcon className="h-4 w-4" strokeWidth={2.5} />
                         </span>
                     </button>
                     <button
                         type="button"
                         onClick={onBackToMenu}
-                        className="text-[11px] font-bold tracking-tight text-feldgrau transition-colors hover:text-licorice"
+                        className="
+                            flex w-full max-w-md md:max-w-2xl items-center justify-center
+                            rounded-2xl bg-white px-6 py-4
+                            text-[15px] font-bold tracking-tight text-licorice
+                            shadow-[0_8px_24px_rgba(35,20,12,0.04)] ring-1 ring-licorice/8
+                            transition-all duration-200 ease-out
+                            hover:bg-isabelline active:scale-[0.985]
+                            focus:outline-none focus-visible:ring-2 focus-visible:ring-khaki
+                        "
                     >
                         Or order something else
                     </button>

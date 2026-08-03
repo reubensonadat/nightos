@@ -28,17 +28,18 @@ export function useVenue(slug?: string) {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!slug) {
+    const venueSlug = slug;
+    if (!venueSlug) {
       setLoading(false);
       return;
     }
 
     let cancelled = false;
 
-    async function load() {
+    async function load(currentSlug: string) {
       setLoading(true);
       setError(null);
-      const { data, error: err } = await db.venueBySlug(slug!);
+      const { data, error: err } = await db.venueBySlug(currentSlug);
       if (cancelled) return;
       if (err || !data) {
         setError('Could not load venue');
@@ -49,7 +50,7 @@ export function useVenue(slug?: string) {
       setLoading(false);
     }
 
-    load();
+    load(venueSlug);
     return () => {
       cancelled = true;
     };

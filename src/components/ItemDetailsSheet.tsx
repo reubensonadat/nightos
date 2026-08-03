@@ -435,7 +435,7 @@ export function ItemDetailsSheet({ item, onClose }: Props) {
                     className="
                         shrink-0 border-t border-licorice/8
                         bg-isabelline
-                        px-5 md:px-8 pt-3 pb-[max(env(safe-area-inset-bottom),16px)]
+                        px-5 md:px-8 pt-3 pb-[calc(72px+env(safe-area-inset-bottom))]
                     "
                 >
                     <div className="flex items-center gap-3">

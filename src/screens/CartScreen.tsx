@@ -160,7 +160,7 @@ export function CartScreen({ venueId, venueName, tableLabel, billId, customerSes
         return (
             <main className="relative min-h-svh w-full overflow-x-hidden bg-isabelline font-sans text-licorice antialiased">
                 {/* Dark hero */}
-                <div className="relative overflow-hidden bg-gradient-to-b from-licorice via-licorice to-licorice/95 px-5 pt-[max(env(safe-area-inset-top),20px)] pb-20">
+                <div className="relative overflow-hidden bg-gradient-to-b from-licorice via-licorice to-licorice/95 pt-[max(env(safe-area-inset-top),20px)] pb-20">
                     <div
                         aria-hidden="true"
                         className="pointer-events-none absolute inset-0"
@@ -169,7 +169,7 @@ export function CartScreen({ venueId, venueName, tableLabel, billId, customerSes
                         <div className="absolute top-20 -left-16 h-48 w-48 rounded-full bg-light-blue mix-blend-screen blur-[70px] opacity-15" />
                     </div>
 
-                    <div className="relative z-10 flex items-center justify-between">
+                    <div className="relative z-10 mx-auto flex w-full max-w-7xl items-center justify-between px-5 md:px-8">
                         <button
                             type="button"
                             onClick={onBack}
@@ -178,18 +178,19 @@ export function CartScreen({ venueId, venueName, tableLabel, billId, customerSes
                         >
                             <ArrowLeftIcon className="h-4 w-4" strokeWidth={2.25} />
                         </button>
-                        <div className="flex items-center gap-1.5 rounded-full border border-isabelline/15 bg-isabelline/5 px-2.5 py-1.5">
-                            <MapPinIcon className="h-3 w-3 text-khaki" strokeWidth={2.25} />
+                        
+                        <h1 className="text-[16px] font-bold tracking-tight text-isabelline absolute left-1/2 -translate-x-1/2">
+                            Your Tab
+                        </h1>
+
+                        <div className="flex items-center gap-1.5 rounded-full border border-isabelline/15 bg-isabelline/5 px-3 py-2">
                             <span className="text-[10px] font-bold uppercase tracking-wider text-isabelline">
                                 T·{tableLabel ?? "—"}
                             </span>
                         </div>
                     </div>
 
-                    <div className="relative z-10 mt-8 text-center">
-                        <p className="text-[11px] font-bold uppercase tracking-[0.22em] text-khaki">
-                            Your Tab
-                        </p>
+                    <div className="relative z-10 mt-8 mx-auto w-full max-w-7xl px-5 md:px-8 text-center">
                         <h1 className="mt-2 text-[2rem] font-black leading-tight tracking-[-0.04em] text-isabelline">
                             Nothing here
                             <br />
@@ -205,7 +206,7 @@ export function CartScreen({ venueId, venueName, tableLabel, billId, customerSes
                 </div>
 
                 {/* Overlapping CTA */}
-                <section className="relative z-20 -mt-10 px-5">
+                <div className="fixed inset-x-0 bottom-[88px] z-40 flex justify-center px-5 md:px-8">
                     <button
                         type="button"
                         onClick={onContinueShopping}
@@ -231,7 +232,7 @@ export function CartScreen({ venueId, venueName, tableLabel, billId, customerSes
                             <ArrowRightIcon className="h-4 w-4" strokeWidth={2.5} />
                         </span>
                     </button>
-                </section>
+                </div>
             </main>
         );
     }
@@ -242,7 +243,7 @@ export function CartScreen({ venueId, venueName, tableLabel, billId, customerSes
             {/* ═══════════════════════════════════════════════════════════
                 DARK LICORICE HERO
               ═══════════════════════════════════════════════════════════ */}
-            <header className="relative overflow-hidden bg-gradient-to-b from-licorice via-licorice to-licorice/95 px-5 pt-[max(env(safe-area-inset-top),20px)] pb-20">
+            <header className="relative overflow-hidden bg-gradient-to-b from-licorice via-licorice to-licorice/95 pt-[max(env(safe-area-inset-top),20px)] pb-20">
                 {/* Blur orbs */}
                 <div
                     aria-hidden="true"
@@ -284,7 +285,7 @@ export function CartScreen({ venueId, venueName, tableLabel, billId, customerSes
                 </div>
 
                 {/* Hero summary */}
-                <div className="relative z-10 mt-7">
+                <div className="relative z-10 mt-7 mx-auto w-full max-w-7xl px-5 md:px-8">
                     <p className="text-[11px] font-bold uppercase tracking-[0.22em] text-khaki">
                         {itemCount} {itemCount === 1 ? "item" : "items"} ready
                     </p>
@@ -299,7 +300,7 @@ export function CartScreen({ venueId, venueName, tableLabel, billId, customerSes
                 </div>
 
                 {/* Widget strip — quiet, just two pills */}
-                <div className="relative z-10 mt-5 flex flex-wrap gap-2">
+                <div className="relative z-10 mt-5 mx-auto flex w-full max-w-7xl flex-wrap gap-2 px-5 md:px-8">
                     <div className="inline-flex items-center gap-1.5 rounded-2xl border border-khaki/30 bg-khaki/10 px-3 py-2 backdrop-blur-md">
                         <ClockIcon className="h-3.5 w-3.5 text-khaki" strokeWidth={2.25} />
                         <div className="flex flex-col leading-tight">
@@ -328,7 +329,7 @@ export function CartScreen({ venueId, venueName, tableLabel, billId, customerSes
             {/* ═══════════════════════════════════════════════════════════
                 OVERLAPPING CONTENT
               ═══════════════════════════════════════════════════════════ */}
-            <section className="relative z-20 mx-auto w-full max-w-3xl -mt-12 px-5 md:px-8 pb-[calc(220px+env(safe-area-inset-bottom))]">
+            <section className="relative z-20 mx-auto w-full max-w-7xl -mt-12 px-5 md:px-8 pb-[calc(140px+env(safe-area-inset-bottom))]">
                 {/* ── Cart line items ── */}
                 <div className="flex flex-col gap-3">
                     {lines.map((line, idx) => {

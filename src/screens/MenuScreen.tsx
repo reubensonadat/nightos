@@ -158,37 +158,36 @@ export function MenuScreen({ venueId, venueName, tableLabel, waiterName, onBack,
                             aria-label={searchOpen ? "Close search" : "Open search"}
                             className="flex h-9 w-9 items-center justify-center rounded-full bg-white text-licorice shadow-sm ring-1 ring-licorice/8 transition-colors hover:bg-isabelline active:scale-95"
                         >
-                            <MagnifyingGlassIcon className="h-4 w-4" strokeWidth={2.25} />
-                        </button>
+                        <MagnifyingGlassIcon className="h-4 w-4" strokeWidth={2.25} />
+                    </button>
                     </div>
                 </div>
 
                 {/* Search input */}
                 {searchOpen && (
-                    <div className="mx-auto w-full max-w-7xl px-5 md:px-8 pb-3 animate-velvet-fade">
-                        <div className="flex items-center gap-2 rounded-full bg-white px-4 py-2.5 shadow-sm ring-1 ring-licorice/8">
-                            <MagnifyingGlassIcon
-                                className="h-4 w-4 text-feldgrau"
-                                strokeWidth={2.25}
-                            />
-                            <input
-                                autoFocus
-                                value={query}
-                                onChange={(e) => setQuery(e.target.value)}
-                                placeholder="Search cocktails, wines, plates…"
-                                className="flex-1 bg-transparent text-[13px] text-licorice placeholder:text-feldgrau/70 focus:outline-none"
-                            />
-                            {query && (
-                                <button
-                                    type="button"
-                                    onClick={() => setQuery("")}
-                                    className="text-[10px] font-bold uppercase tracking-wider text-feldgrau hover:text-licorice"
-                                >
-                                    Clear
-                                </button>
-                            )}
-                        </div>
+                <div className="mx-auto w-full max-w-7xl px-5 md:px-8 pb-3 animate-velvet-fade">
+                    <div className="flex items-center gap-2 rounded-full bg-white px-4 py-2.5 shadow-sm ring-1 ring-licorice/8">
+                        <MagnifyingGlassIcon
+                            className="h-4 w-4 text-feldgrau"
+                            strokeWidth={2.25}
+                        />
+                        <input
+                            value={query}
+                            onChange={(e) => setQuery(e.target.value)}
+                            placeholder="Search cocktails, wines, plates…"
+                            className="flex-1 bg-transparent text-[13px] text-licorice placeholder:text-feldgrau/70 focus:outline-none"
+                        />
+                        {query && (
+                            <button
+                                type="button"
+                                onClick={() => setQuery("")}
+                                className="text-[10px] font-bold uppercase tracking-wider text-feldgrau hover:text-licorice"
+                            >
+                                Clear
+                            </button>
+                        )}
                     </div>
+                </div>
                 )}
 
                 {/* ── Category pills ── */}
@@ -205,7 +204,7 @@ export function MenuScreen({ venueId, venueName, tableLabel, waiterName, onBack,
                                         setQuery("");
                                     }}
                                     className={`shrink-0 inline-flex items-center rounded-full px-4 py-2 text-[12px] font-bold tracking-tight transition-all duration-200 ease-out ${isActive
-                                        ? "bg-licorice text-isabelline shadow-[0_4px_14px_rgba(35,20,12,0.25)]"
+                                        ? "bg-licorice text-isabelline"
                                         : "bg-white text-feldgrau ring-1 ring-licorice/8 hover:text-licorice hover:ring-licorice/15"
                                         }`}
                                 >
@@ -368,23 +367,23 @@ export function MenuScreen({ venueId, venueName, tableLabel, waiterName, onBack,
                     <button
                         type="button"
                         onClick={onViewCart}
-                        className="animate-velvet-rise flex w-full max-w-md md:max-w-2xl items-center justify-between gap-3 rounded-full bg-licorice px-5 py-3.5 shadow-[0_20px_50px_rgba(35,20,12,0.25)] ring-1 ring-licorice/80 transition-all duration-200 ease-out hover:bg-licorice/95 hover:shadow-[0_24px_60px_rgba(35,20,12,0.30)] active:scale-[0.985] focus:outline-none focus-visible:ring-2 focus-visible:ring-khaki"
+                        className="animate-velvet-rise flex w-full max-w-md md:max-w-2xl items-center justify-between gap-3 rounded-full bg-licorice px-6 py-4 shadow-[0_20px_50px_rgba(35,20,12,0.25)] ring-1 ring-licorice/80 transition-all duration-200 ease-out hover:bg-licorice/95 hover:shadow-[0_24px_60px_rgba(35,20,12,0.30)] active:scale-[0.985] focus:outline-none focus-visible:ring-2 focus-visible:ring-khaki"
                         aria-label={`View cart — ${itemCount} items, ${formatGHS(subtotal)}`}
                     >
                         <div className="flex items-center gap-3">
-                            <span className="flex h-7 w-7 items-center justify-center rounded-full bg-isabelline/15 text-[12px] font-bold text-isabelline ring-1 ring-isabelline/20">
+                            <span className="flex h-9 w-9 items-center justify-center rounded-full bg-isabelline/15 text-[14px] font-bold text-isabelline ring-1 ring-isabelline/20">
                                 {itemCount}
                             </span>
                             <div className="flex flex-col items-start leading-tight">
-                                <span className="text-[10px] font-bold uppercase tracking-wider text-khaki">
+                                <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-khaki">
                                     Your tab
                                 </span>
-                                <span className="font-mono text-[14px] font-bold tabular-nums text-isabelline">
+                                <span className="text-[15px] font-bold tracking-tight text-isabelline">
                                     {formatGHS(subtotal)}
                                 </span>
                             </div>
                         </div>
-                        <span className="flex items-center gap-1.5 text-[13px] font-bold tracking-tight text-isabelline">
+                        <span className="flex items-center gap-1.5 text-[15px] font-bold tracking-tight text-isabelline group-hover:translate-x-0.5 transition-transform duration-200">
                             View Cart
                             <ArrowRightIcon className="h-4 w-4" strokeWidth={2.25} />
                         </span>

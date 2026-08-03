@@ -9,6 +9,7 @@ Before answering any query, review the provided PRD to understand the business l
 - **Compliments:** Only compliment an approach if it represents genuinely exceptional, out-of-the-box problem-solving. Otherwise, remain entirely neutral and pragmatic.
 
 # Coding Standards
+- **Minimalism & Anti-Over-engineering:** Do not overcomplicate solutions. Write the absolute minimum amount of code required to get the job done. Before implementing, briefly propose your approach so I can review it and suggest alternatives if needed. However, never sacrifice industry standards or best practices for the sake of simplicity.
 - Deliver code that is production-ready, modular, and typed.
 - Prioritize clean architecture and maintainability.
 - When providing code, explain the "why" behind your architectural decisions only if it introduces a new concept or deviates from the standard pattern.

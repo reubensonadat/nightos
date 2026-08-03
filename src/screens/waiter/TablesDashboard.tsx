@@ -2,8 +2,9 @@ import { useState, useMemo, useEffect, useCallback, useRef } from "react";
 import {
     ArrowRightIcon,
     ArrowPathIcon,
-    ClockIcon,
     UserGroupIcon,
+    ChartBarIcon,
+    ArrowRightStartOnRectangleIcon,
 } from "@heroicons/react/24/outline";
 import { formatGHS } from "../../data/menu";
 import { db } from "../../lib/api";
@@ -213,11 +214,11 @@ export function TablesDashboard({ venueId, staffName, staffId: _staffId, role, o
     };
 
     return (
-        <main className="relative min-h-svh w-full overflow-x-hidden bg-isabelline font-sans text-licorice antialiased">
+        <main className="relative min-h-svh w-full overflow-x-hidden bg-khaki/15 font-sans text-licorice antialiased">
             {/* ═══════════════════════════════════════════════════════════
                 LIGHT EDITORIAL HEADER
               ═══════════════════════════════════════════════════════════ */}
-            <header className="sticky top-0 z-30 bg-isabelline/95 backdrop-blur-xl border-b border-licorice/8">
+            <header className="sticky top-0 z-30 bg-khaki/20 backdrop-blur-xl border-b border-licorice/8">
                 {/* Top bar */}
                 <div className="mx-auto flex w-full max-w-7xl items-center justify-between px-5 md:px-8 pt-[max(env(safe-area-inset-top),16px)] pb-3">
                     <div className="flex items-center gap-2.5">
@@ -237,34 +238,24 @@ export function TablesDashboard({ venueId, staffName, staffId: _staffId, role, o
                     </div>
 
                     <div className="flex items-center gap-2">
-                        <button
-                            type="button"
-                            onClick={handleRefresh}
-                            aria-label="Refresh tables"
-                            className="flex h-9 w-9 items-center justify-center rounded-full bg-white text-licorice shadow-sm ring-1 ring-licorice/8 transition-colors hover:bg-isabelline active:scale-95"
-                        >
-                            <ArrowPathIcon
-                                className={`h-4 w-4 transition-transform ${refreshing ? "animate-spin" : ""}`}
-                                strokeWidth={2.25}
-                            />
-                        </button>
                         <div className="flex items-center gap-1">
                             {onViewShift && (
                                 <button
                                     type="button"
                                     onClick={onViewShift}
                                     aria-label="View shift performance"
-                                    className="rounded-full bg-white px-2.5 py-2 text-[9px] font-bold uppercase tracking-wider text-feldgrau shadow-sm ring-1 ring-licorice/8 transition-colors hover:text-licorice active:scale-95"
+                                    className="flex h-9 w-9 items-center justify-center rounded-full bg-white text-licorice shadow-sm ring-1 ring-licorice/8 transition-colors hover:bg-isabelline active:scale-95"
                                 >
-                                    Shift
+                                    <ChartBarIcon className="h-4 w-4" strokeWidth={2.25} />
                                 </button>
                             )}
                             <button
                                 type="button"
                                 onClick={onSignOut}
-                                className="text-[10px] font-bold uppercase tracking-wider text-feldgrau transition-colors hover:text-dark-red"
+                                aria-label="Sign out"
+                                className="flex h-9 w-9 items-center justify-center rounded-full bg-white text-dark-red shadow-sm ring-1 ring-licorice/8 transition-colors hover:bg-isabelline active:scale-95"
                             >
-                                Sign Out
+                                <ArrowRightStartOnRectangleIcon className="h-4 w-4" strokeWidth={2.25} />
                             </button>
                         </div>
                     </div>
@@ -395,7 +386,7 @@ export function TablesDashboard({ venueId, staffName, staffId: _staffId, role, o
                                     <p className="text-[9px] font-bold uppercase tracking-[0.18em] text-feldgrau">
                                         Table
                                     </p>
-                                    <p className="mt-0.5 font-serif text-[28px] font-black leading-none tracking-[-0.04em] text-licorice">
+                                    <p className="mt-0.5 text-3xl font-bold font-sans tracking-tight text-licorice">
                                         {String(table.number).padStart(2, "0")}
                                     </p>
                                 </div>
@@ -416,12 +407,6 @@ export function TablesDashboard({ venueId, staffName, staffId: _staffId, role, o
                                                 <UserGroupIcon className="h-3 w-3" strokeWidth={2.25} />
                                                 {table.guests}
                                             </span>
-                                            {table.seatedAt && (
-                                                <span className="inline-flex items-center gap-1">
-                                                    <ClockIcon className="h-3 w-3" strokeWidth={2.25} />
-                                                    {formatDuration(minutesSince(table.seatedAt))}
-                                                </span>
-                                            )}
                                         </div>
                                         {table.tabTotal !== undefined && (
                                             <p className="mt-2 font-mono text-[16px] font-bold tabular-nums text-licorice">
@@ -438,16 +423,14 @@ export function TablesDashboard({ venueId, staffName, staffId: _staffId, role, o
 
                                 {table.status === "reserved" && (
                                     <>
-                                        <div className="flex items-center gap-3 text-[10px] font-semibold tracking-tight text-feldgrau">
-                                            <span className="inline-flex items-center gap-1">
-                                                <ClockIcon className="h-3 w-3" strokeWidth={2.25} />
-                                                {table.reservationTime}
-                                            </span>
-                                            <span className="inline-flex items-center gap-1">
-                                                <UserGroupIcon className="h-3 w-3" strokeWidth={2.25} />
-                                                {table.reservationGuests}
-                                            </span>
-                                        </div>
+                                        {table.reservationGuests && (
+                                            <div className="flex items-center gap-3 text-[10px] font-semibold tracking-tight text-feldgrau">
+                                                <span className="inline-flex items-center gap-1">
+                                                    <UserGroupIcon className="h-3 w-3" strokeWidth={2.25} />
+                                                    {table.reservationGuests}
+                                                </span>
+                                            </div>
+                                        )}
                                         <p className="mt-2 text-[11px] font-medium tracking-tight text-feldgrau">
                                             Reserved for arrival
                                         </p>
