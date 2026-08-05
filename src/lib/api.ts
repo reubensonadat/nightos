@@ -123,6 +123,7 @@ export type DbBill = {
   created_at: string;
   updated_at: string;
   closed_at: string | null;
+  last_activity_at: string;
 };
 
 export type DbOrderSubmission = {
@@ -182,6 +183,8 @@ export type DbStaff = {
   max_tables: number;
   area_assignment: string | null;
   hourly_rate: number;
+  pay_model: 'hourly' | 'salary';
+  salary_amount: number | null;
   created_at: string;
 };
 
@@ -443,7 +446,7 @@ export const db = {
     supabase
       .from('bills')
       .select(
-        'id, venue_id, table_id, waiter_id, guest_count, status, payment_model, subtotal, service_charge, vat, total, amount_paid, is_merged, merged_into_bill_id, created_at, updated_at, closed_at',
+        'id, venue_id, table_id, waiter_id, guest_count, status, payment_model, subtotal, service_charge, vat, total, amount_paid, is_merged, merged_into_bill_id, created_at, updated_at, closed_at, last_activity_at',
       )
       .eq('table_id', tableId)
       .in('status', ['open', 'settling'])
@@ -455,7 +458,7 @@ export const db = {
     supabase
       .from('bills')
       .select(
-        'id, venue_id, table_id, waiter_id, guest_count, status, payment_model, subtotal, service_charge, vat, total, amount_paid, is_merged, merged_into_bill_id, created_at, updated_at, closed_at',
+        'id, venue_id, table_id, waiter_id, guest_count, status, payment_model, subtotal, service_charge, vat, total, amount_paid, is_merged, merged_into_bill_id, created_at, updated_at, closed_at, last_activity_at',
       )
       .eq('id', id)
       .maybeSingle(),
@@ -488,7 +491,7 @@ export const db = {
     const { data, error } = await supabase
       .from('bills')
       .select(
-        'id, venue_id, table_id, waiter_id, guest_count, status, payment_model, subtotal, service_charge, vat, total, amount_paid, is_merged, merged_into_bill_id, created_at, updated_at, closed_at',
+        'id, venue_id, table_id, waiter_id, guest_count, status, payment_model, subtotal, service_charge, vat, total, amount_paid, is_merged, merged_into_bill_id, created_at, updated_at, closed_at, last_activity_at',
       )
       .eq('venue_id', venueId)
       .in('status', ['open', 'settling'])
@@ -622,7 +625,7 @@ export const db = {
     supabase
       .from('bills')
       .select(
-        'id, venue_id, table_id, waiter_id, guest_count, status, payment_model, subtotal, service_charge, vat, total, amount_paid, is_merged, merged_into_bill_id, created_at, updated_at, closed_at, tables!inner(id, table_number, table_label, area)',
+        'id, venue_id, table_id, waiter_id, guest_count, status, payment_model, subtotal, service_charge, vat, total, amount_paid, is_merged, merged_into_bill_id, created_at, updated_at, closed_at, last_activity_at, tables!inner(id, table_number, table_label, area)',
       )
       .eq('id', billId)
       .single(),
@@ -671,6 +674,26 @@ export const db = {
       .select('id, bill_id, venue_id, amount, method, reference, payer_name, collected_by, status, paystack_data, platform_fee, fee_settled, created_at')
       .eq('bill_id', billId),
 
+  /** Recent cash payments + table labels — per-order fee ledger for LiveOps. */
+  recentCashFees: async (venueId: string, pageSize = 10) => {
+    const { data, error } = await supabase.rpc('recent_cash_fees', {
+      p_venue_id: venueId,
+      p_limit: pageSize,
+    });
+    return {
+      data: (data ?? []) as {
+        payment_id: string;
+        amount: number;
+        platform_fee: number;
+        fee_settled: boolean;
+        created_at: string;
+        table_number: number;
+        table_label: string;
+      }[],
+      error,
+    };
+  },
+
   /**
    * Payments for a venue with pagination (newest first): one page of up to
    * `pageSize` rows plus total count.
@@ -701,7 +724,7 @@ export const db = {
     supabase
       .from('staff')
       .select(
-        'id, venue_id, name, phone, email, role, is_active, max_tables, area_assignment, hourly_rate, created_at',
+        'id, venue_id, name, phone, email, role, is_active, max_tables, area_assignment, hourly_rate, pay_model, salary_amount, created_at',
       )
       .eq('phone', phone)
       .maybeSingle(),
@@ -715,7 +738,7 @@ export const db = {
         supabase
           .from('staff')
           .select(
-            'id, venue_id, name, phone, email, role, is_active, max_tables, area_assignment, hourly_rate, created_at',
+            'id, venue_id, name, phone, email, role, is_active, max_tables, area_assignment, hourly_rate, pay_model, salary_amount, created_at',
           )
           .eq('venue_id', venueId)
           .order('name'),
@@ -757,6 +780,8 @@ export const db = {
     hourlyRate?: number;
     maxTables?: number;
     areaAssignment?: string | null;
+    payModel?: 'hourly' | 'salary';
+    salaryAmount?: number | null;
   }) => {
     cacheInvalidate(`staff:${args.venueId}`);
     const { data, error } = await supabase.rpc('create_staff', {
@@ -768,8 +793,37 @@ export const db = {
       p_hourly_rate: args.hourlyRate ?? 0,
       p_max_tables: args.maxTables ?? 6,
       p_area_assignment: args.areaAssignment || null,
+      p_pay_model: args.payModel ?? 'hourly',
+      p_salary_amount: args.salaryAmount ?? null,
     });
     return { data: (data ?? { ok: false, error: 'unknown' }) as { ok: boolean; error?: string; id?: string }, error };
+  },
+
+  updateStaff: async (args: {
+    staffId: string;
+    venueId: string;
+    role?: string;
+    email?: string | null;
+    hourlyRate?: number;
+    payModel?: 'hourly' | 'salary';
+    salaryAmount?: number | null;
+    maxTables?: number;
+    areaAssignment?: string | null;
+    isActive?: boolean;
+  }) => {
+    cacheInvalidate(`staff:${args.venueId}`);
+    const { data, error } = await supabase.rpc('update_staff', {
+      p_staff_id: args.staffId,
+      p_role: args.role ?? null,
+      p_email: args.email === undefined ? null : args.email,
+      p_hourly_rate: args.hourlyRate ?? null,
+      p_pay_model: args.payModel ?? null,
+      p_salary_amount: args.salaryAmount === undefined ? null : args.salaryAmount,
+      p_max_tables: args.maxTables ?? null,
+      p_area_assignment: args.areaAssignment === undefined ? null : args.areaAssignment,
+      p_is_active: args.isActive ?? null,
+    });
+    return { data: (data ?? { ok: false, error: 'unknown' }) as { ok: boolean; error?: string }, error };
   },
 
   setStaffActive: async (staffId: string, active: boolean, venueId: string) => {
@@ -897,11 +951,24 @@ export const db = {
         total: number;
         amount_paid: number;
         age_minutes: number;
+        last_activity_at: string;
+        dwell_minutes: number;
         is_merged: boolean;
         merged_into_bill_id: string | null;
       }[],
       error,
     };
+  },
+
+  /** Reads a venue_settings key (e.g. max_dwell_minutes) — staff-safe RPC. */
+  getVenueSetting: async (venueId: string, key: string, fallback: number) => {
+    const { data, error } = await supabase.rpc('get_venue_setting', {
+      p_venue_id: venueId,
+      p_key: key,
+      p_default: fallback,
+    });
+    const raw = data === null || data === undefined ? fallback : Number(data);
+    return { data: Number.isFinite(raw) ? raw : fallback, error };
   },
 
   /* ── Table operations (waiter) ── */
@@ -973,7 +1040,7 @@ export const db = {
     const { data, error } = await supabase
       .from('bills')
       .select(
-        'id, venue_id, table_id, waiter_id, guest_count, status, payment_model, subtotal, service_charge, vat, total, amount_paid, is_merged, merged_into_bill_id, created_at, updated_at, closed_at',
+        'id, venue_id, table_id, waiter_id, guest_count, status, payment_model, subtotal, service_charge, vat, total, amount_paid, is_merged, merged_into_bill_id, created_at, updated_at, closed_at, last_activity_at',
       )
       .eq('venue_id', venueId)
       .gte('created_at', sinceIso)
@@ -1004,6 +1071,18 @@ export const db = {
       )
       .eq('venue_id', venueId)
       .in('status', ['active', 'on_break']),
+
+  /** Idempotent clock-in: called on sign-in / session boot. */
+  clockInStaff: async (staffId: string) => {
+    const { data, error } = await supabase.rpc('clock_in_staff', { p_staff_id: staffId });
+    return { data: (data as boolean) ?? false, error };
+  },
+
+  /** Clock-out: closes the active shift on sign-out. */
+  clockOutStaff: async (staffId: string) => {
+    const { data, error } = await supabase.rpc('clock_out_staff', { p_staff_id: staffId });
+    return { data: (data as boolean) ?? false, error };
+  },
 
   /* ── Reservations ── */
   createReservation: (

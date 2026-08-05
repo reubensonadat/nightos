@@ -84,6 +84,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 area_assignment: fullStaffData.area_assignment,
                 max_tables: fullStaffData.max_tables,
              })
+
+             // Auto clock-in — idempotent, so session reloads and token
+             // refreshes reuse the existing active shift instead of stacking.
+             ;(async () => {
+               try { await supabase.rpc('clock_in_staff', { p_staff_id: fullStaffData.id }) } catch { /* non-fatal */ }
+             })()
           }
           return
         }

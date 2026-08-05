@@ -57,6 +57,14 @@ function formatGHSCompact(n: number): string {
     return formatGHS(n);
 }
 
+/** "45m", "2h", "2h 05m" — for idle/dwell times. */
+function formatDwell(mins: number): string {
+    if (mins < 60) return `${mins}m`;
+    const h = Math.floor(mins / 60);
+    const m = mins % 60;
+    return m === 0 ? `${h}h` : `${h}h ${String(m).padStart(2, "0")}m`;
+}
+
 /* ═══════════════════════════════════════════════════════════════════════════
    COMPONENT
    ═══════════════════════════════════════════════════════════════════════════ */
@@ -69,6 +77,8 @@ export function LiveOpsScreen() {
     const [outstanding, setOutstanding] = useState(0);
     const [landed, setLanded] = useState<Awaited<ReturnType<typeof db.landedWithoutOrders>>["data"]>([]);
     const [openBills, setOpenBills] = useState<Awaited<ReturnType<typeof db.openBillOverview>>["data"]>([]);
+    const [dwellThreshold, setDwellThreshold] = useState(120);
+    const [recentFees, setRecentFees] = useState<Awaited<ReturnType<typeof db.recentCashFees>>["data"]>([]);
 
     // Group per-table bills by their merged target so linked tables (ABC + CBD)
     // show as one line with both table labels.
@@ -86,14 +96,18 @@ export function LiveOpsScreen() {
     const loadLive = useCallback(async () => {
         if (!venue.id || venue.id === "00000000-0000-0000-0000-000000000000") return;
         try {
-            const [bal, landedRows, billRows] = await Promise.all([
+            const [{ data: threshold }, bal, landedRows, billRows, fees] = await Promise.all([
+                db.getVenueSetting(venue.id, 'max_dwell_minutes', 120),
                 db.outstandingBalance(venue.id),
                 db.landedWithoutOrders(venue.id),
                 db.openBillOverview(venue.id),
+                db.recentCashFees(venue.id),
             ]);
+            if (threshold !== null) setDwellThreshold(threshold);
             setOutstanding(bal.data);
             setLanded(landedRows.data);
             setOpenBills(billRows.data);
+            setRecentFees(fees.data);
         } catch {
             /* keep last known values */
         }
@@ -132,6 +146,14 @@ export function LiveOpsScreen() {
     const waitAlerts = s.recentOrders
         .filter((o) => (o.status === "pending" || o.status === "confirmed" || o.status === "preparing") && o.time.includes("min ago"))
         .slice(0, 3);
+
+    // Tables idle past the venue's max_dwell_minutes → dwell alerts
+    const dwellAlerts = billGroups
+        .filter((group) => Math.max(...group.map((b) => b.dwell_minutes)) >= dwellThreshold)
+        .map((group) => ({
+            label: group.map((b) => b.table_label ?? `Table ${b.table_number}`).join(" + "),
+            dwell: Math.max(...group.map((b) => b.dwell_minutes)),
+        }));
 
     if (s.loading && s.recentOrders.length === 0) {
         return (
@@ -507,16 +529,16 @@ export function LiveOpsScreen() {
                             <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-dark-red">Alerts</p>
                         </div>
                         <span className="rounded-full bg-dark-red/10 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider text-dark-red">
-                            {s.lowStockCount + waitAlerts.length}
+                            {s.lowStockCount + waitAlerts.length + dwellAlerts.length}
                         </span>
                     </div>
                     <h3 className="text-[16px] font-bold tracking-tight text-licorice mb-4">Needs attention</h3>
 
-                    {s.lowStockCount === 0 && waitAlerts.length === 0 ? (
+                    {s.lowStockCount === 0 && waitAlerts.length === 0 && dwellAlerts.length === 0 ? (
                         <div className="py-10 text-center">
                             <CheckBadgeIcon className="mx-auto h-8 w-8 text-emerald-500" strokeWidth={1.5} />
                             <p className="mt-2 text-[12px] font-bold text-feldgrau">All clear</p>
-                            <p className="text-[10.5px] text-feldgrau/70 mt-1">No stock or wait-time issues.</p>
+                            <p className="text-[10.5px] text-feldgrau/70 mt-1">No stock, wait-time or idle-table issues.</p>
                         </div>
                     ) : (
                         <div className="space-y-2">
@@ -554,6 +576,22 @@ export function LiveOpsScreen() {
                                         <p className="text-[12px] font-bold tracking-tight text-licorice">{o.table}</p>
                                         <p className="text-[10.5px] tracking-tight text-feldgrau">
                                             Order waiting {o.time} · {o.status}
+                                        </p>
+                                    </div>
+                                </div>
+                            ))}
+                            {dwellAlerts.map((a) => (
+                                <div
+                                    key={`dwell-${a.label}`}
+                                    className="flex items-start gap-3 rounded-xl border-l-2 border-dark-red bg-dark-red/5 px-3 py-2.5"
+                                >
+                                    <span className="mt-0.5 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-dark-red/15 text-[9px] font-bold uppercase text-dark-red">
+                                        TBL
+                                    </span>
+                                    <div className="min-w-0 flex-1">
+                                        <p className="text-[12px] font-bold tracking-tight text-licorice">{a.label}</p>
+                                        <p className="text-[10.5px] tracking-tight text-feldgrau">
+                                            Idle {formatDwell(a.dwell)} · no activity since {formatDwell(a.dwell)} ago
                                         </p>
                                     </div>
                                 </div>
@@ -749,8 +787,8 @@ export function LiveOpsScreen() {
                             {formatGHS(outstanding)}
                         </p>
                         <p className="text-[10.5px] text-isabelline/60 leading-snug mt-1">
-                            1% fee on cash payments (min ₵1, max ₵15). Online fees are auto-deducted by the payment
-                            provider at each transaction.
+                            Flat ₵1–₵5 per cash sale by amount (≤₵50 ₵1 · ≤₵100 ₵2 · ≤₵150 ₵3 · ≤₵200 ₵4 · ₵5 above).
+                            Online fees are auto-deducted by the payment provider at each transaction.
                         </p>
                     </div>
 
@@ -783,6 +821,44 @@ export function LiveOpsScreen() {
 
                 <div className="mt-4">
                     <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-feldgrau">
+                        Cash fee ledger{" "}
+                        <span className="ml-1 normal-case tracking-normal text-feldgrau/60">
+                            · flat ₵1–₵5 per cash sale, same as online
+                        </span>
+                    </p>
+                    {recentFees.length === 0 ? (
+                        <p className="mt-3 text-[11.5px] text-feldgrau/70">
+                            No cash fees yet — the first cash payment will appear here.
+                        </p>
+                    ) : (
+                        <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                            {recentFees.map((p) => (
+                                <div key={p.payment_id} className="flex items-center justify-between gap-3 rounded-xl bg-isabelline/60 px-3.5 py-2.5">
+                                    <div className="min-w-0">
+                                        <p className="font-mono text-[11px] font-bold text-licorice">
+                                            {p.table_label ?? `Table ${p.table_number}`}
+                                        </p>
+                                        <p className="text-[9.5px] text-feldgrau/60">
+                                            {formatGHS(p.amount)} cash ·{" "}
+                                            {new Date(p.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                                        </p>
+                                    </div>
+                                    <div className="text-right">
+                                        <p className="font-mono text-[12px] font-bold tabular-nums text-dark-red">
+                                            {formatGHS(p.platform_fee)} fee
+                                        </p>
+                                        <span className={`text-[9px] font-bold uppercase tracking-wider ${p.fee_settled ? "text-emerald-600" : "text-amber-600"}`}>
+                                            {p.fee_settled ? "Settled" : "Owed to Bysen"}
+                                        </span>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </div>
+
+                <div className="mt-4">
+                    <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-feldgrau">
                         Open bills per table <span className="ml-1 normal-case tracking-normal text-feldgrau/60">· linked tables are counted together</span>
                     </p>
                     <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
@@ -792,6 +868,8 @@ export function LiveOpsScreen() {
                         {billGroups.map((group) => {
                             const total = group.reduce((sum, b) => sum + Number(b.total), 0);
                             const openFor = Math.max(...group.map((b) => b.age_minutes));
+                            const dwell = Math.max(...group.map((b) => b.dwell_minutes));
+                            const dwellOver = dwell >= dwellThreshold;
                             const label = group
                                 .map((b) => b.table_label ?? `Table ${b.table_number}`)
                                 .join(" + ");
@@ -807,8 +885,9 @@ export function LiveOpsScreen() {
                                         <p className="font-mono text-[12px] font-bold tabular-nums text-licorice">
                                             {formatGHS(total)}
                                         </p>
-                                        <p className="text-[9.5px] text-feldgrau/60">
-                                            {openFor} min open · {group.reduce((sum, b) => sum + b.guests, 0)}{" "}
+                                        <p className={`text-[9.5px] ${dwellOver ? "font-bold text-dark-red" : "text-feldgrau/60"}`}>
+                                            {openFor} min open · idle {formatDwell(dwell)}
+                                            {dwellOver ? " · TOO LONG" : ""} · {group.reduce((sum, b) => sum + b.guests, 0)}{" "}
                                             {group.reduce((sum, b) => sum + b.guests, 0) === 1 ? "guest" : "guests"}
                                         </p>
                                     </div>

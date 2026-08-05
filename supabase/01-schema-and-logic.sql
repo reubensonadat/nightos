@@ -23,20 +23,33 @@ DROP TABLE IF EXISTS public.venue_settings CASCADE;
 DROP TABLE IF EXISTS public.venues CASCADE;
 
 CREATE OR REPLACE FUNCTION public.is_venue_member(target_venue_id uuid)
-RETURNS boolean AS $$
+RETURNS boolean
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
 DECLARE
     user_phone text;
 BEGIN
+    IF target_venue_id IS NULL THEN
+        RETURN false;
+    END IF;
     IF EXISTS (SELECT 1 FROM public.venues WHERE id = target_venue_id AND owner_id = auth.uid()) THEN
         RETURN true;
     END IF;
-    SELECT raw_user_meta_data->>'phone' INTO user_phone FROM auth.users WHERE id = auth.uid();
+    SELECT u.phone INTO user_phone FROM auth.users u WHERE u.id = auth.uid();
+    IF user_phone IS NULL OR user_phone = '' THEN
+        SELECT raw_user_meta_data->>'phone' INTO user_phone
+        FROM auth.users WHERE id = auth.uid();
+    END IF;
+    IF user_phone IS NULL OR user_phone = '' THEN
+        RETURN false;
+    END IF;
     RETURN EXISTS (
         SELECT 1 FROM public.staff
         WHERE venue_id = target_venue_id AND phone = user_phone AND is_active = true
     );
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$;
+
+GRANT EXECUTE ON FUNCTION public.is_venue_member(uuid) TO anon, authenticated, service_role;
 
 CREATE TABLE IF NOT EXISTS public.venues (
     id uuid NOT NULL DEFAULT gen_random_uuid(),
@@ -69,6 +82,32 @@ RETURNS TABLE (venue_id uuid, role text, venue jsonb) AS $$
 BEGIN
     RETURN QUERY
     SELECT s.venue_id, s.role, row_to_json(v.*)::jsonb AS venue
+    FROM public.staff s
+    JOIN public.venues v ON v.id = s.venue_id
+    WHERE RIGHT(REGEXP_REPLACE(s.phone, '\D', '', 'g'), 9) = RIGHT(REGEXP_REPLACE(p_phone, '\D', '', 'g'), 9)
+      AND s.is_active = true
+    LIMIT 1;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Staff read their own profile via Supabase phone OTP auth. This RPC
+-- securely bypasses RLS (avoids the 403 infinite recursion on public.staff)
+-- and never exposes the PIN (there is none).
+CREATE OR REPLACE FUNCTION public.get_staff_profile_by_phone(p_phone text)
+RETURNS TABLE (
+    id uuid,
+    name text,
+    role text,
+    max_tables integer,
+    area_assignment text,
+    venue_id uuid,
+    venue_name text,
+    venue_slug text
+) AS $$
+BEGIN
+    RETURN QUERY
+    SELECT s.id, s.name, s.role, s.max_tables, s.area_assignment,
+           v.id AS venue_id, v.name AS venue_name, v.slug AS venue_slug
     FROM public.staff s
     JOIN public.venues v ON v.id = s.venue_id
     WHERE RIGHT(REGEXP_REPLACE(s.phone, '\D', '', 'g'), 9) = RIGHT(REGEXP_REPLACE(p_phone, '\D', '', 'g'), 9)
@@ -135,11 +174,12 @@ CREATE TABLE IF NOT EXISTS public.staff (
     phone text NOT NULL,
     email text,
     role text NOT NULL DEFAULT 'waiter' CHECK (role IN ('owner', 'manager', 'supervisor', 'waiter', 'kitchen', 'bar', 'cashier')),
-    pin text NOT NULL,
     is_active boolean NOT NULL DEFAULT true,
     max_tables integer NOT NULL DEFAULT 6,
     area_assignment text,
     hourly_rate numeric(10,2) NOT NULL DEFAULT 0,
+    pay_model text NOT NULL DEFAULT 'hourly' CHECK (pay_model IN ('hourly', 'salary')),
+    salary_amount numeric(10,2),
     created_at timestamptz NOT NULL DEFAULT now(),
     CONSTRAINT staff_pkey PRIMARY KEY (id),
     CONSTRAINT staff_venue_id_phone UNIQUE (venue_id, phone)
@@ -164,6 +204,48 @@ CREATE TABLE IF NOT EXISTS public.staff_shifts (
 ALTER TABLE public.staff_shifts ENABLE ROW LEVEL security;
 CREATE POLICY "Staff can read own shifts" ON public.staff_shifts FOR SELECT
     USING (staff_id IN (SELECT id FROM public.staff WHERE phone = auth.jwt()->>'phone'));
+CREATE POLICY "Venue members can read shifts" ON public.staff_shifts
+    FOR SELECT USING (public.is_venue_member(venue_id));
+
+-- Auto shifts: sign-in clocks in (idempotent — reloads/token refreshes
+-- reuse the existing active shift), sign-out clocks out. These feed
+-- assign_waiter_to_bill and the LiveOps coverage stats.
+CREATE OR REPLACE FUNCTION public.clock_in_staff(p_staff_id uuid)
+RETURNS boolean
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+DECLARE
+    v_venue_id uuid;
+BEGIN
+    SELECT venue_id INTO v_venue_id
+    FROM public.staff
+    WHERE id = p_staff_id AND is_active = true;
+    IF v_venue_id IS NULL THEN
+        RETURN false;
+    END IF;
+    IF NOT EXISTS (
+        SELECT 1 FROM public.staff_shifts
+        WHERE staff_id = p_staff_id AND status IN ('active', 'on_break')
+    ) THEN
+        INSERT INTO public.staff_shifts (staff_id, venue_id, status)
+        VALUES (p_staff_id, v_venue_id, 'active');
+    END IF;
+    RETURN true;
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION public.clock_out_staff(p_staff_id uuid)
+RETURNS boolean
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+BEGIN
+    UPDATE public.staff_shifts
+    SET status = 'closed', clock_out = now()
+    WHERE staff_id = p_staff_id AND status IN ('active', 'on_break');
+    RETURN FOUND;
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION public.clock_in_staff(uuid) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.clock_out_staff(uuid) TO authenticated;
 
 CREATE TABLE IF NOT EXISTS public.menu_categories (
     id uuid NOT NULL DEFAULT gen_random_uuid(),
@@ -258,6 +340,7 @@ CREATE TABLE IF NOT EXISTS public.bills (
     created_at timestamptz NOT NULL DEFAULT now(),
     updated_at timestamptz NOT NULL DEFAULT now(),
     closed_at timestamptz,
+    last_activity_at timestamptz NOT NULL DEFAULT now(),
     CONSTRAINT bills_pkey PRIMARY KEY (id)
 );
 ALTER TABLE public.bills ENABLE ROW LEVEL security;
@@ -503,6 +586,50 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 CREATE TRIGGER on_order_item_change
     AFTER INSERT OR UPDATE OR DELETE ON public.order_items
     FOR EACH ROW EXECUTE FUNCTION public.recalculate_bill();
+
+-- ────────────────────────────────────────────────────────────
+-- TABLE DWELL TIME — bills.last_activity_at
+-- Any change to a bill's items or payments resets the dwell clock.
+-- Dwell = minutes since last_activity_at; used by the waiter/manager
+-- dashboards to flag tables idle past the venue's max_dwell_minutes
+-- (venue_settings key, default 120). Merge/split re-point order_items
+-- → fires automatically.
+-- ────────────────────────────────────────────────────────────
+CREATE OR REPLACE FUNCTION public.touch_bill_activity()
+RETURNS trigger
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+DECLARE
+    v_bill_id uuid;
+BEGIN
+    v_bill_id := COALESCE(NEW.bill_id, OLD.bill_id);
+    IF v_bill_id IS NOT NULL THEN
+        UPDATE public.bills
+        SET last_activity_at = now(), updated_at = now()
+        WHERE id = v_bill_id;
+    END IF;
+    RETURN COALESCE(NEW, OLD);
+END;
+$$;
+
+DROP TRIGGER IF EXISTS trg_bill_activity_items ON public.order_items;
+CREATE TRIGGER trg_bill_activity_items
+    AFTER INSERT OR UPDATE OR DELETE ON public.order_items
+    FOR EACH ROW EXECUTE FUNCTION public.touch_bill_activity();
+
+DROP TRIGGER IF EXISTS trg_bill_activity_payments ON public.payments;
+CREATE TRIGGER trg_bill_activity_payments
+    AFTER INSERT OR UPDATE OR DELETE ON public.payments
+    FOR EACH ROW EXECUTE FUNCTION public.touch_bill_activity();
+
+-- Default dwell threshold for every venue (idempotent — keeps the value
+-- on re-runs of the full schema; change per venue directly in the table).
+INSERT INTO public.venue_settings (venue_id, key, value)
+SELECT v.id, 'max_dwell_minutes', '120'::jsonb
+FROM public.venues v
+WHERE NOT EXISTS (
+    SELECT 1 FROM public.venue_settings s
+    WHERE s.venue_id = v.id AND s.key = 'max_dwell_minutes'
+);
 
 CREATE OR REPLACE FUNCTION public.update_bill_payment()
 RETURNS trigger AS $$
@@ -774,10 +901,10 @@ UPDATE public.staff
 SET phone = public.normalise_phone(phone)
 WHERE phone IS NOT NULL AND phone NOT LIKE '+233%';
 
--- Hash the plaintext pins already in the DB (e.g. the seed's 1234)
-UPDATE public.staff
-SET pin_hash = crypt(pin, gen_salt('bf'))
-WHERE pin_hash IS NULL AND pin IS NOT NULL AND pin <> '';
+-- Staff auth is Supabase phone OTP (no PIN columns — they were removed
+-- by the OTP migration). Staff read their own profile via the
+-- get_staff_profile_by_phone SECURITY DEFINER function below, which
+-- bypasses RLS. It never returns the PIN (there is none).
 
 -- Phone lookup â€” safe, never returns the PIN. Also gives the venue
 -- name so staff know which restaurant they are signing into.
@@ -864,12 +991,19 @@ ALTER TABLE public.payments
 CREATE INDEX IF NOT EXISTS payments_fee_settled_idx
     ON public.payments (venue_id, fee_settled);
 
--- Fee formula: 1% of the bill, clamped between 1.00 and 15.00.
+-- Fee formula: flat GHS by bill amount — the same tiered schedule
+-- Paystack charges per transaction, so cash and online fees are unified.
 CREATE OR REPLACE FUNCTION public.platform_fee_for(p_amount numeric)
 RETURNS numeric
 LANGUAGE sql STABLE
 SET search_path = public AS $$
-    SELECT GREATEST(1.00, LEAST(15.00, ROUND(p_amount * 0.01, 2)));
+    SELECT CASE
+        WHEN p_amount <= 50   THEN 1.00
+        WHEN p_amount <= 100  THEN 2.00
+        WHEN p_amount <= 150  THEN 3.00
+        WHEN p_amount <= 200  THEN 4.00
+        ELSE 5.00
+    END::numeric(10,2);
 $$;
 
 -- â”€â”€ B2. CASH SETTLEMENT (waiter confirms the cash) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
@@ -1078,24 +1212,28 @@ END;
 $$;
 
 -- â”€â”€ C1. STAFF MANAGEMENT (owner writes) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
--- Owner-only list (never exposes pin_hash), create staff, activate/deactivate.
+-- Owner-only list, create staff, activate/deactivate. Staff auth is
+-- Supabase phone OTP, so pin_set is always false (kept for UI compat).
 CREATE OR REPLACE FUNCTION public.staff_list(p_venue_id uuid)
 RETURNS TABLE(
     id uuid, name text, phone text, email text, role text,
     is_active boolean, pin_set boolean, max_tables int,
-    area_assignment text, hourly_rate numeric, created_at timestamptz
+    area_assignment text, hourly_rate numeric, pay_model text,
+    salary_amount numeric, created_at timestamptz
 )
 LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
     SELECT s.id, s.name, s.phone, s.email, s.role, s.is_active,
-           s.pin_hash IS NOT NULL, s.max_tables, s.area_assignment,
-           s.hourly_rate, s.created_at
+           false AS pin_set, s.max_tables, s.area_assignment,
+           s.hourly_rate, s.pay_model, s.salary_amount, s.created_at
     FROM public.staff s
     WHERE s.venue_id = p_venue_id
+      AND public.is_venue_member(p_venue_id)
     ORDER BY s.name;
 $$;
 
--- Add a staff member. The new member has no PIN yet â€” they set it
--- themselves on their first sign-in (staff_lookup returns pin_set=false).
+GRANT EXECUTE ON FUNCTION public.staff_list(uuid) TO anon, authenticated, service_role;
+
+-- Add a staff member. Auth is Supabase phone OTP (no PIN setup needed).
 CREATE OR REPLACE FUNCTION public.create_staff(
     p_venue_id uuid,
     p_name text,
@@ -1104,7 +1242,9 @@ CREATE OR REPLACE FUNCTION public.create_staff(
     p_email text DEFAULT NULL,
     p_hourly_rate numeric DEFAULT 0,
     p_max_tables int DEFAULT 6,
-    p_area_assignment text DEFAULT NULL
+    p_area_assignment text DEFAULT NULL,
+    p_pay_model text DEFAULT 'hourly',
+    p_salary_amount numeric DEFAULT NULL
 )
 RETURNS jsonb
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
@@ -1119,17 +1259,20 @@ BEGIN
     IF p_role NOT IN ('owner', 'manager', 'supervisor', 'waiter', 'kitchen', 'bar', 'cashier') THEN
         RETURN jsonb_build_object('ok', false, 'error', 'invalid_role');
     END IF;
+    IF p_pay_model NOT IN ('hourly', 'salary') THEN
+        RETURN jsonb_build_object('ok', false, 'error', 'invalid_pay_model');
+    END IF;
     IF EXISTS (SELECT 1 FROM public.staff WHERE venue_id = p_venue_id AND phone = p_phone) THEN
         RETURN jsonb_build_object('ok', false, 'error', 'phone_exists');
     END IF;
 
     INSERT INTO public.staff (
-        venue_id, name, phone, email, role, pin, is_active,
-        max_tables, area_assignment, hourly_rate
+        venue_id, name, phone, email, role, is_active,
+        max_tables, area_assignment, hourly_rate, pay_model, salary_amount
     )
     VALUES (
-        p_venue_id, p_name, p_phone, p_email, p_role, '', true,
-        p_max_tables, p_area_assignment, p_hourly_rate
+        p_venue_id, p_name, p_phone, p_email, p_role, true,
+        p_max_tables, p_area_assignment, p_hourly_rate, p_pay_model, p_salary_amount
     )
     RETURNING id INTO v_new_id;
 
@@ -1160,6 +1303,61 @@ BEGIN
 END;
 $$;
 
+-- Edit a staff member (owner only). NULL params keep the current value.
+CREATE OR REPLACE FUNCTION public.update_staff(
+    p_staff_id uuid,
+    p_role text DEFAULT NULL,
+    p_email text DEFAULT NULL,
+    p_hourly_rate numeric DEFAULT NULL,
+    p_pay_model text DEFAULT NULL,
+    p_salary_amount numeric DEFAULT NULL,
+    p_max_tables int DEFAULT NULL,
+    p_area_assignment text DEFAULT NULL,
+    p_is_active boolean DEFAULT NULL
+)
+RETURNS jsonb
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+DECLARE
+    v_venue_id uuid;
+    v_owner uuid;
+BEGIN
+    SELECT venue_id INTO v_venue_id FROM public.staff WHERE id = p_staff_id;
+    IF v_venue_id IS NULL THEN
+        RETURN jsonb_build_object('ok', false, 'error', 'not_found');
+    END IF;
+    SELECT owner_id INTO v_owner FROM public.venues WHERE id = v_venue_id;
+    IF v_owner IS DISTINCT FROM auth.uid() THEN
+        RETURN jsonb_build_object('ok', false, 'error', 'not_owner');
+    END IF;
+    IF p_role IS NOT NULL AND p_role NOT IN ('owner', 'manager', 'supervisor', 'waiter', 'kitchen', 'bar', 'cashier') THEN
+        RETURN jsonb_build_object('ok', false, 'error', 'invalid_role');
+    END IF;
+    IF p_pay_model IS NOT NULL AND p_pay_model NOT IN ('hourly', 'salary') THEN
+        RETURN jsonb_build_object('ok', false, 'error', 'invalid_pay_model');
+    END IF;
+
+    UPDATE public.staff
+    SET role = COALESCE(p_role, role),
+        email = COALESCE(p_email, email),
+        hourly_rate = COALESCE(p_hourly_rate, hourly_rate),
+        pay_model = COALESCE(p_pay_model, pay_model),
+        salary_amount = COALESCE(p_salary_amount, salary_amount),
+        max_tables = COALESCE(p_max_tables, max_tables),
+        area_assignment = COALESCE(p_area_assignment, area_assignment),
+        is_active = COALESCE(p_is_active, is_active)
+    WHERE id = p_staff_id;
+
+    INSERT INTO public.activity_logs (venue_id, actor_type, actor_name, action, entity_type, entity_id, details)
+    VALUES (v_venue_id, 'staff', 'owner', 'staff_updated', 'staff', p_staff_id::text,
+            jsonb_build_object('role', p_role, 'pay_model', p_pay_model, 'hourly_rate', p_hourly_rate,
+                               'salary_amount', p_salary_amount));
+
+    RETURN jsonb_build_object('ok', true);
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION public.update_staff(uuid, text, text, numeric, text, numeric, int, text, boolean) TO authenticated;
+
 -- â”€â”€ C2. MANAGER DASHBOARD HELPERS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 -- What the restaurant owes Bysen (fees on cash payments, unpaid).
 CREATE OR REPLACE FUNCTION public.outstanding_balance(p_venue_id uuid)
@@ -1172,9 +1370,33 @@ LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
       AND status = 'success';
 $$;
 
--- Sessions that landed but never ordered (waiters approach them).
-CREATE OR REPLACE FUNCTION public.landed_without_orders(p_venue_id uuid)
+-- Per-order cash fee ledger (LiveOps): recent cash payments with their
+-- table labels. platform_fee is recorded at payment time by
+-- record_cash_payment(); fee_settled flips when the venue settles.
+CREATE OR REPLACE FUNCTION public.recent_cash_fees(p_venue_id uuid, p_limit int DEFAULT 10)
 RETURNS TABLE(
+    payment_id uuid, amount numeric, platform_fee numeric,
+    fee_settled boolean, created_at timestamptz,
+    table_number int, table_label text
+)
+LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
+    SELECT p.id, p.amount, p.platform_fee, p.fee_settled, p.created_at,
+           t.table_number, t.table_label
+    FROM public.payments p
+    JOIN public.bills b ON b.id = p.bill_id
+    JOIN public.tables t ON t.id = b.table_id
+    WHERE p.venue_id = p_venue_id
+      AND p.method = 'cash'
+      AND p.status = 'success'
+      AND p.platform_fee > 0
+    ORDER BY p.created_at DESC
+    LIMIT p_limit;
+$$;
+
+GRANT EXECUTE ON FUNCTION public.recent_cash_fees(uuid, int) TO anon, authenticated;
+
+-- Sessions that landed but never ordered (waiters approach them).
+CREATE OR REPLACE FUNCTION public.landed_without_orders(p_venue_id uuid)RETURNS TABLE(
     session_id uuid, table_number int, table_label text,
     created_at timestamptz, age_minutes int
 )
@@ -1193,16 +1415,21 @@ LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
 $$;
 
 -- Open bills per table (with merged-bill info for connected tables).
+-- v2: also returns last_activity_at + dwell_minutes (time since the
+-- last order item or payment) for table-dwell alerts.
 CREATE OR REPLACE FUNCTION public.open_bill_overview(p_venue_id uuid)
 RETURNS TABLE(
     bill_id uuid, table_number int, table_label text, guests int,
     waiter_name text, total numeric, amount_paid numeric, age_minutes int,
+    last_activity_at timestamptz, dwell_minutes int,
     is_merged bool, merged_into_bill_id uuid
 )
 LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
     SELECT b.id, t.table_number, t.table_label, b.guest_count,
            s.name, b.total, b.amount_paid,
            GREATEST(0, floor(EXTRACT(EPOCH FROM (now() - b.created_at)) / 60))::int,
+           b.last_activity_at,
+           GREATEST(0, floor(EXTRACT(EPOCH FROM (now() - b.last_activity_at)) / 60))::int,
            COALESCE(b.is_merged, false), b.merged_into_bill_id
     FROM public.bills b
     JOIN public.tables t ON t.id = b.table_id
@@ -1211,6 +1438,24 @@ LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
       AND b.status IN ('open', 'settling')
     ORDER BY b.created_at;
 $$;
+
+-- Staff-safe venue setting reader. venue_settings RLS is owner-only;
+-- waiter devices run as anon, so this SECURITY DEFINER reader shares
+-- the dwell threshold (max_dwell_minutes, default 120).
+CREATE OR REPLACE FUNCTION public.get_venue_setting(
+    p_venue_id uuid,
+    p_key text,
+    p_default jsonb DEFAULT 'null'::jsonb
+)
+RETURNS jsonb
+LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
+    SELECT COALESCE(
+        (SELECT value FROM public.venue_settings WHERE venue_id = p_venue_id AND key = p_key),
+        p_default
+    );
+$$;
+
+GRANT EXECUTE ON FUNCTION public.get_venue_setting(uuid, text, jsonb) TO anon, authenticated;
 
 -- â”€â”€ C3. TABLE OPERATIONS (transfer / merge / split) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 -- Recompute a bill's subtotal / service charge / VAT / total from
@@ -1674,11 +1919,11 @@ CREATE POLICY "Owner manages own venue" ON public.venues
 
 -- â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 -- DONE. Verify with:
---   SELECT name, phone, role, pin_hash IS NOT NULL AS has_pin FROM staff ORDER BY role;
---   SELECT public.staff_lookup('0240000001');
+--   SELECT name, phone, role FROM staff ORDER BY role;
+--   SELECT public.get_staff_profile_by_phone('0240000001');
 --   SELECT name, owner_id IS NOT NULL AS owner_linked FROM venues WHERE slug='velvet-lounge';
---   SELECT public.platform_fee_for(45), public.platform_fee_for(60), public.platform_fee_for(5000);
---     -- expect 1.00 | 1.00 | 15.00
+--   SELECT public.platform_fee_for(45), public.platform_fee_for(60), public.platform_fee_for(160), public.platform_fee_for(5000);
+--     -- expect 1.00 | 2.00 | 4.00 | 5.00 (tiered ₵1–₵5, unified with Paystack)
 --   SELECT public.expire_stale_sessions();
 --   SELECT public.outstanding_balance((SELECT id FROM venues WHERE slug='velvet-lounge'));
 --   SELECT tablename FROM pg_publication_tables WHERE pubname='supabase_realtime' ORDER BY tablename;
@@ -1792,13 +2037,6 @@ UPDATE public.staff
 SET phone = public.normalise_phone(phone)
 WHERE phone IS NOT NULL AND phone NOT LIKE '+233%';
 
--- â”€â”€ staff_lookup â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-
--- â”€â”€ set_staff_pin â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-
--- â”€â”€ staff_sign_in â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-
--- â”€â”€ VERIFY (run these after) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+-- VERIFY (run these after)
 -- SELECT proname FROM pg_proc WHERE proname IN
---   ('normalise_phone','staff_lookup','set_staff_pin','staff_sign_in');
--- Should return 4 rows.
+--   ('normalise_phone','get_staff_profile_by_phone','get_venue_by_staff_phone');

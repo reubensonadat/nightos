@@ -454,6 +454,8 @@ function AppShell() {
   };
 
   const handleStaffSignOut = () => {
+    const staffId = staffSession?.id;
+    if (staffId) db.clockOutStaff(staffId).catch(() => {});
     authSignOut();
     setSelectedTable(null);
   };

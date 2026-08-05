@@ -5,6 +5,8 @@ import {
     UserGroupIcon,
     ChartBarIcon,
     ArrowRightStartOnRectangleIcon,
+    ClockIcon,
+    ExclamationTriangleIcon,
 } from "@heroicons/react/24/outline";
 import { formatGHS } from "../../data/menu";
 import { db } from "../../lib/api";
@@ -22,6 +24,7 @@ export type Table = {
     guests?: number;
     tabTotal?: number;
     seatedAt?: string; // ISO time string
+    lastActivityAt?: string; // ISO time string — dwell clock
     reservationTime?: string;
     reservationGuests?: number;
     server?: string;
@@ -116,6 +119,7 @@ function transformToTables(dbTables: any[], openBills: any[], waiterNames: Recor
                 guests: guestCount,
                 tabTotal: bill.total,
                 seatedAt,
+                lastActivityAt: bill.last_activity_at ?? bill.created_at,
                 server: waiterId ? (waiterNames[waiterId] ?? undefined) : undefined,
             };
         }
@@ -133,8 +137,17 @@ export function TablesDashboard({ venueId, staffName, staffId: _staffId, role, o
     const [filter, setFilter] = useState<Filter>("all");
     const [refreshing, setRefreshing] = useState(false);
     const [loading, setLoading] = useState(true);
+    const [dwellThreshold, setDwellThreshold] = useState(120);
+    const [, setNowTick] = useState(0);
     const reloadTimer = useRef<number | null>(null);
     const waiterNamesRef = useRef<Record<string, string>>({});
+
+    // Keep dwell counters live (computed client-side from last_activity_at)
+    // without hammering the database — one re-render every 30s is enough.
+    useEffect(() => {
+        const t = window.setInterval(() => setNowTick((n) => n + 1), 30_000);
+        return () => window.clearInterval(t);
+    }, []);
 
     const scheduleReload = useCallback(() => {
         if (reloadTimer.current) window.clearTimeout(reloadTimer.current);
@@ -145,6 +158,9 @@ export function TablesDashboard({ venueId, staffName, staffId: _staffId, role, o
         if (!venueId) return;
         setRefreshing(true);
         try {
+            const { data: threshold } = await db.getVenueSetting(venueId, 'max_dwell_minutes', 120);
+            if (threshold !== null) setDwellThreshold(threshold);
+
             const [tablesResult, billsResult] = await Promise.all([
                 db.tablesByVenue(venueId),
                 db.billsByVenue(venueId),
@@ -400,26 +416,48 @@ export function TablesDashboard({ venueId, staffName, staffId: _staffId, role, o
 
                             {/* Details */}
                             <div className="flex-1 px-3.5 pb-3.5 pt-3">
-                                {table.status === "occupied" && (
-                                    <>
-                                        <div className="flex items-center gap-3 text-[10px] font-semibold tracking-tight text-feldgrau">
-                                            <span className="inline-flex items-center gap-1">
-                                                <UserGroupIcon className="h-3 w-3" strokeWidth={2.25} />
-                                                {table.guests}
-                                            </span>
-                                        </div>
-                                        {table.tabTotal !== undefined && (
-                                            <p className="mt-2 font-mono text-[16px] font-bold tabular-nums text-licorice">
-                                                {formatGHS(table.tabTotal)}
-                                            </p>
-                                        )}
-                                        {table.server && (
-                                            <p className="mt-1 text-[10px] font-semibold tracking-tight text-feldgrau/80">
-                                                Served by {table.server}
-                                            </p>
-                                        )}
-                                    </>
-                                )}
+                                {table.status === "occupied" && (() => {
+                                    const dwell = table.lastActivityAt ? minutesSince(table.lastActivityAt) : 0;
+                                    const isOver = dwell >= dwellThreshold;
+                                    const isWarn = !isOver && dwell >= Math.round(dwellThreshold * 0.6);
+                                    return (
+                                        <>
+                                            <div className="flex items-center gap-3 text-[10px] font-semibold tracking-tight text-feldgrau">
+                                                <span className="inline-flex items-center gap-1">
+                                                    <UserGroupIcon className="h-3 w-3" strokeWidth={2.25} />
+                                                    {table.guests}
+                                                </span>
+                                                <span
+                                                    className={`inline-flex items-center gap-1 ${isOver
+                                                        ? "text-dark-red"
+                                                        : isWarn
+                                                            ? "text-amber-600"
+                                                            : "text-feldgrau/70"
+                                                        }`}
+                                                >
+                                                    <ClockIcon className="h-3 w-3" strokeWidth={2.25} />
+                                                    idle {formatDuration(dwell)}
+                                                </span>
+                                            </div>
+                                            {isOver && (
+                                                <p className="mt-1.5 inline-flex items-center gap-1 rounded-full bg-dark-red/10 px-2 py-0.5 text-[8.5px] font-bold uppercase tracking-[0.12em] text-dark-red">
+                                                    <ExclamationTriangleIcon className="h-3 w-3" strokeWidth={2.5} />
+                                                    Open too long
+                                                </p>
+                                            )}
+                                            {table.tabTotal !== undefined && (
+                                                <p className="mt-2 font-mono text-[16px] font-bold tabular-nums text-licorice">
+                                                    {formatGHS(table.tabTotal)}
+                                                </p>
+                                            )}
+                                            {table.server && (
+                                                <p className="mt-1 text-[10px] font-semibold tracking-tight text-feldgrau/80">
+                                                    Served by {table.server}
+                                                </p>
+                                            )}
+                                        </>
+                                    );
+                                })()}
 
                                 {table.status === "reserved" && (
                                     <>

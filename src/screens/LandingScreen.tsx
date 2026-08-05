@@ -115,7 +115,7 @@ export function LandingScreen({ onEnterCustomer, onViewReservations, onStaffPort
                             ["QR ordering", "no menu apps to install"],
                             ["Real-time kitchen", "live ticket display"],
                             ["Waiter PIN login", "no shared passwords"],
-                            ["Platform fees", "1% · min ₵1 · max ₵15"],
+                            ["Platform fees", "flat ₵1–₵5 per sale"],
                         ].map(([k, v]) => (
                             <span
                                 key={k}

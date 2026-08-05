@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import {
     CheckIcon,
     MagnifyingGlassIcon,
+    PencilSquareIcon,
     PhoneIcon,
     PlusIcon,
     ShieldCheckIcon,
@@ -14,8 +15,8 @@ import { normalizeGhanaPhone } from "../../lib/utils";
 import clsx from "clsx";
 
 /* ═══════════════════════════════════════════════════════════════════════════
-   STAFF & ROLES — fully real: rows come from the staff table, PIN status is
-   read from the DB, and Add/Activate go through owner RPCs.
+   STAFF & ROLES — fully real: rows come from the staff table, sign-in is by
+   phone OTP (no PIN), and Add/Activate go through owner RPCs.
    ═══════════════════════════════════════════════════════════════════════════ */
 
 type StaffRow = NonNullable<Awaited<ReturnType<typeof db.staffList>>["data"]>[number];
@@ -60,6 +61,7 @@ export function StaffManagerScreen() {
     const [roleFilter, setRoleFilter] = useState<string>("all");
     const [creating, setCreating] = useState(false);
     const [selectedStaff, setSelectedStaff] = useState<StaffRow | null>(null);
+    const [editingStaff, setEditingStaff] = useState<StaffRow | null>(null);
 
     const load = useCallback(async () => {
         // Wait until we have a real venue UUID (not the default placeholder).
@@ -105,12 +107,36 @@ export function StaffManagerScreen() {
         }
     };
 
+    const updateStaff = async (id: string, patch: {
+        role?: string;
+        email?: string | null;
+        hourlyRate?: number;
+        payModel?: "hourly" | "salary";
+        salaryAmount?: number | null;
+        maxTables?: number;
+        areaAssignment?: string | null;
+        isActive?: boolean;
+    }) => {
+        const prev = staff;
+        setStaff((cur) => cur.map((s) => (s.id === id ? { ...s, ...patch } : s)));
+        const { data, error } = await db.updateStaff({ staffId: id, venueId: venue.id, ...patch });
+        if (error || !data?.ok) {
+            setStaff(prev);
+            toast.error("Could not update this staff member.");
+            return false;
+        }
+        toast.success("Staff updated.");
+        return true;
+    };
+
     const addStaff = async (input: {
         name: string;
         phone: string;
         role: string;
         email?: string;
         hourlyRate: number;
+        payModel: "hourly" | "salary";
+        salaryAmount: number | null;
         maxTables: number;
     }) => {
         const { data, error } = await db.createStaff({
@@ -120,6 +146,8 @@ export function StaffManagerScreen() {
             role: input.role,
             email: input.email || null,
             hourlyRate: input.hourlyRate,
+            payModel: input.payModel,
+            salaryAmount: input.salaryAmount,
             maxTables: input.maxTables,
         });
         if (error || !data?.ok) {
@@ -132,7 +160,7 @@ export function StaffManagerScreen() {
             toast.error(reason);
             return false;
         }
-        toast.success(`${input.name} added — they'll set their own PIN on first sign-in.`);
+        toast.success(`${input.name} added — they'll sign in with their phone.`);
         setCreating(false);
         await load();
         return true;
@@ -140,13 +168,12 @@ export function StaffManagerScreen() {
 
     const totalCount = staff.length;
     const onShift = shiftStaffIds.size;
-    const pinsSet = staff.filter((s) => s.pin_set).length;
     const activeCount = staff.filter((s) => s.is_active).length;
 
     return (
         <div className="mx-auto w-full max-w-7xl space-y-6">
             {/* ── Stats row (real) ── */}
-            <div className="grid grid-cols-2 gap-3 md:grid-cols-4 md:gap-4">
+            <div className="grid grid-cols-2 gap-3 md:grid-cols-3 md:gap-4">
                 <div className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-isabelline">
                     <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-feldgrau">Total Staff</p>
                     <p className="mt-1 font-mono text-[22px] font-black tabular-nums text-licorice">{loading ? "…" : totalCount}</p>
@@ -158,10 +185,6 @@ export function StaffManagerScreen() {
                 <div className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-isabelline">
                     <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-feldgrau">Active</p>
                     <p className="mt-1 font-mono text-[22px] font-black tabular-nums text-licorice">{loading ? "…" : activeCount}</p>
-                </div>
-                <div className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-isabelline">
-                    <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-feldgrau">PINs Set</p>
-                    <p className="mt-1 font-mono text-[22px] font-black tabular-nums text-khaki">{loading ? "…" : `${pinsSet}/${totalCount}`}</p>
                 </div>
             </div>
 
@@ -224,7 +247,7 @@ export function StaffManagerScreen() {
                     <div className="flex flex-col items-center justify-center px-6 py-16 text-center">
                         <h3 className="text-[14px] font-bold tracking-tight text-licorice">No staff found</h3>
                         <p className="mt-1 text-[12px] tracking-tight text-feldgrau">
-                            Add your first staff member — they'll set their own PIN on first sign-in.
+                            Add your first staff member — they'll sign in with their phone.
                         </p>
                     </div>
                 ) : (
@@ -235,7 +258,6 @@ export function StaffManagerScreen() {
                                 <tr className="text-left">
                                     <th className="px-4 py-2.5 text-[9px] font-bold uppercase tracking-[0.18em] text-feldgrau">Name</th>
                                     <th className="px-4 py-2.5 text-[9px] font-bold uppercase tracking-[0.18em] text-feldgrau">Role</th>
-                                    <th className="px-4 py-2.5 text-[9px] font-bold uppercase tracking-[0.18em] text-feldgrau">PIN</th>
                                     <th className="px-4 py-2.5 text-[9px] font-bold uppercase tracking-[0.18em] text-feldgrau">Status</th>
                                     <th className="px-4 py-2.5 text-[9px] font-bold uppercase tracking-[0.18em] text-feldgrau text-right">Actions</th>
                                 </tr>
@@ -262,18 +284,6 @@ export function StaffManagerScreen() {
                                             <span className={clsx("inline-flex items-center rounded-full px-2.5 py-0.5 text-[9px] font-bold uppercase tracking-wider", ROLE_COLORS[s.role] ?? "bg-isabelline text-feldgrau")}>
                                                 {roleLabel(s.role)}
                                             </span>
-                                        </td>
-                                        <td className="px-4 py-2.5">
-                                            {s.pin_set ? (
-                                                <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider text-emerald-600">
-                                                    <CheckIcon className="h-2.5 w-2.5" strokeWidth={2.5} />
-                                                    Set
-                                                </span>
-                                            ) : (
-                                                <span className="rounded-full bg-amber-50 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider text-amber-600">
-                                                    First login
-                                                </span>
-                                            )}
                                         </td>
                                         <td className="px-4 py-2.5">
                                             <div className="flex items-center gap-2">
@@ -339,10 +349,6 @@ export function StaffManagerScreen() {
                                                     <span className={clsx("h-1.5 w-1.5 rounded-full", shiftStaffIds.has(s.id) ? "bg-emerald-400" : "bg-feldgrau/30")} />
                                                     {shiftStaffIds.has(s.id) ? "On Shift" : "Off Duty"}
                                                 </span>
-                                                <span className="text-feldgrau">·</span>
-                                                <span className={clsx("text-[9px] font-bold", s.pin_set ? "text-emerald-600" : "text-amber-600")}>
-                                                    {s.pin_set ? "PIN set" : "No PIN yet"}
-                                                </span>
                                             </div>
                                         </div>
                                     </div>
@@ -386,11 +392,29 @@ export function StaffManagerScreen() {
                     onShift={shiftStaffIds.has(selectedStaff.id)}
                     onClose={() => setSelectedStaff(null)}
                     onToggleActive={toggleActive}
+                    onEdit={() => setEditingStaff(selectedStaff)}
                 />
             )}
 
             {/* ── Add Staff Modal ── */}
             {creating && <AddStaffModal onAdd={addStaff} onClose={() => setCreating(false)} />}
+
+            {/* ── Edit Staff Modal ── */}
+            {editingStaff && (
+                <EditStaffModal
+                    staff={editingStaff}
+                    onSave={async (patch) => {
+                        const ok = await updateStaff(editingStaff.id, patch);
+                        if (ok) {
+                            setEditingStaff(null);
+                            setSelectedStaff(editingStaff);
+                            await load();
+                        }
+                        return ok;
+                    }}
+                    onClose={() => setEditingStaff(null)}
+                />
+            )}
         </div>
     );
 }
@@ -404,11 +428,13 @@ function StaffDetailDrawer({
     onShift,
     onClose,
     onToggleActive,
+    onEdit,
 }: {
     staff: StaffRow;
     onShift: boolean;
     onClose: () => void;
     onToggleActive: (id: string, active: boolean) => void;
+    onEdit: () => void;
 }) {
     return (
         <div className="fixed inset-0 z-50 flex items-end md:items-center justify-end md:justify-center">
@@ -440,22 +466,20 @@ function StaffDetailDrawer({
                         </div>
                     </div>
 
-                    <div className="mt-4 grid grid-cols-3 gap-2 rounded-xl bg-isabelline p-3">
-                        <div className="text-center">
-                            <p className={clsx("font-mono text-[16px] font-black tabular-nums", staff.pin_set ? "text-emerald-600" : "text-amber-600")}>
-                                {staff.pin_set ? "Set" : "—"}
-                            </p>
-                            <p className="text-[9px] font-bold uppercase tracking-wider text-feldgrau">PIN</p>
-                        </div>
-                        <div className="border-x border-licorice/8 text-center">
+                    <div className="mt-4 grid grid-cols-2 gap-2 rounded-xl bg-isabelline p-3">
+                        <div className="border-r border-licorice/8 text-center">
                             <p className="font-mono text-[16px] font-black tabular-nums text-licorice">{staff.max_tables}</p>
                             <p className="text-[9px] font-bold uppercase tracking-wider text-feldgrau">Max Tables</p>
                         </div>
                         <div className="text-center">
                             <p className="font-mono text-[16px] font-black tabular-nums text-khaki">
-                                {staff.hourly_rate > 0 ? `GH₵${staff.hourly_rate}` : "—"}
+                                {staff.pay_model === "salary"
+                                    ? (staff.salary_amount != null ? `GH₵${staff.salary_amount}` : "—")
+                                    : (staff.hourly_rate > 0 ? `GH₵${staff.hourly_rate}` : "—")}
                             </p>
-                            <p className="text-[9px] font-bold uppercase tracking-wider text-feldgrau">Hourly</p>
+                            <p className="text-[9px] font-bold uppercase tracking-wider text-feldgrau">
+                                {staff.pay_model === "salary" ? "Salary/mo" : "Hourly"}
+                            </p>
                         </div>
                     </div>
 
@@ -485,19 +509,22 @@ function StaffDetailDrawer({
                                 {new Date(staff.created_at).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}
                             </span>
                         </div>
-                        {!staff.pin_set && (
-                            <p className="rounded-lg bg-amber-50 px-3 py-2 text-[11px] font-semibold tracking-tight text-amber-700">
-                                No PIN yet — they'll set it themselves on their first sign-in.
-                            </p>
-                        )}
                     </div>
 
-                    <div className="mt-4">
+                    <div className="mt-4 grid grid-cols-2 gap-2">
+                        <button
+                            type="button"
+                            onClick={onEdit}
+                            className="inline-flex items-center justify-center gap-1 rounded-full bg-licorice px-3 py-2 text-[11px] font-bold tracking-tight text-isabelline shadow-sm transition-all active:scale-95"
+                        >
+                            <PencilSquareIcon className="h-3.5 w-3.5" strokeWidth={2.25} />
+                            Edit
+                        </button>
                         <button
                             type="button"
                             onClick={() => { onToggleActive(staff.id, staff.is_active); onClose(); }}
                             className={clsx(
-                                "w-full inline-flex items-center justify-center gap-1 rounded-full px-3 py-2 text-[11px] font-bold tracking-tight transition-all active:scale-95",
+                                "inline-flex items-center justify-center gap-1 rounded-full px-3 py-2 text-[11px] font-bold tracking-tight transition-all active:scale-95",
                                 staff.is_active ? "bg-isabelline text-feldgrau ring-1 ring-licorice/8" : "bg-licorice text-isabelline",
                             )}
                         >
@@ -515,14 +542,16 @@ function StaffDetailDrawer({
    ═══════════════════════════════════════════════════════════════════════════ */
 
 function AddStaffModal({ onAdd, onClose }: {
-    onAdd: (input: { name: string; phone: string; role: string; email?: string; hourlyRate: number; maxTables: number }) => Promise<boolean>;
+    onAdd: (input: { name: string; phone: string; role: string; email?: string; hourlyRate: number; payModel: "hourly" | "salary"; salaryAmount: number | null; maxTables: number }) => Promise<boolean>;
     onClose: () => void;
 }) {
     const [name, setName] = useState("");
     const [email, setEmail] = useState("");
     const [phone, setPhone] = useState("");
     const [role, setRole] = useState("waiter");
+    const [payModel, setPayModel] = useState<"hourly" | "salary">("hourly");
     const [hourlyRate, setHourlyRate] = useState(25);
+    const [salaryAmount, setSalaryAmount] = useState(0);
     const [maxTables, setMaxTables] = useState(6);
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -544,6 +573,8 @@ function AddStaffModal({ onAdd, onClose }: {
             role,
             email: email.trim() || undefined,
             hourlyRate,
+            payModel,
+            salaryAmount: payModel === "salary" ? salaryAmount : null,
             maxTables,
         });
         setSaving(false);
@@ -583,12 +614,38 @@ function AddStaffModal({ onAdd, onClose }: {
                         <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="kojo@velvetlounge.gh"
                             className="mt-1 w-full rounded-lg bg-isabelline px-3 py-2 text-[12px] text-licorice placeholder:text-feldgrau/50 ring-1 ring-licorice/8 focus:outline-none focus:ring-2 focus:ring-licorice/20" />
                     </div>
-                    <div className="grid grid-cols-2 gap-3">
-                        <div>
-                            <label className="text-[10px] font-bold uppercase tracking-[0.18em] text-feldgrau">Hourly Rate (GHS)</label>
-                            <input type="number" min={0} value={hourlyRate} onChange={(e) => setHourlyRate(parseInt(e.target.value) || 0)}
-                                className="mt-1 w-full rounded-lg bg-isabelline px-3 py-2 font-mono text-[12px] tabular-nums text-licorice ring-1 ring-licorice/8 focus:outline-none focus:ring-2 focus:ring-licorice/20" />
+                    <div>
+                        <label className="text-[10px] font-bold uppercase tracking-[0.18em] text-feldgrau">Pay</label>
+                        <div className="mt-1 grid grid-cols-2 gap-2">
+                            {([["hourly", "Hourly"], ["salary", "Salary/mo"]] as const).map(([val, lbl]) => (
+                                <button
+                                    key={val}
+                                    type="button"
+                                    onClick={() => setPayModel(val)}
+                                    className={clsx(
+                                        "rounded-lg py-2 text-[10px] font-bold tracking-tight transition-all active:scale-95",
+                                        payModel === val ? "bg-licorice text-isabelline shadow-sm" : "bg-isabelline text-feldgrau ring-1 ring-licorice/8",
+                                    )}
+                                >
+                                    {lbl}
+                                </button>
+                            ))}
                         </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                        {payModel === "hourly" ? (
+                            <div>
+                                <label className="text-[10px] font-bold uppercase tracking-[0.18em] text-feldgrau">Hourly Rate (GHS)</label>
+                                <input type="number" min={0} value={hourlyRate} onChange={(e) => setHourlyRate(parseInt(e.target.value) || 0)}
+                                    className="mt-1 w-full rounded-lg bg-isabelline px-3 py-2 font-mono text-[12px] tabular-nums text-licorice ring-1 ring-licorice/8 focus:outline-none focus:ring-2 focus:ring-licorice/20" />
+                            </div>
+                        ) : (
+                            <div>
+                                <label className="text-[10px] font-bold uppercase tracking-[0.18em] text-feldgrau">Salary (GHS/mo)</label>
+                                <input type="number" min={0} value={salaryAmount} onChange={(e) => setSalaryAmount(parseInt(e.target.value) || 0)}
+                                    className="mt-1 w-full rounded-lg bg-isabelline px-3 py-2 font-mono text-[12px] tabular-nums text-licorice ring-1 ring-licorice/8 focus:outline-none focus:ring-2 focus:ring-licorice/20" />
+                            </div>
+                        )}
                         <div>
                             <label className="text-[10px] font-bold uppercase tracking-[0.18em] text-feldgrau">Max Tables</label>
                             <input type="number" min={1} max={20} value={maxTables} onChange={(e) => setMaxTables(parseInt(e.target.value) || 1)}
@@ -633,6 +690,166 @@ function AddStaffModal({ onAdd, onClose }: {
                             <>
                                 <CheckIcon className="h-3.5 w-3.5" strokeWidth={2.5} />
                                 Add Staff
+                            </>
+                        )}
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   EDIT STAFF MODAL (owner RPC — role, pay model, rate/salary, limits)
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+function EditStaffModal({ staff, onSave, onClose }: {
+    staff: StaffRow;
+    onSave: (patch: {
+        role?: string;
+        email?: string | null;
+        hourlyRate?: number;
+        payModel?: "hourly" | "salary";
+        salaryAmount?: number | null;
+        maxTables?: number;
+        areaAssignment?: string | null;
+        isActive?: boolean;
+    }) => Promise<boolean>;
+    onClose: () => void;
+}) {
+    const [role, setRole] = useState(staff.role);
+    const [email, setEmail] = useState(staff.email ?? "");
+    const [payModel, setPayModel] = useState<"hourly" | "salary">(staff.pay_model ?? "hourly");
+    const [hourlyRate, setHourlyRate] = useState(staff.hourly_rate || 0);
+    const [salaryAmount, setSalaryAmount] = useState(staff.salary_amount ?? 0);
+    const [maxTables, setMaxTables] = useState(staff.max_tables);
+    const [area, setArea] = useState(staff.area_assignment ?? "");
+    const [isActive, setIsActive] = useState(staff.is_active);
+    const [saving, setSaving] = useState(false);
+
+    const handleSave = async () => {
+        setSaving(true);
+        const ok = await onSave({
+            role,
+            email: email.trim() ? email.trim() : null,
+            hourlyRate,
+            payModel,
+            salaryAmount: payModel === "salary" ? salaryAmount : null,
+            maxTables,
+            areaAssignment: area.trim() ? area.trim() : null,
+            isActive,
+        });
+        setSaving(false);
+        if (!ok) onClose();
+    };
+
+    return (
+        <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center px-4">
+            <div className="absolute inset-0 bg-licorice/50 backdrop-blur-sm" onClick={onClose} />
+            <div className="relative w-full max-w-md rounded-t-2xl md:rounded-2xl bg-white shadow-2xl">
+                <div className="flex items-center justify-between border-b border-isabelline px-5 py-3">
+                    <div>
+                        <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-feldgrau">Edit Staff</p>
+                        <h3 className="text-[14px] font-bold tracking-tight text-licorice">{staff.name}</h3>
+                    </div>
+                    <button type="button" onClick={onClose} aria-label="Close" className="flex h-8 w-8 items-center justify-center rounded-full bg-isabelline text-licorice">
+                        <XMarkIcon className="h-4 w-4" strokeWidth={2.25} />
+                    </button>
+                </div>
+
+                <div className="space-y-3 px-5 py-4">
+                    <div>
+                        <label className="text-[10px] font-bold uppercase tracking-[0.18em] text-feldgrau">Role</label>
+                        <div className="mt-1 grid grid-cols-4 gap-2">
+                            {ROLE_OPTIONS.filter((r) => r.value !== "owner").map((r) => (
+                                <button
+                                    key={r.value}
+                                    type="button"
+                                    onClick={() => setRole(r.value)}
+                                    className={clsx(
+                                        "rounded-lg py-2 text-[10px] font-bold tracking-tight transition-all active:scale-95",
+                                        role === r.value ? "bg-licorice text-isabelline shadow-sm" : "bg-isabelline text-feldgrau ring-1 ring-licorice/8",
+                                    )}
+                                >
+                                    {r.label}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+
+                    <div>
+                        <label className="text-[10px] font-bold uppercase tracking-[0.18em] text-feldgrau">Pay</label>
+                        <div className="mt-1 grid grid-cols-2 gap-2">
+                            {([["hourly", "Hourly"], ["salary", "Salary/mo"]] as const).map(([val, lbl]) => (
+                                <button
+                                    key={val}
+                                    type="button"
+                                    onClick={() => setPayModel(val)}
+                                    className={clsx(
+                                        "rounded-lg py-2 text-[10px] font-bold tracking-tight transition-all active:scale-95",
+                                        payModel === val ? "bg-licorice text-isabelline shadow-sm" : "bg-isabelline text-feldgrau ring-1 ring-licorice/8",
+                                    )}
+                                >
+                                    {lbl}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3">
+                        {payModel === "hourly" ? (
+                            <div>
+                                <label className="text-[10px] font-bold uppercase tracking-[0.18em] text-feldgrau">Hourly Rate (GHS)</label>
+                                <input type="number" min={0} value={hourlyRate} onChange={(e) => setHourlyRate(parseInt(e.target.value) || 0)}
+                                    className="mt-1 w-full rounded-lg bg-isabelline px-3 py-2 font-mono text-[12px] tabular-nums text-licorice ring-1 ring-licorice/8 focus:outline-none focus:ring-2 focus:ring-licorice/20" />
+                            </div>
+                        ) : (
+                            <div>
+                                <label className="text-[10px] font-bold uppercase tracking-[0.18em] text-feldgrau">Salary (GHS/mo)</label>
+                                <input type="number" min={0} value={salaryAmount} onChange={(e) => setSalaryAmount(parseInt(e.target.value) || 0)}
+                                    className="mt-1 w-full rounded-lg bg-isabelline px-3 py-2 font-mono text-[12px] tabular-nums text-licorice ring-1 ring-licorice/8 focus:outline-none focus:ring-2 focus:ring-licorice/20" />
+                            </div>
+                        )}
+                        <div>
+                            <label className="text-[10px] font-bold uppercase tracking-[0.18em] text-feldgrau">Max Tables</label>
+                            <input type="number" min={1} max={20} value={maxTables} onChange={(e) => setMaxTables(parseInt(e.target.value) || 1)}
+                                className="mt-1 w-full rounded-lg bg-isabelline px-3 py-2 font-mono text-[12px] tabular-nums text-licorice ring-1 ring-licorice/8 focus:outline-none focus:ring-2 focus:ring-licorice/20" />
+                        </div>
+                    </div>
+
+                    <div>
+                        <label className="text-[10px] font-bold uppercase tracking-[0.18em] text-feldgrau">Email</label>
+                        <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="kojo@velvetlounge.gh"
+                            className="mt-1 w-full rounded-lg bg-isabelline px-3 py-2 text-[12px] text-licorice placeholder:text-feldgrau/50 ring-1 ring-licorice/8 focus:outline-none focus:ring-2 focus:ring-licorice/20" />
+                    </div>
+
+                    <div>
+                        <label className="text-[10px] font-bold uppercase tracking-[0.18em] text-feldgrau">Area</label>
+                        <input type="text" value={area} onChange={(e) => setArea(e.target.value)} placeholder="Main, VIP, Lounge…"
+                            className="mt-1 w-full rounded-lg bg-isabelline px-3 py-2 text-[12px] text-licorice placeholder:text-feldgrau/50 ring-1 ring-licorice/8 focus:outline-none focus:ring-2 focus:ring-licorice/20" />
+                    </div>
+
+                    <label className="flex items-center gap-2 cursor-pointer">
+                        <input type="checkbox" checked={isActive} onChange={(e) => setIsActive(e.target.checked)}
+                            className="h-4 w-4 accent-khaki" />
+                        <span className="text-[11px] font-bold tracking-tight text-licorice">Active (can sign in)</span>
+                    </label>
+                </div>
+
+                <div className="flex items-center justify-end gap-2 border-t border-isabelline px-5 py-3">
+                    <button type="button" onClick={onClose} className="rounded-full bg-isabelline px-4 py-2 text-[11px] font-bold tracking-tight text-feldgrau ring-1 ring-licorice/8">
+                        Cancel
+                    </button>
+                    <button
+                        type="button"
+                        onClick={handleSave}
+                        disabled={saving}
+                        className="inline-flex items-center gap-1 rounded-full bg-licorice px-4 py-2 text-[11px] font-bold tracking-tight text-isabelline shadow-sm disabled:opacity-40"
+                    >
+                        {saving ? "Saving…" : (
+                            <>
+                                <CheckIcon className="h-3.5 w-3.5" strokeWidth={2.5} />
+                                Save Changes
                             </>
                         )}
                     </button>
