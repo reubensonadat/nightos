@@ -61,6 +61,29 @@ CREATE EXTENSION IF NOT EXISTS pgcrypto;
 
 ALTER TABLE public.staff ADD COLUMN IF NOT EXISTS pin_hash text;
 
+-- ── Phone normaliser ───────────────────────────────────────────────
+-- Converts any Ghana phone (024…, 233…, +233…) to +233XXXXXXXXX.
+-- Used inside every staff auth RPC so format mismatches never cause
+-- a sign-in failure.
+CREATE OR REPLACE FUNCTION public.normalise_phone(p_phone text)
+RETURNS text
+LANGUAGE sql IMMUTABLE STRICT SET search_path = public AS $$
+  SELECT CASE
+    WHEN regexp_replace(p_phone, '[^0-9]', '', 'g') ~ '^233[0-9]{9}$'
+      THEN '+' || regexp_replace(p_phone, '[^0-9]', '', 'g')
+    WHEN regexp_replace(p_phone, '[^0-9]', '', 'g') ~ '^0[0-9]{9}$'
+      THEN '+233' || substring(regexp_replace(p_phone, '[^0-9]', '', 'g') FROM 2)
+    WHEN regexp_replace(p_phone, '[^0-9]', '', 'g') ~ '^[0-9]{9}$'
+      THEN '+233' || regexp_replace(p_phone, '[^0-9]', '', 'g')
+    ELSE p_phone
+  END;
+$$;
+
+-- Normalise all existing staff phone numbers to +233XXXXXXXXX
+UPDATE public.staff
+SET phone = public.normalise_phone(phone)
+WHERE phone IS NOT NULL AND phone NOT LIKE '+233%';
+
 -- Hash the plaintext pins already in the DB (e.g. the seed's 1234)
 UPDATE public.staff
 SET pin_hash = crypt(pin, gen_salt('bf'))
@@ -77,7 +100,7 @@ LANGUAGE sql SECURITY DEFINER SET search_path = public AS $$
     SELECT s.id, s.name, s.role, v.id, v.name, v.slug, s.pin_hash IS NOT NULL
     FROM public.staff s
     JOIN public.venues v ON v.id = s.venue_id
-    WHERE s.phone = p_phone
+    WHERE s.phone = public.normalise_phone(p_phone)
       AND s.is_active = true
       AND v.is_active = true
     LIMIT 1;
@@ -97,7 +120,9 @@ BEGIN
     END IF;
     UPDATE public.staff
     SET pin_hash = crypt(p_pin, gen_salt('bf'))
-    WHERE phone = p_phone AND is_active = true AND pin_hash IS NULL;
+    WHERE phone = public.normalise_phone(p_phone)
+      AND is_active = true
+      AND pin_hash IS NULL;
     v_updated := FOUND;
     RETURN v_updated;
 END;
@@ -116,7 +141,8 @@ DECLARE
 BEGIN
     SELECT * INTO v_staff
     FROM public.staff
-    WHERE phone = p_phone AND is_active = true
+    WHERE phone = public.normalise_phone(p_phone)
+      AND is_active = true
     LIMIT 1;
 
     IF NOT FOUND OR v_staff.pin_hash IS NULL
@@ -337,6 +363,7 @@ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
 DECLARE
     v_count int;
 BEGIN
+    -- 1. Mark stale sessions expired (unchanged rule: active, >20 min, no orders)
     UPDATE public.customer_sessions cs
     SET status = 'expired', last_active_at = now()
     WHERE cs.status = 'active'
@@ -346,6 +373,19 @@ BEGIN
           WHERE os.customer_session_id = cs.id
       );
     GET DIAGNOSTICS v_count = ROW_COUNT;
+
+    -- 2. Cancel the orphaned bill of any expired session, but only if it
+    --    really is empty (no items, no successful payments) and still open.
+    UPDATE public.bills b
+    SET status = 'cancelled', closed_at = now(), updated_at = now()
+    WHERE b.status IN ('open', 'settling')
+      AND NOT EXISTS (SELECT 1 FROM public.order_items oi WHERE oi.bill_id = b.id)
+      AND NOT EXISTS (SELECT 1 FROM public.payments p WHERE p.bill_id = b.id AND p.status = 'success')
+      AND EXISTS (
+          SELECT 1 FROM public.customer_sessions cs
+          WHERE cs.bill_id = b.id AND cs.status = 'expired'
+      );
+
     RETURN v_count;
 END;
 $$;
@@ -357,6 +397,56 @@ BEGIN
         PERFORM cron.schedule('bysen-expire-sessions', '* * * * *', 'SELECT public.expire_stale_sessions()');
     END IF;
 END $$;
+
+-- ── B5. CLOSE BILL (waiter closes a table) ──────────────────────
+-- Any active staff member of the same venue can close a table:
+--   - bill must be open/settling with NO successful payments
+--   - bill → cancelled, its sessions → closed, pending items → cancelled
+CREATE OR REPLACE FUNCTION public.close_bill(
+    p_bill_id uuid,
+    p_staff_id uuid
+)
+RETURNS boolean
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+DECLARE
+    v_bill public.bills%ROWTYPE;
+    v_staff public.staff%ROWTYPE;
+BEGIN
+    SELECT * INTO v_staff FROM public.staff WHERE id = p_staff_id AND is_active = true LIMIT 1;
+    IF NOT FOUND THEN RETURN false; END IF;
+
+    SELECT * INTO v_bill FROM public.bills WHERE id = p_bill_id LIMIT 1;
+    IF NOT FOUND OR v_bill.venue_id IS DISTINCT FROM v_staff.venue_id THEN
+        RETURN false;
+    END IF;
+
+    IF v_bill.status NOT IN ('open', 'settling') THEN
+        RETURN false;
+    END IF;
+
+    IF EXISTS (SELECT 1 FROM public.payments p WHERE p.bill_id = p_bill_id AND p.status = 'success') THEN
+        RETURN false;
+    END IF;
+
+    UPDATE public.bills
+    SET status = 'cancelled', closed_at = now(), updated_at = now()
+    WHERE id = p_bill_id;
+
+    UPDATE public.customer_sessions
+    SET status = 'closed', last_active_at = now()
+    WHERE bill_id = p_bill_id AND status IN ('active', 'expired');
+
+    UPDATE public.order_submissions
+    SET status = 'cancelled', updated_at = now()
+    WHERE bill_id = p_bill_id AND status IN ('pending', 'confirmed', 'preparing');
+
+    INSERT INTO public.activity_logs (venue_id, actor_type, actor_name, action, entity_type, entity_id, details)
+    VALUES (v_bill.venue_id, 'staff', v_staff.name, 'bill_closed', 'bill', p_bill_id::text,
+            jsonb_build_object('subtotal', v_bill.subtotal, 'table_id', v_bill.table_id));
+
+    RETURN true;
+END;
+$$;
 
 -- ── C1. STAFF MANAGEMENT (owner writes) ────────────────────────
 -- Owner-only list (never exposes pin_hash), create staff, activate/deactivate.
@@ -520,7 +610,7 @@ BEGIN
 
     v_service := ROUND(v_subtotal * v_venue.service_charge_pct / 100, 2);
     v_vat := ROUND(v_subtotal * v_venue.vat_pct / 100, 2);
-    v_total := v_subtotal + v_service + v_vat + v_bill.convenience_fee;
+    v_total := v_subtotal + v_service + v_vat;
 
     UPDATE public.bills
     SET subtotal = v_subtotal, service_charge = v_service,

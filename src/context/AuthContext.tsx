@@ -1,7 +1,7 @@
 import { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { authDb } from '../lib/db/auth'
-import type { DbVenue } from '../lib/api'
+import type { DbVenue, DbStaffSession } from '../lib/api'
 
 type AuthUser = import('@supabase/supabase-js').User
 type Session = import('@supabase/supabase-js').Session
@@ -19,6 +19,7 @@ type AuthContextValue = {
   profile: Profile | null
   venue: DbVenue | null
   role: string | null
+  staffSession: DbStaffSession | null
   isInitializing: boolean
   isAuthenticated: boolean
   hasVenue: boolean
@@ -28,6 +29,7 @@ type AuthContextValue = {
   verifyPhoneOtp: (phone: string, token: string) => Promise<{ error: any }>
   signOut: () => Promise<void>
   refreshVenue: () => Promise<void>
+  refreshStaffSession: () => Promise<void>
 }
 
 const AuthContext = createContext<AuthContextValue>(null!)
@@ -38,6 +40,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [profile, setProfile] = useState<Profile | null>(null)
   const [venue, setVenue] = useState<DbVenue | null>(null)
   const [role, setRole] = useState<string | null>(null)
+  const [staffSession, setStaffSession] = useState<DbStaffSession | null>(null)
   const [isInitializing, setIsInitializing] = useState(true)
 
   const currentUserIdRef = useRef<string | null>(null)
@@ -47,6 +50,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setProfile(null)
       setVenue(null)
       setRole(null)
+      setStaffSession(null)
       return
     }
 
@@ -54,19 +58,39 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (v) {
       setVenue(v as DbVenue)
       setRole('owner')
+      setStaffSession(null)
     } else {
       const phoneToCheck = userPhone
       if (phoneToCheck) {
+        // Find staff
         const { data: staffData } = await authDb.venueByStaffPhone(phoneToCheck)
         if (staffData) {
           const sd = staffData as any
           setVenue(sd.venue as DbVenue)
           setRole(sd.role)
+
+          // Also populate staffSession for App.tsx backward compatibility
+          const { data } = await supabase.rpc('get_staff_profile_by_phone', { p_phone: phoneToCheck }).single();
+          const fullStaffData = data as any;
+            
+          if (fullStaffData && fullStaffData.venue_id) {
+             setStaffSession({
+                id: fullStaffData.id,
+                name: fullStaffData.name,
+                role: fullStaffData.role as any,
+                venue_id: fullStaffData.venue_id,
+                venue_name: fullStaffData.venue_name,
+                venue_slug: fullStaffData.venue_slug,
+                area_assignment: fullStaffData.area_assignment,
+                max_tables: fullStaffData.max_tables,
+             })
+          }
           return
         }
       }
       setVenue(null)
       setRole(null)
+      setStaffSession(null)
     }
   }
 
@@ -105,6 +129,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setProfile(null)
         setVenue(null)
         setRole(null)
+        setStaffSession(null)
       } else if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
         await loadUserData(sess.user.id, sess.user.phone)
       }
@@ -149,6 +174,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setProfile({ id: data.user.id, email, phone_number: null, name: null })
       setVenue(null)
       setRole(null)
+      setStaffSession(null)
       try {
         await loadUserData(data.user.id, data.user.phone)
       } catch (e) {
@@ -169,12 +195,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setProfile(null)
     setVenue(null)
     setRole(null)
+    setStaffSession(null)
   }
 
   const refreshVenue = async () => {
     if (!user?.id) return
     const { data: v } = await authDb.venueByOwner(user.id)
     setVenue((v as DbVenue) ?? null)
+  }
+
+  const refreshStaffSession = async () => {
+    if (!user?.id) return
+    await loadUserData(user.id, user.phone)
   }
 
   const value = useMemo(
@@ -184,6 +216,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       profile,
       venue,
       role,
+      staffSession,
       isInitializing,
       isAuthenticated: Boolean(user),
       hasVenue: Boolean(venue),
@@ -193,8 +226,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       verifyPhoneOtp,
       signOut,
       refreshVenue,
+      refreshStaffSession
     }),
-    [user, session, profile, venue, role, isInitializing],
+    [user, session, profile, venue, role, staffSession, isInitializing],
   )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

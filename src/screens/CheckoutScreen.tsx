@@ -12,6 +12,7 @@ import { CheckCircleIcon } from "@heroicons/react/24/solid";
 import toast from "react-hot-toast";
 import { formatGHS } from "../data/menu";
 import { PaystackButton } from "../components/PaystackButton";
+import { ReceiptDownloader } from "../components/ReceiptDownloader";
 import { db, type DbBill, type DbVenue } from "../lib/api";
 
 /* ────────────────────────── Payment methods ────────────────────────── */
@@ -108,17 +109,15 @@ export function CheckoutScreen({ total, billId, venueId, sessionToken, onBack, o
 
     const isPrepay = venue?.payment_model === 'PREPAY' || bill?.payment_model === 'PREPAY';
 
-    const { subtotal, serviceCharge, vat, convenienceFee, billTotal, payAmount } = useMemo(() => {
+    const { subtotal, serviceCharge, vat, billTotal, payAmount } = useMemo(() => {
         if (bill) {
             const remainingAmount = Math.max(0, Math.round((bill.total - bill.amount_paid) * 100) / 100);
-            const fee = remainingAmount > 0 && isPrepay ? bill.convenience_fee : 0;
             return {
                 subtotal: bill.subtotal,
                 serviceCharge: bill.service_charge,
                 vat: bill.vat,
-                convenienceFee: fee,
                 billTotal: bill.total,
-                payAmount: Math.round((remainingAmount + fee) * 100) / 100,
+                payAmount: remainingAmount,
             };
         }
         // Fallback while the bill loads (legacy prop math, never used for charging)
@@ -127,11 +126,10 @@ export function CheckoutScreen({ total, billId, venueId, sessionToken, onBack, o
             subtotal: Math.round(sub * 100) / 100,
             serviceCharge: Math.round(sub * 0.1 * 100) / 100,
             vat: Math.round(sub * 0.125 * 100) / 100,
-            convenienceFee: 0,
             billTotal: total,
             payAmount: total,
         };
-    }, [bill, total, isPrepay]);
+    }, [bill, total]);
 
     const handlePay = async () => {
         if (!billId || !venueId) {
@@ -183,38 +181,55 @@ export function CheckoutScreen({ total, billId, venueId, sessionToken, onBack, o
     };
 
     // ── Success state ──
-    if (paid) {
+    if (paid && billId) {
         return (
-            <main className="relative min-h-svh w-full overflow-hidden bg-isabelline font-sans text-licorice antialiased flex items-center justify-center px-5">
+            <main className="relative min-h-svh w-full overflow-x-hidden bg-isabelline font-sans text-licorice antialiased flex flex-col items-center justify-center px-5 py-12">
                 <div
                     aria-hidden="true"
-                    className="pointer-events-none absolute inset-0"
+                    className="pointer-events-none absolute inset-0 overflow-hidden"
                 >
                     <div className="absolute -top-20 -right-16 h-72 w-72 rounded-full bg-khaki blur-[80px] opacity-25" />
                     <div className="absolute bottom-0 -left-20 h-64 w-64 rounded-full bg-light-blue blur-[80px] opacity-20" />
                 </div>
-                <div className="relative z-10 flex flex-col items-center text-center animate-velvet-scale-in">
-                    <div className="relative">
-                        <div className="absolute inset-0 animate-ping rounded-full bg-khaki/30" />
-                        <div className="relative flex h-20 w-20 items-center justify-center rounded-full bg-licorice shadow-[0_16px_40px_rgba(35,20,12,0.25)]">
-                            <CheckCircleIcon className="h-10 w-10 text-khaki" strokeWidth={2} />
+                <div className="relative z-10 w-full max-w-sm animate-velvet-scale-in">
+                    <ReceiptDownloader fileName={`Receipt-${billId.slice(0, 8)}.png`}>
+                        <div className="flex flex-col items-center text-center">
+                            <div className="relative">
+                                <div className="absolute inset-0 animate-ping rounded-full bg-khaki/30" />
+                                <div className="relative flex h-20 w-20 items-center justify-center rounded-full bg-licorice shadow-[0_16px_40px_rgba(35,20,12,0.25)]">
+                                    <CheckCircleIcon className="h-10 w-10 text-khaki" strokeWidth={2} />
+                                </div>
+                            </div>
+                            <p className="mt-6 text-[11px] font-bold uppercase tracking-[0.22em] text-feldgrau">
+                                Payment Received
+                            </p>
+                            <h1 className="mt-2 text-[2rem] font-black leading-tight tracking-[-0.04em] text-licorice">
+                                Thank you
+                            </h1>
+                            <p className="mt-3 text-[13px] leading-relaxed text-feldgrau/80">
+                                Your order has been placed successfully and the payment has been recorded.
+                            </p>
+                            
+                            <div className="mt-6 w-full rounded-xl bg-isabelline p-4 text-left border border-licorice/5">
+                                <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-feldgrau mb-2 text-center">Order Summary</p>
+                                <div className="flex justify-between items-center py-2 border-b border-licorice/5">
+                                    <span className="text-[13px] font-semibold text-licorice">Order Code</span>
+                                    <span className="text-[13px] font-bold text-licorice tracking-widest">{billId.slice(0, 8).toUpperCase()}</span>
+                                </div>
+                                <div className="flex justify-between items-center py-2">
+                                    <span className="text-[13px] font-semibold text-licorice">Amount Paid</span>
+                                    <span className="text-[13px] font-bold text-licorice">GH₵ {payAmount.toFixed(2)}</span>
+                                </div>
+                            </div>
                         </div>
-                    </div>
-                    <p className="mt-6 text-[11px] font-bold uppercase tracking-[0.22em] text-feldgrau">
-                        Payment Received
-                    </p>
-                    <h1 className="mt-2 text-[2rem] font-black leading-tight tracking-[-0.04em] text-licorice">
-                        Thank you
-                        <br />
-                        <span className="italic font-serif font-bold text-khaki">
-                            for dining with us
-                        </span>
-                    </h1>
-                    <p className="mx-auto mt-3 max-w-[300px] text-[13px] leading-[1.55] tracking-tight text-feldgrau">
-                        {formatGHS(payAmount)} paid via{" "}
-                        {PAYMENT_OPTIONS.find((p) => p.id === method)?.label}.
-                        Your receipt has been sent.
-                    </p>
+                    </ReceiptDownloader>
+                    <button
+                        type="button"
+                        onClick={onBack}
+                        className="mt-6 w-full flex items-center justify-center gap-2 rounded-full border border-licorice/10 bg-transparent px-5 py-3 text-[13px] font-bold tracking-tight text-licorice transition-all duration-200 hover:bg-black/5 active:scale-95"
+                    >
+                        Back to Menu
+                    </button>
                 </div>
             </main>
         );
@@ -305,17 +320,6 @@ export function CheckoutScreen({ total, billId, venueId, sessionToken, onBack, o
                                 {formatGHS(vat)}
                             </span>
                         </div>
-                        {convenienceFee > 0 && (
-                            <div className="flex items-center justify-between text-[12px]">
-                                <span className="tracking-tight text-feldgrau">
-                                    Convenience fee{" "}
-                                    <span className="text-feldgrau/60">(prepaid)</span>
-                                </span>
-                                <span className="font-mono font-bold tabular-nums text-licorice">
-                                    {formatGHS(convenienceFee)}
-                                </span>
-                            </div>
-                        )}
                     </div>
 
                     {/* Bill Total */}
@@ -401,11 +405,9 @@ export function CheckoutScreen({ total, billId, venueId, sessionToken, onBack, o
                                 You Pay
                             </p>
                             <p className="mt-0.5 text-[10px] font-medium tracking-tight text-isabelline/50">
-                                {isPrepay && convenienceFee > 0
-                                    ? "Includes prepaid convenience fee"
-                                    : isPrepay
-                                        ? "Prepay your bill — pay before ordering"
-                                        : "Pay at the table when you're done"}
+                                {isPrepay
+                                    ? "Prepay your bill — pay before ordering"
+                                    : "Pay at the table when you're done"}
                             </p>
                         </div>
                         <span className="font-mono text-[22px] font-black tabular-nums text-isabelline">

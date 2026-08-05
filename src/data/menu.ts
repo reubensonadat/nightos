@@ -22,6 +22,8 @@ export type MenuItem = {
     longDescription?: string;
     price: number; // in GHS
     category: MenuCategory;
+    /** Station this item is prepared at — sourced from products.station in the DB. */
+    station?: 'kitchen' | 'bar' | 'both';
     image: string;
     gallery?: string[];
     tags?: ("Popular" | "New" | "Chef's Pick" | "Vegetarian")[];

@@ -26,8 +26,6 @@ type Props = {
   amount: number;
   billId: string;
   venueId: string;
-  subaccountCode?: string;
-  convenienceFee?: number;
   onSuccess: (reference: string) => void;
   onClose?: () => void;
   children?: React.ReactNode;
@@ -40,8 +38,6 @@ export function PaystackButton({
   amount,
   billId,
   venueId,
-  subaccountCode,
-  convenienceFee,
   onSuccess,
   onClose,
   children,
@@ -92,15 +88,9 @@ export function PaystackButton({
       },
     };
 
-    if (subaccountCode && convenienceFee) {
-      config.subaccount = subaccountCode;
-      config.transaction_charge = Math.round(convenienceFee * 100);
-      config.bearer = 'subaccount';
-    }
-
     const handler = window.PaystackPop.setup(config);
     handler.openIframe();
-  }, [amount, billId, venueId, email, subaccountCode, convenienceFee, onSuccess, onClose]);
+  }, [amount, billId, venueId, email, onSuccess, onClose]);
 
   return (
     <button type="button" onClick={handlePayment} disabled={disabled} className={className}>

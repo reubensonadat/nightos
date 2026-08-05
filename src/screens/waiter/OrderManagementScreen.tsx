@@ -10,6 +10,7 @@ import toast from "react-hot-toast";
 import { formatGHS } from "../../data/menu";
 import { db, type DbOrderSubmission, type DbOrderItem, type DbProduct, type DbMenuCategory } from "../../lib/api";
 import type { Table } from "./TablesDashboard";
+import { MenuItemCard } from "../../components/MenuItemCard";
 
 /* ────────────────────────── Types ────────────────────────── */
 
@@ -71,6 +72,24 @@ export function OrderManagementScreen({ table, staffId, venueId, onBack, onGoToT
     const [itemsBySubmission, setItemsBySubmission] = useState<Record<string, DbOrderItem[]>>({});
     const [loading, setLoading] = useState(true);
     const [cancellingId, setCancellingId] = useState<string | null>(null);
+    const [closingBill, setClosingBill] = useState(false);
+    const [confirmClose, setConfirmClose] = useState(false);
+
+    const closeTable = useCallback(async () => {
+        if (!billId || closingBill) return;
+        setClosingBill(true);
+        const { ok, error } = await db.closeBill(billId, staffId);
+        setClosingBill(false);
+        setConfirmClose(false);
+        if (!ok) {
+            toast.error(error ? String((error as { message?: string }).message ?? error) : "Couldn't close this table");
+            return;
+        }
+        toast.success("Table closed — bill cancelled");
+        setBillId(null);
+        setSubmissions([]);
+        setItemsBySubmission({});
+    }, [billId, staffId, closingBill]);
 
     const load = useCallback(async () => {
         setLoading(true);
@@ -315,6 +334,50 @@ export function OrderManagementScreen({ table, staffId, venueId, onBack, onGoToT
                         >
                             Bill
                         </button>
+                        {billId && (
+                            <button
+                                type="button"
+                                onClick={() => setConfirmClose((c) => !c)}
+                                disabled={closingBill}
+                                aria-label="Close table"
+                                className={`rounded-full px-2.5 py-2 text-[9px] font-bold uppercase tracking-wider shadow-sm transition-colors active:scale-95 ${confirmClose
+                                    ? "bg-red-700 text-white"
+                                    : "bg-white text-red-700 ring-1 ring-red-200 hover:bg-red-50"
+                                    }`}
+                            >
+                                {closingBill ? "…" : confirmClose ? "Tap again" : "Close"}
+                            </button>
+                        )}
+                        {confirmClose && billId && (
+                            <div className="fixed inset-0 z-50 flex items-end justify-center bg-ink/40 p-6" onClick={() => setConfirmClose(false)}>
+                                <div
+                                    className="w-full max-w-sm rounded-2xl bg-white p-5 shadow-xl"
+                                    onClick={(e) => e.stopPropagation()}
+                                >
+                                    <p className="text-[14px] font-bold text-licorice">Close this table?</p>
+                                    <p className="mt-1 text-[12px] leading-relaxed text-feldgrau">
+                                        The bill will be cancelled and this table's session will end. Guests can re-scan
+                                        the QR to start fresh.
+                                    </p>
+                                    <div className="mt-4 flex gap-2">
+                                        <button
+                                            type="button"
+                                            onClick={() => setConfirmClose(false)}
+                                            className="flex-1 rounded-full py-2.5 text-[12px] font-bold text-feldgrau ring-1 ring-licorice/10"
+                                        >
+                                            Keep open
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={closeTable}
+                                            className="flex-1 rounded-full py-2.5 text-[12px] font-bold text-white bg-red-700"
+                                        >
+                                            Close table
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
                     </div>
                 </div>
 
@@ -454,6 +517,15 @@ export function OrderManagementScreen({ table, staffId, venueId, onBack, onGoToT
                                         </div>
                                     );
                                 })}
+
+                                <button
+                                    type="button"
+                                    onClick={() => setTab("add")}
+                                    className="mt-2 inline-flex w-full items-center justify-center gap-1.5 rounded-2xl bg-white px-4 py-4 text-[12px] font-bold tracking-tight text-licorice shadow-sm ring-1 ring-licorice/10 transition-all hover:bg-isabelline active:scale-[0.98]"
+                                >
+                                    <PlusIcon className="h-4 w-4" strokeWidth={2.5} />
+                                    Add more items to table
+                                </button>
                             </div>
                         )}
                     </div>
@@ -501,55 +573,17 @@ export function OrderManagementScreen({ table, staffId, venueId, onBack, onGoToT
                         ) : (
                         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 md:gap-5">
                             {filteredMenu.map((item, idx) => (
-                                <button
+                                <MenuItemCard
                                     key={item.id}
-                                    type="button"
+                                    id={item.id}
+                                    name={item.name}
+                                    price={item.price}
+                                    image={item.image}
+                                    category={item.category}
                                     onClick={() => addToOrder(item)}
-                                    className="
-                                        animate-velvet-rise
-                                        group flex flex-col overflow-hidden rounded-2xl bg-white
-                                        shadow-[0_4px_14px_rgba(35,20,12,0.05)]
-                                        ring-1 ring-isabelline
-                                        transition-all duration-200
-                                        hover:shadow-[0_12px_28px_rgba(35,20,12,0.10)]
-                                        hover:ring-khaki/30
-                                        active:scale-[0.98]
-                                        text-left
-                                    "
-                                    style={{ animationDelay: `${Math.min(idx * 30, 200)}ms` }}
-                                >
-                                    <div className="relative h-24 w-full overflow-hidden bg-isabelline">
-                                        {item.image ? (
-                                            <img
-                                                src={item.image}
-                                                alt={item.name}
-                                                className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
-                                            />
-                                        ) : (
-                                            <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-licorice/85 to-licorice">
-                                                <span className="font-serif text-[22px] font-bold text-isabelline/80">
-                                                    {item.name.charAt(0)}
-                                                </span>
-                                            </div>
-                                        )}
-                                        <div className="absolute right-2 top-2 flex h-7 w-7 items-center justify-center rounded-full bg-licorice text-isabelline shadow-[0_4px_12px_rgba(35,20,12,0.25)] opacity-0 transition-opacity group-hover:opacity-100">
-                                            <PlusIcon className="h-3.5 w-3.5" strokeWidth={2.5} />
-                                        </div>
-                                    </div>
-                                    <div className="flex flex-1 flex-col justify-between p-3">
-                                        <div>
-                                            <p className="text-[9px] font-bold uppercase tracking-wider text-feldgrau">
-                                                {item.category}
-                                            </p>
-                                            <h4 className="mt-0.5 line-clamp-1 text-[12.5px] font-bold tracking-tight text-licorice">
-                                                {item.name}
-                                            </h4>
-                                        </div>
-                                        <p className="mt-2 font-mono text-[12px] font-bold tabular-nums text-licorice">
-                                            {formatGHS(item.price)}
-                                        </p>
-                                    </div>
-                                </button>
+                                    onAdd={() => addToOrder(item)}
+                                    animationDelayMs={Math.min(idx * 30, 200)}
+                                />
                             ))}
                         </div>
                         )}

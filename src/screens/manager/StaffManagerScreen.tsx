@@ -62,7 +62,9 @@ export function StaffManagerScreen() {
     const [selectedStaff, setSelectedStaff] = useState<StaffRow | null>(null);
 
     const load = useCallback(async () => {
-        if (!venue.id) return;
+        // Wait until we have a real venue UUID (not the default placeholder).
+        if (!venue.id || venue.id === '00000000-0000-0000-0000-000000000000') return;
+        setLoading(true);
         const [{ data: rows }, { data: shifts }] = await Promise.all([
             db.staffList(venue.id),
             db.activeShiftsByVenue(venue.id),

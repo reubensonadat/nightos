@@ -11,6 +11,7 @@ import {
 import { HeartIcon as HeartIconSolid } from "@heroicons/react/24/solid";
 import { formatGHS } from "../data/menu";
 import type { MenuCategory, MenuItem } from "../data/menu";
+import { MenuItemCard } from "../components/MenuItemCard";
 import { useCart } from "../context/CartContext";
 import { ItemDetailsSheet } from "../components/ItemDetailsSheet";
 import { db, type DbProduct } from "../lib/api";
@@ -39,6 +40,7 @@ async function fetchProducts(venueId: string): Promise<MenuItem[]> {
         longDescription: p.long_description || undefined,
         price: p.price,
         category: p.category_id ? categoryMap.get(p.category_id) || "Other" : "Other",
+        station: p.station,  // 'kitchen' | 'bar' | 'both' — used by CartScreen for station routing
         image: p.images?.[0] || '',
         tags: ((p.tags ?? []) as string[]).filter((t) =>
             ['Popular', 'New', "Chef's Pick", 'Vegetarian'].includes(t)
@@ -46,6 +48,7 @@ async function fetchProducts(venueId: string): Promise<MenuItem[]> {
         abv: p.abv || undefined,
         origin: p.origin || undefined,
     }));
+
 }
 
 export function MenuScreen({ venueId, venueName, tableLabel, waiterName, onBack, onViewCart }: Props) {
@@ -276,82 +279,21 @@ export function MenuScreen({ venueId, venueName, tableLabel, waiterName, onBack,
                     {gridItems.map((item, idx) => {
                         const fav = isFavorite(item.id);
                         return (
-                            <article
+                            <MenuItemCard
                                 key={item.id}
-                                className="animate-velvet-rise group relative flex flex-col"
-                                style={{ animationDelay: `${Math.min(idx * 40, 240)}ms` }}
-                            >
-                                {/* ── Image Section (Completely separate from text) ── */}
-                                <div className="relative aspect-square w-full shrink-0 overflow-hidden rounded-[24px] bg-black/5 shadow-sm">
-                                    <button
-                                        type="button"
-                                        onClick={() => setActiveItemId(item.id)}
-                                        aria-label={`View details for ${item.name}`}
-                                        className="absolute inset-0 z-10 block"
-                                    />
-                                    <img
-                                        src={item.image}
-                                        alt={item.name}
-                                        loading="lazy"
-                                        className="h-full w-full object-cover transition-transform duration-500 ease-out group-hover:scale-105"
-                                    />
-
-                                    {/* Top-right Heart Button */}
-                                    <button
-                                        type="button"
-                                        onClick={(e) => {
-                                            e.stopPropagation();
-                                            toggleFavorite(item.id);
-                                        }}
-                                        aria-label={fav ? "Remove from favorites" : "Add to favorites"}
-                                        aria-pressed={fav}
-                                        className="absolute right-3 top-3 z-20 flex h-8 w-8 items-center justify-center rounded-full bg-white/90 shadow-sm backdrop-blur-md transition-transform active:scale-90"
-                                    >
-                                        {fav ? (
-                                            <HeartIconSolid className="h-4 w-4 text-dark-red" />
-                                        ) : (
-                                            <HeartIcon className="h-4 w-4 text-licorice" strokeWidth={2.5} />
-                                        )}
-                                    </button>
-                                </div>
-
-                                {/* ── Information Section (No white background) ── */}
-                                <div className="mt-3 flex flex-col px-1">
-                                    {/* Row 1: Price and Plus Button */}
-                                    <div className="flex items-center justify-between">
-                                        <span className="font-mono text-[16px] font-bold text-licorice">
-                                            {formatGHS(item.price)}
-                                        </span>
-                                        <button
-                                            type="button"
-                                            onClick={(e) => {
-                                                e.stopPropagation();
-                                                addQuick(item);
-                                            }}
-                                            aria-label={`Add ${item.name} to cart`}
-                                            className="relative z-20 flex h-8 w-8 items-center justify-end text-licorice transition-transform hover:opacity-70 active:scale-90"
-                                        >
-                                            <PlusIcon className="h-6 w-6" strokeWidth={2.5} />
-                                        </button>
-                                    </div>
-
-                                    {/* Row 2: Name */}
-                                    <button
-                                        type="button"
-                                        onClick={() => setActiveItemId(item.id)}
-                                        className="mt-1 text-left"
-                                    >
-                                        <h3 className="line-clamp-1 text-[14px] font-bold leading-tight tracking-tight text-licorice">
-                                            {item.name}
-                                        </h3>
-                                    </button>
-
-                                    {/* Row 3: Description (or category/abv if no description) */}
-                                    <p className="mt-1 line-clamp-2 text-[11px] leading-[1.4] text-feldgrau">
-                                        {item.description || (item.abv ? `ABV ${item.abv} • ${item.category}` : item.category)}
-                                    </p>
-                                </div>
-                            </article>
+                                id={item.id}
+                                name={item.name}
+                                price={item.price}
+                                image={item.image}
+                                description={item.description}
+                                category={item.category}
+                                abv={item.abv}
+                                isFavorite={fav}
+                                onToggleFavorite={() => toggleFavorite(item.id)}
+                                onClick={() => setActiveItemId(item.id)}
+                                onAdd={() => addQuick(item)}
+                                animationDelayMs={Math.min(idx * 40, 240)}
+                            />
                         );
                     })}
                 </div>

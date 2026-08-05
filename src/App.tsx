@@ -39,7 +39,6 @@ import { MenuManagerScreen } from "./screens/manager/MenuManagerScreen";
 import { StaffManagerScreen } from "./screens/manager/StaffManagerScreen";
 import { FinancialReportsScreen } from "./screens/manager/FinancialReportsScreen";
 import { CrmScreen } from "./screens/manager/CrmScreen";
-import { BrandSettingsScreen } from "./screens/manager/BrandSettingsScreen";
 import { ReservationsScreen } from "./screens/ReservationsScreen";
 import { useVenue } from "./hooks/useVenue";
 import { useQrTable } from "./hooks/useQrTable";
@@ -129,9 +128,8 @@ function CustomerShell({ venueId, tableId, tableLabel }: { venueId: string; tabl
     try { localStorage.setItem("nightos:orders", JSON.stringify({ active: activeOrders, past: history })); } catch {}
   }, [activeOrders, history]);
 
-  // Live status: realtime streams pending→ready (anon kitchen policy);
-  // the 12s refresh below is a small reconciliation for served/cancelled
-  // transitions, which header-token RLS can't deliver over websockets.
+  // Live status: realtime streams pending→ready→served→cancelled
+  // (anon kitchen policy covers every status, so no polling needed).
   const activeSubmissionIds = useMemo(
     () => activeOrders.filter((o) => o.submissionId).map((o) => o.submissionId as string),
     [activeOrders],
@@ -156,14 +154,8 @@ function CustomerShell({ venueId, tableId, tableLabel }: { venueId: string; tabl
     });
   }, [activeSubmissionIds, session?.session_token]);
 
-  useEffect(() => {
-    refreshStatuses();
-    const t = window.setInterval(refreshStatuses, 12_000);
-    return () => window.clearInterval(t);
-  }, [refreshStatuses]);
-
   // Realtime: the customer's own submissions (events pass RLS for
-  // pending/confirmed/preparing/ready statuses).
+  // every status via the anon kitchen policy).
   useRealtime({
     table: 'order_submissions',
     filter: bill?.id ? `bill_id=eq.${bill.id}` : undefined,
@@ -409,7 +401,7 @@ function AppShell() {
   }, []);
 
   const [waiterScreen, setWaiterScreen] = useState<WaiterScreen>("auth");
-  const [staffSession, setStaffSession] = useState<DbStaffSession | null>(null);
+  const { staffSession, signOut: authSignOut } = useAuth();
   const [selectedTable, setSelectedTable] = useState<Table | null>(null);
 
   // Manager page is URL-driven: /manager/ops, /manager/floorplan, ...
@@ -430,29 +422,10 @@ function AppShell() {
     [navigate],
   );
 
-  // Restore a staff session (no Supabase auth — plain localStorage)
-  useEffect(() => {
-    try {
-      const raw = localStorage.getItem("nightos:staff-session");
-      if (raw) {
-        const parsed = JSON.parse(raw) as DbStaffSession;
-        if (parsed && parsed.id && parsed.venue_id) setStaffSession(parsed);
-      }
-    } catch {}
-  }, []);
-
   useEffect(() => {
     if (staffSession) setWaiterScreen("dashboard");
     else setWaiterScreen("auth");
   }, [staffSession]);
-
-  const persistStaffSession = (s: DbStaffSession | null) => {
-    setStaffSession(s);
-    try {
-      if (s) localStorage.setItem("nightos:staff-session", JSON.stringify(s));
-      else localStorage.removeItem("nightos:staff-session");
-    } catch {}
-  };
 
   useEffect(() => {
     const paths: Record<Mode, string> = {
@@ -481,7 +454,7 @@ function AppShell() {
   };
 
   const handleStaffSignOut = () => {
-    persistStaffSession(null);
+    authSignOut();
     setSelectedTable(null);
   };
 
@@ -521,11 +494,7 @@ function AppShell() {
       {mode === "waiter" && (
         <>
           {waiterScreen === "auth" && !staffSession && (
-            <StaffAuthScreen
-              onSignIn={(session) => {
-                persistStaffSession(session);
-              }}
-            />
+            <StaffAuthScreen />
           )}
           {waiterScreen === "dashboard" && staffSession && (
             <TablesDashboard
@@ -587,7 +556,7 @@ function AppShell() {
             onSignOut={handleStaffSignOut}
           />
         ) : (
-          <StaffAuthScreen onSignIn={persistStaffSession} />
+          <StaffAuthScreen />
         )
       )}
 
@@ -606,7 +575,6 @@ function AppShell() {
               {managerPage === "staff" && <StaffManagerScreen />}
               {managerPage === "finance" && <FinancialReportsScreen />}
               {managerPage === "crm" && <CrmScreen />}
-              {managerPage === "brand" && <BrandSettingsScreen />}
             </ManagerShell>
           </VenueRequired>
         </ProtectedRoute>

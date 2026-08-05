@@ -89,17 +89,20 @@ $$;
 -- Anon can read orders that are still being worked on (not served),
 -- their items, the bill/table info, and the waiter names attached to
 -- open bills. Served/history orders stay private to the owner.
+-- NOTE: 'served'/'cancelled' are included so the customer's realtime
+-- feed (anonymous, no token) can deliver those final statuses —
+-- this replaces the old 12-second poll.
 
 DROP POLICY IF EXISTS "Kitchen reads active submissions" ON public.order_submissions;
 CREATE POLICY "Kitchen reads active submissions" ON public.order_submissions
-    FOR SELECT USING (status IN ('pending', 'confirmed', 'preparing', 'ready'));
+    FOR SELECT USING (status IN ('pending', 'confirmed', 'preparing', 'ready', 'served', 'cancelled'));
 
 DROP POLICY IF EXISTS "Kitchen reads order items" ON public.order_items;
 CREATE POLICY "Kitchen reads order items" ON public.order_items
     FOR SELECT USING (
         submission_id IN (
             SELECT id FROM public.order_submissions
-            WHERE status IN ('pending', 'confirmed', 'preparing', 'ready')
+            WHERE status IN ('pending', 'confirmed', 'preparing', 'ready', 'served', 'cancelled')
         )
     );
 
@@ -108,7 +111,7 @@ CREATE POLICY "Kitchen reads bills" ON public.bills
     FOR SELECT USING (
         id IN (
             SELECT bill_id FROM public.order_submissions
-            WHERE status IN ('pending', 'confirmed', 'preparing', 'ready')
+            WHERE status IN ('pending', 'confirmed', 'preparing', 'ready', 'served', 'cancelled')
         )
     );
 

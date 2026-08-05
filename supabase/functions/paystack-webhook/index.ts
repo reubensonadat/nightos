@@ -68,7 +68,7 @@ serve(async (req) => {
 
       const { data: bill } = await supabase
         .from('bills')
-        .select('total, venue_id, status, payment_model, convenience_fee')
+        .select('total, venue_id, status')
         .eq('id', billId)
         .single()
 

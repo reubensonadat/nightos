@@ -18,24 +18,9 @@ DROP TABLE IF EXISTS public.products CASCADE;
 DROP TABLE IF EXISTS public.menu_categories CASCADE;
 DROP TABLE IF EXISTS public.staff_shifts CASCADE;
 DROP TABLE IF EXISTS public.staff CASCADE;
-DROP TABLE IF EXISTS public.venue_staff CASCADE;
 DROP TABLE IF EXISTS public.tables CASCADE;
 DROP TABLE IF EXISTS public.venue_settings CASCADE;
-DROP TABLE IF EXISTS public.profiles CASCADE;
 DROP TABLE IF EXISTS public.venues CASCADE;
-
-CREATE OR REPLACE FUNCTION public.compute_convenience_fee(subtotal numeric)
-RETURNS numeric(10,2) AS $$
-BEGIN
-    RETURN CASE
-        WHEN subtotal <= 50   THEN 1.00
-        WHEN subtotal <= 100  THEN 2.00
-        WHEN subtotal <= 150  THEN 3.00
-        WHEN subtotal <= 200  THEN 4.00
-        ELSE                       5.00
-    END;
-END;
-$$ LANGUAGE plpgsql IMMUTABLE;
 
 CREATE OR REPLACE FUNCTION public.is_venue_member(target_venue_id uuid)
 RETURNS boolean AS $$
@@ -78,63 +63,16 @@ ALTER TABLE public.venues ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Venue owner can manage" ON public.venues FOR ALL USING (auth.uid() = owner_id);
 CREATE POLICY "Public can read active venues" ON public.venues FOR SELECT USING (is_active = true);
 
-CREATE TABLE IF NOT EXISTS public.profiles (
-    id uuid NOT NULL PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
-    email text,
-    phone_number text,
-    name text,
-    created_at timestamptz NOT NULL DEFAULT now(),
-    updated_at timestamptz NOT NULL DEFAULT now()
-);
-ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "Users can read own profile" ON public.profiles FOR SELECT USING (auth.uid() = id);
-CREATE POLICY "Users can update own profile" ON public.profiles FOR UPDATE USING (auth.uid() = id);
-
-CREATE OR REPLACE FUNCTION public.handle_new_user()
-RETURNS trigger AS $$
-BEGIN
-    INSERT INTO public.profiles (id, email, phone_number, name)
-    VALUES (
-        NEW.id,
-        NEW.email,
-        NEW.raw_user_meta_data->>'phone',
-        NEW.raw_user_meta_data->>'name'
-    );
-    RETURN NEW;
-END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
-
-DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
-CREATE TRIGGER on_auth_user_created
-    AFTER INSERT ON auth.users
-    FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
-
-CREATE TABLE IF NOT EXISTS public.venue_staff (
-    id uuid NOT NULL DEFAULT gen_random_uuid(),
-    venue_id uuid NOT NULL REFERENCES public.venues(id) ON DELETE CASCADE,
-    phone_number text NOT NULL,
-    role text NOT NULL CHECK (role IN ('manager', 'supervisor', 'waiter', 'kitchen', 'bar', 'cashier')),
-    name text,
-    is_active boolean NOT NULL DEFAULT true,
-    created_at timestamptz NOT NULL DEFAULT now(),
-    CONSTRAINT venue_staff_pkey PRIMARY KEY (id),
-    CONSTRAINT venue_staff_venue_id_phone UNIQUE (venue_id, phone_number)
-);
-ALTER TABLE public.venue_staff ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "Venue owner can manage venue staff" ON public.venue_staff FOR ALL
-    USING (auth.uid() = (SELECT owner_id FROM public.venues WHERE id = venue_id));
-CREATE POLICY "Venue staff can read venue staff" ON public.venue_staff FOR SELECT
-    USING (public.is_venue_member(venue_id));
-
 CREATE OR REPLACE FUNCTION public.get_venue_by_staff_phone(p_phone text)
 RETURNS TABLE (venue_id uuid, role text, venue jsonb) AS $$
 #variable_conflict use_column
 BEGIN
     RETURN QUERY
-    SELECT vs.venue_id, vs.role, row_to_json(v.*)::jsonb AS venue
-    FROM public.venue_staff vs
-    JOIN public.venues v ON v.id = vs.venue_id
-    WHERE RIGHT(REGEXP_REPLACE(vs.phone_number, '\D', '', 'g'), 9) = RIGHT(REGEXP_REPLACE(p_phone, '\D', '', 'g'), 9)
+    SELECT s.venue_id, s.role, row_to_json(v.*)::jsonb AS venue
+    FROM public.staff s
+    JOIN public.venues v ON v.id = s.venue_id
+    WHERE RIGHT(REGEXP_REPLACE(s.phone, '\D', '', 'g'), 9) = RIGHT(REGEXP_REPLACE(p_phone, '\D', '', 'g'), 9)
+      AND s.is_active = true
     LIMIT 1;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
@@ -145,8 +83,11 @@ DECLARE
     v_exists boolean;
 BEGIN
     SELECT EXISTS (
-        SELECT 1 FROM public.profiles
-        WHERE RIGHT(REGEXP_REPLACE(phone_number, '\D', '', 'g'), 9) = RIGHT(REGEXP_REPLACE(p_phone, '\D', '', 'g'), 9)
+        SELECT 1 FROM public.staff
+        WHERE RIGHT(REGEXP_REPLACE(phone, '\D', '', 'g'), 9) = RIGHT(REGEXP_REPLACE(p_phone, '\D', '', 'g'), 9)
+        UNION ALL
+        SELECT 1 FROM public.customer_profiles
+        WHERE RIGHT(REGEXP_REPLACE(phone, '\D', '', 'g'), 9) = RIGHT(REGEXP_REPLACE(p_phone, '\D', '', 'g'), 9)
     ) INTO v_exists;
     RETURN v_exists;
 END;
@@ -310,7 +251,6 @@ CREATE TABLE IF NOT EXISTS public.bills (
     subtotal numeric(10,2) NOT NULL DEFAULT 0,
     service_charge numeric(10,2) NOT NULL DEFAULT 0,
     vat numeric(10,2) NOT NULL DEFAULT 0,
-    convenience_fee numeric(10,2) NOT NULL DEFAULT 0,
     total numeric(10,2) NOT NULL DEFAULT 0,
     amount_paid numeric(10,2) NOT NULL DEFAULT 0,
     is_merged boolean NOT NULL DEFAULT false,
@@ -353,7 +293,6 @@ CREATE TABLE IF NOT EXISTS public.order_submissions (
     notes text,
     created_at timestamptz NOT NULL DEFAULT now(),
     updated_at timestamptz NOT NULL DEFAULT now(),
-    customer_session_id uuid REFERENCES public.customer_sessions(id) ON DELETE SET NULL,
     CONSTRAINT order_submissions_pkey PRIMARY KEY (id)
 );
 ALTER TABLE public.order_submissions ENABLE ROW LEVEL security;
@@ -375,7 +314,6 @@ CREATE TABLE IF NOT EXISTS public.order_items (
     notes text,
     guest_name text,
     created_at timestamptz NOT NULL DEFAULT now(),
-    customer_session_id uuid REFERENCES public.customer_sessions(id) ON DELETE SET NULL,
     CONSTRAINT order_items_pkey PRIMARY KEY (id)
 );
 ALTER TABLE public.order_items ENABLE ROW LEVEL security;
@@ -555,10 +493,9 @@ BEGIN
     SET
         subtotal = (SELECT COALESCE(SUM(oi.line_total), 0) FROM public.order_items oi WHERE oi.bill_id = v_bill_id),
         service_charge = ROUND((SELECT COALESCE(SUM(oi.line_total), 0) FROM public.order_items oi WHERE oi.bill_id = v_bill_id) * (SELECT COALESCE(service_charge_pct, 0) / 100 FROM public.venues v JOIN public.bills b2 ON b2.venue_id = v.id WHERE b2.id = v_bill_id), 2),
-        vat = ROUND((SELECT COALESCE(SUM(oi.line_total), 0) FROM public.order_items oi WHERE oi.bill_id = v_bill_id) * (SELECT COALESCE(vat_pct, 0) / 100 FROM public.venues v JOIN public.bills b2 ON b2.venue_id = v.id WHERE b2.id = v_bill_id), 2),
-        convenience_fee = public.compute_convenience_fee((SELECT COALESCE(SUM(oi.line_total), 0) FROM public.order_items oi WHERE oi.bill_id = v_bill_id))
+        vat = ROUND((SELECT COALESCE(SUM(oi.line_total), 0) FROM public.order_items oi WHERE oi.bill_id = v_bill_id) * (SELECT COALESCE(vat_pct, 0) / 100 FROM public.venues v JOIN public.bills b2 ON b2.venue_id = v.id WHERE b2.id = v_bill_id), 2)
     WHERE b.id = v_bill_id;
-    UPDATE public.bills b SET total = subtotal + service_charge + vat + convenience_fee WHERE b.id = v_bill_id;
+    UPDATE public.bills b SET total = subtotal + service_charge + vat WHERE b.id = v_bill_id;
     RETURN COALESCE(NEW, OLD);
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;

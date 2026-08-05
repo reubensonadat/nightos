@@ -87,9 +87,12 @@ export function CartScreen({ venueId, venueName, tableLabel, billId, customerSes
         setSending(true);
 
         try {
-            const station = lines.some((l) => l.item.category === "Small Plates")
-                ? 'kitchen'
-                : 'bar';
+            // Determine the station from the items' station field (set in DB).
+            // A cart with any bar-only items goes to 'bar'; all kitchen → 'kitchen'.
+            // Falls back to 'kitchen' if station is unset (backwards compatible).
+            const hasKitchen = lines.some((l) => !l.item.station || l.item.station === 'kitchen' || l.item.station === 'both');
+            const hasBar = lines.some((l) => l.item.station === 'bar' || l.item.station === 'both');
+            const station = hasKitchen ? 'kitchen' : hasBar ? 'bar' : 'kitchen';
 
             const { data: submission, error: subErr } = await db.createOrderSubmission(
                 billId,

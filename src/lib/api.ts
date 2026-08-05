@@ -116,7 +116,6 @@ export type DbBill = {
   subtotal: number;
   service_charge: number;
   vat: number;
-  convenience_fee: number;
   total: number;
   amount_paid: number;
   is_merged: boolean;
@@ -444,7 +443,7 @@ export const db = {
     supabase
       .from('bills')
       .select(
-        'id, venue_id, table_id, waiter_id, guest_count, status, payment_model, subtotal, service_charge, vat, convenience_fee, total, amount_paid, is_merged, merged_into_bill_id, created_at, updated_at, closed_at',
+        'id, venue_id, table_id, waiter_id, guest_count, status, payment_model, subtotal, service_charge, vat, total, amount_paid, is_merged, merged_into_bill_id, created_at, updated_at, closed_at',
       )
       .eq('table_id', tableId)
       .in('status', ['open', 'settling'])
@@ -456,7 +455,7 @@ export const db = {
     supabase
       .from('bills')
       .select(
-        'id, venue_id, table_id, waiter_id, guest_count, status, payment_model, subtotal, service_charge, vat, convenience_fee, total, amount_paid, is_merged, merged_into_bill_id, created_at, updated_at, closed_at',
+        'id, venue_id, table_id, waiter_id, guest_count, status, payment_model, subtotal, service_charge, vat, total, amount_paid, is_merged, merged_into_bill_id, created_at, updated_at, closed_at',
       )
       .eq('id', id)
       .maybeSingle(),
@@ -489,7 +488,7 @@ export const db = {
     const { data, error } = await supabase
       .from('bills')
       .select(
-        'id, venue_id, table_id, waiter_id, guest_count, status, payment_model, subtotal, service_charge, vat, convenience_fee, total, amount_paid, is_merged, merged_into_bill_id, created_at, updated_at, closed_at',
+        'id, venue_id, table_id, waiter_id, guest_count, status, payment_model, subtotal, service_charge, vat, total, amount_paid, is_merged, merged_into_bill_id, created_at, updated_at, closed_at',
       )
       .eq('venue_id', venueId)
       .in('status', ['open', 'settling'])
@@ -623,7 +622,7 @@ export const db = {
     supabase
       .from('bills')
       .select(
-        'id, venue_id, table_id, waiter_id, guest_count, status, payment_model, subtotal, service_charge, vat, convenience_fee, total, amount_paid, is_merged, merged_into_bill_id, created_at, updated_at, closed_at, tables!inner(id, table_number, table_label, area)',
+        'id, venue_id, table_id, waiter_id, guest_count, status, payment_model, subtotal, service_charge, vat, total, amount_paid, is_merged, merged_into_bill_id, created_at, updated_at, closed_at, tables!inner(id, table_number, table_label, area)',
       )
       .eq('id', billId)
       .single(),
@@ -647,6 +646,9 @@ export const db = {
     sessionToken?: string | null,
   ) => {
     cacheInvalidate('bills:');
+    // NOTE: no .select() here — customers have no SELECT policy on payments,
+    // so a select-back would fail under RLS even though the insert succeeds.
+    // The DB trigger closes the bill; the client doesn't need the row back.
     return withSession(
       supabase
         .from('payments')
@@ -660,9 +662,7 @@ export const db = {
           status: 'success',
         }),
       sessionToken,
-    )
-      .select()
-      .single();
+    );
   },
 
   paymentsByBill: (billId: string) =>
@@ -729,9 +729,9 @@ export const db = {
 
   setStaffPin: async (phone: string, pin: string) => {
     const { data, error } = await supabase
-      .rpc('set_staff_pin', { p_phone: phone, p_pin: pin })
-      .single<{ set_staff_pin: boolean }>();
-    return { data: data?.set_staff_pin ?? false, error };
+      .rpc('set_staff_pin', { p_phone: phone, p_pin: pin });
+    // RETURNS boolean → PostgREST returns the scalar directly (not a wrapped object).
+    return { data: (data as boolean) ?? false, error };
   },
 
   staffSignIn: (phone: string, pin: string) =>
@@ -801,9 +801,21 @@ export const db = {
         p_submission_id: submissionId,
         p_status: status,
         p_staff_id: staffId,
-      })
-      .single<{ set_order_status: boolean }>();
-    return { data: data?.set_order_status ?? false, error };
+      });
+    // RETURNS boolean — PostgREST returns the scalar directly.
+    return { data: (data as boolean) ?? false, error };
+  },
+
+  /** Staff closes a table: cancels the bill (no successful payments),
+   *  closes its sessions, cancels pending submissions. */
+  closeBill: async (billId: string, staffId: string) => {
+    const { data, error } = await supabase
+      .rpc('close_bill', {
+        p_bill_id: billId,
+        p_staff_id: staffId,
+      });
+    // RETURNS boolean — PostgREST returns the scalar directly.
+    return { ok: (data as boolean) ?? false, error };
   },
 
   /** Real status of the customer's own submissions (via session token). */
@@ -961,7 +973,7 @@ export const db = {
     const { data, error } = await supabase
       .from('bills')
       .select(
-        'id, venue_id, table_id, waiter_id, guest_count, status, payment_model, subtotal, service_charge, vat, convenience_fee, total, amount_paid, is_merged, merged_into_bill_id, created_at, updated_at, closed_at',
+        'id, venue_id, table_id, waiter_id, guest_count, status, payment_model, subtotal, service_charge, vat, total, amount_paid, is_merged, merged_into_bill_id, created_at, updated_at, closed_at',
       )
       .eq('venue_id', venueId)
       .gte('created_at', sinceIso)

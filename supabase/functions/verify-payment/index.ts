@@ -74,7 +74,7 @@ serve(async (req) => {
     // 2. Load the bill — the server-side source of truth for the amount.
     const { data: bill } = await supabase
       .from('bills')
-      .select('total, venue_id, status, payment_model, convenience_fee')
+      .select('total, venue_id, status')
       .eq('id', bill_id)
       .single()
 

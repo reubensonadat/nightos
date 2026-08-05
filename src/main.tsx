@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client'
 import './index.css'
 import { BrowserRouter } from 'react-router-dom'
 import { BrandProvider } from './context/BrandContext'
+import { AuthProvider } from './context/AuthContext'
 import App from './App.tsx'
 
 const skeleton = document.getElementById('skeleton')
@@ -12,7 +13,9 @@ createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <BrowserRouter>
       <BrandProvider>
-        <App />
+        <AuthProvider>
+          <App />
+        </AuthProvider>
       </BrandProvider>
     </BrowserRouter>
   </StrictMode>,

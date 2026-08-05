@@ -122,18 +122,19 @@ CROSS JOIN (VALUES
 WHERE v.slug = 'velvet-lounge'
 ON CONFLICT (venue_id, table_number) DO UPDATE SET qr_code_token = EXCLUDED.qr_code_token;
 
--- ── 6. STAFF (phone + PIN login) ───────────────────────────────
+-- ── 6. STAFF (phone + PIN login) ─────────────────────────────────
 -- Owner = your signup phone. PINs are plaintext for now (hashed in v2).
 INSERT INTO public.staff
-  (venue_id, name, phone, role, pin, is_active, max_tables, area_assignment)
-SELECT v.id, s.name, s.phone, s.role, s.pin, true, s.max_tables, s.area
+  (venue_id, name, phone, role, is_active, max_tables, area_assignment)
+SELECT v.id, s.name, public.normalise_phone(s.phone), s.role, true, s.max_tables, s.area
 FROM public.venues v
 CROSS JOIN (VALUES
     ('Velvet Owner', '0541651298', 'owner', '1234', 6, NULL),
     ('Kojo',         '0240000001', 'waiter', '1234', 6, 'Main'),
     ('Ama',          '0240000002', 'bar',    '1234', 6, NULL),
     ('Esi',          '0240000003', 'kitchen','1234', 6, NULL),
-    ('Kofi',         '0240000004', 'cashier','1234', 6, NULL)
+    ('Kofi',         '0240000004', 'cashier','1234', 6, NULL),
+    ('Demo Waiter',  '0201534711', 'waiter', '0000', 6, 'Main')
 ) AS s(name, phone, role, pin, max_tables, area)
 WHERE v.slug = 'velvet-lounge'
 ON CONFLICT (venue_id, phone) DO NOTHING;
