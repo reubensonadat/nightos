@@ -65,8 +65,10 @@ export function PaystackButton({
   }, []);
 
   const handlePayment = useCallback(() => {
-    const key = import.meta.env.VITE_PAYSTACK_PUBLIC_KEY || '';
-    if (!key || key.startsWith('pk_test_placeholder')) {
+    const key = import.meta.env.PROD
+      ? import.meta.env.VITE_PAYSTACK_LIVE_KEY || ''
+      : import.meta.env.VITE_PAYSTACK_PUBLIC_KEY || '';
+    if (!key || key.startsWith('pk_test_placeholder') || key.startsWith('pk_live_placeholder')) {
       toast.error("Payments aren't set up yet — the venue is missing its Paystack key.");
       return;
     }

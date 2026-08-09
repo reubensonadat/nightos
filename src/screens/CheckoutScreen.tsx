@@ -15,6 +15,18 @@ import { PaystackButton } from "../components/PaystackButton";
 import { ReceiptDownloader } from "../components/ReceiptDownloader";
 import { db, type DbBill, type DbVenue } from "../lib/api";
 
+const sleep = (ms: number) => new Promise<void>((resolve) => window.setTimeout(resolve, ms));
+
+const verifyOnce = async (reference: string, billId: string): Promise<boolean> => {
+    try {
+        const { data, error } = await db.verifyPayment(reference, billId);
+        if (error || !data || (data as { success?: boolean }).success !== true) return false;
+        return true;
+    } catch {
+        return false;
+    }
+};
+
 /* ────────────────────────── Payment methods ────────────────────────── */
 
 type PaymentMethod = "card" | "momo" | "bank" | "wallet" | "cash";
@@ -77,6 +89,11 @@ export function CheckoutScreen({ total, billId, venueId, sessionToken, onBack, o
     const [method, setMethod] = useState<PaymentMethod>("momo");
     const [paying, setPaying] = useState(false);
     const [paid, setPaid] = useState(false);
+    const [verifying, setVerifying] = useState(false);
+    const [needsCheck, setNeedsCheck] = useState(false);
+    const [canReCheck, setCanReCheck] = useState(false);
+    const [countdownLeft, setCountdownLeft] = useState<number | null>(null);
+    const [lastReference, setLastReference] = useState<string | null>(null);
 
     useEffect(() => {
         if (!billId) return;
@@ -165,20 +182,58 @@ export function CheckoutScreen({ total, billId, venueId, sessionToken, onBack, o
 
     const handlePaystackSuccess = async (reference: string) => {
         if (!billId) return;
-        try {
-            const { data, error } = await db.verifyPayment(reference, billId);
-            if (error || !data || (data as { success?: boolean }).success !== true) {
-                toast.error("Payment couldn't be verified. We'll check it and update your bill.");
+        setLastReference(reference);
+        setVerifying(true);
+        setPaying(true);
+
+        for (const delay of [2000, 4000]) {
+            await sleep(delay);
+            if (await verifyOnce(reference, billId)) {
+                setVerifying(false);
                 setPaying(false);
+                setPaid(true);
+                window.setTimeout(onPaid, 1800);
                 return;
             }
-            setPaid(true);
-            window.setTimeout(onPaid, 1800);
-        } catch {
-            toast.error("Payment couldn't be verified. We'll check it and update your bill.");
-            setPaying(false);
         }
+
+        setVerifying(false);
+        setPaying(false);
+        setNeedsCheck(true);
+        setCanReCheck(false);
+        setCountdownLeft(8);
     };
+
+    const handleCheckAgain = async () => {
+        if (!lastReference) return;
+        setPaying(true);
+        for (const delay of [0, 1500, 3000]) {
+            if (delay) await sleep(delay);
+            if (await verifyOnce(lastReference, billId)) {
+                setPaying(false);
+                setNeedsCheck(false);
+                setPaid(true);
+                window.setTimeout(onPaid, 1800);
+                return;
+            }
+        }
+        setPaying(false);
+        toast.error("We still can't see the payment yet. Keep your Paystack receipt — we'll reconcile it.");
+        setCanReCheck(false);
+        setCountdownLeft(8);
+        setNeedsCheck(true);
+    };
+
+    useEffect(() => {
+        if (!needsCheck || countdownLeft === null) return;
+        if (countdownLeft <= 0) {
+            setCanReCheck(true);
+            setCountdownLeft(null);
+            return;
+        }
+        const t = window.setTimeout(() => setCountdownLeft((c) => (c === null ? null : c - 1)), 1000);
+        return () => window.clearTimeout(t);
+    }, [needsCheck, countdownLeft]);
 
     // ── Success state ──
     if (paid && billId) {
@@ -412,7 +467,72 @@ export function CheckoutScreen({ total, billId, venueId, sessionToken, onBack, o
                 STICKY BOTTOM CTA — Pay
               ═══════════════════════════════════════════════════════════ */}
             <div className="fixed inset-x-0 bottom-0 z-40 flex justify-center px-5 pb-[max(env(safe-area-inset-bottom),18px)] pt-3 bg-gradient-to-t from-isabelline via-isabelline/95 to-transparent">
-                {billId && venueId && (method === 'card' || method === 'momo') ? (
+                {verifying ? (
+                    <button
+                        type="button"
+                        disabled
+                        className="
+                            group flex w-full max-w-md md:max-w-2xl items-center justify-between
+                            gap-3 rounded-full bg-licorice px-6 py-4
+                            shadow-[0_20px_50px_rgba(35,20,12,0.25)]
+                            ring-1 ring-licorice/80
+                            disabled:opacity-90
+                        "
+                    >
+                        <span className="flex flex-col items-start leading-tight">
+                            <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-khaki">
+                                Confirming
+                            </span>
+                            <span className="text-[15px] font-bold tracking-tight text-isabelline">
+                                Confirming your payment with Paystack…
+                            </span>
+                        </span>
+                        <span className="flex h-9 w-9 items-center justify-center rounded-full bg-isabelline text-licorice">
+                            <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none">
+                                <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" strokeOpacity="0.25" />
+                                <path d="M22 12a10 10 0 0 1-10 10" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
+                            </svg>
+                        </span>
+                    </button>
+                ) : needsCheck ? (
+                    <button
+                        type="button"
+                        onClick={handleCheckAgain}
+                        disabled={!canReCheck || paying}
+                        className="
+                            group flex w-full max-w-md md:max-w-2xl items-center justify-between
+                            gap-3 rounded-full bg-licorice px-6 py-4
+                            shadow-[0_20px_50px_rgba(35,20,12,0.25)]
+                            ring-1 ring-licorice/80
+                            transition-all duration-200 ease-out
+                            active:scale-[0.985]
+                            disabled:opacity-90
+                        "
+                    >
+                        <span className="flex flex-col items-start leading-tight">
+                            <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-khaki">
+                                {paying ? "Checking…" : "Payment pending"}
+                            </span>
+                            <span className="text-[15px] font-bold tracking-tight text-isabelline">
+                                {paying
+                                    ? "Checking with Paystack…"
+                                    : canReCheck
+                                        ? "Check again"
+                                        : `Recheck available in ${countdownLeft ?? 8}s`}
+                            </span>
+                        </span>
+                        <span className="flex h-9 w-9 items-center justify-center rounded-full bg-isabelline text-licorice">
+                            {paying ? (
+                                <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none">
+                                    <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" strokeOpacity="0.25" />
+                                    <path d="M22 12a10 10 0 0 1-10 10" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
+                                </svg>
+                            ) : (
+                                <CheckIcon className="h-4 w-4" strokeWidth={3} />
+                            )}
+                        </span>
+                    </button>
+                ) : billId && venueId && (method === 'card' || method === 'momo') ? (
                     <PaystackButton
                         amount={payAmount}
                         billId={billId}
