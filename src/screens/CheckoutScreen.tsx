@@ -305,15 +305,6 @@ export function CheckoutScreen({ total, billId, venueId, sessionToken, onBack, o
                         </div>
                         <div className="flex items-center justify-between text-[12px]">
                             <span className="tracking-tight text-feldgrau">
-                                Service charge{" "}
-                                <span className="text-feldgrau/60">({venue?.service_charge_pct ?? 10}%)</span>
-                            </span>
-                            <span className="font-mono font-bold tabular-nums text-licorice">
-                                {formatGHS(serviceCharge)}
-                            </span>
-                        </div>
-                        <div className="flex items-center justify-between text-[12px]">
-                            <span className="tracking-tight text-feldgrau">
                                 VAT <span className="text-feldgrau/60">({venue?.vat_pct ?? 12.5}%)</span>
                             </span>
                             <span className="font-mono font-bold tabular-nums text-licorice">

@@ -144,6 +144,7 @@ export function CartScreen({ venueId, venueName, tableLabel, billId, customerSes
                 itemCount,
                 sentAt: Date.now(),
                 venueId,
+                billId,
                 submissionId: submission.id,
                 status: "confirmed",
             };
@@ -521,14 +522,6 @@ export function CartScreen({ venueId, venueName, tableLabel, billId, customerSes
                             <span className="tracking-tight text-isabelline/70">Subtotal</span>
                             <span className="font-mono font-bold tabular-nums text-isabelline">
                                 {formatGHS(subtotal)}
-                            </span>
-                        </div>
-                        <div className="flex items-center justify-between text-[12px]">
-                            <span className="tracking-tight text-isabelline/70">
-                                Service charge <span className="text-isabelline/40">({venueFees.serviceChargePct}%)</span>
-                            </span>
-                            <span className="font-mono font-bold tabular-nums text-isabelline">
-                                {formatGHS(serviceCharge)}
                             </span>
                         </div>
                         <div className="flex items-center justify-between text-[12px]">

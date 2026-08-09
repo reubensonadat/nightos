@@ -120,6 +120,21 @@ function CustomerShell({ venueId, tableId, tableLabel }: { venueId: string; tabl
     } catch {}
   }, []);
 
+  // A new scan = a new visit: wipe the orders list unless we've already
+  // marked THIS session (so a page refresh mid-visit keeps its orders).
+  const sessionOrdersKey = session ? `nightos:orders:sid:${session.id}` : "";
+  useEffect(() => {
+    if (!session) return;
+    try {
+      const marked = localStorage.getItem(sessionOrdersKey) === "1";
+      localStorage.setItem(sessionOrdersKey, "1");
+      if (!marked) {
+        setActiveOrders([]);
+        setHistory([]);
+      }
+    } catch {}
+  }, [sessionOrdersKey, session]);
+
   useEffect(() => {
     try { localStorage.setItem("nightos:customer:tab", tab); } catch {}
   }, [tab]);
@@ -263,6 +278,10 @@ function CustomerShell({ venueId, tableId, tableLabel }: { venueId: string; tabl
         <OrdersScreen
           activeOrders={activeOrders}
           history={history}
+          tableLabel={tableLabel}
+          venueName={venueName}
+          billId={bill?.id ?? null}
+          sessionToken={session?.session_token}
           onPayBill={setPayingOrder}
         />
       )}

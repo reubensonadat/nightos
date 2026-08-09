@@ -631,6 +631,33 @@ export const db = {
       )
       .eq('submission_id', submissionId),
 
+  /** All items on a bill, customer-scoped (x-session-token header). Used for
+   *  the whole-stay receipt. */
+  orderItemsByBill: (billId: string, sessionToken?: string | null) =>
+    withSession(
+      supabase
+        .from('order_items')
+        .select(
+          'id, submission_id, bill_id, product_id, product_name, quantity, unit_price, modifier_snapshot, modifier_price_adjustment, line_total, notes, guest_name, customer_session_id, created_at',
+        )
+        .eq('bill_id', billId)
+        .order('created_at', { ascending: true }),
+      sessionToken,
+    ),
+
+  /** The customer's own bill row (x-session-token scope) for receipts. */
+  customerBill: (billId: string, sessionToken?: string | null) =>
+    withSession(
+      supabase
+        .from('bills')
+        .select(
+          'id, venue_id, table_id, waiter_id, guest_count, status, payment_model, subtotal, service_charge, vat, total, amount_paid, created_at, updated_at, closed_at, tables(id, table_number, table_label)',
+        )
+        .eq('id', billId)
+        .maybeSingle(),
+      sessionToken,
+    ),
+
   submissionsByBill: (billId: string) =>
     supabase
       .from('order_submissions')

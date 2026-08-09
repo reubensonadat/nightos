@@ -1,14 +1,17 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   ArrowLeftIcon,
   ArrowRightIcon,
   CheckIcon,
   ChevronDownIcon,
   ClipboardDocumentListIcon,
+  XMarkIcon,
 } from "@heroicons/react/24/outline";
 import { useNavigate } from "react-router-dom";
 import { CheckCircleIcon } from "@heroicons/react/24/solid";
 import { formatGHS } from "../data/menu";
+import { db, type DbOrderItem } from "../lib/api";
+import { ReceiptDownloader } from "../components/ReceiptDownloader";
 import { STAGES, statusStage, type OrderSummary } from "./OrderTrackingScreen";
 
 function formatDate(ts: number): string {
@@ -20,6 +23,9 @@ function formatDate(ts: number): string {
 type Props = {
   activeOrders: OrderSummary[];
   history: OrderSummary[];
+  tableLabel?: string | null;
+  billId?: string | null;
+  sessionToken?: string | null;
   onPayBill: (order: OrderSummary) => void;
   onReorder?: (order: OrderSummary) => void;
 };
@@ -126,30 +132,229 @@ function ActiveOrderCard({ order }: { order: OrderSummary }) {
   );
 }
 
-/* ────────────────────────── History Card ────────────────────────── */
+/* ────────────────────────── Receipt Modal ────────────────────────── */
 
-function HistoryCard({ order }: { order: OrderSummary }) {
+type ReceiptModalProps = {
+  order: OrderSummary;
+  venueName?: string | null;
+  sessionToken?: string | null;
+  onClose: () => void;
+};
+
+function ReceiptModal({ order, venueName, sessionToken, onClose }: ReceiptModalProps) {
+  const [items, setItems] = useState<DbOrderItem[] | null>(null);
+  const [bill, setBill] = useState<{
+    subtotal: number;
+    vat: number;
+    total: number;
+    created_at: string;
+    tables?: { table_label?: string; table_number?: number } | null;
+  } | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const [itemsRes, billRes] = await Promise.all([
+        order.billId ? db.orderItemsByBill(order.billId, sessionToken) : Promise.resolve({ data: null }),
+        order.billId ? db.customerBill(order.billId, sessionToken) : Promise.resolve({ data: null }),
+      ]);
+      if (cancelled) return;
+      setItems(itemsRes.data && itemsRes.data.length > 0 ? itemsRes.data : null);
+      if (billRes.data) {
+        setBill({
+          subtotal: Number(billRes.data.subtotal ?? 0),
+          vat: Number(billRes.data.vat ?? 0),
+          total: Number(billRes.data.total ?? order.total),
+          created_at: billRes.data.created_at,
+          tables: billRes.data.tables,
+        });
+      }
+      setLoading(false);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [order.billId, order.total, sessionToken]);
+
+  // Items shown from the DB when available, else the summary snapshot.
+  const shownItems =
+    items && items.length > 0
+      ? items.map((i) => ({ name: i.product_name, qty: i.quantity, lineTotal: Number(i.line_total) }))
+      : order.items.map((i) => ({ name: i.name, qty: i.qty, lineTotal: i.lineTotal }));
+
+  const itemsSubtotal = shownItems.reduce((s, i) => s + i.lineTotal, 0);
+  const receiptTotal = bill ? bill.total : order.total;
+  const vat = bill ? bill.vat : Math.max(0, Math.round((receiptTotal - itemsSubtotal) * 100) / 100);
+  const stamp = bill?.created_at ?? new Date(order.sentAt).toISOString();
+
   return (
-    <div className="flex items-center justify-between rounded-xl bg-white px-4 py-3 shadow-sm ring-1 ring-isabelline">
-      <div className="min-w-0 flex-1">
-        <div className="flex items-center gap-2">
-          <p className="text-[12px] font-bold tracking-tight text-licorice">Order #{order.orderNumber}</p>
-          {order.cancelled && (
-            <span className="rounded-full bg-red-50 ring-1 ring-red-200 text-red-500 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider">
-              Cancelled
-            </span>
+    <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center">
+      <button
+        type="button"
+        aria-label="Close"
+        onClick={onClose}
+        className="absolute inset-0 bg-licorice/60 backdrop-blur-sm"
+      />
+      <div className="relative z-10 w-full max-w-md animate-velvet-scale-in rounded-t-3xl sm:rounded-3xl bg-isabelline shadow-[0_24px_80px_rgba(35,20,12,0.35)] max-h-[92svh] overflow-y-auto pb-6">
+        {/* Handle + header */}
+        <div className="sticky top-0 z-10 rounded-t-3xl sm:rounded-t-3xl border-b border-licorice/8 bg-isabelline/95 backdrop-blur-xl px-5 pt-3 pb-3">
+          <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-licorice/15" />
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-khaki">Your receipt</p>
+              <p className="text-[15px] font-black tracking-[-0.02em] text-licorice">
+                {bill?.tables?.table_label ? `Table ${bill.tables.table_label}` : venueName || "Bysen"}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={onClose}
+              aria-label="Close receipt"
+              className="flex h-9 w-9 items-center justify-center rounded-full bg-white text-licorice shadow-sm ring-1 ring-licorice/8 transition-colors hover:bg-isabelline active:scale-95"
+            >
+              <XMarkIcon className="h-4 w-4" strokeWidth={2.25} />
+            </button>
+          </div>
+        </div>
+
+        <div className="px-5 pt-4">
+          {loading ? (
+            <div className="flex h-40 items-center justify-center">
+              <div className="h-8 w-8 animate-spin rounded-full border-2 border-licorice/20 border-t-licorice" />
+            </div>
+          ) : (
+            <ReceiptDownloader fileName={`Receipt-${order.orderNumber}.png`}>
+              <div className="bg-white">
+                {/* Receipt header — dark editorial band */}
+                <div className="bg-licorice px-5 pt-6 pb-7 text-center">
+                  <p className="text-[10px] font-bold uppercase tracking-[0.24em] text-khaki">
+                    Receipt
+                  </p>
+                  <p className="mt-2 font-serif text-[22px] font-bold italic tracking-[-0.02em] text-isabelline">
+                    {venueName || "Bysen"}
+                  </p>
+                  <div className="mx-auto mt-4 flex items-center justify-center gap-4">
+                    <div>
+                      <p className="text-[8px] font-bold uppercase tracking-[0.18em] text-isabelline/50">Order</p>
+                      <p className="mt-0.5 font-mono text-[12px] font-bold tracking-widest text-isabelline">
+                        #{order.orderNumber}
+                      </p>
+                    </div>
+                    <div className="h-6 w-px bg-isabelline/15" />
+                    <div>
+                      <p className="text-[8px] font-bold uppercase tracking-[0.18em] text-isabelline/50">Issued</p>
+                      <p className="mt-0.5 text-[11px] font-semibold text-isabelline">
+                        {formatDate(new Date(stamp).getTime())}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="px-5 py-5">
+                  {/* Items */}
+                  <div className="space-y-2.5">
+                    {shownItems.map((item, i) => (
+                      <div key={i} className="flex items-start justify-between gap-3 text-[12px]">
+                        <span className="min-w-0 flex-1 text-licorice">
+                          <span className="font-mono font-bold text-feldgrau">×{item.qty}</span>{" "}
+                          <span className="font-semibold tracking-tight">{item.name}</span>
+                        </span>
+                        <span className="shrink-0 font-mono font-bold tabular-nums text-licorice">
+                          {formatGHS(item.lineTotal)}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="my-5 border-t border-dashed border-licorice/20" />
+
+                  {/* Totals */}
+                  <div className="space-y-1.5 text-[12px]">
+                    <div className="flex justify-between text-feldgrau">
+                      <span>Subtotal</span>
+                      <span className="font-mono tabular-nums">{formatGHS(itemsSubtotal)}</span>
+                    </div>
+                    {vat > 0 && (
+                      <div className="flex justify-between text-feldgrau">
+                        <span>VAT</span>
+                        <span className="font-mono tabular-nums">{formatGHS(vat)}</span>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Total band */}
+                  <div className="mt-4 flex items-center justify-between rounded-xl bg-licorice px-4 py-3">
+                    <span className="font-serif text-[14px] font-bold italic tracking-tight text-isabelline">
+                      Total
+                    </span>
+                    <span className="font-mono text-[17px] font-black tabular-nums text-khaki">
+                      {formatGHS(receiptTotal)}
+                    </span>
+                  </div>
+
+                  <p className="mt-4 text-center font-serif text-[10px] italic text-feldgrau/60">
+                    Thank you — we hope you enjoyed your visit.
+                  </p>
+                </div>
+              </div>
+            </ReceiptDownloader>
           )}
         </div>
-        <p className="text-[10px] text-feldgrau">{order.itemCount} {order.itemCount === 1 ? "item" : "items"} · {formatDate(order.sentAt)}</p>
       </div>
-      <span className="font-mono text-[13px] font-bold tabular-nums text-khaki">{formatGHS(order.total)}</span>
     </div>
+  );
+}
+
+/* ────────────────────────── History Card ────────────────────────── */
+
+function HistoryCard({
+  order,
+  venueName,
+  sessionToken,
+}: {
+  order: OrderSummary;
+  venueName?: string | null;
+  sessionToken?: string | null;
+}) {
+  const [open, setOpen] = useState(false);
+
+  return (
+    <>
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        className="flex w-full items-center justify-between rounded-xl bg-white px-4 py-3 shadow-sm ring-1 ring-isabelline transition-all hover:ring-licorice/20 active:scale-[0.995] text-left"
+      >
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2">
+            <p className="text-[12px] font-bold tracking-tight text-licorice">Order #{order.orderNumber}</p>
+            {order.cancelled && (
+              <span className="rounded-full bg-red-50 ring-1 ring-red-200 text-red-500 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider">
+                Cancelled
+              </span>
+            )}
+          </div>
+          <p className="text-[10px] text-feldgrau">{order.itemCount} {order.itemCount === 1 ? "item" : "items"} · {formatDate(order.sentAt)}</p>
+        </div>
+        <span className="font-mono text-[13px] font-bold tabular-nums text-khaki">{formatGHS(order.total)}</span>
+        <ChevronDownIcon className="ml-2 h-4 w-4 -rotate-90 text-feldgrau/50" strokeWidth={2.25} />
+      </button>
+      {open && (
+        <ReceiptModal
+          order={order}
+          venueName={venueName}
+          sessionToken={sessionToken}
+          onClose={() => setOpen(false)}
+        />
+      )}
+    </>
   );
 }
 
 /* ────────────────────────── Main Screen ────────────────────────── */
 
-export function OrdersScreen({ activeOrders, history, onPayBill, onReorder: _onReorder }: Props) {
+export function OrdersScreen({ activeOrders, history, tableLabel, billId: _billId, sessionToken, venueName, onPayBill, onReorder: _onReorder }: Props & { venueName?: string | null }) {
   const navigate = useNavigate();
   const hasActive = activeOrders.length > 0;
   const hasHistory = history.length > 0;
@@ -174,7 +379,7 @@ export function OrdersScreen({ activeOrders, history, onPayBill, onReorder: _onR
 
           <div className="flex items-center gap-1.5 rounded-full border border-licorice/15 bg-licorice/5 px-3 py-2">
             <span className="text-[10px] font-bold uppercase tracking-wider text-licorice">
-              Table 4
+              {tableLabel ? `Table ${tableLabel}` : venueName || "Order"}
             </span>
           </div>
         </div>
@@ -233,7 +438,7 @@ export function OrdersScreen({ activeOrders, history, onPayBill, onReorder: _onR
           </h2>
           <div className="flex flex-col gap-2">
             {history.map((o) => (
-              <HistoryCard key={o.orderNumber} order={o} />
+              <HistoryCard key={o.orderNumber} order={o} venueName={venueName} sessionToken={sessionToken} />
             ))}
           </div>
         </div>
