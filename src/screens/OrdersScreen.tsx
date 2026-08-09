@@ -13,9 +13,15 @@ import { formatGHS } from "../data/menu";
 import { db, type DbOrderItem } from "../lib/api";
 import { ReceiptDownloader } from "../components/ReceiptDownloader";
 import { STAGES, statusStage, type OrderSummary } from "./OrderTrackingScreen";
+import { ProfessionalReceipt } from "../components/ProfessionalReceipt";
 
 function formatDate(ts: number): string {
   return new Date(ts).toLocaleDateString("en-GH", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
+}
+
+function statusLabelFor(order: OrderSummary): string {
+  if (order.cancelled) return "Cancelled";
+  return order.status ? statusStage(order.status).label : "Confirmed";
 }
 
 /* ────────────────────────── Props ────────────────────────── */
@@ -225,79 +231,21 @@ function ReceiptModal({ order, venueName, sessionToken, onClose }: ReceiptModalP
             </div>
           ) : (
             <ReceiptDownloader fileName={`Receipt-${order.orderNumber}.png`}>
-              <div className="bg-white">
-                {/* Receipt header — dark editorial band */}
-                <div className="bg-licorice px-5 pt-6 pb-7 text-center">
-                  <p className="text-[10px] font-bold uppercase tracking-[0.24em] text-khaki">
-                    Receipt
-                  </p>
-                  <p className="mt-2 font-serif text-[22px] font-bold italic tracking-[-0.02em] text-isabelline">
-                    {venueName || "Bysen"}
-                  </p>
-                  <div className="mx-auto mt-4 flex items-center justify-center gap-4">
-                    <div>
-                      <p className="text-[8px] font-bold uppercase tracking-[0.18em] text-isabelline/50">Order</p>
-                      <p className="mt-0.5 font-mono text-[12px] font-bold tracking-widest text-isabelline">
-                        #{order.orderNumber}
-                      </p>
-                    </div>
-                    <div className="h-6 w-px bg-isabelline/15" />
-                    <div>
-                      <p className="text-[8px] font-bold uppercase tracking-[0.18em] text-isabelline/50">Issued</p>
-                      <p className="mt-0.5 text-[11px] font-semibold text-isabelline">
-                        {formatDate(new Date(stamp).getTime())}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="px-5 py-5">
-                  {/* Items */}
-                  <div className="space-y-2.5">
-                    {shownItems.map((item, i) => (
-                      <div key={i} className="flex items-start justify-between gap-3 text-[12px]">
-                        <span className="min-w-0 flex-1 text-licorice">
-                          <span className="font-mono font-bold text-feldgrau">×{item.qty}</span>{" "}
-                          <span className="font-semibold tracking-tight">{item.name}</span>
-                        </span>
-                        <span className="shrink-0 font-mono font-bold tabular-nums text-licorice">
-                          {formatGHS(item.lineTotal)}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-
-                  <div className="my-5 border-t border-dashed border-licorice/20" />
-
-                  {/* Totals */}
-                  <div className="space-y-1.5 text-[12px]">
-                    <div className="flex justify-between text-feldgrau">
-                      <span>Subtotal</span>
-                      <span className="font-mono tabular-nums">{formatGHS(itemsSubtotal)}</span>
-                    </div>
-                    {vat > 0 && (
-                      <div className="flex justify-between text-feldgrau">
-                        <span>VAT</span>
-                        <span className="font-mono tabular-nums">{formatGHS(vat)}</span>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Total band */}
-                  <div className="mt-4 flex items-center justify-between rounded-xl bg-licorice px-4 py-3">
-                    <span className="font-serif text-[14px] font-bold italic tracking-tight text-isabelline">
-                      Total
-                    </span>
-                    <span className="font-mono text-[17px] font-black tabular-nums text-khaki">
-                      {formatGHS(receiptTotal)}
-                    </span>
-                  </div>
-
-                  <p className="mt-4 text-center font-serif text-[10px] italic text-feldgrau/60">
-                    Thank you — we hope you enjoyed your visit.
-                  </p>
-                </div>
-              </div>
+              <ProfessionalReceipt
+                venueName={venueName || "Bysen"}
+                refCode={order.orderNumber}
+                dateISO={stamp}
+                statusLabel={bill ? "Paid" : statusLabelFor(order)}
+                servedLabel={
+                  bill?.tables?.table_label
+                    ? `Table ${bill.tables.table_label}`
+                    : undefined
+                }
+                items={shownItems}
+                subtotal={itemsSubtotal}
+                vat={vat}
+                total={receiptTotal}
+              />
             </ReceiptDownloader>
           )}
         </div>

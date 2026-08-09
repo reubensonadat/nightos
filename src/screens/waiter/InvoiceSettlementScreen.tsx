@@ -9,6 +9,8 @@ import {
 } from "@heroicons/react/24/outline";
 import { formatGHS } from "../../data/menu";
 import { db } from "../../lib/api";
+import { ReceiptDownloader } from "../../components/ReceiptDownloader";
+import { ProfessionalReceipt } from "../../components/ProfessionalReceipt";
 import type { Table } from "./TablesDashboard";
 
 /* ────────────────────────── Payment methods ────────────────────────── */
@@ -57,6 +59,8 @@ export function InvoiceSettlementScreen({ table, staffId, onBack, onSettled }: P
     const [items, setItems] = useState<BillItem[]>([]);
     const [loading, setLoading] = useState(true);
     const [invoiceNo] = useState(() => `VL-${Date.now().toString(36).slice(-6).toUpperCase()}`);
+    const [showInvoice, setShowInvoice] = useState(false);
+    const [venueName, setVenueName] = useState<string | null>(null);
 
     /* ── Load the real open bill for this table ── */
     useEffect(() => {
@@ -64,6 +68,10 @@ export function InvoiceSettlementScreen({ table, staffId, onBack, onSettled }: P
         const load = async () => {
             const { data: billRow } = await db.openBillForTable(table.id);
             if (cancelled) return;
+            db.venueById(table.venue_id).then(
+                ({ data }) => { if (!cancelled && data) setVenueName(data.name); },
+                () => {},
+            );
             if (!billRow || billRow.status !== 'open') {
                 setBill(null);
                 setLoading(false);
@@ -369,6 +377,49 @@ export function InvoiceSettlementScreen({ table, staffId, onBack, onSettled }: P
                             {formatGHS(total)}
                         </span>
                     </div>
+                </div>
+
+                {/* ── Invoice / receipt for the customer ── */}
+                <div className="mt-5 rounded-2xl bg-white p-4 shadow-[0_4px_16px_rgba(35,20,12,0.04)] ring-1 ring-isabelline">
+                    <button
+                        type="button"
+                        onClick={() => setShowInvoice((v) => !v)}
+                        className="flex w-full items-center justify-between text-left"
+                    >
+                        <div>
+                            <p className="text-[12px] font-bold tracking-tight text-licorice">
+                                Invoice for customer
+                            </p>
+                            <p className="mt-0.5 text-[10.5px] tracking-tight text-feldgrau">
+                                {showInvoice ? "Hide the invoice preview" : "Let them see it and download the receipt"}
+                            </p>
+                        </div>
+                        <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-khaki">
+                            {showInvoice ? "Close" : "Show"}
+                        </span>
+                    </button>
+
+                    {showInvoice && bill && (
+                        <div className="mt-3">
+                            <ReceiptDownloader fileName={`Invoice-${bill.id.slice(0, 8).toUpperCase()}.png`}>
+                                <ProfessionalReceipt
+                                    venueName={venueName || "Bysen"}
+                                    refCode={bill.id.slice(0, 8).toUpperCase()}
+                                    dateISO={new Date().toISOString()}
+                                    statusLabel={bill.status === "open" ? "Open" : bill.status}
+                                    servedLabel={`Table ${String(table.number).padStart(2, "0")}`}
+                                    items={items.map((i) => ({
+                                        name: i.product_name,
+                                        qty: i.quantity,
+                                        lineTotal: i.line_total,
+                                    }))}
+                                    subtotal={bill.subtotal}
+                                    vat={bill.vat}
+                                    total={bill.total}
+                                />
+                            </ReceiptDownloader>
+                        </div>
+                    )}
                 </div>
 
                 {/* Payment method selector */}
