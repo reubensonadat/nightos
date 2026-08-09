@@ -454,6 +454,25 @@ export const db = {
       .limit(1)
       .maybeSingle(),
 
+  /** Server-side open/claim for the waiter flow: reuses the newest open bill,
+   *  claims it if it has no waiter, otherwise creates a new bill owned by the
+   *  waiter. Never steals a bill that already has a waiter. */
+  openBillForWaiter: async (tableId: string, staffId: string) => {
+    cacheInvalidate('bills:');
+    const { data: billId, error: rpcErr } = await supabase.rpc('open_bill_for_waiter', {
+      p_table_id: tableId,
+      p_staff_id: staffId,
+    });
+    if (rpcErr || !billId) return { data: null, error: rpcErr };
+    return supabase
+      .from('bills')
+      .select(
+        'id, venue_id, table_id, waiter_id, guest_count, status, payment_model, subtotal, service_charge, vat, total, amount_paid, is_merged, merged_into_bill_id, created_at, updated_at, closed_at, last_activity_at',
+      )
+      .eq('id', billId)
+      .maybeSingle();
+  },
+
   billById: (id: string) =>
     supabase
       .from('bills')
@@ -1083,6 +1102,19 @@ export const db = {
     const { data, error } = await supabase.rpc('clock_out_staff', { p_staff_id: staffId });
     return { data: (data as boolean) ?? false, error };
   },
+
+  /** Approve a staff shift (owner/manager/supervisor only). approve=false = take off duty. */
+  approveShift: async (shiftId: string, approve = true) => {
+    const { data, error } = await supabase.rpc('approve_shift', {
+      p_shift_id: shiftId,
+      p_approve: approve,
+    });
+    return { data: (data as boolean) ?? false, error };
+  },
+
+  /** Who is on duty / pending / off, with live open-bill counts (manager panel). */
+  shiftCoverage: (venueId: string) =>
+    supabase.rpc('shift_coverage', { p_venue_id: venueId }),
 
   /* ── Reservations ── */
   createReservation: (

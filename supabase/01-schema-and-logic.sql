@@ -1,4 +1,4 @@
-﻿DROP TABLE IF EXISTS public.activity_logs CASCADE;
+DROP TABLE IF EXISTS public.activity_logs CASCADE;
 DROP TABLE IF EXISTS public.expenses CASCADE;
 DROP TABLE IF EXISTS public.customer_profiles CASCADE;
 DROP TABLE IF EXISTS public.event_tickets CASCADE;
@@ -677,28 +677,37 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 CREATE OR REPLACE FUNCTION public.assign_waiter_to_bill(p_bill_id uuid)
 RETURNS uuid AS $$
 DECLARE
-    v_venue_id uuid;
-    v_table_id uuid;
+    v_bill  public.bills%ROWTYPE;
     v_table_area text;
     v_best_waiter_id uuid;
 BEGIN
-    SELECT venue_id, table_id INTO v_venue_id, v_table_id
-    FROM public.bills WHERE id = p_bill_id;
+    SELECT * INTO v_bill FROM public.bills WHERE id = p_bill_id LIMIT 1;
+    IF NOT FOUND THEN RETURN NULL; END IF;
 
-    SELECT area INTO v_table_area FROM public.tables WHERE id = v_table_id;
+    -- Idempotent: a bill that already has a waiter keeps that waiter.
+    IF v_bill.waiter_id IS NOT NULL THEN RETURN v_bill.waiter_id; END IF;
 
+    SELECT area INTO v_table_area FROM public.tables WHERE id = v_bill.table_id;
+
+    -- PEOPLE-WEIGHTED LOAD BALANCING (source of truth):
+    --   load = SUM(guests on open bills) + 0.5 per open table
+    -- Example: waiter A has 4 tables of 5 people  (load ≈ 22)
+    --          waiter B has 6 tables of 2 people  (load ≈ 12)
+    --          -> B wins, workload is shared by people, not by table count.
+    -- Hard rules: only waiters, must be ON SHIFT, area match, under max_tables.
     SELECT s.id INTO v_best_waiter_id
     FROM public.staff s
     LEFT JOIN public.bills b
         ON b.waiter_id = s.id
         AND b.status IN ('open', 'settling')
         AND b.id != p_bill_id
-    WHERE s.venue_id = v_venue_id
+    WHERE s.venue_id = v_bill.venue_id
         AND s.role = 'waiter'
         AND s.is_active = true
         AND EXISTS (
             SELECT 1 FROM public.staff_shifts ss
             WHERE ss.staff_id = s.id AND ss.status = 'active'
+              AND ss.supervisor_approved = true
         )
         AND (s.area_assignment IS NULL OR s.area_assignment = v_table_area)
         AND (
@@ -708,11 +717,12 @@ BEGIN
               AND id != p_bill_id
         ) < s.max_tables
     GROUP BY s.id, s.max_tables
-    ORDER BY COALESCE(SUM(b.guest_count), 0) + 0.5 * COUNT(b.id) ASC
+    ORDER BY COALESCE(SUM(b.guest_count), 0) + 0.5 * COUNT(b.id) ASC,
+             MIN(s.created_at) ASC
     LIMIT 1;
 
     IF v_best_waiter_id IS NOT NULL THEN
-        UPDATE public.bills SET waiter_id = v_best_waiter_id WHERE id = p_bill_id;
+        UPDATE public.bills SET waiter_id = v_best_waiter_id, updated_at = now() WHERE id = p_bill_id;
     END IF;
 
     RETURN v_best_waiter_id;
@@ -1940,46 +1950,7 @@ CREATE POLICY "Owner manages own venue" ON public.venues
 -- Run this in Supabase Dashboard â†’ SQL Editor
 -- ================================================================
 
--- â”€â”€ FIX 1: assign_waiter_to_bill RPC â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
--- Called by useCustomerSession and the assign-waiter edge function.
--- Assigns the least-loaded active waiter to a newly created bill.
--- â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-CREATE OR REPLACE FUNCTION public.assign_waiter_to_bill(p_bill_id uuid)
-RETURNS uuid
-LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
-DECLARE
-  v_bill  public.bills%ROWTYPE;
-  v_waiter_id uuid;
-BEGIN
-  SELECT * INTO v_bill FROM public.bills WHERE id = p_bill_id LIMIT 1;
-  IF NOT FOUND THEN RETURN NULL; END IF;
-  IF v_bill.waiter_id IS NOT NULL THEN RETURN v_bill.waiter_id; END IF;
 
-  SELECT s.id INTO v_waiter_id
-  FROM   public.staff s
-  LEFT JOIN public.bills b
-         ON b.waiter_id = s.id
-        AND b.status IN ('open', 'settling')
-  WHERE  s.venue_id  = v_bill.venue_id
-    AND  s.is_active = true
-    AND  s.role      IN ('waiter', 'supervisor')
-  GROUP BY s.id
-  ORDER BY COUNT(b.id) ASC, RANDOM()
-  LIMIT 1;
-
-  IF v_waiter_id IS NOT NULL THEN
-    UPDATE public.bills
-       SET waiter_id  = v_waiter_id,
-           updated_at = now()
-     WHERE id = p_bill_id;
-  END IF;
-
-  RETURN v_waiter_id;
-END;
-$$;
-
-GRANT EXECUTE ON FUNCTION public.assign_waiter_to_bill(uuid) TO anon;
-GRANT EXECUTE ON FUNCTION public.assign_waiter_to_bill(uuid) TO authenticated;
 
 
 -- â”€â”€ FIX 2: RLS â€” anon INSERT on customer_sessions â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€

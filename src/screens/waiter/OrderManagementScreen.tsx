@@ -96,7 +96,11 @@ export function OrderManagementScreen({ table, staffId, venueId, onBack, onGoToT
         try {
             const { data: bill } = await db.openBillForTable(table.id);
             if (bill) {
-                setBillId(bill.id);
+                const billId =
+                    bill.waiter_id
+                        ? bill.id
+                        : ((await db.openBillForWaiter(table.id, staffId)).data?.id ?? bill.id);
+                setBillId(billId);
                 const { data: subs } = await db.submissionsByBill(bill.id);
                 const list = subs ?? [];
                 setSubmissions(list);
@@ -225,12 +229,9 @@ export function OrderManagementScreen({ table, staffId, venueId, onBack, onGoToT
         if (order.length === 0 || sending) return;
         setSending(true);
         try {
-            // Ensure there is an open bill for the table first.
-            let bill = (await db.openBillForTable(table.id)).data;
-            if (!bill) {
-                const { data: created } = await db.createBill(venueId, table.id, 1);
-                bill = created ?? null;
-            }
+            // Ensure there is an open bill for the table first (server claims or
+            // creates one, owned by this waiter — no more waiterless bills).
+            const { data: bill } = await db.openBillForWaiter(table.id, staffId);
             if (!bill) {
                 toast.error("Could not open a bill for this table");
                 return;

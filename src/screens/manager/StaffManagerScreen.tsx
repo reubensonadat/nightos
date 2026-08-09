@@ -21,6 +21,17 @@ import clsx from "clsx";
 
 type StaffRow = NonNullable<Awaited<ReturnType<typeof db.staffList>>["data"]>[number];
 
+type ShiftCoverageRow = {
+    staff_id: string;
+    name: string;
+    role: string;
+    shift_id: string | null;
+    shift_status: string | null;
+    supervisor_approved: boolean | null;
+    clock_in: string | null;
+    open_bills: number;
+};
+
 const ROLE_OPTIONS = [
     { value: "manager", label: "Manager" },
     { value: "supervisor", label: "Supervisor" },
@@ -62,17 +73,20 @@ export function StaffManagerScreen() {
     const [creating, setCreating] = useState(false);
     const [selectedStaff, setSelectedStaff] = useState<StaffRow | null>(null);
     const [editingStaff, setEditingStaff] = useState<StaffRow | null>(null);
+    const [coverage, setCoverage] = useState<ShiftCoverageRow[] | null>(null);
 
     const load = useCallback(async () => {
         // Wait until we have a real venue UUID (not the default placeholder).
         if (!venue.id || venue.id === '00000000-0000-0000-0000-000000000000') return;
         setLoading(true);
-        const [{ data: rows }, { data: shifts }] = await Promise.all([
+        const [{ data: rows }, { data: shifts }, { data: coverageRows }] = await Promise.all([
             db.staffList(venue.id),
             db.activeShiftsByVenue(venue.id),
+            db.shiftCoverage(venue.id),
         ]);
         setStaff(rows ?? []);
         setShiftStaffIds(new Set((shifts ?? []).map((sh) => sh.staff_id)));
+        setCoverage((coverageRows as ShiftCoverageRow[] | null) ?? null);
         setLoading(false);
     }, [venue.id]);
 
@@ -105,6 +119,26 @@ export function StaffManagerScreen() {
             setStaff(prev);
             toast.error("Could not update this staff member.");
         }
+    };
+
+    const approveShift = async (shiftId: string) => {
+        const { data: ok, error } = await db.approveShift(shiftId, true);
+        if (error || !ok) {
+            toast.error("You don't have permission, or the shift is gone.");
+            return;
+        }
+        toast.success("Staff member confirmed on duty.");
+        await load();
+    };
+
+    const takeOffDuty = async (shiftId: string) => {
+        const { data: ok, error } = await db.approveShift(shiftId, false);
+        if (error || !ok) {
+            toast.error("Could not close the shift.");
+            return;
+        }
+        toast.success("Taken off duty.");
+        await load();
     };
 
     const updateStaff = async (id: string, patch: {
@@ -187,6 +221,73 @@ export function StaffManagerScreen() {
                     <p className="mt-1 font-mono text-[22px] font-black tabular-nums text-licorice">{loading ? "…" : activeCount}</p>
                 </div>
             </div>
+
+            {coverage && coverage.length > 0 && (
+                <div className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-isabelline">
+                    <div className="mb-3 flex items-center justify-between">
+                        <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-feldgrau">
+                            Team on duty
+                        </p>
+                        <span className="text-[10px] font-semibold tracking-tight text-feldgrau/60">
+                            {coverage.filter((c) => c.supervisor_approved).length} confirmed ·{" "}
+                            {coverage.filter((c) => c.shift_id && !c.supervisor_approved).length} waiting
+                        </span>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                        {coverage.map((c) => {
+                            const onShift = !!c.shift_id;
+                            const approved = c.supervisor_approved === true;
+                            return (
+                                <div
+                                    key={c.staff_id}
+                                    className={clsx(
+                                        "flex items-center gap-2 rounded-xl px-3 py-2 ring-1",
+                                        approved
+                                            ? "bg-emerald-600/10 ring-emerald-600/20"
+                                            : onShift
+                                              ? "bg-khaki/15 ring-khaki/30"
+                                              : "bg-isabelline ring-licorice/5",
+                                    )}
+                                >
+                                    <span
+                                        className={clsx(
+                                            "h-2 w-2 shrink-0 rounded-full",
+                                            approved ? "bg-emerald-500" : onShift ? "bg-khaki" : "bg-feldgrau/30",
+                                        )}
+                                    />
+                                    <span className="text-[11px] font-bold tracking-tight text-licorice">{c.name}</span>
+                                    <span className="hidden text-[9px] font-semibold uppercase tracking-wider text-feldgrau sm:inline">
+                                        {roleLabel(c.role)}
+                                    </span>
+                                    <span className="hidden text-[9px] font-semibold tracking-tight text-feldgrau/70 md:inline">
+                                        {onShift && c.clock_in
+                                            ? `since ${new Date(c.clock_in).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`
+                                            : "not clocked in"}
+                                    </span>
+                                    {onShift && !approved && (
+                                        <button
+                                            type="button"
+                                            onClick={() => c.shift_id && approveShift(c.shift_id)}
+                                            className="rounded-full bg-licorice px-2.5 py-1 text-[9px] font-bold uppercase tracking-wider text-isabelline transition-all hover:bg-licorice/90 active:scale-95"
+                                        >
+                                            Approve
+                                        </button>
+                                    )}
+                                    {onShift && approved && (
+                                        <button
+                                            type="button"
+                                            onClick={() => c.shift_id && takeOffDuty(c.shift_id)}
+                                            className="rounded-full bg-rose-500/10 px-2.5 py-1 text-[9px] font-bold uppercase tracking-wider text-rose-600 ring-1 ring-rose-500/20 transition-all hover:bg-rose-500/20 active:scale-95"
+                                        >
+                                            Off duty
+                                        </button>
+                                    )}
+                                </div>
+                            );
+                        })}
+                    </div>
+                </div>
+            )}
 
             {/* ── Toolbar ── */}
             <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-white p-4 shadow-sm ring-1 ring-isabelline">
