@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import toast from 'react-hot-toast';
 import { generateReference } from '../lib/utils';
 
 declare global {
@@ -44,25 +45,37 @@ export function PaystackButton({
   disabled,
   className,
 }: Props) {
-  const scriptLoadedRef = useRef(false);
+  const [scriptReady, setScriptReady] = useState(() => {
+    return typeof window.PaystackPop !== 'undefined';
+  });
 
   useEffect(() => {
-    if (document.querySelector('script[src*="paystack"]')) {
-      scriptLoadedRef.current = true;
+    if (typeof window.PaystackPop !== 'undefined') {
+      setScriptReady(true);
       return;
+    }
+    if (document.querySelector('script[src*="paystack"]')) {
+      return; // will flip flag onload below
     }
     const script = document.createElement('script');
     script.src = 'https://js.paystack.co/v1/inline.js';
     script.async = true;
+    script.onload = () => setScriptReady(true);
     document.body.appendChild(script);
-    script.onload = () => {
-      scriptLoadedRef.current = true;
-    };
   }, []);
 
   const handlePayment = useCallback(() => {
+    const key = import.meta.env.VITE_PAYSTACK_PUBLIC_KEY || '';
+    if (!key || key.startsWith('pk_test_placeholder')) {
+      toast.error("Payments aren't set up yet — the venue is missing its Paystack key.");
+      return;
+    }
+    if (amount <= 0) {
+      toast.error("Nothing due — this bill is already settled.");
+      return;
+    }
     if (!window.PaystackPop) {
-      console.error('Paystack script not loaded yet');
+      toast.error("Payment is still loading — please try again in a second.");
       return;
     }
 
@@ -70,7 +83,7 @@ export function PaystackButton({
     const amountPesewas = Math.round(amount * 100);
 
     const config: Parameters<typeof window.PaystackPop.setup>[0] = {
-      key: import.meta.env.VITE_PAYSTACK_PUBLIC_KEY || 'pk_test_placeholder',
+      key,
       email: email || `${billId.slice(0, 8)}@bysen.com`,
       amount: amountPesewas,
       currency: 'GHS',
@@ -93,7 +106,12 @@ export function PaystackButton({
   }, [amount, billId, venueId, email, onSuccess, onClose]);
 
   return (
-    <button type="button" onClick={handlePayment} disabled={disabled} className={className}>
+    <button
+      type="button"
+      onClick={handlePayment}
+      disabled={disabled || !scriptReady}
+      className={className}
+    >
       {children}
     </button>
   );
