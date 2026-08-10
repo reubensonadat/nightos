@@ -34,6 +34,14 @@ type AuthContextValue = {
 
 const AuthContext = createContext<AuthContextValue>(null!)
 
+/** Where a signed-in user belongs after OTP: owner → manager, kitchen/bar →
+ * kitchen display, everyone else on staff → the waiter dashboard. */
+export function sectorPath(role: string | null): string {
+  if (role === 'owner') return '/manager'
+  if (role === 'kitchen' || role === 'bar') return '/kitchen'
+  return '/waiter'
+}
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null)
   const [session, setSession] = useState<Session | null>(null)
@@ -44,6 +52,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isInitializing, setIsInitializing] = useState(true)
 
   const currentUserIdRef = useRef<string | null>(null)
+  const lastPhoneRef = useRef<string | null>(null)
 
   const loadUserData = async (userId: string, userPhone: string | null = null) => {
     if (!userId) {
@@ -60,7 +69,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setRole('owner')
       setStaffSession(null)
     } else {
-      const phoneToCheck = userPhone
+      const phoneToCheck = userPhone ?? lastPhoneRef.current
       if (phoneToCheck) {
         // Find staff
         const { data: staffData } = await authDb.venueByStaffPhone(phoneToCheck)
@@ -70,7 +79,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           setRole(sd.role)
 
           // Also populate staffSession for App.tsx backward compatibility
-          const { data } = await supabase.rpc('get_staff_profile_by_phone', { p_phone: phoneToCheck }).single();
+          const { data, error } = await supabase.rpc('get_staff_profile_by_phone', { p_phone: phoneToCheck }).single();
+          if (error) {
+            console.warn('[AuthContext] get_staff_profile_by_phone failed:', error)
+          }
           const fullStaffData = data as any;
             
           if (fullStaffData && fullStaffData.venue_id) {
@@ -137,7 +149,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setRole(null)
         setStaffSession(null)
       } else if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
-        await loadUserData(sess.user.id, sess.user.phone)
+        await loadUserData(sess.user.id, sess.user.phone ?? lastPhoneRef.current)
       }
     })
 
@@ -155,6 +167,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   const signInWithPhone = async (phone: string) => {
+    lastPhoneRef.current = phone
     const { error } = await supabase.auth.signInWithOtp({ phone })
     return { error }
   }
@@ -162,7 +175,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const verifyPhoneOtp = async (phone: string, token: string) => {
     const { data, error } = await supabase.auth.verifyOtp({ phone, token, type: 'sms' })
     if (error) return { error }
-    if (data.user) await loadUserData(data.user.id, data.user.phone)
+    if (data.user) {
+      lastPhoneRef.current = phone
+      await loadUserData(data.user.id, phone)
+    }
     return { error: null }
   }
 

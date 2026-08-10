@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import toast from 'react-hot-toast'
-import { useAuth } from '../../context/AuthContext'
+import { useAuth, sectorPath } from '../../context/AuthContext'
 
 const OTP_STORAGE_KEY = 'nightos:otp_pending'
 const OTP_COOLDOWN_SECONDS = 60
@@ -54,7 +54,7 @@ function OtpInput({ length, value, onChange, onComplete, disabled }: {
 
 export function VerifyOtpScreen() {
   const navigate = useNavigate()
-  const { verifyPhoneOtp, signInWithPhone } = useAuth()
+  const { verifyPhoneOtp, signInWithPhone, role, staffSession } = useAuth()
 
   const [pending] = useState(() => {
     try {
@@ -104,7 +104,7 @@ export function VerifyOtpScreen() {
     } else {
       toast.success('Verified! Welcome back.')
       sessionStorage.removeItem(OTP_STORAGE_KEY)
-      navigate('/manager', { replace: true })
+      navigate(sectorPath(staffSession?.role ?? role), { replace: true })
     }
   }
 
