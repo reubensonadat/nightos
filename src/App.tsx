@@ -391,22 +391,7 @@ function AppShell() {
     return "customer";
   };
 
-  const [mode, setMode] = useState<Mode>(() => {
-    const pathMode = getModeFromPath();
-    if (pathMode !== "customer") return pathMode;
-    try {
-      const saved = localStorage.getItem("nightos:mode") as Mode | null;
-      if (saved === "waiter" || saved === "kitchen" || saved === "manager") {
-        return saved;
-      }
-    } catch {}
-    return "customer";
-  });
-
-  // Keep the current mode across refreshes so a reload doesn't kick you out
-  useEffect(() => {
-    try { localStorage.setItem("nightos:mode", mode); } catch {}
-  }, [mode]);
+  const [mode, setMode] = useState<Mode>(() => getModeFromPath());
 
   // Back button safety: never let the browser leave the app's first entry
   useEffect(() => {

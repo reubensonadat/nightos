@@ -349,12 +349,7 @@ export function ManagerShell({ managerName, activePage, onPageChange, onSignOut,
                 {/* Desktop top bar */}
                 <header className="hidden md:flex sticky top-0 z-20 items-center justify-between border-b border-licorice/8 bg-isabelline/95 backdrop-blur-xl px-8 py-3">
                     <div className="flex items-center gap-2">
-                        <ChartBarIcon className="h-4 w-4 text-feldgrau" strokeWidth={2} />
                         <h1 className="text-[15px] font-bold tracking-tight text-licorice">{activeItem.label}</h1>
-                        <span className="ml-2 inline-flex items-center gap-1 rounded-full bg-khaki/15 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider text-khaki">
-                            <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-khaki" />
-                            Live
-                        </span>
                     </div>
                     <div className="flex items-center gap-3">
                         <span className="font-mono text-[11px] font-bold tabular-nums text-feldgrau">

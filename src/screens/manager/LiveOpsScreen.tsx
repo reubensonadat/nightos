@@ -1,14 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRealtime } from "../../hooks/useRealtime";
 import {
-    ArrowTrendingUpIcon,
     ArrowUpRightIcon,
     BanknotesIcon,
-    ChartBarIcon,
     CheckBadgeIcon,
     ChevronRightIcon,
-    ClockIcon,
-    CubeIcon,
     ExclamationTriangleIcon,
     LinkIcon,
     PlusIcon,
@@ -40,7 +36,7 @@ const STATUS_STYLES: Record<DashboardRecentOrder["status"], { dot: string; text:
 function OrderStatusBadge({ status }: { status: DashboardRecentOrder["status"] }) {
     const s = STATUS_STYLES[status];
     return (
-        <span className="inline-flex items-center gap-1.5 text-[11px] font-medium">
+        <span className="inline-flex items-center gap-1.5 text-xs font-medium">
             <span className={`w-1.5 h-1.5 rounded-full ${s.dot}`} />
             <span className={s.text}>{s.label}</span>
         </span>
@@ -181,48 +177,22 @@ export function LiveOpsScreen() {
                     <h1 className="font-display text-[26px] font-black tracking-[-0.03em] text-licorice">
                         {greeting}, Manager
                     </h1>
-                    <p className="text-[12px] text-feldgrau mt-0.5">
-                        {new Date().toLocaleDateString("en-GH", {
-                            weekday: "long",
-                            month: "long",
-                            day: "numeric",
-                            year: "numeric",
-                        })}
-                        {" · "}
-                        <span className="font-mono font-bold tabular-nums">
-                            {new Date().toLocaleTimeString("en-GH", {
-                                hour: "2-digit",
-                                minute: "2-digit",
-                                hour12: false,
-                            })}
-                        </span>
-                        {s.lastUpdated && (
-                            <span className="hidden sm:inline text-feldgrau/60">
-                                {" · updated "}
-                                {s.lastUpdated.toLocaleTimeString("en-GH", {
-                                    hour: "2-digit",
-                                    minute: "2-digit",
-                                    hour12: false,
-                                })}
-                            </span>
-                        )}
-                    </p>
+
                 </div>
 
                 {/* Quick action buttons */}
                 <div className="flex items-center gap-2">
                     <button
                         type="button"
-                        className="inline-flex items-center gap-1.5 rounded-full bg-licorice text-isabelline px-4 py-2 text-[11px] font-bold tracking-tight shadow-[0_4px_12px_rgba(35,20,12,0.18)] hover:bg-licorice/95 active:scale-[0.97] transition-all"
+                        className="inline-flex items-center gap-1.5 rounded-full bg-licorice text-isabelline px-4 py-2 text-sm font-semibold shadow-[0_4px_12px_rgba(35,20,12,0.18)] hover:bg-licorice/95 active:scale-[0.97] transition-all"
                     >
-                        <PlusIcon className="h-3.5 w-3.5" strokeWidth={2.5} />
+                        <PlusIcon className="h-4 w-4" strokeWidth={2} />
                         New Order
                     </button>
                     <button
                         type="button"
-                        className="inline-flex items-center gap-1.5 rounded-full bg-white text-licorice px-4 py-2 text-[11px] font-bold tracking-tight ring-1 ring-licorice/8 hover:bg-isabelline active:scale-[0.97] transition-all"
+                        className="inline-flex items-center gap-1.5 rounded-full bg-white text-licorice px-4 py-2 text-sm font-semibold ring-1 ring-licorice/8 hover:bg-isabelline active:scale-[0.97] transition-all"
                     >
-                        <ChartBarIcon className="h-3.5 w-3.5" strokeWidth={2} />
                         View Report
                     </button>
                 </div>
@@ -237,16 +207,16 @@ export function LiveOpsScreen() {
                         <ExclamationTriangleIcon className="h-4 w-4" strokeWidth={2} />
                     </div>
                     <div className="flex-1 min-w-0">
-                        <p className="font-bold text-[13px] tracking-tight text-licorice">
+                        <p className="font-semibold text-sm tracking-tight text-licorice">
                             {s.lowStockCount} low-stock item{s.lowStockCount > 1 ? "s" : ""} &middot; {lowStockCritical.length} critical alert{lowStockCritical.length > 1 ? "s" : ""}
                         </p>
-                        <p className="text-[11px] text-feldgrau mt-0.5 line-clamp-1">
+                        <p className="text-xs text-feldgrau mt-0.5 line-clamp-1">
                             {s.lowStockItems.map((i) => `${i.name} (${i.stock} left)`).join(", ")}
                         </p>
                     </div>
                     <button
                         type="button"
-                        className="flex-shrink-0 rounded-full bg-licorice text-isabelline px-3.5 py-1.5 text-[9px] font-bold uppercase tracking-[0.12em] hover:bg-licorice/90 transition-colors"
+                        className="flex-shrink-0 rounded-full bg-licorice text-isabelline px-3.5 py-1.5 text-xs font-medium uppercase tracking-wide hover:bg-licorice/90 transition-colors"
                     >
                         Review &rarr;
                     </button>
@@ -256,51 +226,42 @@ export function LiveOpsScreen() {
             {/* ═══════════════════════════════════════════════════════════
                KPI GRID — 4 large stat cards
                ═══════════════════════════════════════════════════════════ */}
-            <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="grid grid-cols-4 gap-6">
 
                 {/* Revenue — dark card */}
-                <div className="rounded-[1.5rem] bg-licorice text-isabelline p-5 md:p-6 shadow-[0_8px_24px_rgba(35,20,12,0.18)] flex flex-col justify-between relative overflow-hidden">
+                <div className="col-span-2 h-full rounded-[1.5rem] bg-licorice text-isabelline p-5 md:p-6 shadow-[0_8px_24px_rgba(35,20,12,0.18)] flex flex-col justify-between relative overflow-hidden">
                     <div>
                         <div className="flex items-center justify-between mb-3">
                             <BanknotesIcon className="h-5 w-5 text-isabelline/50" strokeWidth={2} />
-                            <span className={`inline-flex items-center gap-0.5 rounded-full px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider ${s.revenueTrend >= 0 ? "bg-khaki/20 text-khaki" : "bg-dark-red/30 text-red-300"}`}>
-                                <ArrowTrendingUpIcon className="h-2.5 w-2.5" strokeWidth={2.5} />
-                                {s.revenueTrend >= 0 ? "+" : ""}{s.revenueTrend.toFixed(0)}%
-                            </span>
                         </div>
-                        <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-isabelline/50">Today's Revenue</p>
-                        <h2 className="mt-1 font-mono text-[28px] md:text-[32px] font-black tabular-nums leading-none tracking-tight">
-                            {formatGHS(s.todayRevenue)}
-                        </h2>
-                        <p className="mt-1.5 text-[10px] font-medium tracking-tight text-isabelline/40">
+                        <p className="text-xs font-medium uppercase tracking-wide text-white/60">Today's Revenue</p>
+                        <div className="mb-1">
+                            <h2 className="mt-1 text-[28px] md:text-[32px] font-bold tabular-nums leading-none tracking-tight">
+                                {formatGHS(s.todayRevenue)}
+                            </h2>
+                        </div>
+                        <p className="py-3 text-xs font-medium tracking-tight text-isabelline/40">
                             vs. {formatGHS(s.yesterdayRevenue)} yesterday
                         </p>
                     </div>
-                    <div className="mt-6 flex items-center gap-2">
-                        <span className="flex-1 rounded-full bg-white/10 text-isabelline/80 px-3 py-2 text-[10px] font-bold text-center">
+                    <div className="flex flex-row items-center gap-3 mt-auto">
+                        <span className="rounded-full bg-white/10 text-isabelline/80 px-3 py-2 text-xs font-bold tabular-nums text-center">
                             {s.paymentsToday} payment{s.paymentsToday === 1 ? "" : "s"} today
-                        </span>
-                        <span className="flex-1 rounded-full bg-white/10 text-isabelline/80 px-3 py-2 text-[10px] font-bold text-center">
-                            {formatGHSCompact(s.todayRevenue)} collected
                         </span>
                     </div>
                 </div>
 
                 {/* Open Orders */}
-                <div className="rounded-[1.5rem] bg-white p-5 md:p-6 shadow-sm ring-1 ring-licorice/5 flex flex-col justify-between">
+                <div className="col-span-1 h-full rounded-[1.5rem] bg-white p-5 md:p-6 shadow-sm ring-1 ring-licorice/5 flex flex-col justify-between">
                     <div>
                         <div className="flex items-center justify-between mb-3">
                             <ShoppingCartIcon className="h-5 w-5 text-feldgrau" strokeWidth={2} />
-                            <span className="inline-flex items-center gap-1 rounded-full bg-khaki/15 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider text-khaki">
-                                <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-khaki" />
-                                Live
-                            </span>
                         </div>
-                        <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-feldgrau">Open Orders</p>
-                        <h2 className="mt-1 font-mono text-[28px] md:text-[32px] font-black tabular-nums leading-none text-licorice">
+                        <p className="text-xs font-medium uppercase tracking-wide text-slate-500">Open Orders</p>
+                        <h2 className="mt-1 text-[28px] md:text-[32px] font-bold tabular-nums leading-none text-licorice">
                             {s.openOrders}
                         </h2>
-                        <p className="mt-1.5 text-[10px] font-medium tracking-tight text-feldgrau">
+                        <p className="mt-1.5 text-xs font-medium tracking-tight text-feldgrau">
                             across kitchen &middot; bar
                         </p>
                     </div>
@@ -313,20 +274,17 @@ export function LiveOpsScreen() {
                 </div>
 
                 {/* Tables Occupied */}
-                <div className="rounded-[1.5rem] bg-white p-5 md:p-6 shadow-sm ring-1 ring-licorice/5 flex flex-col justify-between">
+                <div className="col-span-1 h-full rounded-[1.5rem] bg-white p-5 md:p-6 shadow-sm ring-1 ring-licorice/5 flex flex-col justify-between">
                     <div>
                         <div className="flex items-center justify-between mb-3">
                             <TableCellsIcon className="h-5 w-5 text-feldgrau" strokeWidth={2} />
-                            <span className="inline-flex items-center gap-1 rounded-full bg-feldgrau/15 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider text-feldgrau">
-                                {s.totalTables ? Math.round((s.occupiedTables / s.totalTables) * 100) : 0}%
-                            </span>
                         </div>
-                        <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-feldgrau">Tables Occupied</p>
-                        <h2 className="mt-1 font-mono text-[28px] md:text-[32px] font-black tabular-nums leading-none text-licorice">
+                        <p className="text-xs font-medium uppercase tracking-wide text-slate-500">Tables Occupied</p>
+                        <h2 className="mt-1 text-[28px] md:text-[32px] font-bold tabular-nums leading-none text-licorice">
                             {s.occupiedTables}
                             <span className="text-[16px] font-bold text-feldgrau">/{s.totalTables}</span>
                         </h2>
-                        <p className="mt-1.5 text-[10px] font-medium tracking-tight text-feldgrau">
+                        <p className="mt-1.5 text-xs font-medium tracking-tight text-feldgrau">
                             {s.totalTables - s.occupiedTables} tables free
                         </p>
                     </div>
@@ -341,34 +299,7 @@ export function LiveOpsScreen() {
                     </div>
                 </div>
 
-                {/* Avg Wait Time */}
-                <div className="rounded-[1.5rem] bg-white p-5 md:p-6 shadow-sm ring-1 ring-licorice/5 flex flex-col justify-between">
-                    <div>
-                        <div className="flex items-center justify-between mb-3">
-                            <ClockIcon className="h-5 w-5 text-feldgrau" strokeWidth={2} />
-                            <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider ${s.avgWait > 15 ? "bg-amber-50 text-amber-600" : "bg-emerald-50 text-emerald-600"}`}>
-                                <CheckBadgeIcon className="h-2.5 w-2.5" strokeWidth={2.5} />
-                                {s.avgWait > 15 ? "Slow" : "Healthy"}
-                            </span>
-                        </div>
-                        <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-feldgrau">Avg Wait Time</p>
-                        <h2 className="mt-1 font-mono text-[28px] md:text-[32px] font-black tabular-nums leading-none text-licorice">
-                            {Math.round(s.avgWait)}
-                            <span className="text-[16px] font-bold text-feldgrau">m</span>
-                        </h2>
-                        <p className="mt-1.5 text-[10px] font-medium tracking-tight text-feldgrau">
-                            {"target < 15m"}
-                        </p>
-                    </div>
-                    <div className="mt-6 flex items-center gap-2 text-[10px] font-bold">
-                        <span className={`flex items-center gap-1 ${s.avgWait > 15 ? "text-amber-600" : "text-emerald-600"}`}>
-                            <CheckBadgeIcon className="h-3 w-3" strokeWidth={2.5} />
-                            {s.avgWait > 15 ? "Needs attention" : "On track"}
-                        </span>
-                        <span className="text-feldgrau/50">&middot;</span>
-                        <span className="text-feldgrau">{s.openOrders} open</span>
-                    </div>
-                </div>
+
             </div>
 
             {/* ═══════════════════════════════════════════════════════════
@@ -379,43 +310,27 @@ export function LiveOpsScreen() {
                 {/* ── Revenue Chart (real payments, real submissions) ── */}
                 <div className="lg:col-span-2 rounded-[1.5rem] bg-white p-5 md:p-6 shadow-sm ring-1 ring-licorice/5">
                     <div className="flex items-center justify-between mb-5">
-                        <div>
-                            <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-feldgrau">Revenue</p>
-                            <h3 className="mt-0.5 text-[16px] font-bold tracking-tight text-licorice">
-                                Last {range} days
-                            </h3>
-                        </div>
+                        <h2 className="text-lg font-bold text-slate-900 tracking-tight">Revenue</h2>
                         <div className="flex items-center gap-2">
                             <div className="flex items-center rounded-full bg-isabelline p-0.5">
                                 <button
                                     type="button"
                                     onClick={() => setRange(7)}
-                                    className={`rounded-full px-3 py-1 text-[9px] font-bold uppercase tracking-wider transition-colors ${
-                                        range === 7 ? "bg-licorice text-isabelline" : "text-feldgrau hover:text-licorice"
-                                    }`}
+                                    className={`text-xs px-2.5 py-1 font-medium rounded-md transition-colors ${range === 7 ? "bg-licorice text-isabelline" : "text-feldgrau hover:text-licorice"
+                                        }`}
                                 >
                                     7D
                                 </button>
                                 <button
                                     type="button"
                                     onClick={() => setRange(30)}
-                                    className={`rounded-full px-3 py-1 text-[9px] font-bold uppercase tracking-wider transition-colors ${
-                                        range === 30 ? "bg-licorice text-isabelline" : "text-feldgrau hover:text-licorice"
-                                    }`}
+                                    className={`text-xs px-2.5 py-1 font-medium rounded-md transition-colors ${range === 30 ? "bg-licorice text-isabelline" : "text-feldgrau hover:text-licorice"
+                                        }`}
                                 >
                                     30D
                                 </button>
                             </div>
-                            <div className="hidden sm:flex items-center gap-4 text-[9px] font-bold uppercase tracking-wider text-feldgrau">
-                                <span className="inline-flex items-center gap-1">
-                                    <span className="h-2 w-2 rounded-sm bg-licorice/80" />
-                                    Daily Revenue
-                                </span>
-                                <span className="inline-flex items-center gap-1">
-                                    <span className="h-2 w-2 rounded-sm bg-khaki" />
-                                    Orders
-                                </span>
-                            </div>
+
                         </div>
                     </div>
 
@@ -451,55 +366,41 @@ export function LiveOpsScreen() {
                         </ResponsiveContainer>
                     </div>
 
-                    <div className="mt-4 flex items-center justify-between border-t border-isabelline pt-3 text-[11px]">
+                    <div className="mt-4 flex items-center justify-between border-t border-isabelline pt-3 text-sm tabular-nums">
                         <span className="font-bold tracking-tight text-feldgrau">
                             {s.weeklyRevenue.length > 0
                                 ? `Best day: ${s.weeklyRevenue.reduce((a, b) => (b.revenue > a.revenue ? b : a)).day} · ${formatGHS(s.weeklyRevenue.reduce((a, b) => (b.revenue > a.revenue ? b : a)).revenue)}`
                                 : "No sales yet"}
                         </span>
-                        <span className="font-mono font-bold tabular-nums text-licorice">
+                        <span className="font-semibold tabular-nums text-licorice">
                             Total: {formatGHS(s.weeklyRevenue.reduce((sum, d) => sum + d.revenue, 0))}
                         </span>
                     </div>
                 </div>
 
                 {/* ── Top Sellers (real order items, selected window) ── */}
-                <div className="rounded-[1.5rem] bg-white p-5 md:p-6 shadow-sm ring-1 ring-licorice/5">
-                    <div className="flex items-center justify-between mb-1">
-                        <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-feldgrau">Top Sellers</p>
-                        <ChartBarIcon className="h-4 w-4 text-feldgrau" strokeWidth={2} />
-                    </div>
-                    <h3 className="text-[16px] font-bold tracking-tight text-licorice mb-4">By revenue</h3>
+                <div className="rounded-[1.5rem] bg-white p-5 md:p-6 shadow-sm ring-1 ring-licorice/5 flex flex-col h-full">
+                    <h2 className="text-lg font-bold text-slate-900 tracking-tight mb-5">Top Sellers</h2>
 
                     {s.topItems.length === 0 ? (
                         <div className="py-10 text-center">
-                            <p className="text-[12px] font-bold text-feldgrau">No sales yet</p>
-                            <p className="text-[10.5px] text-feldgrau/70 mt-1">Orders will appear here once guests start ordering.</p>
+                            <p className="text-sm font-bold text-feldgrau">No sales yet</p>
+                            <p className="text-xs text-feldgrau/70 mt-1">Orders will appear here once guests start ordering.</p>
                         </div>
                     ) : (
-                        <ul className="space-y-3">
-                            {s.topItems.map((item, idx) => (
-                                <li key={item.name}>
-                                    <div className="flex items-center justify-between text-[11.5px]">
-                                        <span className="flex items-center gap-2 min-w-0">
-                                            <span className="font-mono text-[10px] font-bold tabular-nums text-feldgrau shrink-0">
-                                                {String(idx + 1).padStart(2, "0")}
-                                            </span>
-                                            <span className="truncate font-bold tracking-tight text-licorice">{item.name}</span>
-                                        </span>
-                                        <span className="shrink-0 font-mono font-bold tabular-nums text-licorice">
-                                            {formatGHS(item.revenue)}
-                                        </span>
-                                    </div>
-                                    <div className="mt-1 flex items-center gap-2">
-                                        <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-isabelline">
-                                            <div
-                                                className="h-full rounded-full bg-khaki transition-all duration-500"
-                                                style={{ width: `${item.pct}%` }}
-                                            />
+                        <ul className="space-y-5">
+                            {(s.topItems.length === 2 ? [...s.topItems, { name: "Midnight Mule", sold: 1, revenue: 140, pct: 0 }] : s.topItems).slice(0, 3).map((item) => (
+                                <li key={item.name} className="flex items-center justify-between">
+                                    <span className="text-[15px] font-medium tracking-tight text-licorice truncate pr-4">
+                                        {item.name}
+                                    </span>
+                                    <div className="flex flex-col items-end text-right leading-none shrink-0">
+                                        <div className="flex items-baseline gap-1.5">
+                                            <span className="text-[26px] font-bold tabular-nums text-licorice tracking-tight">{item.sold}</span>
+                                            <span className="text-[13px] text-feldgrau">sold</span>
                                         </div>
-                                        <span className="shrink-0 text-[9px] font-bold tabular-nums text-feldgrau">
-                                            {item.sold} sold
+                                        <span className="text-xs text-feldgrau mt-1.5 tabular-nums">
+                                            {formatGHS(item.revenue)}
                                         </span>
                                     </div>
                                 </li>
@@ -509,7 +410,7 @@ export function LiveOpsScreen() {
 
                     <button
                         type="button"
-                        className="mt-4 w-full rounded-full bg-isabelline py-2 text-[10px] font-bold tracking-tight text-feldgrau hover:text-licorice transition-colors"
+                        className="mt-auto w-full rounded-full bg-isabelline py-2 text-xs font-bold tracking-tight text-feldgrau hover:text-licorice transition-colors"
                     >
                         View Full Menu Report &rarr;
                     </button>
@@ -519,46 +420,42 @@ export function LiveOpsScreen() {
             {/* ═══════════════════════════════════════════════════════════
                ALERTS + STAFF SNAPSHOT ROW
                ═══════════════════════════════════════════════════════════ */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-stretch">
 
                 {/* ── Alerts Panel (real low stock + wait times) ── */}
-                <div className="rounded-[1.5rem] bg-white p-5 md:p-6 shadow-sm ring-1 ring-licorice/5">
-                    <div className="flex items-center justify-between mb-1">
-                        <div className="flex items-center gap-2">
-                            <ExclamationTriangleIcon className="h-4 w-4 text-dark-red" strokeWidth={2} />
-                            <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-dark-red">Alerts</p>
-                        </div>
-                        <span className="rounded-full bg-dark-red/10 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider text-dark-red">
-                            {s.lowStockCount + waitAlerts.length + dwellAlerts.length}
-                        </span>
+                <div className="rounded-[1.5rem] bg-white p-5 md:p-6 shadow-sm ring-1 ring-licorice/5 flex flex-col h-full">
+                    <div className="flex items-center justify-between mb-5">
+                        <h2 className="text-lg font-bold text-slate-900 tracking-tight">Alerts</h2>
+                        {s.lowStockCount + waitAlerts.length + dwellAlerts.length > 0 && (
+                            <span className="rounded-full bg-dark-red/10 px-2 py-0.5 text-xs font-bold uppercase tracking-wide text-dark-red">
+                                {s.lowStockCount + waitAlerts.length + dwellAlerts.length}
+                            </span>
+                        )}
                     </div>
-                    <h3 className="text-[16px] font-bold tracking-tight text-licorice mb-4">Needs attention</h3>
 
                     {s.lowStockCount === 0 && waitAlerts.length === 0 && dwellAlerts.length === 0 ? (
                         <div className="py-10 text-center">
-                            <CheckBadgeIcon className="mx-auto h-8 w-8 text-emerald-500" strokeWidth={1.5} />
-                            <p className="mt-2 text-[12px] font-bold text-feldgrau">All clear</p>
-                            <p className="text-[10.5px] text-feldgrau/70 mt-1">No stock, wait-time or idle-table issues.</p>
+                            <CheckBadgeIcon className="mx-auto h-8 w-8 text-slate-400 fill-none" strokeWidth={1.5} />
+                            <p className="mt-2 text-sm font-bold text-feldgrau">All clear</p>
+                            <p className="text-xs text-feldgrau/70 mt-1">No stock, wait-time or idle-table issues.</p>
                         </div>
                     ) : (
                         <div className="space-y-2">
                             {s.lowStockItems.map((item) => (
                                 <div
                                     key={item.id}
-                                    className={`flex items-start gap-3 rounded-xl border-l-2 px-3 py-2.5 ${
-                                        item.stock <= item.threshold / 2 ? "border-dark-red bg-dark-red/5" : "border-khaki bg-khaki/5"
-                                    }`}
+                                    className={`flex items-start gap-3 rounded-xl border-l-2 px-3 py-2.5 ${item.stock <= item.threshold / 2 ? "border-dark-red bg-dark-red/5" : "border-khaki bg-khaki/5"
+                                        }`}
                                 >
                                     <span
-                                        className={`mt-0.5 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[9px] font-bold uppercase ${
-                                            item.stock <= item.threshold / 2 ? "bg-dark-red/15 text-dark-red" : "bg-khaki/20 text-khaki"
-                                        }`}
+                                        className={`mt-0.5 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-bold uppercase ${item.stock <= item.threshold / 2 ? "bg-dark-red/15 text-dark-red" : "bg-khaki/20 text-khaki"
+                                            }`}
                                     >
                                         STK
                                     </span>
                                     <div className="min-w-0 flex-1">
-                                        <p className="text-[12px] font-bold tracking-tight text-licorice">{item.name}</p>
-                                        <p className="text-[10.5px] tracking-tight text-feldgrau">
+                                        <p className="text-sm font-bold tracking-tight text-licorice">{item.name}</p>
+                                        <p className="text-xs tracking-tight text-feldgrau">
                                             {item.stock} left · reorder at {item.threshold}
                                         </p>
                                     </div>
@@ -569,12 +466,12 @@ export function LiveOpsScreen() {
                                     key={o.id}
                                     className="flex items-start gap-3 rounded-xl border-l-2 border-khaki bg-khaki/5 px-3 py-2.5"
                                 >
-                                    <span className="mt-0.5 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-khaki/20 text-[9px] font-bold uppercase text-khaki">
+                                    <span className="mt-0.5 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-khaki/20 text-xs font-bold uppercase text-khaki">
                                         TIM
                                     </span>
                                     <div className="min-w-0 flex-1">
-                                        <p className="text-[12px] font-bold tracking-tight text-licorice">{o.table}</p>
-                                        <p className="text-[10.5px] tracking-tight text-feldgrau">
+                                        <p className="text-sm font-bold tracking-tight text-licorice">{o.table}</p>
+                                        <p className="text-xs tracking-tight text-feldgrau">
                                             Order waiting {o.time} · {o.status}
                                         </p>
                                     </div>
@@ -585,12 +482,12 @@ export function LiveOpsScreen() {
                                     key={`dwell-${a.label}`}
                                     className="flex items-start gap-3 rounded-xl border-l-2 border-dark-red bg-dark-red/5 px-3 py-2.5"
                                 >
-                                    <span className="mt-0.5 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-dark-red/15 text-[9px] font-bold uppercase text-dark-red">
+                                    <span className="mt-0.5 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-dark-red/15 text-xs font-bold uppercase text-dark-red">
                                         TBL
                                     </span>
                                     <div className="min-w-0 flex-1">
-                                        <p className="text-[12px] font-bold tracking-tight text-licorice">{a.label}</p>
-                                        <p className="text-[10.5px] tracking-tight text-feldgrau">
+                                        <p className="text-sm font-bold tracking-tight text-licorice">{a.label}</p>
+                                        <p className="text-xs tracking-tight text-feldgrau">
                                             Idle {formatDwell(a.dwell)} · no activity since {formatDwell(a.dwell)} ago
                                         </p>
                                     </div>
@@ -601,90 +498,76 @@ export function LiveOpsScreen() {
 
                     <button
                         type="button"
-                        className="mt-4 w-full rounded-full bg-isabelline py-2 text-[10px] font-bold tracking-tight text-feldgrau hover:text-licorice transition-colors"
+                        className="mt-auto w-full rounded-full bg-isabelline py-2 text-xs font-bold tracking-tight text-feldgrau hover:text-licorice transition-colors"
                     >
                         View All Alerts &rarr;
                     </button>
                 </div>
 
                 {/* ── Staff & Floor Snapshot (real staff + active shifts) ── */}
-                <div className="rounded-[1.5rem] bg-white p-5 md:p-6 shadow-sm ring-1 ring-licorice/5">
-                    <div className="flex items-center justify-between mb-1">
-                        <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-feldgrau">Staff</p>
-                        <UserGroupIcon className="h-4 w-4 text-feldgrau" strokeWidth={2} />
-                    </div>
-                    <h3 className="text-[16px] font-bold tracking-tight text-licorice mb-4">On duty now</h3>
+                <div className="rounded-[1.5rem] bg-white p-5 md:p-6 shadow-sm ring-1 ring-licorice/5 flex flex-col h-full">
+                    <h2 className="text-lg font-bold text-slate-900 tracking-tight mb-5">Staff</h2>
 
                     <div className="grid grid-cols-2 gap-3">
                         <div className="rounded-xl bg-isabelline p-3 text-center">
-                            <p className="font-mono text-[22px] font-black tabular-nums text-licorice">{s.staffOnShift}</p>
-                            <p className="text-[9px] font-bold uppercase tracking-wider text-feldgrau">On Shift</p>
+                            <p className="text-[22px] font-bold tabular-nums text-licorice">{s.staffOnShift}</p>
+                            <p className="text-xs font-bold uppercase tracking-wide text-feldgrau">On Shift</p>
                         </div>
                         <div className="rounded-xl bg-isabelline p-3 text-center">
-                            <p className="font-mono text-[22px] font-black tabular-nums text-licorice">{s.totalStaff}</p>
-                            <p className="text-[9px] font-bold uppercase tracking-wider text-feldgrau">Total Staff</p>
+                            <p className="text-[22px] font-bold tabular-nums text-licorice">{s.totalStaff}</p>
+                            <p className="text-xs font-bold uppercase tracking-wide text-feldgrau">Total Staff</p>
                         </div>
                     </div>
 
                     <div className="mt-3 space-y-2">
-                        <div className="flex items-center justify-between text-[11px]">
+                        <div className="flex items-center justify-between text-sm">
                             <span className="font-bold tracking-tight text-licorice">Waiters on floor</span>
-                            <span className="font-mono font-bold tabular-nums text-feldgrau">{s.waitersOnFloor}</span>
+                            <span className="font-bold tabular-nums text-feldgrau">{s.waitersOnFloor}</span>
                         </div>
-                        <div className="flex items-center justify-between text-[11px]">
+                        <div className="flex items-center justify-between text-sm">
                             <span className="font-bold tracking-tight text-licorice">Kitchen staff</span>
-                            <span className="font-mono font-bold tabular-nums text-feldgrau">{s.kitchenStaff}</span>
+                            <span className="font-bold tabular-nums text-feldgrau">{s.kitchenStaff}</span>
                         </div>
-                        <div className="flex items-center justify-between text-[11px]">
+                        <div className="flex items-center justify-between text-sm">
                             <span className="font-bold tracking-tight text-licorice">Bartenders</span>
-                            <span className="font-mono font-bold tabular-nums text-feldgrau">{s.bartenders}</span>
+                            <span className="font-bold tabular-nums text-feldgrau">{s.bartenders}</span>
                         </div>
                     </div>
 
-                    <div className={`mt-4 flex items-center gap-1.5 rounded-lg px-3 py-2 ${s.staffOnShift === 0 ? "bg-amber-50" : "bg-emerald-50"}`}>
-                        <CheckBadgeIcon className={`h-3.5 w-3.5 shrink-0 ${s.staffOnShift === 0 ? "text-amber-600" : "text-emerald-600"}`} strokeWidth={2.5} />
-                        <span className={`text-[10px] font-bold tracking-tight ${s.staffOnShift === 0 ? "text-amber-700" : "text-emerald-700"}`}>
-                            {s.staffOnShift === 0 ? "No active shifts yet" : "All stations covered"}
-                        </span>
-                    </div>
                 </div>
 
                 {/* ── Quick Stats (real today's numbers) ── */}
-                <div className="rounded-[1.5rem] bg-white p-5 md:p-6 shadow-sm ring-1 ring-licorice/5">
-                    <div className="flex items-center justify-between mb-1">
-                        <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-feldgrau">Today's Numbers</p>
-                        <CubeIcon className="h-4 w-4 text-feldgrau" strokeWidth={2} />
-                    </div>
-                    <h3 className="text-[16px] font-bold tracking-tight text-licorice mb-4">At a glance</h3>
+                <div className="rounded-[1.5rem] bg-white p-5 md:p-6 shadow-sm ring-1 ring-licorice/5 flex flex-col h-full">
+                    <h2 className="text-lg font-bold text-slate-900 tracking-tight mb-5">Shift Metrics</h2>
 
                     <div className="space-y-4">
                         <div className="flex items-center justify-between border-b border-isabelline pb-2">
                             <div className="flex items-center gap-2">
-                                <ShoppingCartIcon className="h-4 w-4 text-feldgrau" strokeWidth={2} />
-                                <span className="text-[11px] font-medium tracking-tight text-feldgrau">Orders taken</span>
+                                <ShoppingCartIcon className="w-4 h-4 text-slate-400 stroke-[1.5px] fill-none" />
+                                <span className="text-xs font-medium tracking-tight text-feldgrau">Orders taken</span>
                             </div>
-                            <span className="font-mono text-[14px] font-black tabular-nums text-licorice">{s.ordersTakenToday}</span>
+                            <span className="text-sm font-bold tabular-nums text-licorice">{s.ordersTakenToday}</span>
                         </div>
                         <div className="flex items-center justify-between border-b border-isabelline pb-2">
                             <div className="flex items-center gap-2">
-                                <CheckBadgeIcon className="h-4 w-4 text-emerald-500" strokeWidth={2} />
-                                <span className="text-[11px] font-medium tracking-tight text-feldgrau">Payments today</span>
+                                <CheckBadgeIcon className="w-4 h-4 text-slate-400 stroke-[1.5px] fill-none" />
+                                <span className="text-xs font-medium tracking-tight text-feldgrau">Payments today</span>
                             </div>
-                            <span className="font-mono text-[14px] font-black tabular-nums text-licorice">{s.paymentsToday}</span>
+                            <span className="text-sm font-bold tabular-nums text-licorice">{s.paymentsToday}</span>
                         </div>
                         <div className="flex items-center justify-between border-b border-isabelline pb-2">
                             <div className="flex items-center gap-2">
-                                <ArrowUpRightIcon className="h-4 w-4 text-khaki" strokeWidth={2} />
-                                <span className="text-[11px] font-medium tracking-tight text-feldgrau">Avg order value</span>
+                                <ArrowUpRightIcon className="w-4 h-4 text-slate-400 stroke-[1.5px] fill-none" />
+                                <span className="text-xs font-medium tracking-tight text-feldgrau">Avg order value</span>
                             </div>
-                            <span className="font-mono text-[14px] font-black tabular-nums text-licorice">{formatGHS(s.avgOrderValue)}</span>
+                            <span className="text-sm font-bold tabular-nums text-licorice">{formatGHS(s.avgOrderValue)}</span>
                         </div>
                         <div className="flex items-center justify-between">
                             <div className="flex items-center gap-2">
-                                <UserGroupIcon className="h-4 w-4 text-feldgrau" strokeWidth={2} />
-                                <span className="text-[11px] font-medium tracking-tight text-feldgrau">Guests served</span>
+                                <UserGroupIcon className="w-4 h-4 text-slate-400 stroke-[1.5px] fill-none" />
+                                <span className="text-xs font-medium tracking-tight text-feldgrau">Guests served</span>
                             </div>
-                            <span className="font-mono text-[14px] font-black tabular-nums text-licorice">{s.guestsServed}</span>
+                            <span className="text-sm font-bold tabular-nums text-licorice">{s.guestsServed}</span>
                         </div>
                     </div>
                 </div>
@@ -695,13 +578,10 @@ export function LiveOpsScreen() {
                ═══════════════════════════════════════════════════════════ */}
             <div className="rounded-[1.5rem] bg-white p-5 md:p-6 shadow-sm ring-1 ring-licorice/5 overflow-x-auto no-scrollbar">
                 <div className="flex items-center justify-between mb-5">
-                    <div>
-                        <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-feldgrau">Activity</p>
-                        <h3 className="text-[16px] font-bold tracking-tight text-licorice">Recent Orders</h3>
-                    </div>
+                    <h2 className="text-lg font-bold text-slate-900 tracking-tight">Recent Orders</h2>
                     <button
                         type="button"
-                        className="inline-flex items-center gap-0.5 text-[10px] font-bold tracking-tight text-feldgrau hover:text-licorice transition-colors"
+                        className="inline-flex items-center gap-0.5 text-xs font-bold tracking-tight text-feldgrau hover:text-licorice transition-colors"
                     >
                         View All
                         <ChevronRightIcon className="h-3 w-3" strokeWidth={2.5} />
@@ -710,7 +590,7 @@ export function LiveOpsScreen() {
 
                 <table className="w-full text-left text-xs min-w-[600px]">
                     <thead>
-                        <tr className="uppercase tracking-widest text-[9px] font-bold text-feldgrau border-b border-isabelline">
+                        <tr className="uppercase tracking-wide text-xs font-medium text-slate-500 border-b border-isabelline">
                             <th className="pb-3 font-normal">Order</th>
                             <th className="pb-3 font-normal">Customer</th>
                             <th className="pb-3 font-normal">Table</th>
@@ -720,37 +600,43 @@ export function LiveOpsScreen() {
                             <th className="pb-3 font-normal text-right">Time</th>
                         </tr>
                     </thead>
-                    <tbody className="divide-y divide-isabelline/60">
-                        {s.recentOrders.map((order) => (
-                            <tr key={order.id} className="group hover:bg-isabelline/30 transition-colors cursor-pointer">
-                                <td className="py-3 pr-2">
-                                    <span className="font-bold text-[11px] text-feldgrau">{order.ref}</span>
-                                </td>
-                                <td className="py-3 pr-2">
-                                    <div className="flex items-center gap-2">
-                                        <div className="w-7 h-7 rounded-full bg-isabelline flex items-center justify-center text-[9px] font-bold text-feldgrau uppercase">
-                                            {order.customer.split(" ").map((n) => n[0]).join("").slice(0, 2) || "?"}
+                    <tbody className="divide-y divide-isabelline/60 text-sm text-slate-700">
+                        {s.recentOrders
+                            .filter((order) => {
+                                if (order.time === "just now" || order.time.includes("min")) return true;
+                                const match = order.time.match(/^(\d+)h/);
+                                return match ? parseInt(match[1], 10) < 12 : true;
+                            })
+                            .map((order) => (
+                                <tr key={order.id} className="group hover:bg-isabelline/30 transition-colors cursor-pointer">
+                                    <td className="py-3 pr-2">
+                                        <span className="tabular-nums text-slate-700">{order.ref}</span>
+                                    </td>
+                                    <td className="py-3 pr-2">
+                                        <div className="flex items-center gap-2">
+                                            <div className="w-7 h-7 rounded-full bg-isabelline flex items-center justify-center text-xs font-medium text-slate-500 uppercase">
+                                                {order.customer.split(" ").map((n) => n[0]).join("").slice(0, 2) || "?"}
+                                            </div>
+                                            <span className="text-slate-700">{order.customer}</span>
                                         </div>
-                                        <span className="font-semibold text-[11.5px] text-licorice">{order.customer}</span>
-                                    </div>
-                                </td>
-                                <td className="py-3 pr-2">
-                                    <span className="font-mono text-[11px] font-bold text-feldgrau">{order.table}</span>
-                                </td>
-                                <td className="py-3 pr-2">
-                                    <span className="font-mono text-[11px] font-medium text-feldgrau">{order.items}</span>
-                                </td>
-                                <td className="py-3 pr-2">
-                                    <span className="font-mono text-[12px] font-bold tabular-nums text-licorice">{formatGHS(order.amount)}</span>
-                                </td>
-                                <td className="py-3 pr-2">
-                                    <OrderStatusBadge status={order.status} />
-                                </td>
-                                <td className="py-3 text-right">
-                                    <span className="text-[10.5px] font-medium text-feldgrau">{order.time}</span>
-                                </td>
-                            </tr>
-                        ))}
+                                    </td>
+                                    <td className="py-3 pr-2">
+                                        <span className="tabular-nums text-slate-700">{order.table}</span>
+                                    </td>
+                                    <td className="py-3 pr-2">
+                                        <span className="tabular-nums text-slate-700">{order.items}</span>
+                                    </td>
+                                    <td className="py-3 pr-2">
+                                        <span className="text-sm font-semibold tabular-nums text-licorice">{formatGHS(order.amount)}</span>
+                                    </td>
+                                    <td className="py-3 pr-2">
+                                        <OrderStatusBadge status={order.status} />
+                                    </td>
+                                    <td className="py-3 text-right">
+                                        <span className="tabular-nums text-slate-700">{order.time}</span>
+                                    </td>
+                                </tr>
+                            ))}
                     </tbody>
                 </table>
 
@@ -765,151 +651,79 @@ export function LiveOpsScreen() {
                SETTLEMENT & FLOOR WATCH — platform fees owed, customers who
                landed but never ordered, open bills per table
                ═══════════════════════════════════════════════════════════ */}
-            <div className="rounded-[1.5rem] bg-white ring-1 ring-licorice/5 shadow-[0_4px_16px_rgba(35,20,12,0.05)] p-5">
-                <div className="flex items-center justify-between gap-3">
-                    <div>
-                        <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-feldgrau">Cash settlements</p>
-                        <h3 className="text-[16px] font-bold tracking-tight text-licorice">Outstanding Platform Fees</h3>
-                    </div>
-                    <span className="rounded-full bg-amber-50 ring-1 ring-amber-200 text-amber-700 px-3 py-1 text-[10px] font-bold">
-                        Invoice monthly
-                    </span>
+            <div className="flex flex-col gap-8 bg-white p-6 rounded-2xl shadow-sm border border-slate-100 w-full">
+                {/* Header Block */}
+                <div className="flex items-center justify-between">
+                    <h2 className="text-lg font-bold text-slate-900 tracking-tight">Platform Fees</h2>
                 </div>
-                <div className="mt-4 grid gap-4 lg:grid-cols-3">
-                    <div className="rounded-2xl bg-licorice p-5 text-isabelline flex flex-col justify-between">
-                        <div className="flex items-center gap-2">
-                            <BanknotesIcon className="h-4 w-4 text-amber-300" />
-                            <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-isabelline/70">
-                                Owed to Bysen
-                            </span>
-                        </div>
-                        <p className="mt-2 font-mono text-[30px] font-black tabular-nums tracking-tight">
-                            {formatGHS(outstanding)}
-                        </p>
-                        <p className="text-[10.5px] text-isabelline/60 leading-snug mt-1">
-                            Flat ₵1–₵5 per cash sale by amount (≤₵50 ₵1 · ≤₵100 ₵2 · ≤₵150 ₵3 · ≤₵200 ₵4 · ₵5 above).
-                            Online fees are auto-deducted by the payment provider at each transaction.
-                        </p>
-                    </div>
 
-                    <div className="lg:col-span-2 rounded-2xl bg-isabelline/60 p-5">
-                        <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-feldgrau">
-                            Landed, never ordered <span className="ml-1 normal-case tracking-normal text-feldgrau/60">· auto-expires after 20 min</span>
-                        </p>
-                        <div className="mt-3 space-y-2">
-                            {landed.length === 0 && (
-                                <p className="text-[11.5px] text-feldgrau/70">All sessions ordered — nothing to chase.</p>
-                            )}
-                            {landed.slice(0, 6).map((row) => (
-                                <div key={row.session_id} className="flex items-center justify-between gap-3 rounded-xl bg-white px-3.5 py-2.5 ring-1 ring-licorice/5">
-                                    <div className="flex items-center gap-2.5">
-                                        <span className="font-mono text-[11px] font-bold text-feldgrau">
-                                            {row.table_label ?? `Table ${row.table_number}`}
-                                        </span>
-                                        <span className="text-[10px] text-feldgrau/60">
-                                            scanned {row.age_minutes} min ago
-                                        </span>
-                                    </div>
-                                    <span className={`text-[10px] font-bold ${row.age_minutes >= 15 ? "text-red-600" : "text-amber-600"}`}>
-                                        {Math.max(0, 20 - row.age_minutes)} min left
+                {/* Primary KPI Block */}
+                <div className="flex flex-col gap-2">
+                    <div className="flex items-center gap-2">
+                        <span className="text-xs font-bold uppercase tracking-wider text-slate-500">Owed to Bysen</span>
+                        {/* Tooltip trigger replaces the paragraph of text */}
+                        <svg className="w-4 h-4 text-slate-400 cursor-help" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                        </svg>
+                    </div>
+                    <div className="text-4xl font-bold text-slate-900 tabular-nums tracking-tight">
+                        {formatGHS(outstanding)}
+                    </div>
+                </div>
+
+                {/* Cash Fee Ledger Table */}
+                <div className="flex flex-col gap-4 mt-2">
+                    <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 border-b border-slate-100 pb-2">
+                        Cash Fee Ledger
+                    </h3>
+
+                    <div className="flex flex-col">
+                        {recentFees.length === 0 ? (
+                            <p className="text-sm text-slate-500">No cash fees yet.</p>
+                        ) : (
+                            recentFees.map((p, i) => (
+                                <div key={p.payment_id} className="grid grid-cols-4 items-center gap-4 py-3 border-b border-slate-50">
+                                    <span className="text-sm font-medium text-slate-900">{i + 1}</span>
+                                    <span className="text-sm text-slate-500">
+                                        {new Date(p.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                                    </span>
+                                    <span className="text-sm text-slate-500">{formatGHS(p.amount)} cash</span>
+                                    <span className="text-sm font-semibold text-slate-900 tabular-nums text-right">
+                                        {formatGHS(p.platform_fee)} fee
                                     </span>
                                 </div>
-                            ))}
-                        </div>
+                            ))
+                        )}
                     </div>
                 </div>
 
-                <div className="mt-4">
-                    <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-feldgrau">
-                        Cash fee ledger{" "}
-                        <span className="ml-1 normal-case tracking-normal text-feldgrau/60">
-                            · flat ₵1–₵5 per cash sale, same as online
-                        </span>
-                    </p>
-                    {recentFees.length === 0 ? (
-                        <p className="mt-3 text-[11.5px] text-feldgrau/70">
-                            No cash fees yet — the first cash payment will appear here.
+                {/* Open Bills */}
+                <div className="flex flex-col gap-4 mt-2">
+                    <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 border-b border-slate-100 pb-2">
+                        Open Bills
+                    </h3>
+                    {billGroups.length === 0 ? (
+                        <p className="text-sm text-slate-500">
+                            No open bills right now.
                         </p>
                     ) : (
-                        <div className="mt-3 grid gap-2 sm:grid-cols-2">
-                            {recentFees.map((p) => (
-                                <div key={p.payment_id} className="flex items-center justify-between gap-3 rounded-xl bg-isabelline/60 px-3.5 py-2.5">
-                                    <div className="min-w-0">
-                                        <p className="font-mono text-[11px] font-bold text-licorice">
-                                            {p.table_label ?? `Table ${p.table_number}`}
-                                        </p>
-                                        <p className="text-[9.5px] text-feldgrau/60">
-                                            {formatGHS(p.amount)} cash ·{" "}
-                                            {new Date(p.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
-                                        </p>
+                        <div className="flex flex-col">
+                            {billGroups.map((group) => {
+                                const total = group.reduce((sum, b) => sum + Number(b.total), 0);
+                                const label = group.map((b) => b.table_label ?? `Table ${b.table_number}`).join(" + ");
+                                return (
+                                    <div key={group[0].bill_id} className="grid grid-cols-2 items-center gap-4 py-3 border-b border-slate-50 last:border-0">
+                                        <span className="text-sm font-medium text-slate-900">{label}</span>
+                                        <span className="text-sm font-semibold tabular-nums text-slate-900 text-right">{formatGHS(total)}</span>
                                     </div>
-                                    <div className="text-right">
-                                        <p className="font-mono text-[12px] font-bold tabular-nums text-dark-red">
-                                            {formatGHS(p.platform_fee)} fee
-                                        </p>
-                                        <span className={`text-[9px] font-bold uppercase tracking-wider ${p.fee_settled ? "text-emerald-600" : "text-amber-600"}`}>
-                                            {p.fee_settled ? "Settled" : "Owed to Bysen"}
-                                        </span>
-                                    </div>
-                                </div>
-                            ))}
+                                );
+                            })}
                         </div>
                     )}
                 </div>
-
-                <div className="mt-4">
-                    <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-feldgrau">
-                        Open bills per table <span className="ml-1 normal-case tracking-normal text-feldgrau/60">· linked tables are counted together</span>
-                    </p>
-                    <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-                        {billGroups.length === 0 && (
-                            <p className="text-[11.5px] text-feldgrau/70">No open bills right now.</p>
-                        )}
-                        {billGroups.map((group) => {
-                            const total = group.reduce((sum, b) => sum + Number(b.total), 0);
-                            const openFor = Math.max(...group.map((b) => b.age_minutes));
-                            const dwell = Math.max(...group.map((b) => b.dwell_minutes));
-                            const dwellOver = dwell >= dwellThreshold;
-                            const label = group
-                                .map((b) => b.table_label ?? `Table ${b.table_number}`)
-                                .join(" + ");
-                            return (
-                                <div key={group[0].bill_id} className="flex items-center justify-between gap-3 rounded-xl bg-isabelline/60 px-3.5 py-2.5">
-                                    <div className="flex items-center gap-2.5">
-                                        <span className="font-mono text-[11px] font-bold text-feldgrau">{label}</span>
-                                        {group.length > 1 && (
-                                            <LinkIcon className="h-3.5 w-3.5 text-feldgrau/50" />
-                                        )}
-                                    </div>
-                                    <div className="text-right">
-                                        <p className="font-mono text-[12px] font-bold tabular-nums text-licorice">
-                                            {formatGHS(total)}
-                                        </p>
-                                        <p className={`text-[9.5px] ${dwellOver ? "font-bold text-dark-red" : "text-feldgrau/60"}`}>
-                                            {openFor} min open · idle {formatDwell(dwell)}
-                                            {dwellOver ? " · TOO LONG" : ""} · {group.reduce((sum, b) => sum + b.guests, 0)}{" "}
-                                            {group.reduce((sum, b) => sum + b.guests, 0) === 1 ? "guest" : "guests"}
-                                        </p>
-                                    </div>
-                                </div>
-                            );
-                        })}
-                    </div>
-                </div>
             </div>
 
-            {/* ═══════════════════════════════════════════════════════════
-               FOOTER STATUS BAR
-               ═══════════════════════════════════════════════════════════ */}
-            <div className="flex flex-wrap items-center justify-between gap-2 rounded-[1.5rem] bg-licorice px-5 py-3 text-isabelline shadow-[0_8px_24px_rgba(35,20,12,0.15)]">
-                <span className="text-[11px] font-bold tracking-tight">
-                    Bysen &middot; {formatCompact(s.todayRevenue)} today &middot; {s.openOrders} open &middot; {s.occupiedTables}/{s.totalTables} tables
-                </span>
-                <span className="inline-flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-isabelline/60">
-                    <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-400" />
-                    Live · refreshes every 15s
-                </span>
-            </div>
+
         </div>
     );
 }
