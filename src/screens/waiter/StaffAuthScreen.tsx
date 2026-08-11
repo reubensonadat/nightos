@@ -9,7 +9,7 @@ const OTP_COOLDOWN_SECONDS = 60;
 const OTP_STORAGE_KEY = "bysen:otp_pending";
 
 export function StaffAuthScreen() {
-    const { signInWithPhone, verifyPhoneOtp, staffSession } = useAuth();
+    const { signInWithPhone, verifyPhoneOtp, staffSession, role } = useAuth();
     
     // State to toggle between "phone" entry and "verify" OTP
     const [step, setStep] = useState<"phone" | "verify">(() => {
@@ -55,11 +55,11 @@ export function StaffAuthScreen() {
     const [justVerified, setJustVerified] = useState(false);
 
     useEffect(() => {
-        if (justVerified && !staffSession) {
+        if (justVerified && !staffSession && role !== 'owner') {
             toast.error("This number isn't linked to a staff profile. Ask your manager to add it, then try again.");
             setJustVerified(false);
         }
-    }, [justVerified, staffSession]);
+    }, [justVerified, staffSession, role]);
 
     useEffect(() => {
         const handler = () => setIsDesktop(window.innerWidth >= 1024);

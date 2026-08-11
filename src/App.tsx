@@ -405,7 +405,7 @@ function AppShell() {
   }, []);
 
   const [waiterScreen, setWaiterScreen] = useState<WaiterScreen>("auth");
-  const { staffSession, signOut: authSignOut } = useAuth();
+  const { staffSession, signOut: authSignOut, role, venue, profile } = useAuth();
   const [selectedTable, setSelectedTable] = useState<Table | null>(null);
 
   // Manager page is URL-driven: /manager/ops, /manager/floorplan, ...
@@ -499,15 +499,15 @@ function AppShell() {
 
       {mode === "waiter" && (
         <>
-          {waiterScreen === "auth" && !staffSession && (
+          {waiterScreen === "auth" && !(staffSession || role === "owner") && (
             <StaffAuthScreen />
           )}
-          {waiterScreen === "dashboard" && staffSession && (
+          {waiterScreen === "dashboard" && (staffSession || role === "owner") && (
             <TablesDashboard
-              venueId={staffSession.venue_id}
-              staffName={staffSession.name}
-              staffId={staffSession.id}
-              role={staffSession.role}
+              venueId={staffSession?.venue_id || venue?.id || ""}
+              staffName={staffSession?.name || profile?.name || "Manager"}
+              staffId={staffSession?.id || user?.id || ""}
+              role={staffSession?.role || "manager"}
               onSelectTable={(table) => {
                 setSelectedTable(table);
                 setWaiterScreen("order");
@@ -519,8 +519,8 @@ function AppShell() {
           {waiterScreen === "order" && selectedTable && (
             <OrderManagementScreen
               table={selectedTable}
-              staffId={staffSession?.id ?? ""}
-              venueId={staffSession?.venue_id ?? venueId}
+              staffId={staffSession?.id || user?.id || ""}
+              venueId={staffSession?.venue_id || venue?.id || venueId}
               onBack={() => setWaiterScreen("dashboard")}
               onGoToTableOps={() => setWaiterScreen("ops")}
               onGoToInvoice={() => setWaiterScreen("invoice")}
@@ -529,23 +529,23 @@ function AppShell() {
           {waiterScreen === "ops" && selectedTable && (
             <TableOperationsScreen
               table={selectedTable}
-              venueId={staffSession?.venue_id ?? venueId}
-              staffId={staffSession?.id ?? ""}
+              venueId={staffSession?.venue_id || venue?.id || venueId}
+              staffId={staffSession?.id || user?.id || ""}
               onBack={() => setWaiterScreen("order")}
             />
           )}
           {waiterScreen === "invoice" && selectedTable && (
             <InvoiceSettlementScreen
               table={selectedTable}
-              staffId={staffSession?.id ?? ""}
+              staffId={staffSession?.id || user?.id || ""}
               onBack={() => setWaiterScreen("order")}
               onSettled={() => setWaiterScreen("dashboard")}
             />
           )}
           {waiterScreen === "shift" && (
             <ShiftPerformanceScreen
-              staffId={staffSession?.id ?? ""}
-              staffName={staffSession?.name ?? ""}
+              staffId={staffSession?.id || user?.id || ""}
+              staffName={staffSession?.name || profile?.name || "Manager"}
               onBack={() => setWaiterScreen("dashboard")}
             />
           )}
@@ -553,11 +553,11 @@ function AppShell() {
       )}
 
       {mode === "kitchen" && (
-        staffSession ? (
+        (staffSession || role === "owner") ? (
           <KitchenDisplayScreen
-            venueId={staffSession.venue_id}
-            staffId={staffSession.id}
-            staffName={staffSession.name}
+            venueId={staffSession?.venue_id || venue?.id || ""}
+            staffId={staffSession?.id || user?.id || ""}
+            staffName={staffSession?.name || profile?.name || "Manager"}
             onExit={switchToCustomer}
             onSignOut={handleStaffSignOut}
           />
