@@ -13,7 +13,7 @@ import {
     UserGroupIcon,
 } from "@heroicons/react/24/outline";
 import { BarChart, Bar, XAxis, Tooltip, ResponsiveContainer } from "recharts";
-import { formatGHS } from "../../data/menu";
+import { formatGHS, formatGHSString } from "../../data/menu";
 import { useVenue } from "../../hooks/useVenue";
 import { useManagerDashboard, type DashboardRecentOrder } from "../../hooks/useManagerDashboard";
 import { db } from "../../lib/api";
@@ -48,8 +48,15 @@ function formatCompact(n: number): string {
     return n.toString();
 }
 
-function formatGHSCompact(n: number): string {
-    if (n >= 1000) return `₵${(n / 1000).toFixed(1)}k`;
+function formatGHSCompact(n: number): React.ReactNode {
+    if (n >= 1000) {
+        return (
+            <span className="whitespace-nowrap inline-flex items-baseline">
+                <span className="text-[0.8em] opacity-70 font-semibold mr-[2px]">GH₵</span>
+                <span>{(n / 1000).toFixed(1)}k</span>
+            </span>
+        );
+    }
     return formatGHS(n);
 }
 
@@ -369,7 +376,7 @@ export function LiveOpsScreen() {
                     <div className="mt-4 flex items-center justify-between border-t border-isabelline pt-3 text-sm tabular-nums">
                         <span className="font-bold tracking-tight text-feldgrau">
                             {s.weeklyRevenue.length > 0
-                                ? `Best day: ${s.weeklyRevenue.reduce((a, b) => (b.revenue > a.revenue ? b : a)).day} · ${formatGHS(s.weeklyRevenue.reduce((a, b) => (b.revenue > a.revenue ? b : a)).revenue)}`
+                                ? `Best day: ${s.weeklyRevenue.reduce((a, b) => (b.revenue > a.revenue ? b : a)).day} · ` + formatGHSString(s.weeklyRevenue.reduce((a, b) => (b.revenue > a.revenue ? b : a)).revenue)
                                 : "No sales yet"}
                         </span>
                         <span className="font-semibold tabular-nums text-licorice">

@@ -9,7 +9,7 @@ import {
     UserIcon,
 } from "@heroicons/react/24/outline";
 import { HeartIcon as HeartIconSolid } from "@heroicons/react/24/solid";
-import { formatGHS } from "../data/menu";
+import { formatGHS, formatGHSString } from "../data/menu";
 import type { MenuCategory, MenuItem } from "../data/menu";
 import { MenuItemCard } from "../components/MenuItemCard";
 import { useCart } from "../context/CartContext";
@@ -310,7 +310,7 @@ export function MenuScreen({ venueId, venueName, tableLabel, waiterName, onBack,
                         type="button"
                         onClick={onViewCart}
                         className="animate-velvet-rise flex w-full max-w-md md:max-w-2xl items-center justify-between gap-3 rounded-full bg-licorice px-6 py-4 shadow-[0_20px_50px_rgba(35,20,12,0.25)] ring-1 ring-licorice/80 transition-all duration-200 ease-out hover:bg-licorice/95 hover:shadow-[0_24px_60px_rgba(35,20,12,0.30)] active:scale-[0.985] focus:outline-none focus-visible:ring-2 focus-visible:ring-khaki"
-                        aria-label={`View cart — ${itemCount} items, ${formatGHS(subtotal)}`}
+                        aria-label={`View cart — ${itemCount} items, ${formatGHSString(subtotal)}`}
                     >
                         <div className="flex items-center gap-3">
                             <span className="flex h-9 w-9 items-center justify-center rounded-full bg-isabelline/15 text-[14px] font-bold text-isabelline ring-1 ring-isabelline/20">

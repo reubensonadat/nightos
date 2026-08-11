@@ -192,22 +192,22 @@ export function FloorplanScreen() {
         <div className="mx-auto w-full max-w-7xl space-y-6">
             {/* ── Header summary ── */}
             <div className="grid grid-cols-2 gap-3 md:grid-cols-4 md:gap-4">
-                <div className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-isabelline">
-                    <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-feldgrau">Total Tables</p>
-                    <p className="mt-1 font-mono text-[22px] font-black tabular-nums text-licorice">{tables.length}</p>
+                <div className="rounded-2xl bg-white p-4 shadow-sm border border-slate-100 flex flex-col gap-1">
+                    <p className="text-xs font-bold uppercase tracking-wider text-slate-500">Total Tables</p>
+                    <p className="text-4xl font-bold tabular-nums text-slate-900">{tables.length}</p>
                 </div>
-                <div className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-isabelline">
-                    <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-feldgrau">Occupied</p>
-                    <p className="mt-1 font-mono text-[22px] font-black tabular-nums text-khaki">{occupiedCount}</p>
+                <div className="rounded-2xl bg-white p-4 shadow-sm border border-slate-100 flex flex-col gap-1">
+                    <p className="text-xs font-bold uppercase tracking-wider text-slate-500">Occupied</p>
+                    <p className="text-4xl font-bold tabular-nums text-slate-900">{occupiedCount}</p>
                 </div>
-                <div className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-isabelline">
-                    <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-feldgrau">Total Capacity</p>
-                    <p className="mt-1 font-mono text-[22px] font-black tabular-nums text-licorice">{totalCapacity}</p>
+                <div className="rounded-2xl bg-white p-4 shadow-sm border border-slate-100 flex flex-col gap-1">
+                    <p className="text-xs font-bold uppercase tracking-wider text-slate-500">Total Capacity</p>
+                    <p className="text-4xl font-bold tabular-nums text-slate-900">{totalCapacity}</p>
                 </div>
-                <div className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-isabelline">
-                    <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-feldgrau">Areas</p>
-                    <p className="mt-1 text-[14px] font-bold tracking-tight text-licorice">
-                        {areas.length > 0 ? areas.join(" · ") : "—"}
+                <div className="rounded-2xl bg-white p-4 shadow-sm border border-slate-100 flex flex-col gap-1">
+                    <p className="text-xs font-bold uppercase tracking-wider text-slate-500">Active Guests</p>
+                    <p className="text-4xl font-bold tabular-nums text-slate-900">
+                        {tables.filter(t => t.status === "occupied").reduce((sum, t) => sum + (t.guests || 0), 0)}
                     </p>
                 </div>
             </div>
@@ -217,18 +217,7 @@ export function FloorplanScreen() {
                 {/* Floorplan grid */}
                 <div className="lg:col-span-2 rounded-2xl bg-white p-5 shadow-sm ring-1 ring-isabelline">
                     <div>
-                        <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-feldgrau">Floorplan</p>
-                        <h3 className="mt-0.5 text-[16px] font-bold tracking-tight text-licorice">Live table layout</h3>
-                    </div>
-
-                    {/* Legend */}
-                    <div className="mt-4 flex flex-wrap items-center gap-3 text-[10px] font-bold uppercase tracking-wider">
-                        <span className="inline-flex items-center gap-1 text-feldgrau">
-                            <span className="h-2 w-2 rounded-full bg-feldgrau" /> Available
-                        </span>
-                        <span className="inline-flex items-center gap-1 text-khaki">
-                            <span className="h-2 w-2 rounded-full bg-khaki" /> Occupied
-                        </span>
+                        <h2 className="text-lg font-bold text-slate-900 tracking-tight">Floorplan</h2>
                     </div>
 
                     {loading ? (
@@ -239,7 +228,7 @@ export function FloorplanScreen() {
                     ) : tables.length === 0 ? (
                         <div className="mt-5 flex flex-col items-center justify-center rounded-2xl bg-isabelline px-6 py-16 text-center">
                             <p className="text-[12px] font-bold tracking-tight text-feldgrau">No tables yet</p>
-                            <p className="mt-1 text-[11px] tracking-tight text-feldgrau/70">
+                            <p className="mt-1 text-xs tracking-tight text-feldgrau/70">
                                 Re-run supabase/seed-velvet.sql to create Tables 1–8.
                             </p>
                         </div>
@@ -250,7 +239,7 @@ export function FloorplanScreen() {
                                 if (areaTables.length === 0) return null;
                                 return (
                                     <div key={area}>
-                                        <p className="text-[9px] font-bold uppercase tracking-[0.18em] text-feldgrau/60">
+                                        <p className="text-xs font-bold uppercase text-feldgrau/60">
                                             {area}
                                         </p>
                                         <div className="mt-2 grid grid-cols-2 gap-2 md:grid-cols-4">
@@ -258,30 +247,30 @@ export function FloorplanScreen() {
                                                 const isSelected = selected?.id === table.id;
                                                 const statusColor =
                                                     table.status === "available"
-                                                        ? "bg-white border-feldgrau/30 text-licorice hover:border-feldgrau"
-                                                        : "bg-khaki/15 border-khaki text-licorice";
+                                                        ? "bg-white border-slate-200 text-slate-900 hover:border-slate-300"
+                                                        : "bg-[#E5DCCB] border-[#D4C4B7] text-slate-900";
                                                 return (
                                                     <button
                                                         key={table.id}
                                                         type="button"
                                                         onClick={() => setSelected(table)}
                                                         className={`
-                                                            flex flex-col items-center justify-center rounded-xl border-2 p-3
+                                                            flex flex-col items-center justify-center rounded-xl border p-4
                                                             transition-all duration-150 active:scale-95
                                                             ${statusColor}
-                                                            ${isSelected ? "ring-2 ring-licorice ring-offset-2 ring-offset-white" : ""}
+                                                            ${isSelected ? "ring-2 ring-slate-900 ring-offset-2 ring-offset-white" : ""}
                                                         `}
                                                     >
-                                                        <span className="font-serif text-[18px] font-black leading-none tracking-[-0.04em]">
+                                                        <span className="text-2xl font-bold font-serif tabular-nums tracking-tight">
                                                             {String(table.table_number).padStart(2, "0")}
                                                         </span>
-                                                        <span className="mt-0.5 inline-flex items-center gap-0.5 text-[8px] font-bold uppercase tracking-wider opacity-70">
-                                                            <UserGroupIcon className="h-2 w-2" strokeWidth={2.5} />
+                                                        <span className="mt-1 inline-flex items-center gap-1 text-sm font-medium text-slate-500">
+                                                            <UserGroupIcon className="h-4 w-4" strokeWidth={2} />
                                                             {table.capacity}
                                                         </span>
                                                         {table.status === "occupied" && (
-                                                            <span className="mt-1 inline-flex items-center gap-1 rounded-full bg-khaki/20 px-1.5 py-0.5 text-[7px] font-bold uppercase tracking-wider text-khaki">
-                                                                <ClockIcon className="h-2 w-2" strokeWidth={2.5} />
+                                                            <span className="mt-2 inline-flex items-center gap-1 rounded-full bg-black/5 px-2 py-0.5 text-xs font-bold text-slate-700">
+                                                                <ClockIcon className="h-3 w-3" strokeWidth={2.5} />
                                                                 {table.ageMinutes}m
                                                             </span>
                                                         )}
@@ -298,7 +287,7 @@ export function FloorplanScreen() {
 
                 {/* Details panel */}
                 <div className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-isabelline">
-                    <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-feldgrau">Table Details</p>
+                    <p className="text-xs font-bold uppercase text-feldgrau">Table Details</p>
                     {selected ? (
                         <div className="mt-4">
                             <div className="flex items-baseline gap-3">
@@ -306,12 +295,12 @@ export function FloorplanScreen() {
                                     {String(selected.table_number).padStart(2, "0")}
                                 </span>
                                 <div>
-                                    <p className="text-[10px] font-bold uppercase tracking-wider text-feldgrau">{selected.area}</p>
-                                    <p className="text-[11px] font-medium tracking-tight text-licorice">Capacity: {selected.capacity}</p>
+                                    <p className="text-xs font-bold uppercase tracking-wider text-feldgrau">{selected.area}</p>
+                                    <p className="text-xs font-medium tracking-tight text-licorice">Capacity: {selected.capacity}</p>
                                 </div>
                             </div>
 
-                            <div className="mt-4 space-y-2 text-[11px]">
+                            <div className="mt-4 space-y-2 text-xs">
                                 <div className="flex justify-between border-b border-isabelline pb-1.5">
                                     <span className="font-medium tracking-tight text-feldgrau">Status</span>
                                     <span className={`font-bold uppercase tracking-wider ${selected.status === "occupied" ? "text-khaki" : "text-licorice"}`}>
@@ -347,7 +336,7 @@ export function FloorplanScreen() {
                             <button
                                 type="button"
                                 onClick={() => setShowQrFor(selected)}
-                                className="mt-4 inline-flex w-full items-center justify-center gap-1.5 rounded-full bg-licorice px-4 py-2.5 text-[11px] font-bold tracking-tight text-isabelline shadow-sm transition-all hover:bg-licorice/95 active:scale-[0.98]"
+                                className="mt-4 inline-flex w-full items-center justify-center gap-1.5 rounded-full bg-licorice px-4 py-2.5 text-xs font-bold tracking-tight text-isabelline shadow-sm transition-all hover:bg-licorice/95 active:scale-[0.98]"
                             >
                                 <LinkIcon className="h-3.5 w-3.5" strokeWidth={2} />
                                 Generate QR Code
@@ -356,8 +345,8 @@ export function FloorplanScreen() {
                     ) : (
                         <div className="mt-4 flex flex-col items-center justify-center rounded-xl border-2 border-dashed border-licorice/10 px-4 py-10 text-center">
                             <span className="h-1.5 w-1.5 rounded-full bg-licorice/20" />
-                            <p className="mt-3 text-[11px] font-bold uppercase tracking-wider text-feldgrau">Select a table</p>
-                            <p className="mt-1 text-[10px] tracking-tight text-feldgrau/70">Tap any table on the floorplan</p>
+                            <p className="mt-3 text-xs font-bold uppercase tracking-wider text-feldgrau">Select a table</p>
+                            <p className="mt-1 text-xs tracking-tight text-feldgrau/70">Tap any table on the floorplan</p>
                         </div>
                     )}
                 </div>
@@ -373,7 +362,7 @@ export function FloorplanScreen() {
                     <div className="relative w-full max-w-sm overflow-hidden rounded-2xl bg-white shadow-2xl">
                         <div className="flex items-center justify-between border-b border-isabelline px-5 py-3">
                             <div>
-                                <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-feldgrau">QR Code</p>
+                                <p className="text-xs font-bold uppercase text-feldgrau">QR Code</p>
                                 <h3 className="text-[14px] font-bold tracking-tight text-licorice">
                                     Table {String(showQrFor.table_number).padStart(2, "0")} · {showQrFor.area}
                                 </h3>
@@ -389,8 +378,8 @@ export function FloorplanScreen() {
                         </div>
                         <div className="flex flex-col items-center px-5 py-6">
                             <RealQrCode url={qrUrlFor(showQrFor)} size={200} />
-                            <p className="mt-3 text-[10px] font-bold uppercase tracking-wider text-feldgrau">Scan to order</p>
-                            <p className="mt-0.5 break-all text-center text-[10px] tracking-tight text-feldgrau/70">
+                            <p className="mt-3 text-xs font-bold uppercase tracking-wider text-feldgrau">Scan to order</p>
+                            <p className="mt-0.5 break-all text-center text-xs tracking-tight text-feldgrau/70">
                                 {qrUrlFor(showQrFor)}
                             </p>
                         </div>
@@ -398,7 +387,7 @@ export function FloorplanScreen() {
                             <button
                                 type="button"
                                 onClick={() => handleDownloadQr(showQrFor)}
-                                className="inline-flex items-center justify-center gap-1.5 rounded-full bg-isabelline px-4 py-2.5 text-[11px] font-bold tracking-tight text-licorice ring-1 ring-licorice/8 active:scale-95"
+                                className="inline-flex items-center justify-center gap-1.5 rounded-full bg-isabelline px-4 py-2.5 text-xs font-bold tracking-tight text-licorice ring-1 ring-licorice/8 active:scale-95"
                             >
                                 <ArrowDownTrayIcon className="h-3.5 w-3.5" strokeWidth={2} />
                                 Download PNG
@@ -406,7 +395,7 @@ export function FloorplanScreen() {
                             <button
                                 type="button"
                                 onClick={() => handleCopyLink(showQrFor)}
-                                className="inline-flex items-center justify-center gap-1.5 rounded-full bg-licorice px-4 py-2.5 text-[11px] font-bold tracking-tight text-isabelline active:scale-95"
+                                className="inline-flex items-center justify-center gap-1.5 rounded-full bg-licorice px-4 py-2.5 text-xs font-bold tracking-tight text-isabelline active:scale-95"
                             >
                                 <LinkIcon className="h-3.5 w-3.5" strokeWidth={2} />
                                 {copied ? "Copied!" : "Copy Link"}

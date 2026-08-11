@@ -131,26 +131,25 @@ export function CrmScreen() {
         <div className="mx-auto w-full max-w-7xl space-y-6">
             {/* ── Stats ── */}
             <div className="grid grid-cols-2 gap-3 md:grid-cols-5 md:gap-4">
-                <div className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-isabelline">
-                    <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-feldgrau">Customers</p>
-                    <p className="mt-1 font-mono text-[22px] font-black tabular-nums text-licorice">{totalCustomers}</p>
+                <div className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-isabelline flex flex-col gap-1">
+                    <p className="text-xs font-bold uppercase tracking-wider text-feldgrau">Customers</p>
+                    <p className="text-4xl font-bold tabular-nums text-licorice">{totalCustomers}</p>
                 </div>
-                <div className="rounded-2xl bg-licorice p-4 text-isabelline shadow-[0_8px_24px_rgba(35,20,12,0.15)]">
-                    <HeartIcon className="h-5 w-5 text-khaki" strokeWidth={2} />
-                    <p className="mt-3 text-[10px] font-bold uppercase tracking-[0.18em] text-isabelline/60">VIP Members</p>
-                    <p className="mt-1 font-mono text-[22px] font-black tabular-nums text-khaki">{vipCount}</p>
+                <div className="rounded-2xl bg-licorice p-4 text-isabelline shadow-[0_8px_24px_rgba(35,20,12,0.15)] flex flex-col gap-1">
+                    <p className="text-xs font-bold uppercase tracking-wider text-isabelline/60">VIP Members</p>
+                    <p className="text-4xl font-bold tabular-nums text-khaki">{vipCount}</p>
                 </div>
-                <div className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-isabelline">
-                    <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-feldgrau">Total Spend</p>
-                    <p className="mt-1 font-mono text-[22px] font-black tabular-nums text-licorice">{formatGHS(totalSpend)}</p>
+                <div className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-isabelline flex flex-col gap-1">
+                    <p className="text-xs font-bold uppercase tracking-wider text-feldgrau">Total Spend</p>
+                    <p className="text-4xl font-bold tabular-nums text-licorice">{formatGHS(totalSpend)}</p>
                 </div>
-                <div className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-isabelline">
-                    <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-feldgrau">Avg / Customer</p>
-                    <p className="mt-1 font-mono text-[22px] font-black tabular-nums text-licorice">{formatGHS(avgSpend)}</p>
+                <div className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-isabelline flex flex-col gap-1">
+                    <p className="text-xs font-bold uppercase tracking-wider text-feldgrau">Avg / Customer</p>
+                    <p className="text-4xl font-bold tabular-nums text-licorice">{formatGHS(avgSpend)}</p>
                 </div>
-                <div className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-isabelline">
-                    <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-feldgrau">New Signups</p>
-                    <p className="mt-1 font-mono text-[22px] font-black tabular-nums text-khaki">{newCustomers.length}</p>
+                <div className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-isabelline flex flex-col gap-1">
+                    <p className="text-xs font-bold uppercase tracking-wider text-feldgrau">New Signups</p>
+                    <p className="text-4xl font-bold tabular-nums text-khaki">{newCustomers.length}</p>
                 </div>
             </div>
 
@@ -164,14 +163,14 @@ export function CrmScreen() {
                         <p className="font-bold text-[13px] tracking-tight text-licorice">
                             {churnRisks.length} customer{churnRisks.length > 1 ? "s" : ""} on this page haven't visited in months
                         </p>
-                        <p className="text-[11px] text-feldgrau mt-0.5">
+                        <p className="text-xs text-feldgrau mt-0.5">
                             {churnRisks.slice(0, 3).map((c) => c.name ?? "Guest").join(", ")}{churnRisks.length > 3 ? ` +${churnRisks.length - 3} more` : ""} — consider sending a re-engagement offer
                         </p>
                     </div>
                     <button
                         type="button"
                         onClick={() => setShowCampaign(true)}
-                        className="flex-shrink-0 rounded-full bg-licorice text-isabelline px-3.5 py-1.5 text-[9px] font-bold uppercase tracking-[0.12em] hover:bg-licorice/90 transition-colors"
+                        className="flex-shrink-0 rounded-full bg-licorice text-isabelline px-3.5 py-1.5 text-xs font-bold uppercase hover:bg-licorice/90 transition-colors"
                     >
                         Send Offer &rarr;
                     </button>
@@ -200,7 +199,7 @@ export function CrmScreen() {
                                 type="button"
                                 onClick={() => setTierFilter(t)}
                                 className={clsx(
-                                    "shrink-0 rounded-full px-3 py-1.5 text-[10px] font-bold tracking-tight transition-all",
+                                    "shrink-0 rounded-full px-3 py-1.5 text-xs font-bold tracking-tight transition-all",
                                     isActive ? "bg-licorice text-isabelline shadow-sm" : "text-feldgrau hover:text-licorice"
                                 )}
                             >
@@ -213,7 +212,7 @@ export function CrmScreen() {
                 <button
                     type="button"
                     onClick={() => setShowCampaign(true)}
-                    className="inline-flex items-center gap-1 rounded-full bg-licorice px-3.5 py-2 text-[11px] font-bold tracking-tight text-isabelline shadow-sm transition-all hover:bg-licorice/95 active:scale-95"
+                    className="inline-flex items-center gap-1 rounded-full bg-licorice px-3.5 py-2 text-xs font-bold tracking-tight text-isabelline shadow-sm transition-all hover:bg-licorice/95 active:scale-95"
                 >
                     <PaperAirplaneIcon className="h-3.5 w-3.5" strokeWidth={2} />
                     New Campaign
@@ -232,13 +231,13 @@ export function CrmScreen() {
                         <table className="hidden md:table w-full">
                             <thead className="border-b border-isabelline bg-isabelline/50">
                                 <tr className="text-left">
-                                    <th className="px-4 py-2.5 text-[9px] font-bold uppercase tracking-[0.18em] text-feldgrau">Customer</th>
-                                    <th className="px-4 py-2.5 text-[9px] font-bold uppercase tracking-[0.18em] text-feldgrau">Tier</th>
-                                    <th className="px-4 py-2.5 text-[9px] font-bold uppercase tracking-[0.18em] text-feldgrau">Visits</th>
-                                    <th className="px-4 py-2.5 text-[9px] font-bold uppercase tracking-[0.18em] text-feldgrau">Total Spend</th>
-                                    <th className="px-4 py-2.5 text-[9px] font-bold uppercase tracking-[0.18em] text-feldgrau">Avg/Visit</th>
-                                    <th className="px-4 py-2.5 text-[9px] font-bold uppercase tracking-[0.18em] text-feldgrau">Last Visit</th>
-                                    <th className="px-4 py-2.5 text-[9px] font-bold uppercase tracking-[0.18em] text-feldgrau text-right">Actions</th>
+                                    <th className="px-4 py-2.5 text-xs font-bold uppercase text-feldgrau">Customer</th>
+                                    <th className="px-4 py-2.5 text-xs font-bold uppercase text-feldgrau">Tier</th>
+                                    <th className="px-4 py-2.5 text-xs font-bold uppercase text-feldgrau">Visits</th>
+                                    <th className="px-4 py-2.5 text-xs font-bold uppercase text-feldgrau">Total Spend</th>
+                                    <th className="px-4 py-2.5 text-xs font-bold uppercase text-feldgrau">Avg/Visit</th>
+                                    <th className="px-4 py-2.5 text-xs font-bold uppercase text-feldgrau">Last Visit</th>
+                                    <th className="px-4 py-2.5 text-xs font-bold uppercase text-feldgrau text-right">Actions</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-isabelline">
@@ -260,13 +259,13 @@ export function CrmScreen() {
                                                     </div>
                                                     <div className="min-w-0">
                                                         <p className="truncate text-[12px] font-bold tracking-tight text-licorice">{c.name ?? "Guest"}</p>
-                                                        <p className="truncate text-[10px] tracking-tight text-feldgrau">{c.phone ?? "no phone"}</p>
+                                                        <p className="truncate text-xs tracking-tight text-feldgrau">{c.phone ?? "no phone"}</p>
                                                     </div>
                                                 </div>
                                             </td>
                                             <td className="px-4 py-2.5">
                                                 <span className={clsx(
-                                                    "inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[9px] font-bold uppercase tracking-wider",
+                                                    "inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-bold uppercase tracking-wider",
                                                     TIER_COLORS[c.tier]
                                                 )}>
                                                     {c.tier === "VIP" && <StarIcon className="h-2.5 w-2.5" strokeWidth={2.5} />}
@@ -276,7 +275,7 @@ export function CrmScreen() {
                                             <td className="px-4 py-2.5 font-mono text-[12px] font-bold tabular-nums text-licorice">{c.total_visits}</td>
                                             <td className="px-4 py-2.5 font-mono text-[12px] font-bold tabular-nums text-licorice">{formatGHS(Number(c.total_spend))}</td>
                                             <td className="px-4 py-2.5 font-mono text-[12px] font-bold tabular-nums text-feldgrau">{formatGHS(Math.round(Number(c.total_spend) / visits))}</td>
-                                            <td className="px-4 py-2.5 text-[11px] tracking-tight text-feldgrau">{c.lastVisit}</td>
+                                            <td className="px-4 py-2.5 text-xs tracking-tight text-feldgrau">{c.lastVisit}</td>
                                             <td className="px-4 py-2.5 text-right">
                                                 <button
                                                     type="button"
@@ -320,7 +319,7 @@ export function CrmScreen() {
                                                 {c.tier}
                                             </span>
                                         </div>
-                                        <p className="mt-0.5 text-[10px] tracking-tight text-feldgrau">
+                                        <p className="mt-0.5 text-xs tracking-tight text-feldgrau">
                                             {c.total_visits} visits · {formatGHS(Number(c.total_spend))} · {c.lastVisit}
                                         </p>
                                     </div>
@@ -381,7 +380,7 @@ function CustomerDetailDrawer({ customer, onClose, onToggleVip }: {
             <div className="absolute inset-0 bg-licorice/50 backdrop-blur-sm" onClick={onClose} />
             <div className="relative w-full md:max-w-md max-h-[90vh] overflow-y-auto rounded-t-2xl md:rounded-2xl bg-white shadow-2xl">
                 <div className="flex items-center justify-between border-b border-isabelline px-5 py-3">
-                    <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-feldgrau">Customer Profile</p>
+                    <p className="text-xs font-bold uppercase text-feldgrau">Customer Profile</p>
                     <button type="button" onClick={onClose} className="flex h-8 w-8 items-center justify-center rounded-full bg-isabelline text-licorice">
                         <XMarkIcon className="h-4 w-4" strokeWidth={2.25} />
                     </button>
@@ -399,13 +398,13 @@ function CustomerDetailDrawer({ customer, onClose, onToggleVip }: {
                             <h3 className="truncate text-[16px] font-bold tracking-tight text-licorice">{customer.name ?? "Guest"}</h3>
                             <div className="mt-0.5 flex items-center gap-2">
                                 <span className={clsx(
-                                    "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider",
+                                    "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-bold uppercase tracking-wider",
                                     TIER_COLORS[customer.tier]
                                 )}>
                                     {customer.tier === "VIP" && <StarIcon className="h-2.5 w-2.5" strokeWidth={2.5} />}
                                     {customer.tier}
                                 </span>
-                                <span className="text-[10px] tracking-tight text-feldgrau">{customer.phone ?? "no phone"}</span>
+                                <span className="text-xs tracking-tight text-feldgrau">{customer.phone ?? "no phone"}</span>
                             </div>
                         </div>
                     </div>
@@ -413,19 +412,19 @@ function CustomerDetailDrawer({ customer, onClose, onToggleVip }: {
                     <div className="mt-4 grid grid-cols-3 gap-2 rounded-xl bg-isabelline p-3">
                         <div className="text-center">
                             <p className="font-mono text-[16px] font-black tabular-nums text-licorice">{customer.total_visits}</p>
-                            <p className="text-[9px] font-bold uppercase tracking-wider text-feldgrau">Visits</p>
+                            <p className="text-xs font-bold uppercase tracking-wider text-feldgrau">Visits</p>
                         </div>
                         <div className="border-x border-licorice/8 text-center">
                             <p className="font-mono text-[16px] font-black tabular-nums text-licorice">{formatGHS(Number(customer.total_spend))}</p>
-                            <p className="text-[9px] font-bold uppercase tracking-wider text-feldgrau">Spend</p>
+                            <p className="text-xs font-bold uppercase tracking-wider text-feldgrau">Spend</p>
                         </div>
                         <div className="text-center">
                             <p className="font-mono text-[16px] font-black tabular-nums text-khaki">{formatGHS(avgPerVisit)}</p>
-                            <p className="text-[9px] font-bold uppercase tracking-wider text-feldgrau">Avg/Visit</p>
+                            <p className="text-xs font-bold uppercase tracking-wider text-feldgrau">Avg/Visit</p>
                         </div>
                     </div>
 
-                    <div className="mt-4 space-y-2 text-[11px]">
+                    <div className="mt-4 space-y-2 text-xs">
                         {customer.email && (
                             <div className="flex justify-between border-b border-isabelline pb-1.5">
                                 <span className="font-medium tracking-tight text-feldgrau">Email</span>
@@ -438,8 +437,8 @@ function CustomerDetailDrawer({ customer, onClose, onToggleVip }: {
                         </div>
                         {customer.notes && (
                             <div className="rounded-lg bg-dark-red/8 px-3 py-2">
-                                <p className="text-[9px] font-bold uppercase tracking-wider text-dark-red">Notes</p>
-                                <p className="mt-0.5 text-[11px] tracking-tight text-licorice">{customer.notes}</p>
+                                <p className="text-xs font-bold uppercase tracking-wider text-dark-red">Notes</p>
+                                <p className="mt-0.5 text-xs tracking-tight text-licorice">{customer.notes}</p>
                             </div>
                         )}
                     </div>
@@ -449,7 +448,7 @@ function CustomerDetailDrawer({ customer, onClose, onToggleVip }: {
                             type="button"
                             onClick={() => onToggleVip(customer)}
                             className={clsx(
-                                "inline-flex items-center justify-center gap-1 rounded-full px-3 py-2 text-[10px] font-bold tracking-tight transition-all active:scale-95",
+                                "inline-flex items-center justify-center gap-1 rounded-full px-3 py-2 text-xs font-bold tracking-tight transition-all active:scale-95",
                                 customer.tier === "VIP" ? "bg-khaki/20 text-khaki" : "bg-licorice text-isabelline"
                             )}
                         >
@@ -472,7 +471,7 @@ function CustomerDetailDrawer({ customer, onClose, onToggleVip }: {
                                         .then(() => toast.success("SMS sent."))
                                         .catch(() => toast.error("SMS failed — is the edge function deployed?"));
                                 }}
-                                className="inline-flex items-center justify-center gap-1 rounded-full bg-isabelline px-3 py-2 text-[10px] font-bold tracking-tight text-licorice ring-1 ring-licorice/8 active:scale-95"
+                                className="inline-flex items-center justify-center gap-1 rounded-full bg-isabelline px-3 py-2 text-xs font-bold tracking-tight text-licorice ring-1 ring-licorice/8 active:scale-95"
                             >
                                 <PaperAirplaneIcon className="h-3.5 w-3.5" strokeWidth={2} />
                                 Send SMS
@@ -481,7 +480,7 @@ function CustomerDetailDrawer({ customer, onClose, onToggleVip }: {
                             <button
                                 type="button"
                                 disabled
-                                className="inline-flex items-center justify-center gap-1 rounded-full bg-isabelline/60 px-3 py-2 text-[10px] font-bold tracking-tight text-feldgrau/50 ring-1 ring-licorice/8"
+                                className="inline-flex items-center justify-center gap-1 rounded-full bg-isabelline/60 px-3 py-2 text-xs font-bold tracking-tight text-feldgrau/50 ring-1 ring-licorice/8"
                             >
                                 <PaperAirplaneIcon className="h-3.5 w-3.5" strokeWidth={2} />
                                 No phone
@@ -569,7 +568,7 @@ function CampaignModal({ venueId, vipCount, totalCount, onClose }: {
                     <button
                         type="button"
                         onClick={onClose}
-                        className="mt-4 rounded-full bg-licorice px-4 py-2 text-[11px] font-bold tracking-tight text-isabelline"
+                        className="mt-4 rounded-full bg-licorice px-4 py-2 text-xs font-bold tracking-tight text-isabelline"
                     >
                         Done
                     </button>
@@ -584,7 +583,7 @@ function CampaignModal({ venueId, vipCount, totalCount, onClose }: {
             <div className="relative w-full max-w-md max-h-[90vh] overflow-y-auto rounded-t-2xl md:rounded-2xl bg-white shadow-2xl">
                 <div className="flex items-center justify-between border-b border-isabelline px-5 py-3">
                     <div>
-                        <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-feldgrau">SMS Campaign</p>
+                        <p className="text-xs font-bold uppercase text-feldgrau">SMS Campaign</p>
                         <h3 className="text-[14px] font-bold tracking-tight text-licorice">Reach your customers</h3>
                     </div>
                     <button type="button" onClick={onClose} className="flex h-8 w-8 items-center justify-center rounded-full bg-isabelline text-licorice">
@@ -594,46 +593,46 @@ function CampaignModal({ venueId, vipCount, totalCount, onClose }: {
 
                 <div className="space-y-4 px-5 py-4">
                     <div>
-                        <label className="text-[10px] font-bold uppercase tracking-[0.18em] text-feldgrau">Audience</label>
+                        <label className="text-xs font-bold uppercase text-feldgrau">Audience</label>
                         <div className="mt-1.5 grid grid-cols-2 gap-2">
                             <button type="button" onClick={() => setAudience("vip")}
                                 className={clsx("flex flex-col items-center gap-0.5 rounded-lg py-2.5 transition-all active:scale-95", audience === "vip" ? "bg-licorice text-isabelline shadow-sm" : "bg-isabelline text-feldgrau ring-1 ring-licorice/8")}>
                                 <HeartIcon className="h-4 w-4" strokeWidth={2} />
-                                <span className="text-[10px] font-bold tracking-tight">VIP only</span>
-                                <span className="text-[9px] font-mono tabular-nums opacity-70">{vipCount}</span>
+                                <span className="text-xs font-bold tracking-tight">VIP only</span>
+                                <span className="text-xs font-mono tabular-nums opacity-70">{vipCount}</span>
                             </button>
                             <button type="button" onClick={() => setAudience("all")}
                                 className={clsx("flex flex-col items-center gap-0.5 rounded-lg py-2.5 transition-all active:scale-95", audience === "all" ? "bg-licorice text-isabelline shadow-sm" : "bg-isabelline text-feldgrau ring-1 ring-licorice/8")}>
                                 <PaperAirplaneIcon className="h-4 w-4" strokeWidth={2} />
-                                <span className="text-[10px] font-bold tracking-tight">All customers</span>
-                                <span className="text-[9px] font-mono tabular-nums opacity-70">{totalCount}</span>
+                                <span className="text-xs font-bold tracking-tight">All customers</span>
+                                <span className="text-xs font-mono tabular-nums opacity-70">{totalCount}</span>
                             </button>
                         </div>
                     </div>
 
                     <div>
-                        <label className="text-[10px] font-bold uppercase tracking-[0.18em] text-feldgrau">Message</label>
+                        <label className="text-xs font-bold uppercase text-feldgrau">Message</label>
                         <textarea value={message} onChange={(e) => setMessage(e.target.value)} rows={4} maxLength={160}
                             className="mt-1 w-full resize-none rounded-lg bg-isabelline px-3 py-2 text-[12px] leading-[1.5] text-licorice ring-1 ring-licorice/8 focus:outline-none focus:ring-2 focus:ring-licorice/20" />
-                        <div className="mt-1 flex items-center justify-between text-[9px] font-bold tracking-tight text-feldgrau">
+                        <div className="mt-1 flex items-center justify-between text-xs font-bold tracking-tight text-feldgrau">
                             <span>{message.length}/160 characters</span>
                             <span>{recipientCount} recipients</span>
                         </div>
                     </div>
 
                     <div className="rounded-lg bg-khaki/12 px-3 py-2">
-                        <div className="flex items-center justify-between text-[11px]">
+                        <div className="flex items-center justify-between text-xs">
                             <span className="font-bold tracking-tight text-khaki">Estimated cost</span>
                             <span className="font-mono font-bold tabular-nums text-licorice">{formatGHS(recipientCount * 0.15)}</span>
                         </div>
-                        <p className="mt-0.5 text-[9px] tracking-tight text-feldgrau">GHS 0.15 per SMS · via mnotify</p>
+                        <p className="mt-0.5 text-xs tracking-tight text-feldgrau">GHS 0.15 per SMS · via mnotify</p>
                     </div>
                 </div>
 
                 <div className="flex items-center justify-end gap-2 border-t border-isabelline px-5 py-3">
-                    <button type="button" onClick={onClose} className="rounded-full bg-isabelline px-4 py-2 text-[11px] font-bold tracking-tight text-feldgrau ring-1 ring-licorice/8">Cancel</button>
+                    <button type="button" onClick={onClose} className="rounded-full bg-isabelline px-4 py-2 text-xs font-bold tracking-tight text-feldgrau ring-1 ring-licorice/8">Cancel</button>
                     <button type="button" onClick={handleSend} disabled={!message.trim() || sending}
-                        className="inline-flex items-center gap-1 rounded-full bg-licorice px-4 py-2 text-[11px] font-bold tracking-tight text-isabelline shadow-sm disabled:opacity-40">
+                        className="inline-flex items-center gap-1 rounded-full bg-licorice px-4 py-2 text-xs font-bold tracking-tight text-isabelline shadow-sm disabled:opacity-40">
                         {sending ? (
                             <>
                                 <span className="h-3 w-3 animate-spin rounded-full border-2 border-isabelline/30 border-t-isabelline" />

@@ -1,6 +1,7 @@
 import { useState, type FormEvent, type ReactNode } from "react";
 import {
     ArrowRightIcon,
+    ArrowRightStartOnRectangleIcon,
     BanknotesIcon,
     ChartBarIcon,
     ClipboardDocumentCheckIcon,
@@ -54,7 +55,7 @@ export function AdminLoginScreen({ onSignIn }: LoginProps) {
                     </div>
                     <div className="flex flex-col leading-tight">
                         <span className="text-[14px] font-bold tracking-tight text-licorice">Velvet Lounge</span>
-                        <span className="text-[9px] font-semibold uppercase tracking-[0.18em] text-feldgrau">Manager Portal · Bysen</span>
+                        <span className="text-xs font-semibold uppercase text-feldgrau">Manager Portal · Bysen</span>
                     </div>
                 </div>
             </div>
@@ -63,7 +64,7 @@ export function AdminLoginScreen({ onSignIn }: LoginProps) {
             <div className="flex flex-1 items-center justify-center px-6 py-8">
                 <div className="w-full max-w-sm">
                     <div className="mb-8">
-                        <p className="text-[10px] font-bold uppercase tracking-[0.22em] text-khaki">Admin Sign In</p>
+                        <p className="text-xs font-bold uppercase text-khaki">Admin Sign In</p>
                         <h1 className="mt-1.5 text-[2rem] font-black leading-[1.05] tracking-[-0.04em] text-licorice">
                             Control room
                             <br />
@@ -76,7 +77,7 @@ export function AdminLoginScreen({ onSignIn }: LoginProps) {
 
                     <form onSubmit={handleSubmit} className="flex flex-col gap-3">
                         <div>
-                            <label htmlFor="admin-email" className="text-[10px] font-bold uppercase tracking-[0.18em] text-feldgrau">Email</label>
+                            <label htmlFor="admin-email" className="text-xs font-bold uppercase text-feldgrau">Email</label>
                             <div className="mt-1.5 flex items-center gap-2 rounded-xl bg-white px-3.5 py-3 shadow-sm ring-1 ring-licorice/8 focus-within:ring-2 focus-within:ring-licorice/20 transition-all">
                                 <UserIcon className="h-4 w-4 shrink-0 text-feldgrau" strokeWidth={2} />
                                 <input
@@ -93,7 +94,7 @@ export function AdminLoginScreen({ onSignIn }: LoginProps) {
                         </div>
 
                         <div>
-                            <label htmlFor="admin-password" className="text-[10px] font-bold uppercase tracking-[0.18em] text-feldgrau">Password</label>
+                            <label htmlFor="admin-password" className="text-xs font-bold uppercase text-feldgrau">Password</label>
                             <div className="mt-1.5 flex items-center gap-2 rounded-xl bg-white px-3.5 py-3 shadow-sm ring-1 ring-licorice/8 focus-within:ring-2 focus-within:ring-licorice/20 transition-all">
                                 <LockClosedIcon className="h-4 w-4 shrink-0 text-feldgrau" strokeWidth={2} />
                                 <input
@@ -117,7 +118,7 @@ export function AdminLoginScreen({ onSignIn }: LoginProps) {
                         </div>
 
                         {error && (
-                            <p className="rounded-lg bg-dark-red/8 px-3 py-2 text-[11px] font-semibold tracking-tight text-dark-red">{error}</p>
+                            <p className="rounded-lg bg-dark-red/8 px-3 py-2 text-xs font-semibold tracking-tight text-dark-red">{error}</p>
                         )}
 
                         <button
@@ -146,7 +147,7 @@ export function AdminLoginScreen({ onSignIn }: LoginProps) {
 
             {/* Footer */}
             <div className="px-6 pb-[max(env(safe-area-inset-bottom),20px)] pt-4">
-                <div className="flex items-center justify-center gap-1.5 text-[10px] font-semibold tracking-tight text-feldgrau">
+                <div className="flex items-center justify-center gap-1.5 text-xs font-semibold tracking-tight text-feldgrau">
                     <ShieldCheckIcon className="h-3.5 w-3.5" strokeWidth={2} />
                     <span>Secured by Bysen · Supabase Auth</span>
                 </div>
@@ -200,19 +201,18 @@ export function ManagerShell({ managerName, activePage, onPageChange, onSignOut,
               ═══════════════════════════════════════════════════════════ */}
             <aside className="hidden md:flex fixed inset-y-0 left-0 z-30 w-64 flex-col border-r border-licorice/8 bg-white">
                 {/* Brand */}
-                <div className="flex items-center gap-2.5 border-b border-licorice/8 px-5 py-4">
+                <div className="flex h-[60px] items-center gap-2.5 border-b border-licorice/8 px-5">
                     <div className="flex h-9 w-9 items-center justify-center rounded-full bg-licorice text-isabelline shadow-[0_4px_14px_rgba(35,20,12,0.25)]">
                         <span className="font-serif text-[15px] font-bold leading-none tracking-tight">V</span>
                     </div>
                     <div className="flex flex-col leading-tight">
-                        <span className="text-[13px] font-bold tracking-tight text-licorice">Velvet Lounge</span>
-                        <span className="text-[9px] font-semibold uppercase tracking-[0.18em] text-feldgrau">Manager Portal</span>
+                        <span className="text-[14px] font-bold tracking-tight text-licorice">Velvet Lounge</span>
                     </div>
                 </div>
 
                 {/* Nav */}
                 <nav className="flex-1 overflow-y-auto px-3 py-4">
-                    <p className="px-2 pb-2 text-[9px] font-bold uppercase tracking-[0.18em] text-feldgrau">Operations</p>
+                    <p className="px-2 pb-2 text-xs font-bold uppercase text-feldgrau">Operations</p>
                     {NAV_ITEMS.map((item) => {
                         const Icon = item.icon;
                         const isActive = item.id === activePage;
@@ -244,16 +244,15 @@ export function ManagerShell({ managerName, activePage, onPageChange, onSignOut,
                             <UserCircleIcon className="h-5 w-5" strokeWidth={2} />
                         </div>
                         <div className="min-w-0 flex-1">
-                            <p className="truncate text-[11px] font-bold tracking-tight text-licorice">{managerName}</p>
-                            <p className="text-[9px] font-semibold uppercase tracking-wider text-feldgrau">Manager</p>
+                            <p className="truncate text-[13px] font-bold tracking-tight text-licorice">{managerName}</p>
                         </div>
                         <button
                             type="button"
                             onClick={onSignOut}
                             aria-label="Sign out"
-                            className="text-[9px] font-bold uppercase tracking-wider text-feldgrau transition-colors hover:text-dark-red"
+                            className="flex h-8 w-8 items-center justify-center rounded-md text-feldgrau transition-colors hover:bg-white hover:text-dark-red"
                         >
-                            Exit
+                            <ArrowRightStartOnRectangleIcon className="h-4 w-4" strokeWidth={2.25} />
                         </button>
                     </div>
                 </div>
@@ -273,14 +272,13 @@ export function ManagerShell({ managerName, activePage, onPageChange, onSignOut,
                         <Squares2X2Icon className="h-4 w-4" strokeWidth={2.25} />
                     </button>
                     <div className="flex flex-col items-center leading-tight">
-                        <span className="text-[13px] font-bold tracking-tight text-licorice">{activeItem.label}</span>
-                        <span className="text-[9px] font-semibold uppercase tracking-[0.18em] text-feldgrau">Manager Portal</span>
+                        <span className="text-[15px] font-bold tracking-tight text-licorice">{activeItem.label}</span>
                     </div>
                     <button
                         type="button"
                         onClick={onSignOut}
                         aria-label="Sign out"
-                        className="text-[10px] font-bold uppercase tracking-wider text-feldgrau"
+                        className="text-xs font-bold uppercase tracking-wider text-feldgrau"
                     >
                         Exit
                     </button>
@@ -295,12 +293,14 @@ export function ManagerShell({ managerName, activePage, onPageChange, onSignOut,
                         onClick={() => setMobileNavOpen(false)}
                     />
                     <aside className="relative flex w-72 max-w-[85vw] flex-col bg-white shadow-2xl">
-                        <div className="flex items-center justify-between border-b border-licorice/8 px-5 py-4">
+                        <div className="flex h-[60px] items-center justify-between border-b border-licorice/8 px-5">
                             <div className="flex items-center gap-2.5">
                                 <div className="flex h-8 w-8 items-center justify-center rounded-full bg-licorice text-isabelline">
-                                    <span className="font-serif text-[13px] font-bold leading-none">V</span>
+                                    <span className="font-serif text-[13px] font-bold leading-none tracking-tight">V</span>
                                 </div>
-                                <span className="text-[12px] font-bold tracking-tight">Manager Portal</span>
+                                <div className="flex flex-col leading-tight">
+                                    <span className="text-[14px] font-bold tracking-tight text-licorice">Velvet Lounge</span>
+                                </div>
                             </div>
                             <button
                                 type="button"
@@ -347,12 +347,12 @@ export function ManagerShell({ managerName, activePage, onPageChange, onSignOut,
               ═══════════════════════════════════════════════════════════ */}
             <div className="md:pl-64">
                 {/* Desktop top bar */}
-                <header className="hidden md:flex sticky top-0 z-20 items-center justify-between border-b border-licorice/8 bg-isabelline/95 backdrop-blur-xl px-8 py-3">
+                <header className="hidden md:flex h-[60px] sticky top-0 z-20 items-center justify-between border-b border-licorice/8 bg-isabelline/95 backdrop-blur-xl px-8">
                     <div className="flex items-center gap-2">
                         <h1 className="text-[15px] font-bold tracking-tight text-licorice">{activeItem.label}</h1>
                     </div>
                     <div className="flex items-center gap-3">
-                        <span className="font-mono text-[11px] font-bold tabular-nums text-feldgrau">
+                        <span className="font-mono text-xs font-bold tabular-nums text-feldgrau">
                             {new Date().toLocaleDateString("en-GH", { weekday: "short", month: "short", day: "numeric" })}
                         </span>
                         <span className="font-mono text-[12px] font-bold tabular-nums text-licorice">

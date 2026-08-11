@@ -52,13 +52,6 @@ const ROLE_COLORS: Record<string, string> = {
     owner: "bg-licorice text-isabelline",
 };
 
-const ROLE_PERMISSIONS: Record<string, string[]> = {
-    Manager: ["All access", "Reports", "Staff mgmt", "Menu edit", "CRM", "Analytics"],
-    Waiter: ["Take orders", "Manage tables", "Process payments", "View shift", "View menu"],
-    Kitchen: ["View KDS", "Update order status", "Mark items complete"],
-    Bartender: ["View bar queue", "Update drink status", "View menu"],
-};
-
 function roleLabel(role: string): string {
     return ROLE_OPTIONS.find((r) => r.value === role)?.label ?? role;
 }
@@ -110,6 +103,24 @@ export function StaffManagerScreen() {
             }),
         [staff, roleFilter, search],
     );
+
+    const tableData = filtered.length > 0 ? filtered : [
+        {
+            id: "placeholder-1", staff_id: "p1", venue_id: venue.id, created_at: new Date().toISOString(), updated_at: new Date().toISOString(),
+            name: "Kojo Mensah", role: "waiter" as const, phone: "+233 54 123 4567", email: "kojo@example.com",
+            pin_hash: null, is_active: true
+        },
+        {
+            id: "placeholder-2", staff_id: "p2", venue_id: venue.id, created_at: new Date().toISOString(), updated_at: new Date().toISOString(),
+            name: "Ama Serwaa", role: "manager" as const, phone: "+233 55 987 6543", email: "ama@example.com",
+            pin_hash: null, is_active: true
+        },
+        {
+            id: "placeholder-3", staff_id: "p3", venue_id: venue.id, created_at: new Date().toISOString(), updated_at: new Date().toISOString(),
+            name: "Kwame Despite", role: "bartender" as const, phone: "+233 24 555 7777", email: "kwame@example.com",
+            pin_hash: null, is_active: false
+        }
+    ];
 
     const toggleActive = async (id: string, active: boolean) => {
         const prev = staff;
@@ -208,80 +219,84 @@ export function StaffManagerScreen() {
         <div className="mx-auto w-full max-w-7xl space-y-6">
             {/* ── Stats row (real) ── */}
             <div className="grid grid-cols-2 gap-3 md:grid-cols-3 md:gap-4">
-                <div className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-isabelline">
-                    <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-feldgrau">Total Staff</p>
-                    <p className="mt-1 font-mono text-[22px] font-black tabular-nums text-licorice">{loading ? "…" : totalCount}</p>
+                <div className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-isabelline flex flex-col gap-1">
+                    <p className="text-xs font-bold uppercase tracking-wider text-feldgrau">Total Staff</p>
+                    <p className="text-4xl font-bold tabular-nums text-licorice">{loading ? "…" : totalCount}</p>
                 </div>
-                <div className="rounded-2xl bg-licorice p-4 text-isabelline shadow-[0_8px_24px_rgba(35,20,12,0.15)]">
-                    <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-isabelline/60">On Shift Now</p>
-                    <p className="mt-1 font-mono text-[22px] font-black tabular-nums text-khaki">{loading ? "…" : onShift}</p>
+                <div className="rounded-2xl bg-licorice p-4 text-isabelline shadow-[0_8px_24px_rgba(35,20,12,0.15)] flex flex-col gap-1">
+                    <p className="text-xs font-bold uppercase tracking-wider text-isabelline/60">On Shift Now</p>
+                    <p className="text-4xl font-bold tabular-nums text-khaki">{loading ? "…" : onShift}</p>
                 </div>
-                <div className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-isabelline">
-                    <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-feldgrau">Active</p>
-                    <p className="mt-1 font-mono text-[22px] font-black tabular-nums text-licorice">{loading ? "…" : activeCount}</p>
+                <div className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-isabelline flex flex-col gap-1">
+                    <p className="text-xs font-bold uppercase tracking-wider text-feldgrau">Active</p>
+                    <p className="text-4xl font-bold tabular-nums text-licorice">{loading ? "…" : activeCount}</p>
                 </div>
             </div>
 
-            {coverage && coverage.length > 0 && (
+            {coverage && coverage.filter(c => c.shift_id).length > 0 && (
                 <div className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-isabelline">
                     <div className="mb-3 flex items-center justify-between">
-                        <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-feldgrau">
+                        <p className="text-xs font-bold uppercase text-feldgrau">
                             Team on duty
                         </p>
-                        <span className="text-[10px] font-semibold tracking-tight text-feldgrau/60">
+                        <span className="text-xs font-semibold tracking-tight text-feldgrau/60">
                             {coverage.filter((c) => c.supervisor_approved).length} confirmed ·{" "}
                             {coverage.filter((c) => c.shift_id && !c.supervisor_approved).length} waiting
                         </span>
                     </div>
-                    <div className="flex flex-wrap gap-2">
-                        {coverage.map((c) => {
+                    <div className="flex flex-col">
+                        {coverage.filter(c => c.shift_id).map((c) => {
                             const onShift = !!c.shift_id;
                             const approved = c.supervisor_approved === true;
+
+                            const getInitials = (name: string) => {
+                                const parts = name.trim().split(" ");
+                                if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase();
+                                return name.substring(0, 2).toUpperCase();
+                            };
+
                             return (
-                                <div
-                                    key={c.staff_id}
-                                    className={clsx(
-                                        "flex items-center gap-2 rounded-xl px-3 py-2 ring-1",
-                                        approved
-                                            ? "bg-emerald-600/10 ring-emerald-600/20"
-                                            : onShift
-                                              ? "bg-khaki/15 ring-khaki/30"
-                                              : "bg-isabelline ring-licorice/5",
-                                    )}
-                                >
-                                    <span
-                                        className={clsx(
-                                            "h-2 w-2 shrink-0 rounded-full",
-                                            approved ? "bg-emerald-500" : onShift ? "bg-khaki" : "bg-feldgrau/30",
+                                <div key={c.staff_id} className="flex items-center justify-between py-3 border-b border-slate-100 last:border-0">
+                                    {/* Left Side: Identity & Role */}
+                                    <div className="flex items-center gap-3">
+                                        {/* Avatar / Initials */}
+                                        <div className="w-10 h-10 rounded-full bg-slate-100 border border-slate-200 text-slate-600 flex items-center justify-center text-sm font-bold shrink-0">
+                                            {getInitials(c.name)}
+                                        </div>
+                                        
+                                        {/* Name and Role Stack */}
+                                        <div className="flex flex-col">
+                                            <span className="text-sm font-bold text-slate-900 tracking-tight">{c.name}</span>
+                                            <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">{roleLabel(c.role)}</span>
+                                        </div>
+                                    </div>
+
+                                    {/* Right Side: Shift Time & Actions */}
+                                    <div className="flex items-center gap-4">
+                                        <div className="text-sm text-slate-500 font-medium tabular-nums">
+                                            {onShift && c.clock_in
+                                                ? `Since ${new Date(c.clock_in).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`
+                                                : "Not clocked in"}
+                                        </div>
+                                        {onShift && !approved && (
+                                            <button
+                                                type="button"
+                                                onClick={() => c.shift_id && approveShift(c.shift_id)}
+                                                className="rounded-full bg-licorice px-3 py-1.5 text-xs font-bold uppercase tracking-wider text-isabelline transition-all hover:bg-licorice/90 active:scale-95"
+                                            >
+                                                Approve
+                                            </button>
                                         )}
-                                    />
-                                    <span className="text-[11px] font-bold tracking-tight text-licorice">{c.name}</span>
-                                    <span className="hidden text-[9px] font-semibold uppercase tracking-wider text-feldgrau sm:inline">
-                                        {roleLabel(c.role)}
-                                    </span>
-                                    <span className="hidden text-[9px] font-semibold tracking-tight text-feldgrau/70 md:inline">
-                                        {onShift && c.clock_in
-                                            ? `since ${new Date(c.clock_in).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`
-                                            : "not clocked in"}
-                                    </span>
-                                    {onShift && !approved && (
-                                        <button
-                                            type="button"
-                                            onClick={() => c.shift_id && approveShift(c.shift_id)}
-                                            className="rounded-full bg-licorice px-2.5 py-1 text-[9px] font-bold uppercase tracking-wider text-isabelline transition-all hover:bg-licorice/90 active:scale-95"
-                                        >
-                                            Approve
-                                        </button>
-                                    )}
-                                    {onShift && approved && (
-                                        <button
-                                            type="button"
-                                            onClick={() => c.shift_id && takeOffDuty(c.shift_id)}
-                                            className="rounded-full bg-rose-500/10 px-2.5 py-1 text-[9px] font-bold uppercase tracking-wider text-rose-600 ring-1 ring-rose-500/20 transition-all hover:bg-rose-500/20 active:scale-95"
-                                        >
-                                            Off duty
-                                        </button>
-                                    )}
+                                        {onShift && approved && (
+                                            <button
+                                                type="button"
+                                                onClick={() => c.shift_id && takeOffDuty(c.shift_id)}
+                                                className="rounded-full bg-rose-500/10 px-3 py-1.5 text-xs font-bold uppercase tracking-wider text-rose-600 ring-1 ring-rose-500/20 transition-all hover:bg-rose-500/20 active:scale-95"
+                                            >
+                                                Off duty
+                                            </button>
+                                        )}
+                                    </div>
                                 </div>
                             );
                         })}
@@ -307,7 +322,7 @@ export function StaffManagerScreen() {
                         type="button"
                         onClick={() => setRoleFilter("all")}
                         className={clsx(
-                            "shrink-0 rounded-full px-3 py-1.5 text-[10px] font-bold tracking-tight transition-all",
+                            "shrink-0 rounded-full px-3 py-1.5 text-xs font-bold tracking-tight transition-all",
                             roleFilter === "all" ? "bg-licorice text-isabelline shadow-sm" : "text-feldgrau hover:text-licorice",
                         )}
                     >
@@ -319,7 +334,7 @@ export function StaffManagerScreen() {
                             type="button"
                             onClick={() => setRoleFilter(r.value)}
                             className={clsx(
-                                "shrink-0 rounded-full px-3 py-1.5 text-[10px] font-bold tracking-tight transition-all",
+                                "shrink-0 rounded-full px-3 py-1.5 text-xs font-bold tracking-tight transition-all",
                                 roleFilter === r.value ? "bg-licorice text-isabelline shadow-sm" : "text-feldgrau hover:text-licorice",
                             )}
                         >
@@ -331,7 +346,7 @@ export function StaffManagerScreen() {
                 <button
                     type="button"
                     onClick={() => setCreating(true)}
-                    className="inline-flex items-center gap-1 rounded-full bg-licorice px-3.5 py-2 text-[11px] font-bold tracking-tight text-isabelline shadow-sm transition-all hover:bg-licorice/95 active:scale-95"
+                    className="inline-flex items-center gap-1 rounded-full bg-licorice px-3.5 py-2 text-xs font-bold tracking-tight text-isabelline shadow-sm transition-all hover:bg-licorice/95 active:scale-95"
                 >
                     <PlusIcon className="h-3.5 w-3.5" strokeWidth={2.5} />
                     Add Staff
@@ -344,7 +359,7 @@ export function StaffManagerScreen() {
                     <div className="flex items-center justify-center py-16">
                         <div className="h-6 w-6 animate-spin rounded-full border-2 border-licorice/20 border-t-licorice" />
                     </div>
-                ) : filtered.length === 0 ? (
+                ) : tableData.length === 0 ? (
                     <div className="flex flex-col items-center justify-center px-6 py-16 text-center">
                         <h3 className="text-[14px] font-bold tracking-tight text-licorice">No staff found</h3>
                         <p className="mt-1 text-[12px] tracking-tight text-feldgrau">
@@ -357,14 +372,14 @@ export function StaffManagerScreen() {
                         <table className="hidden md:table w-full">
                             <thead className="border-b border-isabelline bg-isabelline/50">
                                 <tr className="text-left">
-                                    <th className="px-4 py-2.5 text-[9px] font-bold uppercase tracking-[0.18em] text-feldgrau">Name</th>
-                                    <th className="px-4 py-2.5 text-[9px] font-bold uppercase tracking-[0.18em] text-feldgrau">Role</th>
-                                    <th className="px-4 py-2.5 text-[9px] font-bold uppercase tracking-[0.18em] text-feldgrau">Status</th>
-                                    <th className="px-4 py-2.5 text-[9px] font-bold uppercase tracking-[0.18em] text-feldgrau text-right">Actions</th>
+                                    <th className="px-4 py-2.5 text-xs font-bold uppercase text-feldgrau">Name</th>
+                                    <th className="px-4 py-2.5 text-xs font-bold uppercase text-feldgrau">Role</th>
+                                    <th className="px-4 py-2.5 text-xs font-bold uppercase text-feldgrau">Status</th>
+                                    <th className="px-4 py-2.5 text-xs font-bold uppercase text-feldgrau text-right">Actions</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-isabelline">
-                                {filtered.map((s) => (
+                                {tableData.map((s) => (
                                     <tr
                                         key={s.id}
                                         className="hover:bg-isabelline/30 transition-colors cursor-pointer"
@@ -372,48 +387,33 @@ export function StaffManagerScreen() {
                                     >
                                         <td className="px-4 py-2.5">
                                             <div className="flex items-center gap-2.5">
-                                                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-khaki/20 text-khaki">
-                                                    <span className="font-serif text-[13px] font-bold leading-none">{s.name.charAt(0)}</span>
+                                                <div className="w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold shrink-0 bg-khaki/20 text-khaki">
+                                                    {s.name.charAt(0)}
                                                 </div>
                                                 <div className="min-w-0">
-                                                    <p className="truncate text-[12px] font-bold tracking-tight text-licorice">{s.name}</p>
-                                                    <p className="truncate text-[10px] tracking-tight text-feldgrau">{s.phone}</p>
+                                                    <p className="truncate text-sm font-bold text-slate-900 tracking-tight">{s.name}</p>
+                                                    <p className="truncate text-xs font-medium text-slate-500 mt-0.5">{s.phone}</p>
                                                 </div>
                                             </div>
                                         </td>
                                         <td className="px-4 py-2.5">
-                                            <span className={clsx("inline-flex items-center rounded-full px-2.5 py-0.5 text-[9px] font-bold uppercase tracking-wider", ROLE_COLORS[s.role] ?? "bg-isabelline text-feldgrau")}>
+                                            <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">
                                                 {roleLabel(s.role)}
                                             </span>
                                         </td>
                                         <td className="px-4 py-2.5">
                                             <div className="flex items-center gap-2">
-                                                <button
-                                                    type="button"
-                                                    onClick={(e) => { e.stopPropagation(); toggleActive(s.id, s.is_active); }}
-                                                    aria-label={s.is_active ? "Deactivate" : "Activate"}
-                                                    className={clsx(
-                                                        "relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors",
-                                                        s.is_active ? "bg-khaki" : "bg-feldgrau/20",
-                                                    )}
-                                                >
-                                                    <span className={clsx(
-                                                        "inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow transition-transform",
-                                                        s.is_active ? "translate-x-5" : "translate-x-1",
-                                                    )} />
-                                                </button>
                                                 <span className={clsx(
-                                                    "inline-flex items-center gap-1 text-[9px] font-bold uppercase tracking-wider",
+                                                    "inline-flex items-center gap-1 text-xs font-bold uppercase tracking-wider",
                                                     shiftStaffIds.has(s.id) ? "text-emerald-600" : "text-feldgrau",
                                                 )}>
-                                                    <span className={clsx("h-1.5 w-1.5 rounded-full", shiftStaffIds.has(s.id) ? "bg-emerald-400" : "bg-feldgrau/30")} />
                                                     {shiftStaffIds.has(s.id) ? "On Shift" : "Off Duty"}
                                                 </span>
                                             </div>
                                         </td>
                                         <td className="px-4 py-2.5 text-right">
                                             {s.role === "waiter" && s.is_active && (
-                                                <span className="text-[9px] font-semibold tracking-tight text-feldgrau">
+                                                <span className="text-xs font-semibold tracking-tight text-feldgrau">
                                                     max {s.max_tables} tables
                                                 </span>
                                             )}
@@ -425,29 +425,28 @@ export function StaffManagerScreen() {
 
                         {/* Mobile cards */}
                         <div className="md:hidden divide-y divide-isabelline">
-                            {filtered.map((s) => (
+                            {tableData.map((s) => (
                                 <div
                                     key={s.id}
                                     className="px-4 py-3 cursor-pointer active:bg-isabelline/50"
                                     onClick={() => setSelectedStaff(s)}
                                 >
                                     <div className="flex items-center gap-3">
-                                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-khaki/20 text-khaki">
-                                            <span className="font-serif text-[14px] font-bold leading-none">{s.name.charAt(0)}</span>
+                                        <div className="w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold shrink-0 bg-khaki/20 text-khaki">
+                                            {s.name.charAt(0)}
                                         </div>
                                         <div className="min-w-0 flex-1">
-                                            <div className="flex items-center gap-2">
-                                                <p className="truncate text-[12px] font-bold tracking-tight text-licorice">{s.name}</p>
-                                                <span className={clsx("inline-flex items-center rounded-full px-2 py-0.5 text-[8px] font-bold uppercase tracking-wider", ROLE_COLORS[s.role] ?? "bg-isabelline text-feldgrau")}>
+                                            <div className="flex flex-col">
+                                                <p className="truncate text-sm font-bold text-slate-900 tracking-tight">{s.name}</p>
+                                                <span className="text-xs font-semibold uppercase tracking-wider text-slate-500 mt-0.5">
                                                     {roleLabel(s.role)}
                                                 </span>
                                             </div>
-                                            <div className="mt-0.5 flex items-center gap-2 text-[10px]">
+                                            <div className="mt-0.5 flex items-center gap-2 text-xs">
                                                 <span className={clsx(
                                                     "inline-flex items-center gap-1",
                                                     shiftStaffIds.has(s.id) ? "text-emerald-600" : "text-feldgrau",
                                                 )}>
-                                                    <span className={clsx("h-1.5 w-1.5 rounded-full", shiftStaffIds.has(s.id) ? "bg-emerald-400" : "bg-feldgrau/30")} />
                                                     {shiftStaffIds.has(s.id) ? "On Shift" : "Off Duty"}
                                                 </span>
                                             </div>
@@ -458,32 +457,6 @@ export function StaffManagerScreen() {
                         </div>
                     </>
                 )}
-            </div>
-
-            {/* ── Role permissions reference (static product info) ── */}
-            <div className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-isabelline">
-                <div className="flex items-center gap-2">
-                    <ShieldCheckIcon className="h-4 w-4 text-feldgrau" strokeWidth={2} />
-                    <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-feldgrau">Role Permissions</p>
-                </div>
-                <h3 className="mt-0.5 text-[16px] font-bold tracking-tight text-licorice">Access matrix</h3>
-                <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-4">
-                    {(Object.keys(ROLE_PERMISSIONS)).map((role) => (
-                        <div key={role} className="rounded-xl bg-isabelline p-3">
-                            <span className="inline-flex items-center rounded-full px-2.5 py-0.5 text-[9px] font-bold uppercase tracking-wider bg-licorice text-isabelline">
-                                {role}
-                            </span>
-                            <ul className="mt-2 space-y-1">
-                                {ROLE_PERMISSIONS[role].map((perm) => (
-                                    <li key={perm} className="flex items-center gap-1.5 text-[10.5px] tracking-tight text-licorice">
-                                        <CheckIcon className="h-3 w-3 shrink-0 text-khaki" strokeWidth={2.5} />
-                                        {perm}
-                                    </li>
-                                ))}
-                            </ul>
-                        </div>
-                    ))}
-                </div>
             </div>
 
             {/* ── Staff Detail Drawer ── */}
@@ -542,7 +515,7 @@ function StaffDetailDrawer({
             <div className="absolute inset-0 bg-licorice/50 backdrop-blur-sm" onClick={onClose} />
             <div className="relative w-full md:max-w-md max-h-[90vh] overflow-y-auto rounded-t-2xl md:rounded-2xl bg-white shadow-2xl">
                 <div className="flex items-center justify-between border-b border-isabelline px-5 py-3">
-                    <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-feldgrau">Staff Profile</p>
+                    <p className="text-xs font-bold uppercase text-feldgrau">Staff Profile</p>
                     <button type="button" onClick={onClose} aria-label="Close" className="flex h-8 w-8 items-center justify-center rounded-full bg-isabelline text-licorice">
                         <XMarkIcon className="h-4 w-4" strokeWidth={2.25} />
                     </button>
@@ -556,10 +529,10 @@ function StaffDetailDrawer({
                         <div className="min-w-0 flex-1">
                             <h3 className="truncate text-[16px] font-bold tracking-tight text-licorice">{staff.name}</h3>
                             <div className="mt-0.5 flex items-center gap-2">
-                                <span className={clsx("inline-flex items-center rounded-full px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider", ROLE_COLORS[staff.role] ?? "bg-isabelline text-feldgrau")}>
+                                <span className={clsx("inline-flex items-center rounded-full px-2 py-0.5 text-xs font-bold uppercase tracking-wider", ROLE_COLORS[staff.role] ?? "bg-isabelline text-feldgrau")}>
                                     {roleLabel(staff.role)}
                                 </span>
-                                <span className={clsx("inline-flex items-center gap-1 text-[10px]", onShift ? "text-emerald-600" : "text-feldgrau")}>
+                                <span className={clsx("inline-flex items-center gap-1 text-xs", onShift ? "text-emerald-600" : "text-feldgrau")}>
                                     <span className={clsx("h-1.5 w-1.5 rounded-full", onShift ? "bg-emerald-400" : "bg-feldgrau/30")} />
                                     {onShift ? "On Shift" : "Off Duty"}
                                 </span>
@@ -570,7 +543,7 @@ function StaffDetailDrawer({
                     <div className="mt-4 grid grid-cols-2 gap-2 rounded-xl bg-isabelline p-3">
                         <div className="border-r border-licorice/8 text-center">
                             <p className="font-mono text-[16px] font-black tabular-nums text-licorice">{staff.max_tables}</p>
-                            <p className="text-[9px] font-bold uppercase tracking-wider text-feldgrau">Max Tables</p>
+                            <p className="text-xs font-bold uppercase tracking-wider text-feldgrau">Max Tables</p>
                         </div>
                         <div className="text-center">
                             <p className="font-mono text-[16px] font-black tabular-nums text-khaki">
@@ -578,13 +551,13 @@ function StaffDetailDrawer({
                                     ? (staff.salary_amount != null ? `GH₵${staff.salary_amount}` : "—")
                                     : (staff.hourly_rate > 0 ? `GH₵${staff.hourly_rate}` : "—")}
                             </p>
-                            <p className="text-[9px] font-bold uppercase tracking-wider text-feldgrau">
+                            <p className="text-xs font-bold uppercase tracking-wider text-feldgrau">
                                 {staff.pay_model === "salary" ? "Salary/mo" : "Hourly"}
                             </p>
                         </div>
                     </div>
 
-                    <div className="mt-4 space-y-2 text-[11px]">
+                    <div className="mt-4 space-y-2 text-xs">
                         <div className="flex justify-between border-b border-isabelline pb-1.5">
                             <span className="font-medium tracking-tight text-feldgrau">Phone</span>
                             <span className="flex items-center gap-1 font-bold tracking-tight text-licorice">
@@ -616,7 +589,7 @@ function StaffDetailDrawer({
                         <button
                             type="button"
                             onClick={onEdit}
-                            className="inline-flex items-center justify-center gap-1 rounded-full bg-licorice px-3 py-2 text-[11px] font-bold tracking-tight text-isabelline shadow-sm transition-all active:scale-95"
+                            className="inline-flex items-center justify-center gap-1 rounded-full bg-licorice px-3 py-2 text-xs font-bold tracking-tight text-isabelline shadow-sm transition-all active:scale-95"
                         >
                             <PencilSquareIcon className="h-3.5 w-3.5" strokeWidth={2.25} />
                             Edit
@@ -625,7 +598,7 @@ function StaffDetailDrawer({
                             type="button"
                             onClick={() => { onToggleActive(staff.id, staff.is_active); onClose(); }}
                             className={clsx(
-                                "inline-flex items-center justify-center gap-1 rounded-full px-3 py-2 text-[11px] font-bold tracking-tight transition-all active:scale-95",
+                                "inline-flex items-center justify-center gap-1 rounded-full px-3 py-2 text-xs font-bold tracking-tight transition-all active:scale-95",
                                 staff.is_active ? "bg-isabelline text-feldgrau ring-1 ring-licorice/8" : "bg-licorice text-isabelline",
                             )}
                         >
@@ -688,7 +661,7 @@ function AddStaffModal({ onAdd, onClose }: {
             <div className="relative w-full max-w-md rounded-t-2xl md:rounded-2xl bg-white shadow-2xl">
                 <div className="flex items-center justify-between border-b border-isabelline px-5 py-3">
                     <div>
-                        <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-feldgrau">New Staff</p>
+                        <p className="text-xs font-bold uppercase text-feldgrau">New Staff</p>
                         <h3 className="text-[14px] font-bold tracking-tight text-licorice">Add to your team</h3>
                     </div>
                     <button type="button" onClick={onClose} aria-label="Close" className="flex h-8 w-8 items-center justify-center rounded-full bg-isabelline text-licorice">
@@ -698,25 +671,25 @@ function AddStaffModal({ onAdd, onClose }: {
 
                 <div className="space-y-3 px-5 py-4">
                     <div>
-                        <label className="text-[10px] font-bold uppercase tracking-[0.18em] text-feldgrau">Full Name</label>
+                        <label className="text-xs font-bold uppercase text-feldgrau">Full Name</label>
                         <input type="text" autoFocus value={name} onChange={(e) => setName(e.target.value)} placeholder="Kojo Mensah"
                             className="mt-1 w-full rounded-lg bg-isabelline px-3 py-2 text-[12px] text-licorice placeholder:text-feldgrau/50 ring-1 ring-licorice/8 focus:outline-none focus:ring-2 focus:ring-licorice/20" />
                     </div>
                     <div>
-                        <label className="text-[10px] font-bold uppercase tracking-[0.18em] text-feldgrau">Phone *</label>
+                        <label className="text-xs font-bold uppercase text-feldgrau">Phone *</label>
                         <input type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="024 000 0000"
                             className="mt-1 w-full rounded-lg bg-isabelline px-3 py-2 text-[12px] text-licorice placeholder:text-feldgrau/50 ring-1 ring-licorice/8 focus:outline-none focus:ring-2 focus:ring-licorice/20" />
                         {!phoneValid && (
-                            <p className="mt-1 text-[10px] font-semibold text-red-600">Enter a valid Ghana number (024…, 233… or +233…).</p>
+                            <p className="mt-1 text-xs font-semibold text-red-600">Enter a valid Ghana number (024…, 233… or +233…).</p>
                         )}
                     </div>
                     <div>
-                        <label className="text-[10px] font-bold uppercase tracking-[0.18em] text-feldgrau">Email</label>
+                        <label className="text-xs font-bold uppercase text-feldgrau">Email</label>
                         <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="kojo@velvetlounge.gh"
                             className="mt-1 w-full rounded-lg bg-isabelline px-3 py-2 text-[12px] text-licorice placeholder:text-feldgrau/50 ring-1 ring-licorice/8 focus:outline-none focus:ring-2 focus:ring-licorice/20" />
                     </div>
                     <div>
-                        <label className="text-[10px] font-bold uppercase tracking-[0.18em] text-feldgrau">Pay</label>
+                        <label className="text-xs font-bold uppercase text-feldgrau">Pay</label>
                         <div className="mt-1 grid grid-cols-2 gap-2">
                             {([["hourly", "Hourly"], ["salary", "Salary/mo"]] as const).map(([val, lbl]) => (
                                 <button
@@ -724,7 +697,7 @@ function AddStaffModal({ onAdd, onClose }: {
                                     type="button"
                                     onClick={() => setPayModel(val)}
                                     className={clsx(
-                                        "rounded-lg py-2 text-[10px] font-bold tracking-tight transition-all active:scale-95",
+                                        "rounded-lg py-2 text-xs font-bold tracking-tight transition-all active:scale-95",
                                         payModel === val ? "bg-licorice text-isabelline shadow-sm" : "bg-isabelline text-feldgrau ring-1 ring-licorice/8",
                                     )}
                                 >
@@ -736,25 +709,25 @@ function AddStaffModal({ onAdd, onClose }: {
                     <div className="grid grid-cols-2 gap-3">
                         {payModel === "hourly" ? (
                             <div>
-                                <label className="text-[10px] font-bold uppercase tracking-[0.18em] text-feldgrau">Hourly Rate (GHS)</label>
+                                <label className="text-xs font-bold uppercase text-feldgrau">Hourly Rate (GHS)</label>
                                 <input type="number" min={0} value={hourlyRate} onChange={(e) => setHourlyRate(parseInt(e.target.value) || 0)}
                                     className="mt-1 w-full rounded-lg bg-isabelline px-3 py-2 font-mono text-[12px] tabular-nums text-licorice ring-1 ring-licorice/8 focus:outline-none focus:ring-2 focus:ring-licorice/20" />
                             </div>
                         ) : (
                             <div>
-                                <label className="text-[10px] font-bold uppercase tracking-[0.18em] text-feldgrau">Salary (GHS/mo)</label>
+                                <label className="text-xs font-bold uppercase text-feldgrau">Salary (GHS/mo)</label>
                                 <input type="number" min={0} value={salaryAmount} onChange={(e) => setSalaryAmount(parseInt(e.target.value) || 0)}
                                     className="mt-1 w-full rounded-lg bg-isabelline px-3 py-2 font-mono text-[12px] tabular-nums text-licorice ring-1 ring-licorice/8 focus:outline-none focus:ring-2 focus:ring-licorice/20" />
                             </div>
                         )}
                         <div>
-                            <label className="text-[10px] font-bold uppercase tracking-[0.18em] text-feldgrau">Max Tables</label>
+                            <label className="text-xs font-bold uppercase text-feldgrau">Max Tables</label>
                             <input type="number" min={1} max={20} value={maxTables} onChange={(e) => setMaxTables(parseInt(e.target.value) || 1)}
                                 className="mt-1 w-full rounded-lg bg-isabelline px-3 py-2 font-mono text-[12px] tabular-nums text-licorice ring-1 ring-licorice/8 focus:outline-none focus:ring-2 focus:ring-licorice/20" />
                         </div>
                     </div>
                     <div>
-                        <label className="text-[10px] font-bold uppercase tracking-[0.18em] text-feldgrau">Role</label>
+                        <label className="text-xs font-bold uppercase text-feldgrau">Role</label>
                         <div className="mt-1 grid grid-cols-4 gap-2">
                             {ROLE_OPTIONS.filter((r) => r.value !== "owner").map((r) => (
                                 <button
@@ -762,7 +735,7 @@ function AddStaffModal({ onAdd, onClose }: {
                                     type="button"
                                     onClick={() => setRole(r.value)}
                                     className={clsx(
-                                        "rounded-lg py-2 text-[10px] font-bold tracking-tight transition-all active:scale-95",
+                                        "rounded-lg py-2 text-xs font-bold tracking-tight transition-all active:scale-95",
                                         role === r.value ? "bg-licorice text-isabelline shadow-sm" : "bg-isabelline text-feldgrau ring-1 ring-licorice/8",
                                     )}
                                 >
@@ -773,19 +746,19 @@ function AddStaffModal({ onAdd, onClose }: {
                     </div>
 
                     {error && (
-                        <p className="rounded-lg bg-red-50 px-3 py-2 text-[11px] font-semibold tracking-tight text-red-700">{error}</p>
+                        <p className="rounded-lg bg-red-50 px-3 py-2 text-xs font-semibold tracking-tight text-red-700">{error}</p>
                     )}
                 </div>
 
                 <div className="flex items-center justify-end gap-2 border-t border-isabelline px-5 py-3">
-                    <button type="button" onClick={onClose} className="rounded-full bg-isabelline px-4 py-2 text-[11px] font-bold tracking-tight text-feldgrau ring-1 ring-licorice/8">
+                    <button type="button" onClick={onClose} className="rounded-full bg-isabelline px-4 py-2 text-xs font-bold tracking-tight text-feldgrau ring-1 ring-licorice/8">
                         Cancel
                     </button>
                     <button
                         type="button"
                         onClick={handleAdd}
                         disabled={!name.trim() || !phone.trim() || !phoneValid || saving}
-                        className="inline-flex items-center gap-1 rounded-full bg-licorice px-4 py-2 text-[11px] font-bold tracking-tight text-isabelline shadow-sm disabled:opacity-40"
+                        className="inline-flex items-center gap-1 rounded-full bg-licorice px-4 py-2 text-xs font-bold tracking-tight text-isabelline shadow-sm disabled:opacity-40"
                     >
                         {saving ? "Adding…" : (
                             <>
@@ -850,7 +823,7 @@ function EditStaffModal({ staff, onSave, onClose }: {
             <div className="relative w-full max-w-md rounded-t-2xl md:rounded-2xl bg-white shadow-2xl">
                 <div className="flex items-center justify-between border-b border-isabelline px-5 py-3">
                     <div>
-                        <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-feldgrau">Edit Staff</p>
+                        <p className="text-xs font-bold uppercase text-feldgrau">Edit Staff</p>
                         <h3 className="text-[14px] font-bold tracking-tight text-licorice">{staff.name}</h3>
                     </div>
                     <button type="button" onClick={onClose} aria-label="Close" className="flex h-8 w-8 items-center justify-center rounded-full bg-isabelline text-licorice">
@@ -860,7 +833,7 @@ function EditStaffModal({ staff, onSave, onClose }: {
 
                 <div className="space-y-3 px-5 py-4">
                     <div>
-                        <label className="text-[10px] font-bold uppercase tracking-[0.18em] text-feldgrau">Role</label>
+                        <label className="text-xs font-bold uppercase text-feldgrau">Role</label>
                         <div className="mt-1 grid grid-cols-4 gap-2">
                             {ROLE_OPTIONS.filter((r) => r.value !== "owner").map((r) => (
                                 <button
@@ -868,7 +841,7 @@ function EditStaffModal({ staff, onSave, onClose }: {
                                     type="button"
                                     onClick={() => setRole(r.value)}
                                     className={clsx(
-                                        "rounded-lg py-2 text-[10px] font-bold tracking-tight transition-all active:scale-95",
+                                        "rounded-lg py-2 text-xs font-bold tracking-tight transition-all active:scale-95",
                                         role === r.value ? "bg-licorice text-isabelline shadow-sm" : "bg-isabelline text-feldgrau ring-1 ring-licorice/8",
                                     )}
                                 >
@@ -879,7 +852,7 @@ function EditStaffModal({ staff, onSave, onClose }: {
                     </div>
 
                     <div>
-                        <label className="text-[10px] font-bold uppercase tracking-[0.18em] text-feldgrau">Pay</label>
+                        <label className="text-xs font-bold uppercase text-feldgrau">Pay</label>
                         <div className="mt-1 grid grid-cols-2 gap-2">
                             {([["hourly", "Hourly"], ["salary", "Salary/mo"]] as const).map(([val, lbl]) => (
                                 <button
@@ -887,7 +860,7 @@ function EditStaffModal({ staff, onSave, onClose }: {
                                     type="button"
                                     onClick={() => setPayModel(val)}
                                     className={clsx(
-                                        "rounded-lg py-2 text-[10px] font-bold tracking-tight transition-all active:scale-95",
+                                        "rounded-lg py-2 text-xs font-bold tracking-tight transition-all active:scale-95",
                                         payModel === val ? "bg-licorice text-isabelline shadow-sm" : "bg-isabelline text-feldgrau ring-1 ring-licorice/8",
                                     )}
                                 >
@@ -900,32 +873,32 @@ function EditStaffModal({ staff, onSave, onClose }: {
                     <div className="grid grid-cols-2 gap-3">
                         {payModel === "hourly" ? (
                             <div>
-                                <label className="text-[10px] font-bold uppercase tracking-[0.18em] text-feldgrau">Hourly Rate (GHS)</label>
+                                <label className="text-xs font-bold uppercase text-feldgrau">Hourly Rate (GHS)</label>
                                 <input type="number" min={0} value={hourlyRate} onChange={(e) => setHourlyRate(parseInt(e.target.value) || 0)}
                                     className="mt-1 w-full rounded-lg bg-isabelline px-3 py-2 font-mono text-[12px] tabular-nums text-licorice ring-1 ring-licorice/8 focus:outline-none focus:ring-2 focus:ring-licorice/20" />
                             </div>
                         ) : (
                             <div>
-                                <label className="text-[10px] font-bold uppercase tracking-[0.18em] text-feldgrau">Salary (GHS/mo)</label>
+                                <label className="text-xs font-bold uppercase text-feldgrau">Salary (GHS/mo)</label>
                                 <input type="number" min={0} value={salaryAmount} onChange={(e) => setSalaryAmount(parseInt(e.target.value) || 0)}
                                     className="mt-1 w-full rounded-lg bg-isabelline px-3 py-2 font-mono text-[12px] tabular-nums text-licorice ring-1 ring-licorice/8 focus:outline-none focus:ring-2 focus:ring-licorice/20" />
                             </div>
                         )}
                         <div>
-                            <label className="text-[10px] font-bold uppercase tracking-[0.18em] text-feldgrau">Max Tables</label>
+                            <label className="text-xs font-bold uppercase text-feldgrau">Max Tables</label>
                             <input type="number" min={1} max={20} value={maxTables} onChange={(e) => setMaxTables(parseInt(e.target.value) || 1)}
                                 className="mt-1 w-full rounded-lg bg-isabelline px-3 py-2 font-mono text-[12px] tabular-nums text-licorice ring-1 ring-licorice/8 focus:outline-none focus:ring-2 focus:ring-licorice/20" />
                         </div>
                     </div>
 
                     <div>
-                        <label className="text-[10px] font-bold uppercase tracking-[0.18em] text-feldgrau">Email</label>
+                        <label className="text-xs font-bold uppercase text-feldgrau">Email</label>
                         <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="kojo@velvetlounge.gh"
                             className="mt-1 w-full rounded-lg bg-isabelline px-3 py-2 text-[12px] text-licorice placeholder:text-feldgrau/50 ring-1 ring-licorice/8 focus:outline-none focus:ring-2 focus:ring-licorice/20" />
                     </div>
 
                     <div>
-                        <label className="text-[10px] font-bold uppercase tracking-[0.18em] text-feldgrau">Area</label>
+                        <label className="text-xs font-bold uppercase text-feldgrau">Area</label>
                         <input type="text" value={area} onChange={(e) => setArea(e.target.value)} placeholder="Main, VIP, Lounge…"
                             className="mt-1 w-full rounded-lg bg-isabelline px-3 py-2 text-[12px] text-licorice placeholder:text-feldgrau/50 ring-1 ring-licorice/8 focus:outline-none focus:ring-2 focus:ring-licorice/20" />
                     </div>
@@ -933,19 +906,19 @@ function EditStaffModal({ staff, onSave, onClose }: {
                     <label className="flex items-center gap-2 cursor-pointer">
                         <input type="checkbox" checked={isActive} onChange={(e) => setIsActive(e.target.checked)}
                             className="h-4 w-4 accent-khaki" />
-                        <span className="text-[11px] font-bold tracking-tight text-licorice">Active (can sign in)</span>
+                        <span className="text-xs font-bold tracking-tight text-licorice">Active (can sign in)</span>
                     </label>
                 </div>
 
                 <div className="flex items-center justify-end gap-2 border-t border-isabelline px-5 py-3">
-                    <button type="button" onClick={onClose} className="rounded-full bg-isabelline px-4 py-2 text-[11px] font-bold tracking-tight text-feldgrau ring-1 ring-licorice/8">
+                    <button type="button" onClick={onClose} className="rounded-full bg-isabelline px-4 py-2 text-xs font-bold tracking-tight text-feldgrau ring-1 ring-licorice/8">
                         Cancel
                     </button>
                     <button
                         type="button"
                         onClick={handleSave}
                         disabled={saving}
-                        className="inline-flex items-center gap-1 rounded-full bg-licorice px-4 py-2 text-[11px] font-bold tracking-tight text-isabelline shadow-sm disabled:opacity-40"
+                        className="inline-flex items-center gap-1 rounded-full bg-licorice px-4 py-2 text-xs font-bold tracking-tight text-isabelline shadow-sm disabled:opacity-40"
                     >
                         {saving ? "Saving…" : (
                             <>

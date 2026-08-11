@@ -586,7 +586,7 @@ export function CheckoutScreen({ total, billId, venueId, sessionToken, onBack, o
                             <span className="text-[15px] font-bold tracking-tight text-isabelline">
                                 {paying
                                     ? `Paying via ${PAYMENT_OPTIONS.find((p) => p.id === method)?.label}`
-                                    : `Pay ${formatGHS(payAmount)}`}
+                                    : <span className="flex items-center gap-1">Pay {formatGHS(payAmount)}</span>}
                             </span>
                         </span>
                         <span className="flex h-9 w-9 items-center justify-center rounded-full bg-isabelline text-licorice">

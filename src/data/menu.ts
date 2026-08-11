@@ -32,9 +32,23 @@ export type MenuItem = {
     modifiers?: ModifierGroup[];
 };
 
+import React from 'react';
+
 /** Format a number as GHS currency with thousands separators and 2 decimals. */
-export function formatGHS(amount: number): string {
-    return `GHS ${amount.toLocaleString("en-GH", {
+export function formatGHS(amount: number): React.ReactNode {
+    return React.createElement(
+        "span",
+        { className: "whitespace-nowrap inline-flex items-baseline" },
+        React.createElement("span", { className: "text-[0.8em] opacity-70 font-semibold mr-[2px]" }, "GH\u20B5"),
+        React.createElement("span", null, amount.toLocaleString("en-GH", {
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2,
+        }))
+    );
+}
+
+export function formatGHSString(amount: number): string {
+    return `GH\u20B5 ${amount.toLocaleString("en-GH", {
         minimumFractionDigits: 2,
         maximumFractionDigits: 2,
     })}`;

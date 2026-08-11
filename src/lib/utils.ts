@@ -2,8 +2,22 @@ export function cn(...parts: (string | boolean | undefined | null)[]): string {
   return parts.filter(Boolean).join(' ');
 }
 
-export function formatGHS(amount: number): string {
-  return `GHS ${amount.toLocaleString('en-GH', {
+import React from 'react';
+
+export function formatGHS(amount: number): React.ReactNode {
+  return React.createElement(
+    "span",
+    { className: "whitespace-nowrap inline-flex items-baseline" },
+    React.createElement("span", { className: "text-[0.8em] opacity-70 font-semibold mr-[2px]" }, "GH\u20B5"),
+    React.createElement("span", null, amount.toLocaleString('en-GH', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    }))
+  );
+}
+
+export function formatGHSString(amount: number): string {
+  return `GH₵ ${amount.toLocaleString('en-GH', {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   })}`;

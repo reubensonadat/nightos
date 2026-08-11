@@ -1,12 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import {
     ArrowDownTrayIcon,
-    ArrowTrendingUpIcon,
-    ArrowUpRightIcon,
     CalendarIcon,
-    ChartBarIcon,
-    ClockIcon,
-    UsersIcon,
 } from "@heroicons/react/24/outline";
 import {
     BarChart,
@@ -151,22 +146,9 @@ export function FinancialReportsScreen() {
         };
     }, [venue?.id, sinceIso]);
 
-    const financials = useMemo(() => computeFinancials(payments, expenses, items, submissions, customers, timeFilter, customStart, customEnd), [payments, expenses, items, submissions, customers, timeFilter, customStart, customEnd]);
+    const financials = useMemo(() => computeFinancials(payments, expenses, items, submissions, customers), [payments, expenses, items, submissions, customers]);
 
-    const trendText =
-        timeFilter === "ALL_TIME"
-            ? "All time"
-            : timeFilter === "1Y"
-                ? "Last 1 year"
-                : timeFilter === "30D"
-                    ? "Last 30 days"
-                    : timeFilter === "90D"
-                        ? "Last 90 days"
-                        : timeFilter === "7D"
-                            ? "Last 7 days"
-                            : timeFilter === "CUSTOM" && customStart && customEnd
-                                ? `${new Date(customStart).toLocaleDateString("en-GH", { day: "numeric", month: "short" })} – ${new Date(customEnd).toLocaleDateString("en-GH", { day: "numeric", month: "short" })}`
-                                : "Custom range";
+
 
     return (
         <div className="mx-auto w-full max-w-7xl space-y-6 pb-12">
@@ -185,7 +167,7 @@ export function FinancialReportsScreen() {
                         <select
                             value={timeFilter}
                             onChange={(e) => setTimeFilter(e.target.value)}
-                            className="appearance-none rounded-full border border-licorice/10 bg-white pl-10 pr-8 py-2 text-[11px] font-bold tracking-tight text-licorice outline-none focus:ring-2 focus:ring-licorice/20 cursor-pointer"
+                            className="appearance-none rounded-full ring-1 ring-licorice/8 bg-white pl-10 pr-8 py-2 text-sm font-semibold text-licorice outline-none focus:ring-2 focus:ring-licorice/20 cursor-pointer hover:bg-isabelline transition-all"
                         >
                             <option value="ALL_TIME">All Time</option>
                             <option value="1Y">Past Year</option>
@@ -194,7 +176,7 @@ export function FinancialReportsScreen() {
                             <option value="7D">Past 7 Days</option>
                             <option value="CUSTOM">Custom Range</option>
                         </select>
-                        <CalendarIcon className="h-4 w-4 text-feldgrau absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                        <CalendarIcon className="h-4 w-4 text-feldgrau absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none" />
                     </div>
                     {timeFilter === "CUSTOM" && (
                         <div className="flex items-center gap-2">
@@ -202,22 +184,22 @@ export function FinancialReportsScreen() {
                                 type="date"
                                 value={customStart}
                                 onChange={(e) => setCustomStart(e.target.value)}
-                                className="rounded-full border border-licorice/10 bg-white px-3 py-2 text-[10px] font-bold text-licorice outline-none focus:ring-2 focus:ring-licorice/20"
+                                className="rounded-full ring-1 ring-licorice/8 bg-white px-4 py-2 text-sm font-semibold text-licorice outline-none focus:ring-2 focus:ring-licorice/20 hover:bg-isabelline transition-all"
                             />
-                            <span className="text-[10px] text-feldgrau">to</span>
+                            <span className="text-sm font-semibold text-feldgrau">to</span>
                             <input
                                 type="date"
                                 value={customEnd}
                                 onChange={(e) => setCustomEnd(e.target.value)}
-                                className="rounded-full border border-licorice/10 bg-white px-3 py-2 text-[10px] font-bold text-licorice outline-none focus:ring-2 focus:ring-licorice/20"
+                                className="rounded-full ring-1 ring-licorice/8 bg-white px-4 py-2 text-sm font-semibold text-licorice outline-none focus:ring-2 focus:ring-licorice/20 hover:bg-isabelline transition-all"
                             />
                         </div>
                     )}
                     <button
                         type="button"
-                        className="inline-flex items-center gap-1 rounded-full bg-white px-3.5 py-2 text-[11px] font-bold tracking-tight text-licorice ring-1 ring-licorice/8 hover:bg-isabelline active:scale-95 transition-all"
+                        className="inline-flex items-center gap-1.5 rounded-full bg-licorice text-isabelline px-4 py-2 text-sm font-semibold shadow-[0_4px_12px_rgba(35,20,12,0.18)] hover:bg-licorice/95 active:scale-[0.97] transition-all"
                     >
-                        <ArrowDownTrayIcon className="h-3.5 w-3.5" strokeWidth={2} />
+                        <ArrowDownTrayIcon className="h-4 w-4" strokeWidth={2} />
                         Export
                     </button>
                 </div>
@@ -226,7 +208,7 @@ export function FinancialReportsScreen() {
             {loading && (
                 <div className="rounded-[1.5rem] bg-white p-14 text-center shadow-sm ring-1 ring-licorice/5">
                     <div className="mx-auto h-7 w-7 animate-spin rounded-full border-2 border-khaki border-t-transparent" />
-                    <p className="mt-3 text-[11px] font-bold uppercase tracking-wider text-feldgrau">
+                    <p className="mt-3 text-xs font-bold uppercase tracking-wider text-feldgrau">
                         Crunching your numbers…
                     </p>
                 </div>
@@ -238,7 +220,7 @@ export function FinancialReportsScreen() {
                     <button
                         type="button"
                         onClick={load}
-                        className="mt-4 rounded-xl bg-licorice px-5 py-2.5 text-[11px] font-bold uppercase tracking-wider text-isabelline active:scale-95"
+                        className="mt-4 rounded-xl bg-licorice px-5 py-2.5 text-xs font-bold uppercase tracking-wider text-isabelline active:scale-95"
                     >
                         Try again
                     </button>
@@ -249,12 +231,12 @@ export function FinancialReportsScreen() {
                 <>
                     {/* ── Stat Widgets Grid (like Vendly Analytics) ── */}
                     <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-6">
-                        <StatWidget title="Net Profit" value={formatGHS(financials.netProfit)} trend={trendText} positive={financials.netProfit > 0} className="lg:col-span-2" />
-                        <StatWidget title="Total Revenue" value={formatGHS(financials.totalRevenue)} trend={trendText} positive={true} className="lg:col-span-2" />
-                        <StatWidget title="Expenses" value={formatGHS(financials.totalExpenses)} trend={trendText} positive={false} className="lg:col-span-2" />
-                        <StatWidget title="Paid Orders" value={String(financials.paidOrders)} trend={trendText} positive={true} className="lg:col-span-2" />
-                        <StatWidget title="Average Order" value={formatGHS(financials.aov)} trend="Per checkout" positive={true} className="lg:col-span-2" />
-                        <StatWidget title="Return Rate" value={`${financials.returnRate.toFixed(1)}%`} trend="Repeat buyers" positive={financials.returnRate > 15} customIcon={<UsersIcon className="h-3.5 w-3.5" />} className="lg:col-span-2" />
+                        <StatWidget title="Net Profit" value={formatGHS(financials.netProfit)} className="lg:col-span-2" />
+                        <StatWidget title="Total Revenue" value={formatGHS(financials.totalRevenue)} className="lg:col-span-2" />
+                        <StatWidget title="Expenses" value={formatGHS(financials.totalExpenses)} className="lg:col-span-2" />
+                        <StatWidget title="Paid Orders" value={String(financials.paidOrders)} className="lg:col-span-2" />
+                        <StatWidget title="Average Order" value={formatGHS(financials.aov)} className="lg:col-span-2" />
+                        <StatWidget title="Return Rate" value={`${financials.returnRate.toFixed(1)}%`} className="lg:col-span-2" />
                     </div>
 
                     {/* ── Middle Row: Money Flow + Sales Volume Pie ── */}
@@ -262,11 +244,8 @@ export function FinancialReportsScreen() {
                         {/* Money Flow bar chart */}
                         <div className="lg:col-span-2 rounded-[1.5rem] bg-white p-5 md:p-6 shadow-sm ring-1 ring-licorice/5">
                             <div className="flex items-center justify-between mb-5">
-                                <div>
-                                    <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-feldgrau">Money Flow</p>
-                                    <h3 className="text-[16px] font-bold tracking-tight text-licorice">{trendText}</h3>
-                                </div>
-                                <div className="hidden sm:flex items-center gap-4 text-[9px] font-bold uppercase tracking-wider text-feldgrau">
+                                <h2 className="text-lg font-bold text-slate-900 tracking-tight mb-5">Money Flow</h2>
+                                <div className="hidden sm:flex items-center gap-4 text-xs font-bold uppercase tracking-wider text-feldgrau">
                                     <span className="inline-flex items-center gap-1">
                                         <span className="h-2 w-2 rounded-sm bg-licorice" /> Income
                                     </span>
@@ -300,11 +279,7 @@ export function FinancialReportsScreen() {
 
                         {/* Sales Volume Pie */}
                         <div className="rounded-[1.5rem] bg-white p-5 md:p-6 shadow-sm ring-1 ring-licorice/5">
-                            <div className="flex items-center justify-between mb-1">
-                                <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-feldgrau">Sales Volume</p>
-                                <ChartBarIcon className="h-4 w-4 text-feldgrau" strokeWidth={2} />
-                            </div>
-                            <h3 className="text-[16px] font-bold tracking-tight text-licorice mb-4">By quantity</h3>
+                                <h2 className="text-lg font-bold text-slate-900 tracking-tight mb-5">Sales Volume</h2>
 
                             <div className="relative flex items-center justify-center min-h-[160px]">
                                 <ResponsiveContainer width="100%" height={160}>
@@ -327,7 +302,7 @@ export function FinancialReportsScreen() {
                                     </PieChart>
                                 </ResponsiveContainer>
                                 <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                                    <span className="text-[8px] uppercase font-bold text-feldgrau tracking-widest">Total Qty</span>
+                                    <span className="text-[8px] uppercase font-bold text-feldgrau ">Total Qty</span>
                                     <span className="text-[18px] font-bold text-licorice">{financials.salesQuantityByItem.reduce((a, b) => a + b.value, 0)}</span>
                                 </div>
                             </div>
@@ -350,18 +325,14 @@ export function FinancialReportsScreen() {
                     <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
                         {/* Top items by revenue */}
                         <div className="rounded-[1.5rem] bg-white p-5 md:p-6 shadow-sm ring-1 ring-licorice/5">
-                            <div className="flex items-center justify-between mb-1">
-                                <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-feldgrau">Top Items</p>
-                                <ArrowUpRightIcon className="h-4 w-4 text-feldgrau" strokeWidth={2} />
-                            </div>
-                            <h3 className="text-[16px] font-bold tracking-tight text-licorice mb-4">By revenue</h3>
+                                <h2 className="text-lg font-bold text-slate-900 tracking-tight mb-5">Top Items</h2>
 
                             <div className="space-y-4">
                                 {financials.revenueByItem.map((item, i) => {
                                     const pct = Math.min(100, Math.max(0, (item.Revenue / (financials.totalRevenue || 1)) * 100));
                                     return (
                                         <div key={i}>
-                                            <div className="flex items-center justify-between text-[11px] mb-1.5">
+                                            <div className="flex items-center justify-between text-xs mb-1.5">
                                                 <span className="truncate font-bold tracking-tight text-licorice max-w-[140px]">{item.name}</span>
                                                 <span className="font-mono font-bold tabular-nums text-licorice">{formatGHS(item.Revenue)}</span>
                                             </div>
@@ -369,26 +340,20 @@ export function FinancialReportsScreen() {
                                                 <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-isabelline">
                                                     <div className="h-full rounded-full bg-licorice transition-all duration-500" style={{ width: `${pct}%` }} />
                                                 </div>
-                                                <span className="shrink-0 text-[9px] font-bold text-feldgrau">{pct.toFixed(0)}%</span>
+                                                <span className="shrink-0 text-xs font-bold text-feldgrau">{pct.toFixed(0)}%</span>
                                             </div>
                                         </div>
                                     );
                                 })}
                                 {financials.revenueByItem.length === 0 && (
-                                    <p className="text-center py-8 text-feldgrau text-[11px]">No data available</p>
+                                    <p className="text-center py-8 text-feldgrau text-xs">No data available</p>
                                 )}
                             </div>
                         </div>
 
                         {/* Peak Order Times — dark card like Vendly */}
-                        <div className="lg:col-span-2 rounded-[1.5rem] bg-licorice p-5 md:p-6 text-isabelline shadow-[0_8px_24px_rgba(35,20,12,0.18)]">
-                            <div className="flex items-start justify-between mb-4">
-                                <div>
-                                    <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-isabelline/50">Peak Order Times</p>
-                                    <h3 className="text-[16px] font-bold tracking-tight text-isabelline mt-0.5">{financials.peakHourInsight}</h3>
-                                </div>
-                                <ClockIcon className="h-5 w-5 text-isabelline/40" strokeWidth={2} />
-                            </div>
+                        <div className="lg:col-span-2 rounded-[1.5rem] bg-white border border-slate-100 text-slate-900 p-5 md:p-6">
+                            <h2 className="text-lg font-bold text-slate-900 tracking-tight mb-5">Peak Order Times</h2>
 
                             <div className="flex items-end justify-between gap-1 h-32 mt-4">
                                 {financials.hourlyDistribution.map((hourData, i) => {
@@ -400,18 +365,18 @@ export function FinancialReportsScreen() {
                                             <div
                                                 className={clsx(
                                                     "w-full rounded-t-sm transition-all duration-500",
-                                                    isPeak ? "bg-khaki" : "bg-white/20 group-hover:bg-white/40"
+                                                    isPeak ? "bg-khaki" : "bg-slate-100 group-hover:bg-slate-200"
                                                 )}
                                                 style={{ height: `${Math.max(heightPct, 4)}%` }}
                                             />
-                                            <div className="absolute bottom-full mb-2 opacity-0 group-hover:opacity-100 transition-opacity bg-white text-licorice text-[8px] font-bold px-2 py-1 rounded pointer-events-none z-20 whitespace-nowrap">
+                                            <div className="absolute bottom-full mb-2 opacity-0 group-hover:opacity-100 transition-opacity bg-white text-licorice text-[8px] font-bold px-2 py-1 rounded pointer-events-none z-20 whitespace-nowrap shadow">
                                                 {hourData.formatted}: {hourData.count} orders
                                             </div>
                                         </div>
                                     );
                                 })}
                             </div>
-                            <div className="flex justify-between mt-2 text-[8px] font-bold tracking-widest uppercase text-isabelline/30">
+                            <div className="flex justify-between mt-2 text-[8px] font-bold uppercase text-slate-400">
                                 <span>12AM</span>
                                 <span>6AM</span>
                                 <span>12PM</span>
@@ -422,43 +387,40 @@ export function FinancialReportsScreen() {
                     </div>
 
                     {/* ── P&L Breakdown Table ── */}
-                    <div className="rounded-[1.5rem] bg-white shadow-sm ring-1 ring-licorice/5 overflow-hidden">
+                    <div className="rounded-xl bg-white shadow-sm ring-1 ring-licorice/5 overflow-hidden">
                         <div className="border-b border-isabelline px-5 py-3">
-                            <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-feldgrau">Profit & Loss</p>
-                            <h3 className="text-[16px] font-bold tracking-tight text-licorice mt-0.5">{trendText}</h3>
+                            <h2 className="text-lg font-bold text-slate-900 tracking-tight mb-5">Profit & Loss</h2>
                         </div>
                         <table className="w-full">
                             <thead className="border-b border-isabelline bg-isabelline/30">
                                 <tr className="text-left">
-                                    <th className="px-5 py-2.5 text-[9px] font-bold uppercase tracking-[0.18em] text-feldgrau">Category</th>
-                                    <th className="px-5 py-2.5 text-right text-[9px] font-bold uppercase tracking-[0.18em] text-feldgrau">Amount</th>
-                                    <th className="hidden md:table-cell px-5 py-2.5 text-right text-[9px] font-bold uppercase tracking-[0.18em] text-feldgrau">% of Revenue</th>
+                                    <th className="px-5 py-2.5 text-xs font-bold uppercase text-feldgrau">Category</th>
+                                    <th className="px-5 py-2.5 text-right text-xs font-bold uppercase text-feldgrau">Amount</th>
+                                    <th className="hidden md:table-cell px-5 py-2.5 text-right text-xs font-bold uppercase text-feldgrau">% of Revenue</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-isabelline text-[11.5px]">
                                 <tr>
-                                    <td className="px-5 py-2.5 font-bold tracking-tight text-licorice">Gross Revenue</td>
-                                    <td className="px-5 py-2.5 text-right font-mono font-bold tabular-nums text-licorice">{formatGHS(financials.totalRevenue)}</td>
-                                    <td className="hidden md:table-cell px-5 py-2.5 text-right font-mono tabular-nums text-feldgrau">100%</td>
+                                    <td className="pl-4 pr-5 py-2.5 font-bold tracking-tight text-licorice">Gross Revenue</td>
+                                    <td className="px-5 py-2.5 text-right tabular-nums font-bold text-licorice">{formatGHS(financials.totalRevenue)}</td>
+                                    <td className="hidden md:table-cell px-5 py-2.5 text-right tabular-nums text-feldgrau">100%</td>
                                 </tr>
                                 {financials.expenseBreakdown.map((row) => (
                                     <tr key={row.category}>
-                                        <td className="px-5 py-2.5 pl-10 font-medium tracking-tight text-feldgrau">{row.category}</td>
-                                        <td className="px-5 py-2.5 text-right font-mono tabular-nums text-dark-red">−{formatGHS(row.amount)}</td>
-                                        <td className="hidden md:table-cell px-5 py-2.5 text-right font-mono tabular-nums text-feldgrau">{((row.amount / (financials.totalRevenue || 1)) * 100).toFixed(1)}%</td>
+                                        <td className="pl-8 pr-5 py-2.5 font-medium tracking-tight text-slate-600">{row.category}</td>
+                                        <td className="px-5 py-2.5 text-right tabular-nums text-dark-red">−{formatGHS(row.amount)}</td>
+                                        <td className="hidden md:table-cell px-5 py-2.5 text-right tabular-nums text-feldgrau">{((row.amount / (financials.totalRevenue || 1)) * 100).toFixed(1)}%</td>
                                     </tr>
                                 ))}
                                 {financials.expenseBreakdown.length === 0 && (
                                     <tr>
-                                        <td className="px-5 py-2.5 pl-10 font-medium tracking-tight text-feldgrau">No expenses recorded this period</td>
-                                        <td className="px-5 py-2.5 text-right font-mono tabular-nums text-feldgrau">−</td>
-                                        <td className="hidden md:table-cell px-5 py-2.5 text-right font-mono tabular-nums text-feldgrau">—</td>
+                                        <td colSpan={3} className="text-center text-sm text-slate-400 italic py-6">No expenses recorded this period</td>
                                     </tr>
                                 )}
-                                <tr className="bg-licorice text-isabelline">
-                                    <td className="px-5 py-3 font-bold tracking-tight">Net Profit</td>
-                                    <td className="px-5 py-3 text-right font-mono text-[14px] font-black tabular-nums">{formatGHS(financials.netProfit)}</td>
-                                    <td className="hidden md:table-cell px-5 py-3 text-right font-mono font-bold tabular-nums text-isabelline/80">{((financials.netProfit / (financials.totalRevenue || 1)) * 100).toFixed(1)}%</td>
+                                <tr className="bg-slate-50 border-t-2 border-slate-200 text-slate-900 font-bold">
+                                    <td className="pl-4 pr-5 py-3 font-bold tracking-tight">Net Profit</td>
+                                    <td className="px-5 py-3 text-right tabular-nums font-bold">{formatGHS(financials.netProfit)}</td>
+                                    <td className="hidden md:table-cell px-5 py-3 text-right tabular-nums font-bold text-slate-900">{((financials.netProfit / (financials.totalRevenue || 1)) * 100).toFixed(1)}%</td>
                                 </tr>
                             </tbody>
                         </table>
@@ -467,17 +429,14 @@ export function FinancialReportsScreen() {
                     {/* ── Recent Transactions ── */}
                     <div className="rounded-[1.5rem] bg-white p-5 md:p-6 shadow-sm ring-1 ring-licorice/5">
                         <div className="flex items-center justify-between mb-4">
-                            <div>
-                                <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-feldgrau">Activity</p>
-                                <h3 className="text-[16px] font-bold tracking-tight text-licorice">Recent Transactions</h3>
-                            </div>
-                            <span className="text-[10px] text-feldgrau font-medium">{financials.recentOrders.length} transactions</span>
+                            <h2 className="text-lg font-bold text-slate-900 tracking-tight mb-5">Recent Transactions</h2>
+                            <span className="text-xs text-feldgrau font-medium">{financials.recentOrders.length} transactions</span>
                         </div>
 
                         <div className="overflow-x-auto no-scrollbar">
                             <table className="w-full text-left text-xs min-w-[500px]">
                                 <thead>
-                                    <tr className="uppercase tracking-widest text-[9px] font-bold text-feldgrau border-b border-isabelline">
+                                    <tr className="uppercase text-xs font-bold text-feldgrau border-b border-isabelline">
                                         <th className="pb-3 font-normal">Date</th>
                                         <th className="pb-3 font-normal">Amount</th>
                                         <th className="pb-3 font-normal">Customer</th>
@@ -487,7 +446,7 @@ export function FinancialReportsScreen() {
                                 <tbody className="divide-y divide-isabelline/60">
                                     {financials.recentOrders.map((o) => (
                                         <tr key={o.id} className="group hover:bg-isabelline/30 transition-colors">
-                                            <td className="py-3 font-medium text-feldgrau text-[11px]">
+                                            <td className="py-3 font-medium text-feldgrau text-xs">
                                                 {new Date(o.created_at).toLocaleDateString("en-GH", { day: "2-digit", month: "short" })}
                                             </td>
                                             <td className="py-3 font-mono text-[12px] font-bold tabular-nums text-licorice">{formatGHS(o.amount)}</td>
@@ -496,11 +455,11 @@ export function FinancialReportsScreen() {
                                                     <div className="w-6 h-6 rounded-full bg-isabelline flex items-center justify-center text-[8px] font-bold text-feldgrau uppercase">
                                                         {o.customer_name ? o.customer_name.substring(0, 2) : "CU"}
                                                     </div>
-                                                    <span className="font-semibold text-[11px] text-licorice">{o.customer_name || "Walk-in"}</span>
+                                                    <span className="font-semibold text-xs text-licorice">{o.customer_name || "Walk-in"}</span>
                                                 </div>
                                             </td>
                                             <td className="py-3">
-                                                <span className="inline-flex items-center rounded-full bg-emerald-100 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider text-emerald-700">
+                                                <span className="inline-flex items-center rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-bold uppercase tracking-wider text-emerald-700">
                                                     Paid
                                                 </span>
                                             </td>
@@ -585,9 +544,6 @@ function computeFinancials(
     items: ItemRow[],
     submissions: SubRow[],
     customers: CustomerRow[],
-    _timeFilter: string,
-    _customStart: string,
-    _customEnd: string,
 ): Financials {
     const totalRevenue = payments.reduce((s, p) => s + p.amount, 0);
     const totalExpenses = expenses.reduce((s, e) => s + e.amount, 0);
@@ -705,16 +661,10 @@ function formatHour(h: number): string {
 function StatWidget({
     title,
     value,
-    trend,
-    positive,
-    customIcon,
     className,
 }: {
     title: string;
-    value: string;
-    trend: string;
-    positive: boolean;
-    customIcon?: React.ReactNode;
+    value: React.ReactNode;
     className?: string;
 }) {
     return (
@@ -725,23 +675,11 @@ function StatWidget({
             )}
         >
             <div className="flex items-center justify-between mb-3">
-                <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-feldgrau">{title}</p>
-                <div className="p-1.5 bg-isabelline rounded-full text-feldgrau/70 group-hover:bg-licorice group-hover:text-white transition-colors">
-                    {customIcon || <ArrowUpRightIcon className="h-3.5 w-3.5" strokeWidth={2} />}
-                </div>
+                <p className="text-xs font-bold uppercase text-feldgrau">{title}</p>
             </div>
-            <p className="font-mono text-[22px] md:text-[24px] font-black tabular-nums leading-none text-licorice mb-3">
+            <p className="text-2xl font-bold font-sans tabular-nums tracking-tight text-slate-900 mb-3">
                 {value}
             </p>
-            <div
-                className={clsx(
-                    "inline-flex items-center gap-1 text-[9px] font-bold px-2 py-1 rounded-md",
-                    positive ? "text-emerald-600 bg-emerald-50" : "text-feldgrau bg-isabelline"
-                )}
-            >
-                {positive ? <ArrowUpRightIcon className="h-2.5 w-2.5" strokeWidth={2.5} /> : <ArrowTrendingUpIcon className="h-2.5 w-2.5" strokeWidth={2.5} />}
-                {trend}
-            </div>
         </div>
     );
 }

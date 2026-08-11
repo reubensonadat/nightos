@@ -158,25 +158,25 @@ export function MenuManagerScreen() {
     return (
         <div className="mx-auto w-full max-w-7xl space-y-6">
             <div className="grid grid-cols-2 gap-3 md:grid-cols-5 md:gap-4">
-                <div className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-isabelline">
-                    <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-feldgrau">Total Items</p>
-                    <p className="mt-1 font-mono text-[22px] font-black tabular-nums text-licorice">{totalItems}</p>
+                <div className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-isabelline flex flex-col gap-1">
+                    <p className="text-xs font-bold uppercase tracking-wider text-feldgrau">Total Items</p>
+                    <p className="text-4xl font-bold tabular-nums text-licorice">{totalItems}</p>
                 </div>
-                <div className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-isabelline">
-                    <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-feldgrau">Available</p>
-                    <p className="mt-1 font-mono text-[22px] font-black tabular-nums text-khaki">{items.filter((i) => i.is_active).length}</p>
+                <div className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-isabelline flex flex-col gap-1">
+                    <p className="text-xs font-bold uppercase tracking-wider text-feldgrau">Available</p>
+                    <p className="text-4xl font-bold tabular-nums text-khaki">{items.filter((i) => i.is_active).length}</p>
                 </div>
-                <div className="rounded-2xl bg-licorice p-4 text-isabelline shadow-[0_8px_24px_rgba(35,20,12,0.15)]">
-                    <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-isabelline/60">Low Stock</p>
-                    <p className="mt-1 font-mono text-[22px] font-black tabular-nums text-khaki">{lowStock}</p>
+                <div className="rounded-2xl bg-licorice p-4 text-isabelline shadow-[0_8px_24px_rgba(35,20,12,0.15)] flex flex-col gap-1">
+                    <p className="text-xs font-bold uppercase tracking-wider text-isabelline/60">Low Stock</p>
+                    <p className="text-4xl font-bold tabular-nums text-khaki">{lowStock}</p>
                 </div>
-                <div className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-isabelline">
-                    <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-feldgrau">Out of Stock</p>
-                    <p className="mt-1 font-mono text-[22px] font-black tabular-nums text-dark-red">{outOfStock}</p>
+                <div className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-isabelline flex flex-col gap-1">
+                    <p className="text-xs font-bold uppercase tracking-wider text-feldgrau">Out of Stock</p>
+                    <p className="text-4xl font-bold tabular-nums text-dark-red">{outOfStock}</p>
                 </div>
-                <div className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-isabelline">
-                    <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-feldgrau">Inv. Value</p>
-                    <p className="mt-1 font-mono text-[18px] font-black tabular-nums text-licorice">{formatGHS(totalInventoryValue)}</p>
+                <div className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-isabelline flex flex-col gap-1">
+                    <p className="text-xs font-bold uppercase tracking-wider text-feldgrau">Inv. Value</p>
+                    <p className="text-4xl font-bold tabular-nums text-licorice">{formatGHS(totalInventoryValue)}</p>
                 </div>
             </div>
 
@@ -190,14 +190,14 @@ export function MenuManagerScreen() {
                         const isActive = cat === activeCategory;
                         return (
                             <button key={cat} type="button" onClick={() => setActiveCategory(cat)}
-                                className={clsx("shrink-0 rounded-full px-3 py-1.5 text-[10px] font-bold tracking-tight transition-all", isActive ? "bg-licorice text-isabelline shadow-sm" : "text-feldgrau hover:text-licorice")}>
+                                className={clsx("shrink-0 rounded-full px-3 py-1.5 text-xs font-bold tracking-tight transition-all", isActive ? "bg-licorice text-isabelline shadow-sm" : "text-feldgrau hover:text-licorice")}>
                                 {cat}
                             </button>
                         );
                     })}
                 </div>
                 <button type="button" onClick={() => setCreating(true)}
-                    className="inline-flex items-center gap-1 rounded-full bg-licorice px-3.5 py-2 text-[11px] font-bold tracking-tight text-isabelline shadow-sm transition-all hover:bg-licorice/95 active:scale-95">
+                    className="inline-flex items-center gap-1 rounded-full bg-licorice px-3.5 py-2 text-xs font-bold tracking-tight text-isabelline shadow-sm transition-all hover:bg-licorice/95 active:scale-95">
                     <PlusIcon className="h-3.5 w-3.5" strokeWidth={2.5} /> Add Item
                 </button>
             </div>
@@ -212,14 +212,14 @@ export function MenuManagerScreen() {
                     <table className="hidden md:table w-full">
                         <thead className="border-b border-isabelline bg-isabelline/50">
                             <tr className="text-left">
-                                <th className="px-4 py-2.5 text-[9px] font-bold uppercase tracking-[0.18em] text-feldgrau">Item</th>
-                                <th className="px-4 py-2.5 text-[9px] font-bold uppercase tracking-[0.18em] text-feldgrau">Cat.</th>
-                                <th className="px-4 py-2.5 text-[9px] font-bold uppercase tracking-[0.18em] text-feldgrau">Cost</th>
-                                <th className="px-4 py-2.5 text-[9px] font-bold uppercase tracking-[0.18em] text-feldgrau">Sell</th>
-                                <th className="px-4 py-2.5 text-[9px] font-bold uppercase tracking-[0.18em] text-feldgrau">Margin</th>
-                                <th className="px-4 py-2.5 text-[9px] font-bold uppercase tracking-[0.18em] text-feldgrau">Stock</th>
-                                <th className="px-4 py-2.5 text-[9px] font-bold uppercase tracking-[0.18em] text-feldgrau">Status</th>
-                                <th className="px-4 py-2.5 text-[9px] font-bold uppercase tracking-[0.18em] text-feldgrau text-right">Actions</th>
+                                <th className="px-4 py-2.5 text-xs font-bold uppercase text-feldgrau">Item</th>
+                                <th className="px-4 py-2.5 text-xs font-bold uppercase text-feldgrau">Cat.</th>
+                                <th className="px-4 py-2.5 text-xs font-bold uppercase text-feldgrau">Cost</th>
+                                <th className="px-4 py-2.5 text-xs font-bold uppercase text-feldgrau">Sell</th>
+                                <th className="px-4 py-2.5 text-xs font-bold uppercase text-feldgrau">Margin</th>
+                                <th className="px-4 py-2.5 text-xs font-bold uppercase text-feldgrau">Stock</th>
+                                <th className="px-4 py-2.5 text-xs font-bold uppercase text-feldgrau">Status</th>
+                                <th className="px-4 py-2.5 text-xs font-bold uppercase text-feldgrau text-right">Actions</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-isabelline">
@@ -238,23 +238,23 @@ export function MenuManagerScreen() {
                                                 </div>
                                                 <div className="min-w-0">
                                                     <p className="truncate text-[12px] font-bold tracking-tight text-licorice">{item.name}</p>
-                                                    <p className="truncate text-[10px] tracking-tight text-feldgrau">{item.supplier || "No supplier"} · {item.unit}</p>
+                                                    <p className="truncate text-xs tracking-tight text-feldgrau">{item.supplier || "No supplier"} · {item.unit}</p>
                                                 </div>
                                             </div>
                                         </td>
                                         <td className="px-4 py-2.5">
-                                            <span className="rounded-full bg-isabelline px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider text-feldgrau">{item.category}</span>
+                                            <span className="rounded-full bg-isabelline px-2 py-0.5 text-xs font-bold uppercase tracking-wider text-feldgrau">{item.category}</span>
                                         </td>
                                         <td className="px-4 py-2.5 font-mono text-[12px] font-bold tabular-nums text-feldgrau">{formatGHS(Number(item.unit_cost))}</td>
                                         <td className="px-4 py-2.5 font-mono text-[12px] font-bold tabular-nums text-licorice">{item.sellingPrice > 0 ? formatGHS(item.sellingPrice) : <span className="text-feldgrau/50">—</span>}</td>
                                         <td className="px-4 py-2.5">
                                             {item.sellingPrice > 0 ? (
-                                                <span className={clsx("inline-flex items-center rounded-full px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider",
+                                                <span className={clsx("inline-flex items-center rounded-full px-2 py-0.5 text-xs font-bold uppercase tracking-wider",
                                                     marginPct > 50 ? "bg-emerald-100 text-emerald-700" : marginPct > 30 ? "bg-khaki/15 text-khaki" : "bg-dark-red/10 text-dark-red")}>
                                                     {marginPct.toFixed(0)}%
                                                 </span>
                                             ) : (
-                                                <span className="text-[10px] text-feldgrau/50">—</span>
+                                                <span className="text-xs text-feldgrau/50">—</span>
                                             )}
                                         </td>
                                         <td className="px-4 py-2.5">
@@ -301,7 +301,7 @@ export function MenuManagerScreen() {
                                     </div>
                                     <div className="min-w-0 flex-1">
                                         <p className="truncate text-[12px] font-bold tracking-tight text-licorice">{item.name}</p>
-                                        <div className="mt-0.5 flex items-center gap-2 text-[10px] flex-wrap">
+                                        <div className="mt-0.5 flex items-center gap-2 text-xs flex-wrap">
                                             <span className="font-mono font-bold text-licorice">{item.sellingPrice > 0 ? formatGHS(item.sellingPrice) : "—"}</span>
                                             <span className="text-feldgrau">·</span>
                                             <span className={clsx("font-bold", stock === 0 ? "text-dark-red" : isLow ? "text-amber-600" : "text-feldgrau")}>Stock: {stock}</span>
@@ -384,74 +384,74 @@ function ItemModal({ item, onSave, onClose, onDelete }: {
             <div className="relative w-full max-w-md max-h-[90vh] overflow-y-auto rounded-t-2xl md:rounded-2xl bg-white shadow-2xl">
                 <div className="sticky top-0 flex items-center justify-between border-b border-isabelline bg-white px-5 py-3">
                     <div>
-                        <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-feldgrau">{item ? "Edit Item" : "New Item"}</p>
+                        <p className="text-xs font-bold uppercase text-feldgrau">{item ? "Edit Item" : "New Item"}</p>
                         <h3 className="text-[14px] font-bold tracking-tight text-licorice">{item ? item.name : "Add inventory item"}</h3>
                     </div>
                     <button type="button" onClick={onClose} className="flex h-8 w-8 items-center justify-center rounded-full bg-isabelline text-licorice"><XMarkIcon className="h-4 w-4" strokeWidth={2.25} /></button>
                 </div>
                 <div className="space-y-3 px-5 py-4">
                     <div>
-                        <label className="text-[10px] font-bold uppercase tracking-[0.18em] text-feldgrau">Item Name</label>
+                        <label className="text-xs font-bold uppercase text-feldgrau">Item Name</label>
                         <input type="text" value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} placeholder="Cocoa Espresso Liqueur"
                             className="mt-1 w-full rounded-lg bg-isabelline px-3 py-2 text-[12px] text-licorice placeholder:text-feldgrau/50 ring-1 ring-licorice/8 focus:outline-none focus:ring-2 focus:ring-licorice/20" />
                     </div>
                     <div className="grid grid-cols-2 gap-3">
                         <div>
-                            <label className="text-[10px] font-bold uppercase tracking-[0.18em] text-feldgrau">Category</label>
+                            <label className="text-xs font-bold uppercase text-feldgrau">Category</label>
                             <input type="text" value={draft.category} onChange={(e) => setDraft({ ...draft, category: e.target.value })} placeholder="Spirits"
                                 className="mt-1 w-full rounded-lg bg-isabelline px-3 py-2 text-[12px] text-licorice placeholder:text-feldgrau/50 ring-1 ring-licorice/8 focus:outline-none focus:ring-2 focus:ring-licorice/20" />
                         </div>
                         <div>
-                            <label className="text-[10px] font-bold uppercase tracking-[0.18em] text-feldgrau">Unit</label>
+                            <label className="text-xs font-bold uppercase text-feldgrau">Unit</label>
                             <input type="text" value={draft.unit} onChange={(e) => setDraft({ ...draft, unit: e.target.value })} placeholder="bottle / kg / pieces"
                                 className="mt-1 w-full rounded-lg bg-isabelline px-3 py-2 text-[12px] text-licorice placeholder:text-feldgrau/50 ring-1 ring-licorice/8 focus:outline-none focus:ring-2 focus:ring-licorice/20" />
                         </div>
                     </div>
                     <div className="grid grid-cols-2 gap-3">
                         <div>
-                            <label className="text-[10px] font-bold uppercase tracking-[0.18em] text-feldgrau">Unit Cost (GHS)</label>
+                            <label className="text-xs font-bold uppercase text-feldgrau">Unit Cost (GHS)</label>
                             <input type="number" value={Number(draft.unit_cost)} onChange={(e) => setDraft({ ...draft, unit_cost: parseFloat(e.target.value) || 0 })}
                                 className="mt-1 w-full rounded-lg bg-isabelline px-3 py-2 font-mono text-[12px] tabular-nums text-licorice ring-1 ring-licorice/8 focus:outline-none focus:ring-2 focus:ring-licorice/20" />
                         </div>
                         <div>
-                            <label className="text-[10px] font-bold uppercase tracking-[0.18em] text-feldgrau">Sell Price (menu)</label>
+                            <label className="text-xs font-bold uppercase text-feldgrau">Sell Price (menu)</label>
                             <input type="number" value={draft.sellingPrice} disabled
                                 className="mt-1 w-full rounded-lg bg-isabelline/50 px-3 py-2 font-mono text-[12px] tabular-nums text-feldgrau ring-1 ring-licorice/8" />
                         </div>
                     </div>
                     {draft.sellingPrice > 0 && (
-                        <div className={clsx("rounded-lg px-3 py-2 text-[11px] font-bold", marginPct > 50 ? "bg-emerald-50 text-emerald-700" : marginPct > 30 ? "bg-khaki/15 text-khaki" : "bg-dark-red/10 text-dark-red")}>
+                        <div className={clsx("rounded-lg px-3 py-2 text-xs font-bold", marginPct > 50 ? "bg-emerald-50 text-emerald-700" : marginPct > 30 ? "bg-khaki/15 text-khaki" : "bg-dark-red/10 text-dark-red")}>
                             Margin: {marginPct.toFixed(0)}% · Profit: {formatGHS(draft.sellingPrice - Number(draft.unit_cost))}/unit
                         </div>
                     )}
                     <div className="grid grid-cols-2 gap-3">
                         <div>
-                            <label className="text-[10px] font-bold uppercase tracking-[0.18em] text-feldgrau">Stock</label>
+                            <label className="text-xs font-bold uppercase text-feldgrau">Stock</label>
                             <input type="number" value={Number(draft.stock_qty)} onChange={(e) => setDraft({ ...draft, stock_qty: parseFloat(e.target.value) || 0 })}
                                 className="mt-1 w-full rounded-lg bg-isabelline px-3 py-2 font-mono text-[12px] tabular-nums text-licorice ring-1 ring-licorice/8 focus:outline-none focus:ring-2 focus:ring-licorice/20" />
                         </div>
                         <div>
-                            <label className="text-[10px] font-bold uppercase tracking-[0.18em] text-feldgrau">Reorder At</label>
+                            <label className="text-xs font-bold uppercase text-feldgrau">Reorder At</label>
                             <input type="number" value={Number(draft.reorder_threshold)} onChange={(e) => setDraft({ ...draft, reorder_threshold: parseFloat(e.target.value) || 0 })}
                                 className="mt-1 w-full rounded-lg bg-isabelline px-3 py-2 font-mono text-[12px] tabular-nums text-licorice ring-1 ring-licorice/8 focus:outline-none focus:ring-2 focus:ring-licorice/20" />
                         </div>
                     </div>
                     <div>
-                        <label className="text-[10px] font-bold uppercase tracking-[0.18em] text-feldgrau">Supplier</label>
+                        <label className="text-xs font-bold uppercase text-feldgrau">Supplier</label>
                         <input type="text" value={draft.supplier ?? ""} onChange={(e) => setDraft({ ...draft, supplier: e.target.value })} placeholder="e.g. Premium Wines GH"
                             className="mt-1 w-full rounded-lg bg-isabelline px-3 py-2 text-[12px] text-licorice placeholder:text-feldgrau/50 ring-1 ring-licorice/8 focus:outline-none focus:ring-2 focus:ring-licorice/20" />
                     </div>
                 </div>
                 <div className="sticky bottom-0 flex items-center justify-between gap-2 border-t border-isabelline bg-white px-5 py-3">
                     {onDelete ? (
-                        <button type="button" onClick={onDelete} className="inline-flex items-center gap-1 rounded-full bg-dark-red/10 px-3 py-2 text-[10px] font-bold uppercase tracking-wider text-dark-red transition-colors hover:bg-dark-red/20">
+                        <button type="button" onClick={onDelete} className="inline-flex items-center gap-1 rounded-full bg-dark-red/10 px-3 py-2 text-xs font-bold uppercase tracking-wider text-dark-red transition-colors hover:bg-dark-red/20">
                             <TrashIcon className="h-3.5 w-3.5" strokeWidth={2} /> Delete
                         </button>
                     ) : <div />}
                     <div className="flex items-center gap-2">
-                        <button type="button" onClick={onClose} className="rounded-full bg-isabelline px-4 py-2 text-[11px] font-bold tracking-tight text-feldgrau ring-1 ring-licorice/8">Cancel</button>
+                        <button type="button" onClick={onClose} className="rounded-full bg-isabelline px-4 py-2 text-xs font-bold tracking-tight text-feldgrau ring-1 ring-licorice/8">Cancel</button>
                         <button type="button" onClick={() => { if (draft.name.trim()) onSave(draft); }} disabled={!draft.name.trim()}
-                            className="inline-flex items-center gap-1 rounded-full bg-licorice px-4 py-2 text-[11px] font-bold tracking-tight text-isabelline shadow-sm disabled:opacity-40">
+                            className="inline-flex items-center gap-1 rounded-full bg-licorice px-4 py-2 text-xs font-bold tracking-tight text-isabelline shadow-sm disabled:opacity-40">
                             <CheckIcon className="h-3.5 w-3.5" strokeWidth={2.5} /> Save
                         </button>
                     </div>
