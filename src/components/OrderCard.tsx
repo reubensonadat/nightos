@@ -12,6 +12,7 @@ export type OrderItem = {
     name: string;
     quantity: number;
     notes?: string;
+    isAllergy?: boolean;
 };
 
 export type KitchenOrder = {
@@ -36,16 +37,20 @@ type Props = {
 
 /* ────────────────────────── Helpers ────────────────────────── */
 
-function minutesSince(iso: string, now: number): number {
+function secondsSince(iso: string, now: number): number {
     const placed = new Date(iso).getTime();
-    return Math.max(0, Math.floor((now - placed) / 60_000));
+    return Math.max(0, Math.floor((now - placed) / 1000));
 }
 
-function formatDuration(mins: number): string {
-    if (mins < 60) return `${mins}m`;
-    const h = Math.floor(mins / 60);
-    const m = mins % 60;
-    return `${h}h ${m}m`;
+function formatDuration(secs: number): string {
+    const h = Math.floor(secs / 3600);
+    const m = Math.floor((secs % 3600) / 60);
+    const s = secs % 60;
+    
+    if (h > 0) {
+        return `${h}:${m.toString().padStart(2, "0")}:${s.toString().padStart(2, "0")}`;
+    }
+    return `${m.toString().padStart(2, "0")}:${s.toString().padStart(2, "0")}`;
 }
 
 /** Returns urgency level based on minutes since order was placed. */
@@ -58,17 +63,17 @@ function getUrgency(mins: number): "fresh" | "warming" | "urgent" {
 const URGENCY_STYLES = {
     fresh: {
         ring: "ring-feldgrau/15",
-        text: "text-feldgrau",
+        text: "text-emerald-700",
         dot: "bg-feldgrau",
     },
     warming: {
         ring: "ring-khaki/40",
-        text: "text-khaki",
+        text: "text-amber-600",
         dot: "bg-khaki",
     },
     urgent: {
         ring: "ring-dark-red/50",
-        text: "text-dark-red",
+        text: "text-red-600 font-bold animate-pulse",
         dot: "bg-dark-red",
     },
 } as const;
@@ -82,8 +87,9 @@ const STATUS_LABEL: Record<OrderStatus, string> = {
 /* ────────────────────────── Component ────────────────────────── */
 
 export function OrderCard({ order, now, onAdvance, onMarkReady, onMarkServed }: Props) {
-    const elapsed = minutesSince(order.placedAt, now);
-    const urgency = getUrgency(elapsed);
+    const elapsedSeconds = secondsSince(order.placedAt, now);
+    const elapsedMinutes = Math.floor(elapsedSeconds / 60);
+    const urgency = getUrgency(elapsedMinutes);
     const styles = URGENCY_STYLES[urgency];
 
     const totalItems = order.items.reduce((sum, item) => sum + item.quantity, 0);
@@ -103,48 +109,39 @@ export function OrderCard({ order, now, onAdvance, onMarkReady, onMarkServed }: 
             {/* ── Top row: Table + station + timer ── */}
             <header className="flex items-center justify-between border-b border-isabelline px-4 py-2.5">
                 <div className="flex items-center gap-2.5">
-                    <div className="flex flex-col items-center justify-center rounded-lg bg-licorice px-2.5 py-1.5 text-isabelline">
-                        <span className="text-[8px] font-bold uppercase tracking-[0.14em] text-isabelline/60">
+                    <div className="flex flex-col items-center justify-center rounded-lg bg-licorice px-2 py-1 text-isabelline">
+                        <span className="text-[10px] font-bold uppercase tracking-[0.14em] text-isabelline/60">
                             Table
                         </span>
-                        <span className="font-serif text-[18px] font-black leading-none tracking-[-0.04em]">
+                        <span className="font-sans font-bold text-lg tabular-nums leading-none tracking-[-0.04em]">
                             {String(order.tableNumber).padStart(2, "0")}
-                        </span>
-                    </div>
-                    <div className="flex flex-col leading-tight">
-                        <span className="text-[10px] font-bold uppercase tracking-[0.14em] text-feldgrau">
-                            {order.station}
-                        </span>
-                        <span className="text-[10px] font-medium tracking-tight text-feldgrau/80">
-                            {order.server}
                         </span>
                     </div>
                 </div>
 
                 {/* Elapsed timer */}
                 <div className={`flex items-center gap-1 ${styles.text}`}>
-                    <ClockIcon className="h-3.5 w-3.5" strokeWidth={2.25} />
-                    <span className="font-mono text-[13px] font-bold tabular-nums">
-                        {formatDuration(elapsed)}
+                    <span className="text-lg tabular-nums tracking-tight">
+                        {formatDuration(elapsedSeconds)}
                     </span>
                 </div>
             </header>
 
             {/* ── Items list ── */}
             <div className="flex-1 px-4 py-3">
-                <ul className="space-y-1.5">
+                <ul className="space-y-1">
                     {order.items.map((item, idx) => (
-                        <li key={idx} className="flex items-start gap-2">
-                            <span className="mt-0.5 inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-md bg-khaki/15 font-mono text-[11px] font-black tabular-nums text-khaki">
-                                {item.quantity}
+                        <li key={idx} className="grid grid-cols-[30px_1fr] gap-2">
+                            <span className="mt-0.5 text-base font-medium text-slate-400 tabular-nums text-right">
+                                {item.quantity}x
                             </span>
                             <div className="flex-1 min-w-0">
-                                <p className="text-[12.5px] font-bold leading-tight tracking-tight text-licorice">
+                                <p className="text-base font-semibold text-slate-900 leading-tight tracking-tight">
                                     {item.name}
                                 </p>
                                 {item.notes && (
-                                    <p className="mt-0.5 inline-flex items-center gap-1 rounded-md bg-dark-red/8 px-1.5 py-0.5 text-[10px] font-bold tracking-tight text-dark-red">
-                                        ⚠ {item.notes}
+                                    <p className={`mt-0.5 flex items-center text-sm font-normal ${item.isAllergy ? "text-dark-red" : "text-slate-500"}`}>
+                                        {item.isAllergy && "⚠ "}{item.notes}
                                     </p>
                                 )}
                             </div>
@@ -153,14 +150,8 @@ export function OrderCard({ order, now, onAdvance, onMarkReady, onMarkServed }: 
                 </ul>
 
                 {/* Items count footer */}
-                <div className="mt-2 flex items-center justify-between border-t border-isabelline pt-2 text-[9px] font-bold uppercase tracking-wider text-feldgrau">
+                <div className="mt-2 flex items-center justify-between border-t border-isabelline pt-2 text-xs font-medium uppercase tracking-wider text-slate-400">
                     <span>{totalItems} item{totalItems > 1 ? "s" : ""}</span>
-                    {hasNotes && (
-                        <span className="inline-flex items-center gap-1 text-dark-red">
-                            <span className="h-1.5 w-1.5 rounded-full bg-dark-red" />
-                            Notes
-                        </span>
-                    )}
                 </div>
             </div>
 
@@ -174,14 +165,13 @@ export function OrderCard({ order, now, onAdvance, onMarkReady, onMarkServed }: 
                         className="
                             flex w-full items-center justify-center gap-1.5
                             rounded-xl bg-licorice px-4 py-2.5
-                            text-[12px] font-bold tracking-tight text-isabelline
+                            text-base font-bold tracking-tight text-isabelline
                             shadow-[0_4px_12px_rgba(35,20,12,0.18)]
                             transition-all duration-150
                             hover:bg-licorice/95
                             active:scale-[0.98]
                         "
                     >
-                        <PlayIcon className="h-3.5 w-3.5" strokeWidth={2.5} />
                         Start Preparing
                     </button>
                 )}
@@ -194,14 +184,13 @@ export function OrderCard({ order, now, onAdvance, onMarkReady, onMarkServed }: 
                         className="
                             flex w-full items-center justify-center gap-1.5
                             rounded-xl bg-khaki px-4 py-2.5
-                            text-[12px] font-bold tracking-tight text-licorice
+                            text-base font-bold tracking-tight text-licorice
                             shadow-[0_4px_12px_rgba(143,106,55,0.25)]
                             transition-all duration-150
                             hover:brightness-105
                             active:scale-[0.98]
                         "
                     >
-                        <CheckIcon className="h-3.5 w-3.5" strokeWidth={2.5} />
                         Mark Ready
                     </button>
                 )}
@@ -215,19 +204,17 @@ export function OrderCard({ order, now, onAdvance, onMarkReady, onMarkServed }: 
                             className="
                                 flex w-full items-center justify-center gap-1.5
                                 rounded-xl bg-feldgrau px-4 py-2.5
-                                text-[12px] font-bold tracking-tight text-isabelline
+                                text-base font-bold tracking-tight text-isabelline
                                 shadow-[0_4px_12px_rgba(58,66,63,0.25)]
                                 transition-all duration-150
                                 hover:brightness-110
                                 active:scale-[0.98]
                             "
                         >
-                            <CheckIcon className="h-3.5 w-3.5" strokeWidth={2.5} />
                             Mark Served
                         </button>
                     ) : (
-                        <div className="flex items-center justify-center gap-1.5 rounded-xl bg-khaki/15 px-4 py-2.5 text-[12px] font-bold tracking-tight text-khaki">
-                            <CheckIcon className="h-3.5 w-3.5" strokeWidth={2.5} />
+                        <div className="flex items-center justify-center gap-1.5 rounded-xl bg-khaki/15 px-4 py-2.5 text-base font-bold tracking-tight text-khaki">
                             Ready for pickup
                         </div>
                     ))}

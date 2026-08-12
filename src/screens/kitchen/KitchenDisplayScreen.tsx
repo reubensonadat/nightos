@@ -3,6 +3,7 @@ import { useRealtime } from "../../hooks/useRealtime";
 import { ArrowPathIcon, SpeakerWaveIcon } from "@heroicons/react/24/outline";
 import { OrderCard, type KitchenOrder, type OrderStatus } from "../../components/OrderCard";
 import { db, type DbKitchenOrderRow } from "../../lib/api";
+import signoutIcon from "../../assets/sign-out.svg";
 
 /* ────────────────────────── Station filter ────────────────────────── */
 
@@ -201,7 +202,6 @@ export function KitchenDisplayScreen({ venueId, staffId, staffName, onExit, onSi
     );
 
     /* ── Header stats ── */
-    const totalOrders = filteredOrders.length;
     const pendingCount = ordersByStatus.pending.length;
     const preparingCount = ordersByStatus.preparing.length;
     const readyCount = ordersByStatus.ready.length;
@@ -225,52 +225,21 @@ export function KitchenDisplayScreen({ venueId, staffId, staffName, onExit, onSi
                                 <span className="text-[14px] font-bold tracking-tight">
                                     Kitchen Display
                                 </span>
-                                <span className="text-[9px] font-semibold uppercase tracking-[0.18em] text-isabelline/60">
-                                    Velvet Lounge · {staffName}
-                                </span>
                             </div>
                         </div>
 
-                        {/* Live clock */}
-                        <div className="hidden md:flex flex-col items-center leading-tight">
-                            <span className="font-mono text-[22px] font-black tabular-nums tracking-tight">
-                                {new Date(now).toLocaleTimeString("en-GH", {
-                                    hour: "2-digit",
-                                    minute: "2-digit",
-                                    hour12: false,
-                                })}
-                            </span>
-                            <span className="text-[9px] font-semibold uppercase tracking-[0.18em] text-isabelline/60">
-                                {new Date(now).toLocaleDateString("en-GH", {
-                                    weekday: "short",
-                                    month: "short",
-                                    day: "numeric",
-                                })}
-                            </span>
-                        </div>
+
 
                         {/* Refresh + exit */}
                         <div className="flex items-center gap-2">
-                            <div className="hidden sm:flex items-center gap-1.5 rounded-full bg-isabelline/10 px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-isabelline/80">
-                                <ArrowPathIcon className="h-3 w-3 animate-spin" strokeWidth={2.5} style={{ animationDuration: "3s" }} />
-                                Live
-                            </div>
-                            {onSignOut && (
-                                <button
-                                    type="button"
-                                    onClick={onSignOut}
-                                    className="rounded-full bg-isabelline/10 px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-isabelline/80 transition-colors hover:bg-isabelline/20"
-                                >
-                                    Switch staff
-                                </button>
-                            )}
                             {onExit && (
                                 <button
                                     type="button"
                                     onClick={onExit}
-                                    className="rounded-full bg-isabelline/10 px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-isabelline/80 transition-colors hover:bg-isabelline/20"
+                                    className="flex items-center gap-1.5 rounded-full bg-isabelline/10 px-3 py-1.5 text-xs font-bold uppercase tracking-wider text-isabelline/80 transition-colors hover:bg-isabelline/20"
                                 >
-                                    Exit
+                                    <img src={signoutIcon} alt="" className="h-4 w-4 opacity-80" />
+                                    Sign out
                                 </button>
                             )}
                         </div>
@@ -298,16 +267,7 @@ export function KitchenDisplayScreen({ venueId, staffId, staffName, onExit, onSi
                             })}
                         </div>
 
-                        {/* Summary chips */}
-                        <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-wider">
-                            <span className="inline-flex items-center gap-1.5 rounded-full bg-isabelline/10 px-3 py-1.5 text-isabelline/80">
-                                <SpeakerWaveIcon className="h-3 w-3" strokeWidth={2.25} />
-                                Sound on
-                            </span>
-                            <span className="inline-flex items-center gap-1.5 rounded-full bg-isabelline/10 px-3 py-1.5 text-isabelline/80">
-                                {totalOrders} active
-                            </span>
-                        </div>
+
                     </div>
                 </div>
             </header>
@@ -340,7 +300,7 @@ export function KitchenDisplayScreen({ venueId, staffId, staffName, onExit, onSi
                                         ? preparingCount
                                         : readyCount;
                             return (
-                                <div key={col.status} className="flex flex-col">
+                                <div key={col.status} className="flex flex-col h-full">
                                     {/* Column header */}
                                     <div className="mb-3 flex items-center justify-between rounded-xl bg-white px-4 py-2.5 shadow-sm ring-1 ring-isabelline">
                                         <div className="flex items-center gap-2.5">
@@ -355,14 +315,13 @@ export function KitchenDisplayScreen({ venueId, staffId, staffName, onExit, onSi
                                     </div>
 
                                     {/* Cards */}
-                                    <div className="flex flex-col gap-3">
+                                    <div className="flex flex-col gap-3 flex-1">
                                         {colOrders.length === 0 ? (
-                                            <div className="flex flex-col items-center justify-center rounded-2xl border-2 border-dashed border-licorice/10 px-6 py-12 text-center">
-                                                <span className="h-1.5 w-1.5 rounded-full bg-licorice/20" />
-                                                <p className="mt-3 text-[11px] font-bold uppercase tracking-wider text-feldgrau/60">
+                                            <div className="flex flex-col items-center justify-center h-full min-h-[200px] rounded-2xl border-2 border-dashed border-licorice/10 px-6 py-12 text-center">
+                                                <p className="mt-3 text-base font-bold uppercase tracking-wider text-feldgrau/60">
                                                     No orders
                                                 </p>
-                                                <p className="mt-1 text-[10px] tracking-tight text-feldgrau/50">
+                                                <p className="mt-1 text-sm tracking-tight text-feldgrau/50">
                                                     {col.status === "pending"
                                                         ? "New orders appear here as customers send them"
                                                         : col.status === "preparing"
@@ -390,25 +349,6 @@ export function KitchenDisplayScreen({ venueId, staffId, staffName, onExit, onSi
                 )}
             </section>
 
-            {/* ═══════════════════════════════════════════════════════════
-                FOOTER LEGEND
-              ═══════════════════════════════════════════════════════════ */}
-            <footer className="mx-auto w-full max-w-[1400px] px-6 pb-6">
-                <div className="flex flex-wrap items-center justify-center gap-4 rounded-2xl bg-white px-5 py-3 shadow-sm ring-1 ring-isabelline">
-                    <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-feldgrau">
-                        <span className="h-2 w-2 rounded-full bg-feldgrau" />
-                        {"Fresh (< 10m)"}
-                    </div>
-                    <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-khaki">
-                        <span className="h-2 w-2 rounded-full bg-khaki" />
-                        {"Warming (10–20m)"}
-                    </div>
-                    <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-dark-red">
-                        <span className="h-2 w-2 rounded-full bg-dark-red" />
-                        {"Urgent (> 20m)"}
-                    </div>
-                </div>
-            </footer>
         </main>
     );
 }

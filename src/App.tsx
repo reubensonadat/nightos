@@ -427,9 +427,9 @@ function AppShell() {
   );
 
   useEffect(() => {
-    if (staffSession) setWaiterScreen("dashboard");
+    if (staffSession || role === "owner") setWaiterScreen("dashboard");
     else setWaiterScreen("auth");
-  }, [staffSession]);
+  }, [staffSession, role]);
 
   useEffect(() => {
     const paths: Record<Mode, string> = {

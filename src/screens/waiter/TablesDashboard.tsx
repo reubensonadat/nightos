@@ -378,127 +378,109 @@ export function TablesDashboard({ venueId, staffName, staffId: _staffId, role, o
                     </div>
                 ) : (
                     <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 md:gap-5">
-                    {filteredTables.map((table, idx) => (
-                        <button
-                            key={table.id}
-                            type="button"
-                            onClick={() => onSelectTable(table)}
-                            className="
+                        {filteredTables.map((table, idx) => (
+                            <button
+                                key={table.id}
+                                type="button"
+                                onClick={() => onSelectTable(table)}
+                                className={`
                                 animate-velvet-rise
-                                group flex flex-col rounded-2xl bg-white
+                                group flex flex-col rounded-2xl
                                 shadow-[0_4px_16px_rgba(35,20,12,0.06)]
-                                ring-1 ring-isabelline
                                 transition-all duration-200 ease-out
                                 hover:shadow-[0_12px_28px_rgba(35,20,12,0.10)]
                                 hover:ring-khaki/30
                                 active:scale-[0.98]
                                 text-left
-                            "
-                            style={{ animationDelay: `${Math.min(idx * 40, 240)}ms` }}
-                        >
-                            {/* Top row: number + status */}
-                            <div className="flex items-start justify-between px-3.5 pt-3.5">
-                                <div>
-                                    <p className="text-[9px] font-bold uppercase tracking-[0.18em] text-feldgrau">
-                                        Table
-                                    </p>
-                                    <p className="mt-0.5 text-3xl font-bold font-sans tracking-tight text-licorice">
-                                        {String(table.number).padStart(2, "0")}
-                                    </p>
-                                </div>
-                                <span
-                                    className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[8px] font-bold uppercase tracking-[0.14em] ${statusBg(table.status)}`}
-                                >
-                                    <span className={`h-1.5 w-1.5 rounded-full ${statusDot(table.status)}`} />
-                                    {statusLabel(table.status)}
-                                </span>
-                            </div>
-
-                            {/* Details */}
-                            <div className="flex-1 px-3.5 pb-3.5 pt-3">
-                                {table.status === "occupied" && (() => {
-                                    const dwell = table.lastActivityAt ? minutesSince(table.lastActivityAt) : 0;
-                                    const isOver = dwell >= dwellThreshold;
-                                    const isWarn = !isOver && dwell >= Math.round(dwellThreshold * 0.6);
-                                    return (
-                                        <>
-                                            <div className="flex items-center gap-3 text-[10px] font-semibold tracking-tight text-feldgrau">
-                                                <span className="inline-flex items-center gap-1">
-                                                    <UserGroupIcon className="h-3 w-3" strokeWidth={2.25} />
-                                                    {table.guests}
-                                                </span>
-                                                <span
-                                                    className={`inline-flex items-center gap-1 ${isOver
-                                                        ? "text-dark-red"
-                                                        : isWarn
-                                                            ? "text-amber-600"
-                                                            : "text-feldgrau/70"
-                                                        }`}
-                                                >
-                                                    <ClockIcon className="h-3 w-3" strokeWidth={2.25} />
-                                                    idle {formatDuration(dwell)}
-                                                </span>
-                                            </div>
-                                            {isOver && (
-                                                <p className="mt-1.5 inline-flex items-center gap-1 rounded-full bg-dark-red/10 px-2 py-0.5 text-[8.5px] font-bold uppercase tracking-[0.12em] text-dark-red">
-                                                    <ExclamationTriangleIcon className="h-3 w-3" strokeWidth={2.5} />
-                                                    Open too long
-                                                </p>
-                                            )}
-                                            {table.tabTotal !== undefined && (
-                                                <p className="mt-2 font-mono text-[16px] font-bold tabular-nums text-licorice">
-                                                    {formatGHS(table.tabTotal)}
-                                                </p>
-                                            )}
-                                            {table.server && (
-                                                <p className="mt-1 text-[10px] font-semibold tracking-tight text-feldgrau/80">
-                                                    Served by {table.server}
-                                                </p>
-                                            )}
-                                        </>
-                                    );
-                                })()}
-
-                                {table.status === "reserved" && (
-                                    <>
-                                        {table.reservationGuests && (
-                                            <div className="flex items-center gap-3 text-[10px] font-semibold tracking-tight text-feldgrau">
-                                                <span className="inline-flex items-center gap-1">
-                                                    <UserGroupIcon className="h-3 w-3" strokeWidth={2.25} />
-                                                    {table.reservationGuests}
-                                                </span>
-                                            </div>
-                                        )}
-                                        <p className="mt-2 text-[11px] font-medium tracking-tight text-feldgrau">
-                                            Reserved for arrival
+                                ${table.status === "occupied" ? "bg-[#d0ba98] border border-[#D4C4B7]" : "bg-white ring-1 ring-isabelline"}
+                            `}
+                                style={{ animationDelay: `${Math.min(idx * 40, 240)}ms` }}
+                            >
+                                {/* Top row: number + status */}
+                                <div className="flex items-start justify-between px-3.5 pt-3.5">
+                                    <div>
+                                        <p className="text-[9px] font-bold uppercase tracking-[0.18em] text-feldgrau">
+                                            Table
                                         </p>
-                                    </>
-                                )}
+                                        <p className="mt-0.5 text-3xl font-bold font-sans tracking-tight text-licorice">
+                                            {String(table.number).padStart(2, "0")}
+                                        </p>
+                                    </div>
+                                    {table.status !== "occupied" && (
+                                        <span
+                                            className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[8px] font-bold uppercase tracking-[0.14em] ${statusBg(table.status)}`}
+                                        >
+                                            <span className={`h-1.5 w-1.5 rounded-full ${statusDot(table.status)}`} />
+                                            {statusLabel(table.status)}
+                                        </span>
+                                    )}
+                                </div>
 
-                                {table.status === "available" && (
-                                    <p className="text-[11px] font-medium tracking-tight text-feldgrau">
-                                        Ready for new guests
-                                    </p>
-                                )}
-                            </div>
+                                {/* Details */}
+                                <div className="flex-1 px-3.5 pb-3.5 pt-3">
+                                    {table.status === "occupied" && (() => {
+                                        return (
+                                            <>
+                                                <div className="flex items-center gap-3 text-[10px] font-semibold tracking-tight text-feldgrau">
+                                                    <span className="inline-flex items-center gap-1">
+                                                        <UserGroupIcon className="h-3 w-3" strokeWidth={2.25} />
+                                                        {table.guests}
+                                                    </span>
+                                                </div>
+                                                {table.tabTotal !== undefined && (
+                                                    <p className="mt-2 text-lg font-bold tabular-nums tracking-tight text-slate-900">
+                                                        {formatGHS(table.tabTotal)}
+                                                    </p>
+                                                )}
+                                                {table.server && (
+                                                    <p className="mt-1 text-[10px] font-semibold tracking-tight text-feldgrau/80">
+                                                        Served by {table.server}
+                                                    </p>
+                                                )}
+                                            </>
+                                        );
+                                    })()}
 
-                            {/* Action arrow */}
-                            <div className="flex items-center justify-between border-t border-isabelline px-3.5 py-2">
-                                <span className="text-[10px] font-bold tracking-tight text-feldgrau">
-                                    {table.status === "occupied"
-                                        ? "Manage"
-                                        : table.status === "reserved"
-                                            ? "View"
-                                            : "Open"}
-                                </span>
-                                <ArrowRightIcon
-                                    className="h-3.5 w-3.5 text-feldgrau transition-transform group-hover:translate-x-0.5 group-hover:text-licorice"
-                                    strokeWidth={2.5}
-                                />
-                            </div>
-                        </button>
-                    ))}
-                </div>
+                                    {table.status === "reserved" && (
+                                        <>
+                                            {table.reservationGuests && (
+                                                <div className="flex items-center gap-3 text-[10px] font-semibold tracking-tight text-feldgrau">
+                                                    <span className="inline-flex items-center gap-1">
+                                                        <UserGroupIcon className="h-3 w-3" strokeWidth={2.25} />
+                                                        {table.reservationGuests}
+                                                    </span>
+                                                </div>
+                                            )}
+                                            <p className="mt-2 text-[11px] font-medium tracking-tight text-feldgrau">
+                                                Reserved for arrival
+                                            </p>
+                                        </>
+                                    )}
+
+                                    {table.status === "available" && (
+                                        <p className="text-[11px] font-medium tracking-tight text-feldgrau">
+                                            Ready for new guests
+                                        </p>
+                                    )}
+                                </div>
+
+                                {/* Action arrow */}
+                                <div className="flex items-center justify-between border-t border-isabelline px-3.5 py-2">
+                                    <span className="text-[10px] font-bold tracking-tight text-feldgrau">
+                                        {table.status === "occupied"
+                                            ? "Manage"
+                                            : table.status === "reserved"
+                                                ? "View"
+                                                : "Open"}
+                                    </span>
+                                    <ArrowRightIcon
+                                        className="h-3.5 w-3.5 text-feldgrau transition-transform group-hover:translate-x-0.5 group-hover:text-licorice"
+                                        strokeWidth={2.5}
+                                    />
+                                </div>
+                            </button>
+                        ))}
+                    </div>
                 )}
             </section>
         </main>
