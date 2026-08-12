@@ -11,6 +11,9 @@ import {
 import { formatGHS } from "../../data/menu";
 import { db } from "../../lib/api";
 import { useRealtime } from "../../hooks/useRealtime";
+import signoutIcon from "../../assets/sign-out.svg";
+import signoutBlackIcon from "../../assets/sign-out-black.svg";
+import { SignOutModal } from "../../components/SignOutModal";
 
 /* ────────────────────────── Table types ────────────────────────── */
 
@@ -137,6 +140,7 @@ export function TablesDashboard({ venueId, staffName, staffId: _staffId, role, o
     const [filter, setFilter] = useState<Filter>("all");
     const [refreshing, setRefreshing] = useState(false);
     const [loading, setLoading] = useState(true);
+    const [isSignOutModalOpen, setIsSignOutModalOpen] = useState(false);
     const [dwellThreshold, setDwellThreshold] = useState(120);
     const [, setNowTick] = useState(0);
     const reloadTimer = useRef<number | null>(null);
@@ -240,38 +244,24 @@ export function TablesDashboard({ venueId, staffName, staffId: _staffId, role, o
                     <div className="flex items-center gap-2.5">
                         <div className="flex h-9 w-9 items-center justify-center rounded-full bg-licorice text-isabelline shadow-[0_4px_14px_rgba(35,20,12,0.25)]">
                             <span className="font-serif text-[15px] font-bold leading-none tracking-tight">
-                                V
+                                {staffName ? staffName.charAt(0).toUpperCase() : "V"}
                             </span>
                         </div>
                         <div className="flex flex-col leading-tight">
                             <span className="text-[13px] font-bold tracking-tight text-licorice">
                                 {staffName}
                             </span>
-                            <span className="text-[9px] font-semibold uppercase tracking-[0.18em] text-feldgrau">
-                                {role} · Floor
-                            </span>
                         </div>
                     </div>
 
                     <div className="flex items-center gap-2">
                         <div className="flex items-center gap-1">
-                            {onViewShift && (
-                                <button
-                                    type="button"
-                                    onClick={onViewShift}
-                                    aria-label="View shift performance"
-                                    className="flex h-9 w-9 items-center justify-center rounded-full bg-white text-licorice shadow-sm ring-1 ring-licorice/8 transition-colors hover:bg-isabelline active:scale-95"
-                                >
-                                    <ChartBarIcon className="h-4 w-4" strokeWidth={2.25} />
-                                </button>
-                            )}
                             <button
                                 type="button"
-                                onClick={onSignOut}
-                                aria-label="Sign out"
-                                className="flex h-9 w-9 items-center justify-center rounded-full bg-white text-dark-red shadow-sm ring-1 ring-licorice/8 transition-colors hover:bg-isabelline active:scale-95"
+                                onClick={() => setIsSignOutModalOpen(true)}
+                                className="w-10 h-10 rounded-full bg-red-50 text-red-600 flex items-center justify-center active:bg-red-100 transition-colors"
                             >
-                                <ArrowRightStartOnRectangleIcon className="h-4 w-4" strokeWidth={2.25} />
+                                <img src={signoutBlackIcon} alt="Sign Out" className="h-4 w-4" />
                             </button>
                         </div>
                     </div>
@@ -389,10 +379,10 @@ export function TablesDashboard({ venueId, staffName, staffId: _staffId, role, o
                                 shadow-[0_4px_16px_rgba(35,20,12,0.06)]
                                 transition-all duration-200 ease-out
                                 hover:shadow-[0_12px_28px_rgba(35,20,12,0.10)]
-                                hover:ring-khaki/30
+                                hover:ring-khaki/50
                                 active:scale-[0.98]
                                 text-left
-                                ${table.status === "occupied" ? "bg-[#d0ba98] border border-[#D4C4B7]" : "bg-white ring-1 ring-isabelline"}
+                                ${table.status === "occupied" ? "bg-khaki/20 border border-[#D4C4B7]" : "bg-white ring-1 ring-isabelline"}
                             `}
                                 style={{ animationDelay: `${Math.min(idx * 40, 240)}ms` }}
                             >
@@ -406,7 +396,7 @@ export function TablesDashboard({ venueId, staffName, staffId: _staffId, role, o
                                             {String(table.number).padStart(2, "0")}
                                         </p>
                                     </div>
-                                    {table.status !== "occupied" && (
+                                    {table.status === "reserved" && (
                                         <span
                                             className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[8px] font-bold uppercase tracking-[0.14em] ${statusBg(table.status)}`}
                                         >
@@ -483,6 +473,17 @@ export function TablesDashboard({ venueId, staffName, staffId: _staffId, role, o
                     </div>
                 )}
             </section>
+
+            <SignOutModal 
+                isOpen={isSignOutModalOpen}
+                onClose={() => setIsSignOutModalOpen(false)}
+                onSignOut={onSignOut}
+                onReviewPerformance={() => {
+                    setIsSignOutModalOpen(false);
+                    if (onViewShift) onViewShift();
+                }}
+                tablesManaged={14}
+            />
         </main>
     );
 }

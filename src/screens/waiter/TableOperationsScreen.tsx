@@ -16,7 +16,7 @@ import type { Table } from "./TablesDashboard";
 
 /* ────────────────────────── Types ────────────────────────── */
 
-type Op = "transfer" | "merge" | "split";
+type Op = "transfer" | "merge" | "split" | "close";
 
 type OpenBill = {
     id: string;
@@ -46,6 +46,7 @@ export function TableOperationsScreen({ table, venueId, staffId, onBack }: Props
     const [selectedDest, setSelectedDest] = useState<string | null>(null);
     const [selectedMerge, setSelectedMerge] = useState<string | null>(null);
     const [ways, setWays] = useState(2);
+    const [confirmClose, setConfirmClose] = useState(false);
     const reloadTimer = useRef<number | null>(null);
 
     const fetchData = useCallback(async () => {
@@ -173,6 +174,19 @@ export function TableOperationsScreen({ table, venueId, staffId, onBack }: Props
         }
     };
 
+    const handleCloseTable = async () => {
+        if (!bill) return;
+        setWorking("close");
+        const { ok, error } = await db.closeBill(bill.id, staffId);
+        setWorking(null);
+        setConfirmClose(false);
+        if (!ok) {
+            toast.error(error ? String((error as { message?: string }).message ?? error) : "Couldn't close this table");
+            return;
+        }
+        onBack();
+    };
+
     const canConfirm =
         !working &&
         ((op === "transfer" && selectedDest !== null) ||
@@ -198,9 +212,6 @@ export function TableOperationsScreen({ table, venueId, staffId, onBack }: Props
                     <div className="flex flex-col items-center leading-tight">
                         <span className="text-[13px] font-bold tracking-tight text-licorice">
                             Table {String(table.number).padStart(2, "0")}
-                        </span>
-                        <span className="text-[9px] font-semibold uppercase tracking-[0.18em] text-feldgrau">
-                            Table Operations
                         </span>
                     </div>
 
@@ -311,7 +322,7 @@ export function TableOperationsScreen({ table, venueId, staffId, onBack }: Props
                                                     <span className="text-[8px] font-bold uppercase tracking-wider opacity-70">
                                                         Table
                                                     </span>
-                                                    <span className="mt-0.5 font-serif text-[20px] font-black leading-none tracking-[-0.04em]">
+                                                    <span className="mt-0.5 text-2xl font-bold font-sans tabular-nums text-slate-900 leading-none">
                                                         {String(t.number).padStart(2, "0")}
                                                     </span>
                                                     <span className={`mt-1 text-[8px] font-bold uppercase tracking-wider ${isSelected ? "opacity-80" : "text-feldgrau"}`}>
@@ -369,7 +380,7 @@ export function TableOperationsScreen({ table, venueId, staffId, onBack }: Props
                                                         `}
                                                     >
                                                         <div className="flex items-center gap-3">
-                                                            <span className="font-serif text-[20px] font-black leading-none tracking-[-0.04em]">
+                                                            <span className="text-2xl font-bold font-sans tabular-nums text-slate-900 leading-none">
                                                                 {String(t.number).padStart(2, "0")}
                                                             </span>
                                                             <div className="text-left">
@@ -480,7 +491,21 @@ export function TableOperationsScreen({ table, venueId, staffId, onBack }: Props
               ═══════════════════════════════════════════════════════════ */}
             {bill && (
                 <div className="fixed inset-x-0 bottom-0 z-40 bg-isabelline/95 backdrop-blur-xl border-t border-licorice/8">
-                    <div className="mx-auto flex w-full max-w-3xl items-center justify-end gap-3 px-5 md:px-8 pt-3 pb-[max(env(safe-area-inset-bottom),16px)]">
+                    <div className="mx-auto flex w-full max-w-3xl items-center justify-between px-5 md:px-8 pt-3 pb-[max(env(safe-area-inset-bottom),16px)]">
+                        <button
+                            type="button"
+                            onClick={() => setConfirmClose(true)}
+                            disabled={working !== null}
+                            className={`
+                                inline-flex items-center justify-center
+                                rounded-full px-5 py-3
+                                text-[12px] font-bold tracking-tight text-red-600
+                                transition-all duration-200 active:scale-[0.98]
+                                bg-red-50 hover:bg-red-100 disabled:opacity-40
+                            `}
+                        >
+                            Close Table
+                        </button>
                         <button
                             type="button"
                             onClick={handleConfirm}
@@ -499,9 +524,42 @@ export function TableOperationsScreen({ table, venueId, staffId, onBack }: Props
                                     Working…
                                 </>
                             ) : (
-                                <>Confirm</>
+                                "Confirm"
                             )}
                         </button>
+                    </div>
+                </div>
+            )}
+
+            {/* ── MODALS ── */}
+            {confirmClose && bill && (
+                <div className="fixed inset-0 z-50 flex items-end justify-center bg-ink/40 p-6" onClick={() => setConfirmClose(false)}>
+                    <div
+                        className="w-full max-w-sm rounded-2xl bg-white p-5 shadow-xl"
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        <p className="text-[14px] font-bold text-licorice">Close this table?</p>
+                        <p className="mt-1 text-[12px] leading-relaxed text-feldgrau">
+                            The bill will be cancelled and this table's session will end. Guests can re-scan
+                            the QR to start fresh.
+                        </p>
+                        <div className="mt-4 flex gap-2">
+                            <button
+                                type="button"
+                                onClick={() => setConfirmClose(false)}
+                                className="flex-1 rounded-full py-2.5 text-[12px] font-bold text-feldgrau ring-1 ring-licorice/10"
+                            >
+                                Keep open
+                            </button>
+                            <button
+                                type="button"
+                                onClick={handleCloseTable}
+                                disabled={working === "close"}
+                                className="flex-1 rounded-full py-2.5 text-[12px] font-bold text-white bg-red-700 disabled:opacity-50"
+                            >
+                                {working === "close" ? "…" : "Close table"}
+                            </button>
+                        </div>
                     </div>
                 </div>
             )}

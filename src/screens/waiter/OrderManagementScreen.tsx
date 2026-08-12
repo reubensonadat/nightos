@@ -5,6 +5,8 @@ import {
     CheckIcon,
     PlusIcon,
     XMarkIcon,
+    Cog8ToothIcon,
+    DocumentTextIcon,
 } from "@heroicons/react/24/outline";
 import toast from "react-hot-toast";
 import { formatGHS } from "../../data/menu";
@@ -43,12 +45,12 @@ type Props = {
 };
 
 const STATUS_META: Record<string, { label: string; cls: string }> = {
-    pending: { label: "Pending", cls: "bg-amber-50 text-amber-700 ring-amber-200" },
-    confirmed: { label: "Confirmed", cls: "bg-sky-50 text-sky-700 ring-sky-200" },
-    preparing: { label: "Preparing", cls: "bg-blue-50 text-blue-700 ring-blue-200" },
-    ready: { label: "Ready", cls: "bg-indigo-50 text-indigo-700 ring-indigo-200" },
-    served: { label: "Served", cls: "bg-emerald-50 text-emerald-700 ring-emerald-200" },
-    cancelled: { label: "Cancelled", cls: "bg-red-50 text-red-600 ring-red-200" },
+    pending: { label: "Pending", cls: "bg-slate-50 text-slate-700 ring-slate-200" },
+    confirmed: { label: "Confirmed", cls: "bg-slate-50 text-slate-700 ring-slate-200" },
+    preparing: { label: "Preparing", cls: "bg-slate-50 text-slate-700 ring-slate-200" },
+    ready: { label: "Ready", cls: "bg-slate-50 text-slate-700 ring-slate-200" },
+    served: { label: "Served", cls: "bg-slate-50 text-slate-700 ring-slate-200" },
+    cancelled: { label: "Cancelled", cls: "bg-slate-50 text-slate-700 ring-slate-200" },
 };
 
 function statusMeta(status: string) {
@@ -72,24 +74,6 @@ export function OrderManagementScreen({ table, staffId, venueId, onBack, onGoToT
     const [itemsBySubmission, setItemsBySubmission] = useState<Record<string, DbOrderItem[]>>({});
     const [loading, setLoading] = useState(true);
     const [cancellingId, setCancellingId] = useState<string | null>(null);
-    const [closingBill, setClosingBill] = useState(false);
-    const [confirmClose, setConfirmClose] = useState(false);
-
-    const closeTable = useCallback(async () => {
-        if (!billId || closingBill) return;
-        setClosingBill(true);
-        const { ok, error } = await db.closeBill(billId, staffId);
-        setClosingBill(false);
-        setConfirmClose(false);
-        if (!ok) {
-            toast.error(error ? String((error as { message?: string }).message ?? error) : "Couldn't close this table");
-            return;
-        }
-        toast.success("Table closed — bill cancelled");
-        setBillId(null);
-        setSubmissions([]);
-        setItemsBySubmission({});
-    }, [billId, staffId, closingBill]);
 
     const load = useCallback(async () => {
         setLoading(true);
@@ -313,9 +297,7 @@ export function OrderManagementScreen({ table, staffId, venueId, onBack, onGoToT
                         <span className="text-[13px] font-bold tracking-tight text-licorice">
                             Table {String(table.number).padStart(2, "0")}
                         </span>
-                        <span className="text-[9px] font-semibold uppercase tracking-[0.18em] text-feldgrau">
-                            Order Management
-                        </span>
+
                     </div>
 
                     <div className="flex items-center gap-1.5">
@@ -323,62 +305,10 @@ export function OrderManagementScreen({ table, staffId, venueId, onBack, onGoToT
                             type="button"
                             onClick={onGoToTableOps}
                             aria-label="Table operations"
-                            className="rounded-full bg-white px-2.5 py-2 text-[9px] font-bold uppercase tracking-wider text-feldgrau shadow-sm ring-1 ring-licorice/8 transition-colors hover:text-licorice active:scale-95"
+                            className="w-10 h-10 rounded-full bg-white border border-slate-200 flex items-center justify-center text-slate-600 active:bg-slate-50 transition-colors"
                         >
-                            Ops
+                            <Cog8ToothIcon className="h-5 w-5" strokeWidth={2} />
                         </button>
-                        <button
-                            type="button"
-                            onClick={onGoToInvoice}
-                            aria-label="Settle bill"
-                            className="rounded-full bg-licorice px-2.5 py-2 text-[9px] font-bold uppercase tracking-wider text-isabelline shadow-sm transition-colors hover:bg-licorice/90 active:scale-95"
-                        >
-                            Bill
-                        </button>
-                        {billId && (
-                            <button
-                                type="button"
-                                onClick={() => setConfirmClose((c) => !c)}
-                                disabled={closingBill}
-                                aria-label="Close table"
-                                className={`rounded-full px-2.5 py-2 text-[9px] font-bold uppercase tracking-wider shadow-sm transition-colors active:scale-95 ${confirmClose
-                                    ? "bg-red-700 text-white"
-                                    : "bg-white text-red-700 ring-1 ring-red-200 hover:bg-red-50"
-                                    }`}
-                            >
-                                {closingBill ? "…" : confirmClose ? "Tap again" : "Close"}
-                            </button>
-                        )}
-                        {confirmClose && billId && (
-                            <div className="fixed inset-0 z-50 flex items-end justify-center bg-ink/40 p-6" onClick={() => setConfirmClose(false)}>
-                                <div
-                                    className="w-full max-w-sm rounded-2xl bg-white p-5 shadow-xl"
-                                    onClick={(e) => e.stopPropagation()}
-                                >
-                                    <p className="text-[14px] font-bold text-licorice">Close this table?</p>
-                                    <p className="mt-1 text-[12px] leading-relaxed text-feldgrau">
-                                        The bill will be cancelled and this table's session will end. Guests can re-scan
-                                        the QR to start fresh.
-                                    </p>
-                                    <div className="mt-4 flex gap-2">
-                                        <button
-                                            type="button"
-                                            onClick={() => setConfirmClose(false)}
-                                            className="flex-1 rounded-full py-2.5 text-[12px] font-bold text-feldgrau ring-1 ring-licorice/10"
-                                        >
-                                            Keep open
-                                        </button>
-                                        <button
-                                            type="button"
-                                            onClick={closeTable}
-                                            className="flex-1 rounded-full py-2.5 text-[12px] font-bold text-white bg-red-700"
-                                        >
-                                            Close table
-                                        </button>
-                                    </div>
-                                </div>
-                            </div>
-                        )}
                     </div>
                 </div>
 
@@ -478,7 +408,6 @@ export function OrderManagementScreen({ table, staffId, venueId, onBack, onGoToT
                                                     <span className={`rounded-full px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider ring-1 ${meta.cls}`}>
                                                         {meta.label}
                                                     </span>
-                                                    <span className="text-[9.5px] text-feldgrau/50">{timeAgo(sub.created_at)}</span>
                                                 </div>
                                             </div>
 
@@ -500,10 +429,7 @@ export function OrderManagementScreen({ table, staffId, venueId, onBack, onGoToT
                                             </div>
 
                                             {canCancel(sub.status) && (
-                                                <div className="flex items-center justify-between border-t border-isabelline px-3.5 py-2">
-                                                    <span className="text-[10px] text-feldgrau/60">
-                                                        Customers can't cancel — staff only.
-                                                    </span>
+                                                <div className="flex items-center justify-end border-t border-isabelline px-3.5 py-2">
                                                     <button
                                                         type="button"
                                                         onClick={() => cancelSubmission(sub.id)}
@@ -519,14 +445,23 @@ export function OrderManagementScreen({ table, staffId, venueId, onBack, onGoToT
                                     );
                                 })}
 
-                                <button
-                                    type="button"
-                                    onClick={() => setTab("add")}
-                                    className="mt-2 inline-flex w-full items-center justify-center gap-1.5 rounded-2xl bg-white px-4 py-4 text-[12px] font-bold tracking-tight text-licorice shadow-sm ring-1 ring-licorice/10 transition-all hover:bg-isabelline active:scale-[0.98]"
-                                >
-                                    <PlusIcon className="h-4 w-4" strokeWidth={2.5} />
-                                    Add more items to table
-                                </button>
+                                <div className="mt-2 flex flex-col gap-2">
+                                    <button
+                                        type="button"
+                                        onClick={() => setTab("add")}
+                                        className="inline-flex w-full items-center justify-center gap-1.5 rounded-2xl bg-white px-4 py-4 text-[12px] font-bold tracking-tight text-licorice shadow-sm ring-1 ring-licorice/10 transition-all hover:bg-isabelline active:scale-[0.98]"
+                                    >
+                                        <PlusIcon className="h-4 w-4" strokeWidth={2.5} />
+                                        Add more items to table
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={onGoToInvoice}
+                                        className="inline-flex w-full items-center justify-center gap-1.5 rounded-2xl bg-licorice px-4 py-4 text-[12px] font-bold tracking-tight text-white shadow-md transition-all hover:bg-licorice/90 active:scale-[0.98]"
+                                    >
+                                        Bill
+                                    </button>
+                                </div>
                             </div>
                         )}
                     </div>
