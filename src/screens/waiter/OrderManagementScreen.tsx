@@ -7,7 +7,6 @@ import {
     PlusIcon,
     XMarkIcon,
     Cog8ToothIcon,
-    DocumentTextIcon,
 } from "@heroicons/react/24/outline";
 import toast from "react-hot-toast";
 import { formatGHS } from "../../data/menu";
@@ -51,18 +50,19 @@ function statusMeta(status: string) {
     return STATUS_META[status] ?? { label: status, cls: "bg-isabelline text-feldgrau ring-licorice/10" };
 }
 
-function timeAgo(iso: string): string {
-    const mins = Math.floor((Date.now() - new Date(iso).getTime()) / 60_000);
-    if (mins < 1) return "just now";
-    if (mins < 60) return `${mins} min ago`;
-    const h = Math.floor(mins / 60);
-    return `${h}h ${mins % 60}m ago`;
-}
-
 export function OrderManagementScreen() {
     const { table, staffId, venueId } = useOutletContext<{ table: Table; venueId: string; staffId: string }>();
     const navigate = useNavigate();
     const [tab, setTab] = useState<Tab>("order");
+
+    // ── Waiter-composed order (Add Items tab) ──
+    const [order, setOrder] = useState<OrderLine[]>([]);
+    const [activeCategory, setActiveCategory] = useState<string>("");
+    const [sending, setSending] = useState(false);
+
+    // Real menu (products + categories from the DB)
+    const [categories, setCategories] = useState<DbMenuCategory[]>([]);
+    const [products, setProducts] = useState<DbProduct[]>([]);
 
     // ── Real bill + submissions for this table ──
     const [billId, setBillId] = useState<string | null>(null);
@@ -116,10 +116,13 @@ export function OrderManagementScreen() {
         } finally {
             setLoading(false);
         }
-    }, [table.id, venueId]);
+    }, [table.id, venueId, staffId]);
 
     useEffect(() => {
-        load();
+        const init = async () => {
+            await load();
+        };
+        init();
     }, [load]);
 
     // Live refresh — customer submissions and items land here instantly.
@@ -144,14 +147,10 @@ export function OrderManagementScreen() {
         onInsert: scheduleReload,
     });
 
-    // ── Waiter-composed order (Add Items tab) ──
-    const [order, setOrder] = useState<OrderLine[]>([]);
-    const [activeCategory, setActiveCategory] = useState<string>("");
-    const [sending, setSending] = useState(false);
-
-    // Real menu (products + categories from the DB)
-    const [categories, setCategories] = useState<DbMenuCategory[]>([]);
-    const [products, setProducts] = useState<DbProduct[]>([]);
+    useRealtime({
+        table: 'order_items',
+        onInsert: scheduleReload,
+    });
 
     const catNameById = useMemo(() => {
         const m: Record<string, string> = {};

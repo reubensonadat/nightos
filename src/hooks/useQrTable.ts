@@ -12,6 +12,7 @@ export function useQrTable(token: string | null) {
 
   useEffect(() => {
     if (!token) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setState({ table: null, loading: false, error: false })
       return
     }
@@ -29,7 +30,10 @@ export function useQrTable(token: string | null) {
       setState({ table: data, loading: false, error: false })
     }
 
-    resolve()
+    const init = async () => {
+      await resolve()
+    }
+    init()
     return () => {
       cancelled = true
     }

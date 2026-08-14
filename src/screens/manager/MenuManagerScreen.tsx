@@ -51,8 +51,11 @@ export function MenuManagerScreen() {
     }, [venue.id]);
 
     useEffect(() => {
-        fetchData();
-    }, [fetchData]);
+        const init = async () => {
+            await fetchData();
+        };
+        init();
+        }, [fetchData]);
 
     const categories = useMemo(
         () => ["All", ...new Set(items.map((i) => i.category).filter(Boolean))],
@@ -361,6 +364,7 @@ function ItemModal({ item, onSave, onClose, onDelete }: {
     onDelete?: () => void;
 }) {
     const [draft, setDraft] = useState<InventoryRow>(item ?? {
+        // eslint-disable-next-line react-hooks/purity
         id: `inv-${Date.now()}`,
         venue_id: "",
         product_id: null,

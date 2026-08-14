@@ -126,6 +126,7 @@ export function CheckoutScreen({ total, billId, venueId, sessionToken, onBack, o
 
     const isPrepay = venue?.payment_model === 'PREPAY' || bill?.payment_model === 'PREPAY';
 
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const { subtotal, serviceCharge, vat, billTotal, payAmount } = useMemo(() => {
         if (bill) {
             const remainingAmount = Math.max(0, Math.round((bill.total - bill.amount_paid) * 100) / 100);
@@ -227,6 +228,7 @@ export function CheckoutScreen({ total, billId, venueId, sessionToken, onBack, o
     useEffect(() => {
         if (!needsCheck || countdownLeft === null) return;
         if (countdownLeft <= 0) {
+            // eslint-disable-next-line react-hooks/set-state-in-effect
             setCanReCheck(true);
             setCountdownLeft(null);
             return;

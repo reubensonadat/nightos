@@ -74,11 +74,11 @@ export function TableOperationsScreen() {
         }
     }, [venueId, table.id]);
 
-    const fetchDataRef = useRef(fetchData);
-    fetchDataRef.current = fetchData;
-
     useEffect(() => {
-        fetchData();
+        const init = async () => {
+            await fetchData();
+        };
+        init();
     }, [fetchData]);
 
     // Live refresh when any bill changes on this floor.
@@ -87,15 +87,15 @@ export function TableOperationsScreen() {
         filter: `venue_id=eq.${venueId}`,
         onInsert: () => {
             if (reloadTimer.current) window.clearTimeout(reloadTimer.current);
-            reloadTimer.current = window.setTimeout(() => fetchDataRef.current(), 500);
+            reloadTimer.current = window.setTimeout(() => fetchData(), 500);
         },
         onUpdate: () => {
             if (reloadTimer.current) window.clearTimeout(reloadTimer.current);
-            reloadTimer.current = window.setTimeout(() => fetchDataRef.current(), 500);
+            reloadTimer.current = window.setTimeout(() => fetchData(), 500);
         },
         onDelete: () => {
             if (reloadTimer.current) window.clearTimeout(reloadTimer.current);
-            reloadTimer.current = window.setTimeout(() => fetchDataRef.current(), 500);
+            reloadTimer.current = window.setTimeout(() => fetchData(), 500);
         },
     });
 
@@ -119,6 +119,7 @@ export function TableOperationsScreen() {
                     table: t,
                     bill: openBills.find((b) => b.table_id === t.id),
                 })),
+        // eslint-disable-next-line react-hooks/exhaustive-deps
         [tables, occupiedTableIds, openBills],
     );
 
@@ -134,8 +135,8 @@ export function TableOperationsScreen() {
             setWorking("transfer");
             const { data, error } = await db.transferBill(bill.id, selectedDest, staffId);
             setWorking(null);
-            if (error || !data || !(data as any).ok) {
-                const code = data ? (data as any).error : "failed";
+            if (error || !data || !(data as Record<string, unknown>).ok) {
+                const code = data ? (data as Record<string, unknown>).error : "failed";
                 toast.error(code === "table_occupied"
                     ? "That table already has an open tab."
                     : code === "bill_not_open"
@@ -154,7 +155,7 @@ export function TableOperationsScreen() {
             setWorking("merge");
             const { data, error } = await db.mergeBills(bill.id, dest.bill.id, staffId);
             setWorking(null);
-            if (error || !data || !(data as any).ok) {
+            if (error || !data || !(data as Record<string, unknown>).ok) {
                 toast.error("Merge failed — try again.");
                 return;
             }
@@ -164,7 +165,7 @@ export function TableOperationsScreen() {
             setWorking("split");
             const { data, error } = await db.splitBill(bill.id, ways, staffId);
             setWorking(null);
-            if (error || !data || !(data as any).ok) {
+            if (error || !data || !(data as Record<string, unknown>).ok) {
                 toast.error("Split failed — try again.");
                 return;
             }

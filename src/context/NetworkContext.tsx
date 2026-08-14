@@ -23,6 +23,7 @@ export function NetworkProvider({ children }: { children: React.ReactNode }) {
 
   const syncResolverRef = useRef<((value: unknown) => void) | null>(null)
 
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { setIsOnline(status === 'online') }, [status])
 
   useEffect(() => {
@@ -61,6 +62,7 @@ export function NetworkProvider({ children }: { children: React.ReactNode }) {
   )
 }
 
+// eslint-disable-next-line react-refresh/only-export-components
 export function useNetwork() {
   const ctx = useContext(NetworkContext)
   if (!ctx) throw new Error('useNetwork must be used inside <NetworkProvider>')

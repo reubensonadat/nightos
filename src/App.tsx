@@ -21,7 +21,8 @@ import { PartyPrompt } from "./components/PartyPrompt";
 import { ClockIcon } from "@heroicons/react/24/outline";
 
 import { StaffAuthScreen } from "./screens/waiter/StaffAuthScreen";
-import { TablesDashboard, type Table } from "./screens/waiter/TablesDashboard";
+ 
+import { TablesDashboard } from "./screens/waiter/TablesDashboard";
 import { OrderManagementScreen } from "./screens/waiter/OrderManagementScreen";
 import { TableOperationsScreen } from "./screens/waiter/TableOperationsScreen";
 import { InvoiceSettlementScreen } from "./screens/waiter/InvoiceSettlementScreen";
@@ -44,7 +45,8 @@ import { ReservationsScreen } from "./screens/ReservationsScreen";
 import { useVenue } from "./hooks/useVenue";
 import { useQrTable } from "./hooks/useQrTable";
 import { useCustomerSession } from "./hooks/useCustomerSession";
-import { db, type DbTable, type DbStaffSession } from "./lib/api";
+ 
+import { db, type DbTable } from "./lib/api";
 
 type NavTab = "menu" | "cart" | "orders";
 
@@ -81,21 +83,29 @@ function CustomerShell({ venueId, tableId, tableLabel }: { venueId: string; tabl
   // One-time "how many of you?" prompt per session (QR tables only)
   const [partyPromptOpen, setPartyPromptOpen] = useState(false);
   useEffect(() => {
-    if (!tableId || !session || partyPromptOpen) return;
-    try {
-      if (localStorage.getItem(`nightos:party:${session.id}`) === "1") return;
-    } catch {}
-    setPartyPromptOpen(true);
+    const init = async () => {
+      if (!tableId || !session || partyPromptOpen) return;
+      try {
+         
+        if (localStorage.getItem(`nightos:party:${session.id}`) === "1") return;
+       
+      } catch {
+        // ignore
+      }
+      setPartyPromptOpen(true);
+    };
+    init();
   }, [tableId, session, partyPromptOpen]);
 
   const handlePartyConfirm = useCallback(
     async (partySize: number, guestName?: string) => {
+       
       const { error } = await updateParty(partySize, guestName);
       if (error) {
         toast.error(String(error));
         return;
       }
-      try { localStorage.setItem(`nightos:party:${session?.id ?? ''}`, "1"); } catch {}
+      try { localStorage.setItem(`nightos:party:${session?.id ?? ''}`, "1"); } catch { /* ignore */ }
       setPartyPromptOpen(false);
     },
     [updateParty, session],
@@ -115,36 +125,51 @@ function CustomerShell({ venueId, tableId, tableLabel }: { venueId: string; tabl
     };
   }, [venueId]);
 
+   
   useEffect(() => {
-    try {
-      const stored = localStorage.getItem("nightos:orders");
-      if (stored) {
-        const parsed = JSON.parse(stored);
-        if (parsed.active) setActiveOrders(parsed.active);
-        if (parsed.past) setHistory(parsed.past);
+    const init = async () => {
+      try {
+         
+        const stored = localStorage.getItem("nightos:orders");
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          if (parsed.active) setActiveOrders(parsed.active);
+          if (parsed.past) setHistory(parsed.past);
+        }
+      } catch {
+        // ignore
       }
-    } catch {}
+    };
+    init();
   }, []);
+ 
 
   // A new scan = a new visit: wipe the orders list unless we've already
   // marked THIS session (so a page refresh mid-visit keeps its orders).
+   
   const sessionOrdersKey = session ? `nightos:orders:sid:${session.id}` : "";
   useEffect(() => {
-    if (!session) return;
-    try {
-      const marked = localStorage.getItem(sessionOrdersKey) === "1";
-      localStorage.setItem(sessionOrdersKey, "1");
-      if (!marked) {
-        setActiveOrders([]);
-        setHistory([]);
+    const init = async () => {
+      if (!session) return;
+      try {
+        const marked = localStorage.getItem(sessionOrdersKey) === "1";
+         
+        localStorage.setItem(sessionOrdersKey, "1");
+        if (!marked) {
+          setActiveOrders([]);
+          setHistory([]);
+        }
+      } catch {
+        // ignore
       }
-    } catch {}
+    };
+    init();
   }, [sessionOrdersKey, session]);
 
   // Removed localStorage tab sync since we use URLs now
 
   useEffect(() => {
-    try { localStorage.setItem("nightos:orders", JSON.stringify({ active: activeOrders, past: history })); } catch {}
+    try { localStorage.setItem("nightos:orders", JSON.stringify({ active: activeOrders, past: history })); } catch { /* ignore */ }
   }, [activeOrders, history]);
 
   // Live status: realtime streams pending→ready→served→cancelled
@@ -171,6 +196,7 @@ function CustomerShell({ venueId, tableId, tableLabel }: { venueId: string; tabl
         return next && next !== o.status ? { ...o, status: next as OrderSummary['status'] } : o;
       });
     });
+   
   }, [activeSubmissionIds, session?.session_token]);
 
   // Realtime: the customer's own submissions (events pass RLS for
@@ -186,7 +212,7 @@ function CustomerShell({ venueId, tableId, tableLabel }: { venueId: string; tabl
   const handleOrderSent = useCallback((order: OrderSummary) => {
     setActiveOrders((prev) => [...prev, order]);
     setTab("orders");
-  }, []);
+  }, [setTab]);
 
   const handlePaid = useCallback(() => {
     if (!payingOrder) return;

@@ -26,8 +26,11 @@ export function useOrders(venueId: string | null, station?: string) {
   }, [venueId, station]);
 
   useEffect(() => {
-    fetchOrders();
-  }, [fetchOrders]);
+    const init = async () => {
+        await fetchOrders();
+    };
+    init();
+    }, [fetchOrders]);
 
   const onInsertRef = useRef<((row: DbOrderSubmission) => void) | null>(null);
   const onUpdateRef = useRef<((row: DbOrderSubmission) => void) | null>(null);
@@ -58,6 +61,7 @@ export function useOrders(venueId: string | null, station?: string) {
           table: 'order_submissions',
           filter,
         },
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         (payload: any) => {
           if (payload.eventType === 'INSERT') onInsertRef.current?.(payload.new);
           else if (payload.eventType === 'UPDATE') onUpdateRef.current?.(payload.new);

@@ -5,6 +5,7 @@ import type { DbVenue, DbStaffSession } from '../lib/api'
 
 type AuthUser = import('@supabase/supabase-js').User
 type Session = import('@supabase/supabase-js').Session
+type AuthError = import('@supabase/supabase-js').AuthError
 
 type Profile = {
   id: string
@@ -23,10 +24,10 @@ type AuthContextValue = {
   isInitializing: boolean
   isAuthenticated: boolean
   hasVenue: boolean
-  signIn: (email: string, password: string) => Promise<{ error: any }>
-  signUp: (email: string, password: string) => Promise<{ error: any }>
-  signInWithPhone: (phone: string) => Promise<{ error: any }>
-  verifyPhoneOtp: (phone: string, token: string) => Promise<{ error: any }>
+  signIn: (email: string, password: string) => Promise<{ error: AuthError | null }>
+  signUp: (email: string, password: string) => Promise<{ error: AuthError | null }>
+  signInWithPhone: (phone: string) => Promise<{ error: AuthError | null }>
+  verifyPhoneOtp: (phone: string, token: string) => Promise<{ error: AuthError | null }>
   signOut: () => Promise<void>
   refreshVenue: () => Promise<void>
   refreshStaffSession: () => Promise<void>
@@ -36,6 +37,7 @@ const AuthContext = createContext<AuthContextValue>(null!)
 
 /** Where a signed-in user belongs after OTP: owner/manager → manager, kitchen/bar →
  * kitchen display, everyone else on staff → the waiter dashboard. */
+// eslint-disable-next-line react-refresh/only-export-components
 export function sectorPath(role: string | null): string {
   if (role === 'owner' || role === 'manager' || role === 'supervisor') return '/manager'
   if (role === 'kitchen' || role === 'bar') return '/kitchen'
@@ -74,27 +76,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         // Find staff
         const { data: staffData } = await authDb.venueByStaffPhone(phoneToCheck)
         if (staffData) {
-          const sd = staffData as any
+          const sd = staffData as Record<string, unknown>
           setVenue(sd.venue as DbVenue)
-          setRole(sd.role)
+          setRole(sd.role as string)
 
           // Also populate staffSession for App.tsx backward compatibility
           const { data, error } = await supabase.rpc('get_staff_profile_by_phone', { p_phone: phoneToCheck }).single();
           if (error) {
             console.warn('[AuthContext] get_staff_profile_by_phone failed:', error)
           }
-          const fullStaffData = data as any;
+          const fullStaffData = data as Record<string, unknown>;
             
           if (fullStaffData && fullStaffData.venue_id) {
              setStaffSession({
-                id: fullStaffData.id,
-                name: fullStaffData.name,
-                role: fullStaffData.role as any,
-                venue_id: fullStaffData.venue_id,
-                venue_name: fullStaffData.venue_name,
-                venue_slug: fullStaffData.venue_slug,
-                area_assignment: fullStaffData.area_assignment,
-                max_tables: fullStaffData.max_tables,
+                id: fullStaffData.id as string,
+                name: fullStaffData.name as string,
+                role: fullStaffData.role as DbStaffSession['role'],
+                venue_id: fullStaffData.venue_id as string,
+                venue_name: fullStaffData.venue_name as string,
+                venue_slug: fullStaffData.venue_slug as string,
+                area_assignment: fullStaffData.area_assignment as string | null,
+                max_tables: fullStaffData.max_tables as number,
              })
 
              // Auto clock-in — idempotent, so session reloads and token
@@ -250,12 +252,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       refreshVenue,
       refreshStaffSession
     }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     [user, session, profile, venue, role, staffSession, isInitializing],
   )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
 }
 
+// eslint-disable-next-line react-refresh/only-export-components
 export function useAuth() {
   const ctx = useContext(AuthContext)
   if (!ctx) throw new Error('useAuth must be used inside <AuthProvider>')

@@ -2,17 +2,11 @@ import { useState, useMemo, useEffect, useCallback, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import {
     ArrowRightIcon,
-    ArrowPathIcon,
     UserGroupIcon,
-    ChartBarIcon,
-    ArrowRightStartOnRectangleIcon,
-    ClockIcon,
-    ExclamationTriangleIcon,
 } from "@heroicons/react/24/outline";
 import { formatGHS } from "../../data/menu";
 import { db } from "../../lib/api";
 import { useRealtime } from "../../hooks/useRealtime";
-import signoutIcon from "../../assets/sign-out.svg";
 import signoutBlackIcon from "../../assets/sign-out-black.svg";
 import { SignOutModal } from "../../components/SignOutModal";
 
@@ -69,17 +63,7 @@ function statusDot(status: TableStatus): string {
     }
 }
 
-/** Minutes since an ISO timestamp. */
-function minutesSince(iso: string): number {
-    return Math.max(0, Math.floor((Date.now() - new Date(iso).getTime()) / 60_000));
-}
 
-function formatDuration(mins: number): string {
-    if (mins < 60) return `${mins}m`;
-    const h = Math.floor(mins / 60);
-    const m = mins % 60;
-    return `${h}h ${m}m`;
-}
 
 /* ────────────────────────── Filter chips ────────────────────────── */
 
@@ -98,51 +82,49 @@ type Props = {
     venueId: string;
     staffName: string;
     staffId: string;
-    role: string;
     onSignOut: () => void;
+    role?: string;
 };
 
-function transformToTables(dbTables: any[], openBills: any[], waiterNames: Record<string, string>): Table[] {
-    const billMap = new Map<string, any>();
+function transformToTables(dbTables: Record<string, unknown>[], openBills: Record<string, unknown>[], waiterNames: Record<string, string>): Table[] {
+    const billMap = new Map<string, Record<string, unknown>>();
     for (const b of openBills) {
-        billMap.set(b.table_id, b);
+        billMap.set(b.table_id as string, b);
     }
     return dbTables.map((t) => {
-        const bill = billMap.get(t.id);
+        const bill = billMap.get(t.id as string);
         if (bill) {
-            const guestCount = bill.guest_count ?? 1;
-            const seatedAt = bill.created_at;
+            const guestCount = (bill.guest_count as number) ?? 1;
+            const seatedAt = bill.created_at as string;
             const waiterId = bill.waiter_id as string | null;
             return {
-                id: t.id,
-                number: t.table_number,
-                label: t.table_label,
+                id: t.id as string,
+                number: t.table_number as number,
+                label: t.table_label as string,
                 status: 'occupied' as const,
                 guests: guestCount,
-                tabTotal: bill.total,
+                tabTotal: bill.total as number,
                 seatedAt,
-                lastActivityAt: bill.last_activity_at ?? bill.created_at,
+                lastActivityAt: (bill.last_activity_at as string) ?? (bill.created_at as string),
                 server: waiterId ? (waiterNames[waiterId] ?? undefined) : undefined,
             };
         }
         return {
-            id: t.id,
-            number: t.table_number,
-            label: t.table_label,
+            id: t.id as string,
+            number: t.table_number as number,
+            label: t.table_label as string,
             status: 'available' as const,
         };
     });
 }
 
-export function TablesDashboard({ venueId, staffName, staffId, role, onSignOut }: Props) {
+export function TablesDashboard({ venueId, staffName, staffId, onSignOut }: Props) {
     const navigate = useNavigate();
     const [tables, setTables] = useState<Table[]>([]);
     const [filter, setFilter] = useState<Filter>("all");
-    const [refreshing, setRefreshing] = useState(false);
     const [loading, setLoading] = useState(true);
     const [isSignOutModalOpen, setIsSignOutModalOpen] = useState(false);
     const [tablesManaged, setTablesManaged] = useState(0);
-    const [dwellThreshold, setDwellThreshold] = useState(120);
     const [, setNowTick] = useState(0);
     const reloadTimer = useRef<number | null>(null);
     const waiterNamesRef = useRef<Record<string, string>>({});
@@ -154,17 +136,12 @@ export function TablesDashboard({ venueId, staffName, staffId, role, onSignOut }
         return () => window.clearInterval(t);
     }, []);
 
-    const scheduleReload = useCallback(() => {
-        if (reloadTimer.current) window.clearTimeout(reloadTimer.current);
-        reloadTimer.current = window.setTimeout(() => fetchDataRef.current(), 500);
-    }, []);
+
 
     const fetchData = useCallback(async () => {
         if (!venueId) return;
-        setRefreshing(true);
         try {
-            const { data: threshold } = await db.getVenueSetting(venueId, 'max_dwell_minutes', 120);
-            if (threshold !== null) setDwellThreshold(threshold);
+            await db.getVenueSetting(venueId, 'max_dwell_minutes', 120);
 
             const [tablesResult, billsResult] = await Promise.all([
                 db.tablesByVenue(venueId),
@@ -176,7 +153,7 @@ export function TablesDashboard({ venueId, staffName, staffId, role, onSignOut }
 
             const waiterIds = [
                 ...new Set(
-                    billRows.map((b: any) => b.waiter_id).filter((id: unknown): id is string => typeof id === "string" && id.length > 0)
+                    billRows.map((b: Record<string, unknown>) => b.waiter_id).filter((id: unknown): id is string => typeof id === "string" && id.length > 0)
                 ),
             ];
             if (waiterIds.length > 0) {
@@ -188,16 +165,22 @@ export function TablesDashboard({ venueId, staffName, staffId, role, onSignOut }
         } catch {
             // No mock fallback — the grid shows the empty state instead.
         } finally {
-            setRefreshing(false);
             setLoading(false);
         }
     }, [venueId]);
 
-    const fetchDataRef = useRef(fetchData);
-    fetchDataRef.current = fetchData;
+    const scheduleReload = useCallback(() => {
+        if (reloadTimer.current) window.clearTimeout(reloadTimer.current);
+        reloadTimer.current = window.setTimeout(() => fetchData(), 500);
+    }, [fetchData]);
+
+
 
     useEffect(() => {
-        fetchData();
+        const init = async () => {
+            await fetchData();
+        };
+        init();
     }, [fetchData]);
 
     // Live updates: bills change when customers land, order or settle.
@@ -237,10 +220,6 @@ export function TablesDashboard({ venueId, staffName, staffId, role, onSignOut }
             openTabs: totalTabs,
         };
     }, [displayTables]);
-
-    const handleRefresh = () => {
-        fetchData();
-    };
 
     return (
         <main className="relative min-h-svh w-full overflow-x-hidden bg-khaki/15 font-sans text-licorice antialiased">

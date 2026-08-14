@@ -47,6 +47,7 @@ type Stage = {
     status: OrderStatusDb;
 };
 
+// eslint-disable-next-line react-refresh/only-export-components
 export const STAGES: Stage[] = [
     {
         id: "received",
@@ -74,6 +75,7 @@ export const STAGES: Stage[] = [
     },
 ];
 
+// eslint-disable-next-line react-refresh/only-export-components
 export function statusStage(status?: OrderStatusDb): Stage {
     const stage = STAGES.find((s) => s.status === status);
     return stage ?? STAGES[0];

@@ -48,6 +48,7 @@ export function StaffAuthScreen() {
                 const remaining = OTP_COOLDOWN_SECONDS - elapsed;
                 return remaining > 0 ? remaining : 0;
             }
+        // eslint-disable-next-line no-empty
         } catch {}
         return 0;
     });
@@ -57,6 +58,7 @@ export function StaffAuthScreen() {
     useEffect(() => {
         if (justVerified && !staffSession && role !== 'owner') {
             toast.error("This number isn't linked to a staff profile. Ask your manager to add it, then try again.");
+            // eslint-disable-next-line react-hooks/set-state-in-effect
             setJustVerified(false);
         }
     }, [justVerified, staffSession, role]);

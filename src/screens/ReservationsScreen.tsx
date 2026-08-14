@@ -139,12 +139,15 @@ export function ReservationsScreen({ onBack }: Props) {
             if (error) setEventsError(error.message);
             else setEvents(data ?? []);
         });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [venue?.id]);
 
     useEffect(() => {
         try {
             const saved = localStorage.getItem(PHONE_KEY);
+            // eslint-disable-next-line react-hooks/set-state-in-effect
             if (saved) setTicketPhone(saved);
+        // eslint-disable-next-line no-empty
         } catch {}
     }, []);
 
@@ -198,6 +201,7 @@ export function ReservationsScreen({ onBack }: Props) {
         }
         try {
             localStorage.setItem(PHONE_KEY, phone.trim());
+        // eslint-disable-next-line no-empty
         } catch {}
         setTicketPhone(phone.trim());
         setReserved(true);

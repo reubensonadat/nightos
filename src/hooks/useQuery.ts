@@ -1,27 +1,27 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
 
-const INITIAL = { data: null as any, error: null as any, loading: true }
-
-export function useQuery(
-  fetcher: () => Promise<{ data: any; error: any }>,
-  deps: unknown[] = [],
+export function useQuery<TData = unknown, TError = unknown>(
+  fetcher: () => Promise<{ data: TData | null; error: TError | null }>,
 ) {
+  const INITIAL = { data: null as TData | null, error: null as TError | null, loading: true }
   const [state, setState] = useState(INITIAL)
   const mountedRef = useRef(true)
   const fetcherRef = useRef(fetcher)
-  fetcherRef.current = fetcher
+  
+  useEffect(() => {
+    fetcherRef.current = fetcher
+  })
 
   const refetch = useCallback(async () => {
     if (!fetcherRef.current) return
-    setState((prev: any) => ({ ...prev, loading: true }))
+    setState((prev) => ({ ...prev, loading: true }))
     try {
       const { data, error } = await fetcherRef.current()
       if (mountedRef.current) setState({ data, error, loading: false })
     } catch (err) {
-      if (mountedRef.current) setState({ data: null, error: err, loading: false })
+      if (mountedRef.current) setState({ data: null, error: err as TError, loading: false })
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, deps)
+  }, [])
 
   useEffect(() => {
     mountedRef.current = true
@@ -29,5 +29,5 @@ export function useQuery(
     return () => { mountedRef.current = false }
   }, [refetch])
 
-  return { ...state, refetch } as { data: any; error: any; loading: boolean; refetch: () => Promise<void> }
+  return { ...state, refetch }
 }

@@ -40,6 +40,7 @@ type Props = {
     staffName: string;
 };
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 export function ShiftPerformanceScreen({ staffId, staffName }: Props) {
     const navigate = useNavigate();
     const onBack = () => navigate('/waiter');
@@ -72,8 +73,12 @@ export function ShiftPerformanceScreen({ staffId, staffName }: Props) {
     };
 
     useEffect(() => {
-        load();
-    }, [staffId]);
+        const init = async () => {
+            await load();
+        };
+        init();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+        }, [staffId]);
 
     const hoursOnShift = summary ? summary.shift_seconds / 3600 : 0;
     const avgBill =

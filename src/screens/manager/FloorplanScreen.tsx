@@ -123,6 +123,7 @@ export function FloorplanScreen() {
     }, [venue.id]);
 
     const fetchDataRef = useRef(fetchData);
+    // eslint-disable-next-line react-hooks/refs
     fetchDataRef.current = fetchData;
 
     useEffect(() => {

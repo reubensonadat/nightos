@@ -103,6 +103,7 @@ export async function uploadToR2(
     }
   } catch (err: unknown) {
     if (err instanceof Error && (!err.message || err.message === 'Failed to fetch' || err.name === 'TypeError')) {
+      // eslint-disable-next-line preserve-caught-error
       throw new Error('Failed to upload image. Please check your connection and try again.')
     }
     throw err

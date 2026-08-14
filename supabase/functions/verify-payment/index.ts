@@ -7,18 +7,25 @@ const PAYSTACK_SECRET_KEY = Deno.env.get('PAYSTACK_SECRET_KEY')
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
 
-function getMetadataField(metadata: any, field: string): string | null {
+function getMetadataField(metadata: Record<string, unknown> | null | undefined, field: string): string | null {
   if (!metadata) return null
-  if (metadata.custom_fields) {
-    const f = metadata.custom_fields.find((f: any) => f.variable_name === field)
-    if (f) return String(f.value)
+  if (Array.isArray(metadata.custom_fields)) {
+    const f = metadata.custom_fields.find((f: unknown) => {
+      const fieldObj = f as Record<string, unknown>;
+      return fieldObj && fieldObj.variable_name === field;
+    }) as Record<string, unknown> | undefined;
+    if (f && f.value !== undefined) return String(f.value)
   }
   const v = metadata[field]
   return v === undefined || v === null ? null : String(v)
 }
 
-function isUniqueViolation(err: any): boolean {
-  return !!err && (err.code === '23505' || String(err.message || '').includes('duplicate key'))
+function isUniqueViolation(err: unknown): boolean {
+  if (typeof err === 'object' && err !== null) {
+    const errorObj = err as Record<string, unknown>;
+    return errorObj.code === '23505' || String(errorObj.message || '').includes('duplicate key');
+  }
+  return false;
 }
 
 serve(async (req) => {

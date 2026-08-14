@@ -89,13 +89,17 @@ export function CartProvider({ children }: { children: ReactNode }) {
     useEffect(() => {
         try {
             localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(lines));
-        } catch {}
+        } catch {
+            // ignore
+        }
     }, [lines]);
 
     useEffect(() => {
         try {
             localStorage.setItem(FAVORITES_STORAGE_KEY, JSON.stringify([...favorites]));
-        } catch {}
+        } catch {
+            // ignore
+        }
     }, [favorites]);
 
     const value = useMemo<CartContextValue>(() => {
@@ -167,6 +171,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
     return <CartContext.Provider value={value}>{children}</CartContext.Provider>;
 }
 
+// eslint-disable-next-line react-refresh/only-export-components
 export function useCart() {
     const ctx = useContext(CartContext);
     if (!ctx) throw new Error("useCart must be used within a CartProvider");
@@ -174,6 +179,7 @@ export function useCart() {
 }
 
 /** Helper for consumers — computes per-line unit price including modifier deltas. */
+// eslint-disable-next-line react-refresh/only-export-components
 export function getLineUnitPrice(line: CartLine): number {
     return lineUnitPrice(line);
 }

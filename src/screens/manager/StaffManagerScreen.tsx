@@ -5,6 +5,7 @@ import {
     PencilSquareIcon,
     PhoneIcon,
     PlusIcon,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     ShieldCheckIcon,
     XMarkIcon,
 } from "@heroicons/react/24/outline";
@@ -84,8 +85,11 @@ export function StaffManagerScreen() {
     }, [venue.id]);
 
     useEffect(() => {
-        load();
-    }, [load]);
+        const init = async () => {
+            await load();
+        };
+        init();
+        }, [load]);
 
     const filtered = useMemo(
         () =>

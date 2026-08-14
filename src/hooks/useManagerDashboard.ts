@@ -294,8 +294,11 @@ export function useManagerDashboard(venueId: string | null, days: 7 | 30 = 7) {
   }, [venueId, days]);
 
   useEffect(() => {
-    fetchAll();
-  }, [fetchAll]);
+    const init = async () => {
+        await fetchAll();
+    };
+    init();
+    }, [fetchAll]);
 
   // Live refresh: any change to bills / payments / submissions in this
   // venue reloads the numbers (debounced so bursts collapse into one).

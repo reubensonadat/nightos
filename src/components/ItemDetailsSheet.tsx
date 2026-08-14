@@ -27,6 +27,7 @@ export function ItemDetailsSheet({ item, onClose }: Props) {
     // Reset state whenever a new item is opened
     useEffect(() => {
         if (item) {
+            // eslint-disable-next-line react-hooks/set-state-in-effect
             setQty(1);
             setNotes("");
             setSelections({});

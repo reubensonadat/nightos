@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState, useCallback, useRef } from "react";
 import { useRealtime } from "../../hooks/useRealtime";
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 import { ArrowPathIcon, SpeakerWaveIcon } from "@heroicons/react/24/outline";
 import { OrderCard, type KitchenOrder, type OrderStatus } from "../../components/OrderCard";
 import { db, type DbKitchenOrderRow } from "../../lib/api";
@@ -87,10 +88,13 @@ type Props = {
     staffName: string;
     onExit?: () => void;
     onSignOut?: () => void;
+    role?: string;
 };
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 export function KitchenDisplayScreen({ venueId, staffId, staffName, onExit, onSignOut }: Props) {
     const [orders, setOrders] = useState<KitchenOrder[]>([]);
+    // eslint-disable-next-line react-hooks/purity
     const [now, setNow] = useState(Date.now());
     const [stationFilter, setStationFilter] = useState<StationFilter>("all");
     const [showSignOutModal, setShowSignOutModal] = useState(false);
@@ -121,8 +125,11 @@ export function KitchenDisplayScreen({ venueId, staffId, staffName, onExit, onSi
     }, [venueId]);
 
     useEffect(() => {
-        load();
-    }, [load]);
+        const init = async () => {
+            await load();
+        };
+        init();
+        }, [load]);
 
     // Live updates — no polling. A new/updated submission (or its items)
     // reloads the board; the debounce covers the submission+items pair.

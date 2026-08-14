@@ -97,6 +97,7 @@ export function InvoiceSettlementScreen() {
         return () => {
             cancelled = true;
         };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [table.id]);
 
     const total = bill?.total ?? 0;

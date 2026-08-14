@@ -1,6 +1,9 @@
 import {
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     CheckIcon,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     ClockIcon,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     PlayIcon,
 } from "@heroicons/react/24/outline";
 
@@ -93,6 +96,7 @@ export function OrderCard({ order, now, onAdvance, onMarkReady, onMarkServed }: 
     const styles = URGENCY_STYLES[urgency];
 
     const totalItems = order.items.reduce((sum, item) => sum + item.quantity, 0);
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const hasNotes = order.items.some((item) => item.notes);
 
     return (
