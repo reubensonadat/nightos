@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useNavigate, useOutletContext } from "react-router-dom";
 import {
     ArrowLeftIcon,
     BanknotesIcon,
@@ -34,14 +35,11 @@ type BillItem = {
 
 /* ────────────────────────── Component ────────────────────────── */
 
-type Props = {
-    table: Table;
-    staffId: string;
-    onBack: () => void;
-    onSettled: () => void;
-};
-
-export function InvoiceSettlementScreen({ table, staffId, onBack, onSettled }: Props) {
+export function InvoiceSettlementScreen() {
+    const { table, staffId, venueId } = useOutletContext<{ table: Table; venueId: string; staffId: string }>();
+    const navigate = useNavigate();
+    const onBack = () => navigate(`/waiter/table/${table.id}`);
+    const onSettled = () => navigate('/waiter');
     const [method, setMethod] = useState<PaymentMethod>("cash");
     const [cashReceived, setCashReceived] = useState<string>("");
     const [settled, setSettled] = useState(false);

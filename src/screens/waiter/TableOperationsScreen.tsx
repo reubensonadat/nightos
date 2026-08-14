@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useNavigate, useOutletContext } from "react-router-dom";
 import {
     ArrowLeftIcon,
     ArrowPathIcon,
@@ -29,14 +30,12 @@ type OpenBill = {
 
 /* ────────────────────────── Component ────────────────────────── */
 
-type Props = {
-    table: Table;
-    venueId: string;
-    staffId: string;
-    onBack: () => void;
-};
 
-export function TableOperationsScreen({ table, venueId, staffId, onBack }: Props) {
+
+export function TableOperationsScreen() {
+    const { table, staffId, venueId } = useOutletContext<{ table: Table; venueId: string; staffId: string }>();
+    const navigate = useNavigate();
+    const onBack = () => navigate(`/waiter/table/${table.id}`);
     const [op, setOp] = useState<Op>("transfer");
     const [tables, setTables] = useState<Table[]>([]);
     const [openBills, setOpenBills] = useState<OpenBill[]>([]);

@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { useNavigate, useLocation, useSearchParams } from "react-router-dom";
+import { useNavigate, useLocation, useSearchParams, Routes, Route, Navigate } from "react-router-dom";
 import toast from "react-hot-toast";
 import { Toaster } from "react-hot-toast";
 import { useRealtime } from "./hooks/useRealtime";
@@ -26,6 +26,7 @@ import { OrderManagementScreen } from "./screens/waiter/OrderManagementScreen";
 import { TableOperationsScreen } from "./screens/waiter/TableOperationsScreen";
 import { InvoiceSettlementScreen } from "./screens/waiter/InvoiceSettlementScreen";
 import { ShiftPerformanceScreen } from "./screens/waiter/ShiftPerformanceScreen";
+import { TableLayout } from "./screens/waiter/TableLayout";
 
 import { KitchenDisplayScreen } from "./screens/kitchen/KitchenDisplayScreen";
 
@@ -47,13 +48,7 @@ import { db, type DbTable, type DbStaffSession } from "./lib/api";
 
 type NavTab = "menu" | "cart" | "orders";
 
-type WaiterScreen =
-  | "auth"
-  | "dashboard"
-  | "order"
-  | "ops"
-  | "invoice"
-  | "shift";
+
 
 type Mode = "customer" | "waiter" | "kitchen" | "manager";
 
@@ -404,9 +399,7 @@ function AppShell() {
     return () => window.removeEventListener("popstate", onPopState);
   }, []);
 
-  const [waiterScreen, setWaiterScreen] = useState<WaiterScreen>("auth");
   const { staffSession, signOut: authSignOut, role, venue, profile } = useAuth();
-  const [selectedTable, setSelectedTable] = useState<Table | null>(null);
 
   // Manager page is URL-driven: /manager/ops, /manager/floorplan, ...
   const managerPage = useMemo<ManagerPage>(() => {
@@ -426,10 +419,7 @@ function AppShell() {
     [navigate],
   );
 
-  useEffect(() => {
-    if (staffSession || role === "owner") setWaiterScreen("dashboard");
-    else setWaiterScreen("auth");
-  }, [staffSession, role]);
+
 
   useEffect(() => {
     const paths: Record<Mode, string> = {
@@ -438,8 +428,11 @@ function AppShell() {
       kitchen: "/kitchen",
       manager: "/manager",
     };
-    const isMatch = (p: string): boolean =>
-      mode === "manager" ? p === "/manager" || p.startsWith("/manager/") : p === paths[mode];
+    const isMatch = (p: string): boolean => {
+      if (mode === "manager") return p === "/manager" || p.startsWith("/manager/");
+      if (mode === "waiter") return p === "/waiter" || p.startsWith("/waiter/");
+      return p === paths[mode];
+    };
     if (!isMatch(location.pathname)) {
       navigate(paths[mode], { replace: true });
     }
@@ -454,14 +447,12 @@ function AppShell() {
 
   const switchToCustomer = () => {
     setMode("customer");
-    setSelectedTable(null);
   };
 
   const handleStaffSignOut = () => {
     const staffId = staffSession?.id;
     if (staffId) db.clockOutStaff(staffId).catch(() => {});
     authSignOut();
-    setSelectedTable(null);
   };
 
   const handleManagerSignOut = async () => {
@@ -498,58 +489,35 @@ function AppShell() {
       )}
 
       {mode === "waiter" && (
-        <>
-          {waiterScreen === "auth" && !(staffSession || role === "owner") && (
-            <StaffAuthScreen />
-          )}
-          {waiterScreen === "dashboard" && (staffSession || role === "owner") && (
-            <TablesDashboard
-              venueId={staffSession?.venue_id || venue?.id || ""}
-              staffName={staffSession?.name || profile?.name || "Manager"}
-              staffId={staffSession?.id || user?.id || ""}
-              role={staffSession?.role || "manager"}
-              onSelectTable={(table) => {
-                setSelectedTable(table);
-                setWaiterScreen("order");
-              }}
-              onSignOut={handleStaffSignOut}
-              onViewShift={() => setWaiterScreen("shift")}
-            />
-          )}
-          {waiterScreen === "order" && selectedTable && (
-            <OrderManagementScreen
-              table={selectedTable}
-              staffId={staffSession?.id || user?.id || ""}
-              venueId={staffSession?.venue_id || venue?.id || venueId}
-              onBack={() => setWaiterScreen("dashboard")}
-              onGoToTableOps={() => setWaiterScreen("ops")}
-              onGoToInvoice={() => setWaiterScreen("invoice")}
-            />
-          )}
-          {waiterScreen === "ops" && selectedTable && (
-            <TableOperationsScreen
-              table={selectedTable}
-              venueId={staffSession?.venue_id || venue?.id || venueId}
-              staffId={staffSession?.id || user?.id || ""}
-              onBack={() => setWaiterScreen("order")}
-            />
-          )}
-          {waiterScreen === "invoice" && selectedTable && (
-            <InvoiceSettlementScreen
-              table={selectedTable}
-              staffId={staffSession?.id || user?.id || ""}
-              onBack={() => setWaiterScreen("order")}
-              onSettled={() => setWaiterScreen("dashboard")}
-            />
-          )}
-          {waiterScreen === "shift" && (
+        <Routes>
+          <Route path="/waiter" element={
+            (staffSession || role === "owner") ? (
+              <TablesDashboard
+                venueId={staffSession?.venue_id || venue?.id || ""}
+                staffName={staffSession?.name || profile?.name || "Manager"}
+                staffId={staffSession?.id || user?.id || ""}
+                role={staffSession?.role || "manager"}
+                onSignOut={handleStaffSignOut}
+              />
+            ) : (
+              <Navigate to="/waiter/login" replace />
+            )
+          } />
+          <Route path="/waiter/login" element={
+            !(staffSession || role === "owner") ? <StaffAuthScreen /> : <Navigate to="/waiter" replace />
+          } />
+          <Route path="/waiter/shift" element={
             <ShiftPerformanceScreen
               staffId={staffSession?.id || user?.id || ""}
               staffName={staffSession?.name || profile?.name || "Manager"}
-              onBack={() => setWaiterScreen("dashboard")}
             />
-          )}
-        </>
+          } />
+          <Route path="/waiter/table/:tableId" element={<TableLayout />}>
+            <Route index element={<OrderManagementScreen />} />
+            <Route path="ops" element={<TableOperationsScreen />} />
+            <Route path="invoice" element={<InvoiceSettlementScreen />} />
+          </Route>
+        </Routes>
       )}
 
       {mode === "kitchen" && (

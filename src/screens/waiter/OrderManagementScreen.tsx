@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useNavigate, useOutletContext } from "react-router-dom";
 import { useRealtime } from "../../hooks/useRealtime";
 import {
     ArrowLeftIcon,
@@ -35,14 +36,7 @@ type WItem = {
 
 type Tab = "order" | "add";
 
-type Props = {
-    table: Table;
-    staffId: string;
-    venueId: string;
-    onBack: () => void;
-    onGoToTableOps: () => void;
-    onGoToInvoice: () => void;
-};
+
 
 const STATUS_META: Record<string, { label: string; cls: string }> = {
     pending: { label: "Pending", cls: "bg-slate-50 text-slate-700 ring-slate-200" },
@@ -65,7 +59,9 @@ function timeAgo(iso: string): string {
     return `${h}h ${mins % 60}m ago`;
 }
 
-export function OrderManagementScreen({ table, staffId, venueId, onBack, onGoToTableOps, onGoToInvoice }: Props) {
+export function OrderManagementScreen() {
+    const { table, staffId, venueId } = useOutletContext<{ table: Table; venueId: string; staffId: string }>();
+    const navigate = useNavigate();
     const [tab, setTab] = useState<Tab>("order");
 
     // ── Real bill + submissions for this table ──
@@ -286,7 +282,7 @@ export function OrderManagementScreen({ table, staffId, venueId, onBack, onGoToT
                 <div className="mx-auto flex w-full max-w-7xl items-center justify-between px-5 md:px-8 pt-[max(env(safe-area-inset-top),16px)] pb-3">
                     <button
                         type="button"
-                        onClick={onBack}
+                        onClick={() => navigate('/waiter')}
                         aria-label="Back to tables"
                         className="flex h-9 w-9 items-center justify-center rounded-full bg-white text-licorice shadow-sm ring-1 ring-licorice/8 transition-colors hover:bg-isabelline active:scale-95"
                     >
@@ -303,7 +299,7 @@ export function OrderManagementScreen({ table, staffId, venueId, onBack, onGoToT
                     <div className="flex items-center gap-1.5">
                         <button
                             type="button"
-                            onClick={onGoToTableOps}
+                            onClick={() => navigate(`/waiter/table/${table.id}/ops`)}
                             aria-label="Table operations"
                             className="w-10 h-10 rounded-full bg-white border border-slate-200 flex items-center justify-center text-slate-600 active:bg-slate-50 transition-colors"
                         >
@@ -456,7 +452,7 @@ export function OrderManagementScreen({ table, staffId, venueId, onBack, onGoToT
                                     </button>
                                     <button
                                         type="button"
-                                        onClick={onGoToInvoice}
+                                        onClick={() => navigate(`/waiter/table/${table.id}/invoice`)}
                                         className="inline-flex w-full items-center justify-center gap-1.5 rounded-2xl bg-licorice px-4 py-4 text-[12px] font-bold tracking-tight text-white shadow-md transition-all hover:bg-licorice/90 active:scale-[0.98]"
                                     >
                                         Bill

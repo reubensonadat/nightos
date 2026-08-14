@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import {
     ArrowLeftIcon,
     ArrowTrendingUpIcon,
@@ -37,10 +38,11 @@ const COMMISSION_RATE = 0.03; // 3% of sales
 type Props = {
     staffId: string;
     staffName: string;
-    onBack: () => void;
 };
 
-export function ShiftPerformanceScreen({ staffId, staffName, onBack }: Props) {
+export function ShiftPerformanceScreen({ staffId, staffName }: Props) {
+    const navigate = useNavigate();
+    const onBack = () => navigate('/waiter');
     const [summary, setSummary] = useState<ShiftSummary | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [loading, setLoading] = useState(true);
@@ -50,7 +52,14 @@ export function ShiftPerformanceScreen({ staffId, staffName, onBack }: Props) {
         setError(null);
         try {
             const { data } = await db.staffShiftSummary(staffId);
-            if (!data || data.ok === false) {
+            
+            const isEmptyData = 
+                (Array.isArray(data) && data.length === 0) || 
+                (data && typeof data === 'object' && !Array.isArray(data) && Object.keys(data).length === 0);
+
+            if (isEmptyData || data?.error === "staff_not_found") {
+                setError("staff_not_found");
+            } else if (!data || data.ok === false) {
                 setError(data?.error ?? "Could not load your shift.");
             } else {
                 setSummary(data);
@@ -89,12 +98,9 @@ export function ShiftPerformanceScreen({ staffId, staffName, onBack }: Props) {
                         <ArrowLeftIcon className="h-4 w-4" strokeWidth={2.25} />
                     </button>
 
-                    <div className="flex flex-col items-center leading-tight">
+                    <div className="flex items-center justify-center leading-tight">
                         <span className="text-[13px] font-bold tracking-tight text-licorice">
                             My Shift
-                        </span>
-                        <span className="text-[9px] font-semibold uppercase tracking-[0.18em] text-feldgrau">
-                            {staffName} · Performance
                         </span>
                     </div>
 
@@ -115,7 +121,24 @@ export function ShiftPerformanceScreen({ staffId, staffName, onBack }: Props) {
                     </div>
                 )}
 
-                {!loading && error && (
+                {!loading && error === 'staff_not_found' && (
+                    <div className="flex flex-col items-center justify-center p-8 text-center bg-white rounded-2xl border border-slate-100 shadow-sm mt-6">
+                        {/* Typography */}
+                        <h3 className="text-xl font-bold text-slate-900 mb-2">No tables yet</h3>
+                        <p className="text-sm text-slate-500 mb-8 max-w-[250px] mx-auto">
+                            Serve your first table to see your revenue and shift metrics appear here.
+                        </p>
+                        
+                        {/* Action: Redirect to Floor */}
+                        <button 
+                            onClick={onBack}
+                            className="w-full py-2.5 rounded-xl bg-[#2A1A17] text-white font-bold text-base transition-colors active:scale-[0.98]">
+                            Back to Floorplan
+                        </button>
+                    </div>
+                )}
+
+                {!loading && error && error !== 'staff_not_found' && (
                     <div className="rounded-2xl bg-white p-8 text-center shadow-sm ring-1 ring-isabelline">
                         <p className="text-[12px] font-bold text-licorice">{error}</p>
                         <button

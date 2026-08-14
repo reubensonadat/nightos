@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect, useCallback, useRef } from "react";
+import { useNavigate } from "react-router-dom";
 import {
     ArrowRightIcon,
     ArrowPathIcon,
@@ -98,9 +99,7 @@ type Props = {
     staffName: string;
     staffId: string;
     role: string;
-    onSelectTable: (table: Table) => void;
     onSignOut: () => void;
-    onViewShift?: () => void;
 };
 
 function transformToTables(dbTables: any[], openBills: any[], waiterNames: Record<string, string>): Table[] {
@@ -135,12 +134,14 @@ function transformToTables(dbTables: any[], openBills: any[], waiterNames: Recor
     });
 }
 
-export function TablesDashboard({ venueId, staffName, staffId: _staffId, role, onSelectTable, onSignOut, onViewShift }: Props) {
+export function TablesDashboard({ venueId, staffName, staffId, role, onSignOut }: Props) {
+    const navigate = useNavigate();
     const [tables, setTables] = useState<Table[]>([]);
     const [filter, setFilter] = useState<Filter>("all");
     const [refreshing, setRefreshing] = useState(false);
     const [loading, setLoading] = useState(true);
     const [isSignOutModalOpen, setIsSignOutModalOpen] = useState(false);
+    const [tablesManaged, setTablesManaged] = useState(0);
     const [dwellThreshold, setDwellThreshold] = useState(120);
     const [, setNowTick] = useState(0);
     const reloadTimer = useRef<number | null>(null);
@@ -207,6 +208,14 @@ export function TablesDashboard({ venueId, staffName, staffId: _staffId, role, o
         onUpdate: scheduleReload,
         onDelete: scheduleReload,
     });
+
+    useEffect(() => {
+        if (staffId) {
+            db.staffShiftSummary(staffId).then(({ data }) => {
+                if (data && data.tables_served !== undefined) setTablesManaged(data.tables_served || 0);
+            });
+        }
+    }, [isSignOutModalOpen, staffId, venueId]);
 
     useEffect(() => () => {
         if (reloadTimer.current) window.clearTimeout(reloadTimer.current);
@@ -305,29 +314,17 @@ export function TablesDashboard({ venueId, staffName, staffId: _staffId, role, o
                     <div className="no-scrollbar -mx-1 flex items-center gap-2 overflow-x-auto px-1 pb-1">
                         {FILTERS.map((f) => {
                             const isActive = f.id === filter;
-                            const count =
-                                f.id === "all"
-                                    ? displayTables.length
-                                    : displayTables.filter((t) => t.status === f.id).length;
                             return (
                                 <button
                                     key={f.id}
                                     type="button"
                                     onClick={() => setFilter(f.id)}
-                                    className={`shrink-0 inline-flex items-center gap-1.5 rounded-full px-3.5 py-2 text-[11px] font-bold tracking-tight transition-all duration-200 ${isActive
-                                        ? "bg-licorice text-isabelline shadow-[0_4px_14px_rgba(35,20,12,0.25)]"
+                                    className={`flex-1 inline-flex items-center justify-center rounded-full px-4 py-2 text-[11px] font-bold tracking-tight transition-all duration-200 ${isActive
+                                        ? "bg-licorice text-isabelline"
                                         : "bg-white text-feldgrau ring-1 ring-licorice/8 hover:text-licorice"
                                         }`}
                                 >
                                     {f.label}
-                                    <span
-                                        className={`rounded-full px-1.5 py-0.5 text-[8px] font-bold tabular-nums ${isActive
-                                            ? "bg-isabelline/15 text-isabelline/80"
-                                            : "bg-isabelline text-feldgrau/70"
-                                            }`}
-                                    >
-                                        {count}
-                                    </span>
                                 </button>
                             );
                         })}
@@ -372,7 +369,7 @@ export function TablesDashboard({ venueId, staffName, staffId: _staffId, role, o
                             <button
                                 key={table.id}
                                 type="button"
-                                onClick={() => onSelectTable(table)}
+                                onClick={() => navigate(`/waiter/table/${table.id}`)}
                                 className={`
                                 animate-velvet-rise
                                 group flex flex-col rounded-2xl
@@ -480,9 +477,9 @@ export function TablesDashboard({ venueId, staffName, staffId: _staffId, role, o
                 onSignOut={onSignOut}
                 onReviewPerformance={() => {
                     setIsSignOutModalOpen(false);
-                    if (onViewShift) onViewShift();
+                    navigate('/waiter/shift');
                 }}
-                tablesManaged={14}
+                tablesManaged={tablesManaged}
             />
         </main>
     );
