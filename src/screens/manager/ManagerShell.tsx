@@ -3,6 +3,7 @@ import {
     ArrowRightIcon,
     ArrowRightStartOnRectangleIcon,
     BanknotesIcon,
+    Bars3Icon,
     ChartBarIcon,
     ClipboardDocumentCheckIcon,
     EyeIcon,
@@ -16,6 +17,8 @@ import {
     XMarkIcon,
 } from "@heroicons/react/24/outline";
 import { ShieldCheckIcon } from "@heroicons/react/24/solid";
+import signoutBlackIcon from "../../assets/sign-out-black.svg";
+import { ManagerSignOutModal } from "../../components/ManagerSignOutModal";
 
 /* ────────────────────────── Admin Login Screen ────────────────────────── */
 
@@ -191,6 +194,7 @@ type ShellProps = {
 
 export function ManagerShell({ managerName, activePage, onPageChange, onSignOut, children }: ShellProps) {
     const [mobileNavOpen, setMobileNavOpen] = useState(false);
+    const [showSignOutModal, setShowSignOutModal] = useState(false);
 
     const activeItem = NAV_ITEMS.find((item) => item.id === activePage) ?? NAV_ITEMS[0];
 
@@ -248,11 +252,11 @@ export function ManagerShell({ managerName, activePage, onPageChange, onSignOut,
                         </div>
                         <button
                             type="button"
-                            onClick={onSignOut}
+                            onClick={() => setShowSignOutModal(true)}
                             aria-label="Sign out"
                             className="flex h-8 w-8 items-center justify-center rounded-md text-feldgrau transition-colors hover:bg-white hover:text-dark-red"
                         >
-                            <ArrowRightStartOnRectangleIcon className="h-4 w-4" strokeWidth={2.25} />
+                            <img src={signoutBlackIcon} alt="Sign Out" className="h-4 w-4" />
                         </button>
                     </div>
                 </div>
@@ -269,18 +273,18 @@ export function ManagerShell({ managerName, activePage, onPageChange, onSignOut,
                         aria-label="Open navigation"
                         className="flex h-9 w-9 items-center justify-center rounded-full bg-isabelline text-licorice"
                     >
-                        <Squares2X2Icon className="h-4 w-4" strokeWidth={2.25} />
+                        <Bars3Icon className="h-4 w-4" strokeWidth={2.25} />
                     </button>
                     <div className="flex flex-col items-center leading-tight">
                         <span className="text-[15px] font-bold tracking-tight text-licorice">{activeItem.label}</span>
                     </div>
                     <button
                         type="button"
-                        onClick={onSignOut}
+                        onClick={() => setShowSignOutModal(true)}
                         aria-label="Sign out"
-                        className="text-xs font-bold uppercase tracking-wider text-feldgrau"
+                        className="flex h-9 w-9 items-center justify-center rounded-full bg-red-50 text-red-600 active:bg-red-100 transition-colors"
                     >
-                        Exit
+                        <img src={signoutBlackIcon} alt="Sign Out" className="h-4 w-4" />
                     </button>
                 </div>
             </header>
@@ -366,6 +370,12 @@ export function ManagerShell({ managerName, activePage, onPageChange, onSignOut,
                     {children}
                 </main>
             </div>
+
+            <ManagerSignOutModal
+                isOpen={showSignOutModal}
+                onClose={() => setShowSignOutModal(false)}
+                onSignOut={onSignOut}
+            />
         </div>
     );
 }

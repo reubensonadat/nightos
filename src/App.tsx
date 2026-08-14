@@ -55,10 +55,21 @@ type Mode = "customer" | "waiter" | "kitchen" | "manager";
 /* ──────────────────── Customer Shell (bottom nav) ──────────────────── */
 
 function CustomerShell({ venueId, tableId, tableLabel }: { venueId: string; tableId: string | null; tableLabel?: string | null }) {
-  const [tab, setTab] = useState<NavTab>(() => {
-    const saved = localStorage.getItem("nightos:customer:tab");
-    return saved === "cart" || saved === "orders" ? saved : "menu";
-  });
+  const location = useLocation();
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+
+  const path = location.pathname;
+  let tab: NavTab = "menu";
+  if (path.startsWith("/cart")) tab = "cart";
+  if (path.startsWith("/orders")) tab = "orders";
+
+  const setTab = useCallback((newTab: NavTab) => {
+    const tableParam = searchParams.get("table");
+    const query = tableParam ? `?table=${tableParam}` : "";
+    navigate(`/${newTab}${query}`);
+  }, [navigate, searchParams]);
+
   const [activeOrders, setActiveOrders] = useState<OrderSummary[]>([]);
   const [history, setHistory] = useState<OrderSummary[]>([]);
   const [payingOrder, setPayingOrder] = useState<OrderSummary | null>(null);
@@ -130,9 +141,7 @@ function CustomerShell({ venueId, tableId, tableLabel }: { venueId: string; tabl
     } catch {}
   }, [sessionOrdersKey, session]);
 
-  useEffect(() => {
-    try { localStorage.setItem("nightos:customer:tab", tab); } catch {}
-  }, [tab]);
+  // Removed localStorage tab sync since we use URLs now
 
   useEffect(() => {
     try { localStorage.setItem("nightos:orders", JSON.stringify({ active: activeOrders, past: history })); } catch {}
@@ -305,9 +314,8 @@ type CustomerFlowProps = {
 };
 
 function CustomerFlow({ onSwitchMode, venueId, qrTable, qrLoading, qrError }: CustomerFlowProps) {
-  // Per-visit only (never persisted): the "Customer" card on the landing hub
-  const [inShell, setInShell] = useState(false);
-  const [showReservations, setShowReservations] = useState(false);
+  const location = useLocation();
+  const navigate = useNavigate();
 
   if (qrLoading) {
     return (
@@ -335,6 +343,9 @@ function CustomerFlow({ onSwitchMode, venueId, qrTable, qrLoading, qrError }: Cu
   }
 
   if (qrTable) {
+    if (location.pathname === "/") {
+      return <Navigate to={`/menu${location.search}`} replace />;
+    }
     return (
       <CustomerShell
         venueId={qrTable.venue_id}
@@ -344,19 +355,18 @@ function CustomerFlow({ onSwitchMode, venueId, qrTable, qrLoading, qrError }: Cu
     );
   }
 
-  // No QR table → the landing hub: what Bysen is, and a doorway into
-  // every part of the system (customers never see this — their QR goes
-  // straight to the shell above).
-  if (showReservations) {
-    return <ReservationsScreen onBack={() => setShowReservations(false)} />;
+  if (location.pathname === "/reservations") {
+    return <ReservationsScreen onBack={() => navigate("/")} />;
   }
-  if (inShell) {
+
+  if (location.pathname.startsWith("/menu") || location.pathname.startsWith("/cart") || location.pathname.startsWith("/orders")) {
     return <CustomerShell venueId={venueId} tableId={null} />;
   }
+
   return (
     <LandingScreen
-      onEnterCustomer={() => setInShell(true)}
-      onViewReservations={() => setShowReservations(true)}
+      onEnterCustomer={() => navigate("/menu")}
+      onViewReservations={() => navigate("/reservations")}
       onStaffPortal={() => onSwitchMode("waiter")}
       onKitchenDisplay={() => onSwitchMode("kitchen")}
       onManagerPortal={() => onSwitchMode("manager")}
@@ -386,7 +396,16 @@ function AppShell() {
     return "customer";
   };
 
-  const [mode, setMode] = useState<Mode>(() => getModeFromPath());
+  const mode = getModeFromPath();
+  const setMode = useCallback((newMode: Mode) => {
+    const paths: Record<Mode, string> = {
+      customer: "/",
+      waiter: "/waiter",
+      kitchen: "/kitchen",
+      manager: "/manager/ops",
+    };
+    navigate(paths[newMode]);
+  }, [navigate]);
 
   // Back button safety: never let the browser leave the app's first entry
   useEffect(() => {
@@ -421,22 +440,7 @@ function AppShell() {
 
 
 
-  useEffect(() => {
-    const paths: Record<Mode, string> = {
-      customer: "/",
-      waiter: "/waiter",
-      kitchen: "/kitchen",
-      manager: "/manager",
-    };
-    const isMatch = (p: string): boolean => {
-      if (mode === "manager") return p === "/manager" || p.startsWith("/manager/");
-      if (mode === "waiter") return p === "/waiter" || p.startsWith("/waiter/");
-      return p === paths[mode];
-    };
-    if (!isMatch(location.pathname)) {
-      navigate(paths[mode], { replace: true });
-    }
-  }, [mode, navigate, location.pathname]);
+
 
   // /manager defaults to the Live Ops sub-path
   useEffect(() => {
@@ -479,13 +483,17 @@ function AppShell() {
   return (
     <CartProvider>
       {mode === "customer" && (
-        <CustomerFlow
-          onSwitchMode={setMode}
-          venueId={venueId}
-          qrTable={qrTable}
-          qrLoading={qrLoading}
-          qrError={qrError}
-        />
+        <Routes>
+          <Route path="/*" element={
+            <CustomerFlow
+              onSwitchMode={setMode}
+              venueId={venueId}
+              qrTable={qrTable}
+              qrLoading={qrLoading}
+              qrError={qrError}
+            />
+          } />
+        </Routes>
       )}
 
       {mode === "waiter" && (

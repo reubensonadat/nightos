@@ -34,10 +34,10 @@ type AuthContextValue = {
 
 const AuthContext = createContext<AuthContextValue>(null!)
 
-/** Where a signed-in user belongs after OTP: owner → manager, kitchen/bar →
+/** Where a signed-in user belongs after OTP: owner/manager → manager, kitchen/bar →
  * kitchen display, everyone else on staff → the waiter dashboard. */
 export function sectorPath(role: string | null): string {
-  if (role === 'owner') return '/manager'
+  if (role === 'owner' || role === 'manager' || role === 'supervisor') return '/manager'
   if (role === 'kitchen' || role === 'bar') return '/kitchen'
   return '/waiter'
 }

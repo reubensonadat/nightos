@@ -4,6 +4,7 @@ import { ArrowPathIcon, SpeakerWaveIcon } from "@heroicons/react/24/outline";
 import { OrderCard, type KitchenOrder, type OrderStatus } from "../../components/OrderCard";
 import { db, type DbKitchenOrderRow } from "../../lib/api";
 import signoutIcon from "../../assets/sign-out.svg";
+import { WaiterSignOutModal } from "../../components/WaiterSignOutModal";
 
 /* ────────────────────────── Station filter ────────────────────────── */
 
@@ -92,6 +93,7 @@ export function KitchenDisplayScreen({ venueId, staffId, staffName, onExit, onSi
     const [orders, setOrders] = useState<KitchenOrder[]>([]);
     const [now, setNow] = useState(Date.now());
     const [stationFilter, setStationFilter] = useState<StationFilter>("all");
+    const [showSignOutModal, setShowSignOutModal] = useState(false);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
@@ -235,7 +237,14 @@ export function KitchenDisplayScreen({ venueId, staffId, staffName, onExit, onSi
                             {onExit && (
                                 <button
                                     type="button"
-                                    onClick={onExit}
+                                    onClick={() => {
+                                        const activeTickets = pendingCount + preparingCount;
+                                        if (activeTickets > 0) {
+                                            setShowSignOutModal(true);
+                                        } else {
+                                            onExit();
+                                        }
+                                    }}
                                     className="flex items-center gap-1.5 rounded-full bg-isabelline/10 px-3 py-1.5 text-xs font-bold uppercase tracking-wider text-isabelline/80 transition-colors hover:bg-isabelline/20"
                                 >
                                     <img src={signoutIcon} alt="" className="h-4 w-4 opacity-80" />
@@ -349,6 +358,12 @@ export function KitchenDisplayScreen({ venueId, staffId, staffName, onExit, onSi
                 )}
             </section>
 
+            <WaiterSignOutModal
+                isOpen={showSignOutModal}
+                pendingTicketsCount={pendingCount + preparingCount}
+                onClose={() => setShowSignOutModal(false)}
+                onSignOut={onExit || (() => {})}
+            />
         </main>
     );
 }

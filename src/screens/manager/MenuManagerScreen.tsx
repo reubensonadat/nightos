@@ -157,26 +157,26 @@ export function MenuManagerScreen() {
 
     return (
         <div className="mx-auto w-full max-w-7xl space-y-6">
-            <div className="grid grid-cols-2 gap-3 md:grid-cols-5 md:gap-4">
-                <div className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-isabelline flex flex-col gap-1">
+            <div className="grid grid-cols-2 gap-3 md:flex md:flex-row md:overflow-x-auto md:no-scrollbar md:gap-4">
+                <div className="col-span-2 md:shrink-0 md:min-w-[320px] rounded-2xl bg-white p-4 shadow-sm ring-1 ring-isabelline flex flex-col gap-1">
+                    <p className="text-xs font-bold uppercase tracking-wider text-feldgrau">Inv. Value</p>
+                    <p className="text-4xl font-bold tabular-nums text-licorice">{formatGHS(totalInventoryValue)}</p>
+                </div>
+                <div className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-isabelline flex flex-col gap-1 md:shrink-0 md:min-w-[180px] md:flex-1">
                     <p className="text-xs font-bold uppercase tracking-wider text-feldgrau">Total Items</p>
                     <p className="text-4xl font-bold tabular-nums text-licorice">{totalItems}</p>
                 </div>
-                <div className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-isabelline flex flex-col gap-1">
+                <div className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-isabelline flex flex-col gap-1 md:shrink-0 md:min-w-[180px] md:flex-1">
                     <p className="text-xs font-bold uppercase tracking-wider text-feldgrau">Available</p>
                     <p className="text-4xl font-bold tabular-nums text-khaki">{items.filter((i) => i.is_active).length}</p>
                 </div>
-                <div className="rounded-2xl bg-licorice p-4 text-isabelline shadow-[0_8px_24px_rgba(35,20,12,0.15)] flex flex-col gap-1">
+                <div className="rounded-2xl bg-licorice p-4 text-isabelline shadow-[0_8px_24px_rgba(35,20,12,0.15)] flex flex-col gap-1 md:shrink-0 md:min-w-[180px] md:flex-1">
                     <p className="text-xs font-bold uppercase tracking-wider text-isabelline/60">Low Stock</p>
                     <p className="text-4xl font-bold tabular-nums text-khaki">{lowStock}</p>
                 </div>
-                <div className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-isabelline flex flex-col gap-1">
+                <div className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-isabelline flex flex-col gap-1 md:shrink-0 md:min-w-[180px] md:flex-1">
                     <p className="text-xs font-bold uppercase tracking-wider text-feldgrau">Out of Stock</p>
                     <p className="text-4xl font-bold tabular-nums text-dark-red">{outOfStock}</p>
-                </div>
-                <div className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-isabelline flex flex-col gap-1">
-                    <p className="text-xs font-bold uppercase tracking-wider text-feldgrau">Inv. Value</p>
-                    <p className="text-4xl font-bold tabular-nums text-licorice">{formatGHS(totalInventoryValue)}</p>
                 </div>
             </div>
 

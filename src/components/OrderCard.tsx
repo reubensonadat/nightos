@@ -129,10 +129,10 @@ export function OrderCard({ order, now, onAdvance, onMarkReady, onMarkServed }: 
 
             {/* ── Items list ── */}
             <div className="flex-1 px-4 py-3">
-                <ul className="space-y-1">
+                <ul className="space-y-2.5">
                     {order.items.map((item, idx) => (
-                        <li key={idx} className="grid grid-cols-[30px_1fr] gap-2">
-                            <span className="mt-0.5 text-base font-medium text-slate-400 tabular-nums text-right">
+                        <li key={idx} className="grid grid-cols-[28px_1fr] gap-2 items-center">
+                            <span className="text-base font-medium text-slate-400 tabular-nums text-left leading-tight">
                                 {item.quantity}x
                             </span>
                             <div className="flex-1 min-w-0">
