@@ -134,8 +134,8 @@ export function TableOperationsScreen() {
             setWorking("transfer");
             const { data, error } = await db.transferBill(bill.id, selectedDest, staffId);
             setWorking(null);
-            if (error || !data.ok) {
-                const code = (data as { error?: string }).error ?? "failed";
+            if (error || !data || !(data as any).ok) {
+                const code = data ? (data as any).error : "failed";
                 toast.error(code === "table_occupied"
                     ? "That table already has an open tab."
                     : code === "bill_not_open"
@@ -154,7 +154,7 @@ export function TableOperationsScreen() {
             setWorking("merge");
             const { data, error } = await db.mergeBills(bill.id, dest.bill.id, staffId);
             setWorking(null);
-            if (error || !data.ok) {
+            if (error || !data || !(data as any).ok) {
                 toast.error("Merge failed — try again.");
                 return;
             }
@@ -164,7 +164,7 @@ export function TableOperationsScreen() {
             setWorking("split");
             const { data, error } = await db.splitBill(bill.id, ways, staffId);
             setWorking(null);
-            if (error || !data.ok) {
+            if (error || !data || !(data as any).ok) {
                 toast.error("Split failed — try again.");
                 return;
             }

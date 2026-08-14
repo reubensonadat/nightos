@@ -66,7 +66,7 @@ export function InvoiceSettlementScreen() {
         const load = async () => {
             const { data: billRow } = await db.openBillForTable(table.id);
             if (cancelled) return;
-            db.venueById(table.venue_id).then(
+            db.venueById(venueId).then(
                 ({ data }) => { if (!cancelled && data) setVenueName(data.name); },
                 () => {},
             );
