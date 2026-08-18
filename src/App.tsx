@@ -48,7 +48,7 @@ import { useCustomerSession } from "./hooks/useCustomerSession";
  
 import { db, type DbTable } from "./lib/api";
 
-type NavTab = "menu" | "cart" | "orders";
+type NavTab = "menu" | "tab" | "orders";
 
 
 
@@ -63,7 +63,7 @@ function CustomerShell({ venueId, tableId, tableLabel }: { venueId: string; tabl
 
   const path = location.pathname;
   let tab: NavTab = "menu";
-  if (path.startsWith("/cart")) tab = "cart";
+  if (path.startsWith("/tab")) tab = "tab";
   if (path.startsWith("/orders")) tab = "orders";
 
   const setTab = useCallback((newTab: NavTab) => {
@@ -289,10 +289,10 @@ function CustomerShell({ venueId, tableId, tableLabel }: { venueId: string; tabl
           venueName={venueName}
           tableLabel={tableLabel}
           waiterName={waiter?.name ?? null}
-          onViewCart={() => setTab("cart")}
+          onViewCart={() => setTab("tab")}
         />
       )}
-      {tab === "cart" && (
+      {tab === "tab" && (
         <CartScreen
           venueId={venueId}
           venueName={venueName ?? undefined}
@@ -313,6 +313,7 @@ function CustomerShell({ venueId, tableId, tableLabel }: { venueId: string; tabl
           billId={bill?.id ?? null}
           sessionToken={session?.session_token}
           onPayBill={setPayingOrder}
+          onBack={() => setTab("tab")}
         />
       )}
       <CustomerBottomNav activeTab={tab} onTabChange={setTab} cartCount={itemCount} />
@@ -385,7 +386,7 @@ function CustomerFlow({ onSwitchMode, venueId, qrTable, qrLoading, qrError }: Cu
     return <ReservationsScreen onBack={() => navigate("/")} />;
   }
 
-  if (location.pathname.startsWith("/menu") || location.pathname.startsWith("/cart") || location.pathname.startsWith("/orders")) {
+  if (location.pathname.startsWith("/menu") || location.pathname.startsWith("/tab") || location.pathname.startsWith("/orders")) {
     return <CustomerShell venueId={venueId} tableId={null} />;
   }
 

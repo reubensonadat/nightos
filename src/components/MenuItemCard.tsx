@@ -59,25 +59,7 @@ export function MenuItemCard({
                     </div>
                 )}
 
-                {/* Top-right Heart Button (Only show if onToggleFavorite is provided) */}
-                {onToggleFavorite && (
-                    <button
-                        type="button"
-                        onClick={(e) => {
-                            e.stopPropagation();
-                            onToggleFavorite();
-                        }}
-                        aria-label={isFavorite ? "Remove from favorites" : "Add to favorites"}
-                        aria-pressed={isFavorite}
-                        className="absolute right-3 top-3 z-20 flex h-8 w-8 items-center justify-center rounded-full bg-white/90 shadow-sm backdrop-blur-md transition-transform active:scale-90"
-                    >
-                        {isFavorite ? (
-                            <HeartIconSolid className="h-4 w-4 text-dark-red" />
-                        ) : (
-                            <HeartIcon className="h-4 w-4 text-licorice" strokeWidth={2.5} />
-                        )}
-                    </button>
-                )}
+
             </div>
 
             {/* Information Section (No white background) */}
@@ -94,7 +76,7 @@ export function MenuItemCard({
                             onAdd();
                         }}
                         aria-label={`Add ${name} to cart`}
-                        className="relative z-20 flex h-8 w-8 items-center justify-end text-licorice transition-transform hover:opacity-70 active:scale-90"
+                        className="relative z-20 w-10 h-10 rounded-full bg-white border border-slate-200 shadow-sm flex items-center justify-center text-slate-900 active:bg-slate-50 transition-colors"
                     >
                         <PlusIcon className="h-6 w-6" strokeWidth={2.5} />
                     </button>
