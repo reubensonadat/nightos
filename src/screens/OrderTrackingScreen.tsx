@@ -125,22 +125,6 @@ export function OrderTrackingScreen({ order, onBackToMenu, onPayBill }: Props) {
                             </span>
                         </div>
                     </div>
-
-                    <div className="flex items-center">
-                        <button
-                            type="button"
-                            className="
-                                rounded-full border border-licorice/20 bg-transparent
-                                px-3 py-1.5
-                                text-[11px] font-bold uppercase tracking-wider text-licorice
-                                transition-all
-                                hover:border-licorice/40 hover:bg-licorice/5
-                                active:scale-95
-                            "
-                        >
-                            Table 4
-                        </button>
-                    </div>
                 </div>
             </header>
 

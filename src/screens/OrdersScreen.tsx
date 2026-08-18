@@ -304,7 +304,7 @@ function HistoryCard({
 /* ────────────────────────── Main Screen ────────────────────────── */
 
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
-export function OrdersScreen({ activeOrders, history, tableLabel, billId: _billId, sessionToken, venueName, onPayBill, onReorder: _onReorder }: Props & { venueName?: string | null }) {
+export function OrdersScreen({ activeOrders, history, tableLabel, billId: _billId, sessionToken, venueName, onPayBill, onReorder: _onReorder, onBack }: Props & { venueName?: string | null; onBack?: () => void }) {
   const navigate = useNavigate();
   const hasActive = activeOrders.length > 0;
   const hasHistory = history.length > 0;
@@ -316,7 +316,7 @@ export function OrdersScreen({ activeOrders, history, tableLabel, billId: _billI
         <div className="mx-auto flex w-full max-w-7xl items-center justify-between px-5 md:px-8 pt-[max(env(safe-area-inset-top),16px)] pb-3 relative">
           <button
             type="button"
-            onClick={() => navigate("/tab")}
+            onClick={() => onBack ? onBack() : navigate(-1)}
             aria-label="Back"
             className="flex h-9 w-9 items-center justify-center rounded-full bg-white text-licorice shadow-sm ring-1 ring-licorice/8 transition-colors hover:bg-isabelline active:scale-95"
           >
@@ -327,11 +327,7 @@ export function OrdersScreen({ activeOrders, history, tableLabel, billId: _billI
             Orders
           </h1>
 
-          <div className="flex items-center gap-1.5 rounded-full border border-licorice/15 bg-licorice/5 px-3 py-2">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-licorice">
-              {tableLabel ? `Table ${tableLabel}` : venueName || "Order"}
-            </span>
-          </div>
+
         </div>
       </header>
 

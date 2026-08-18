@@ -137,9 +137,11 @@ export function MenuScreen({ venueId, venueName, tableLabel, waiterName, onBack,
                                 <span className="text-[13px] font-bold tracking-tight text-licorice">
                                     {venueName || "Velvet Lounge"}
                                 </span>
-                                <span className="text-[9px] font-semibold uppercase tracking-[0.18em] text-feldgrau">
-                                    Bysen{tableLabel ? ` · Table ${tableLabel}` : ""}
-                                </span>
+                                {tableLabel && (
+                                    <span className="text-[9px] font-semibold uppercase tracking-[0.18em] text-feldgrau">
+                                        Table {tableLabel}
+                                    </span>
+                                )}
                             </div>
                         </div>
                     </div>
@@ -229,30 +231,11 @@ export function MenuScreen({ venueId, venueName, tableLabel, waiterName, onBack,
                 CONTENT — editorial title + cards, flows naturally
               ═══════════════════════════════════════════════════════════ */}
             <section className="mx-auto w-full max-w-7xl px-5 md:px-8 pt-6 pb-[calc(200px+env(safe-area-inset-bottom))]">
-                {/* ── Editorial Title Section ── */}
-                <div className="mb-6">
-                    <p className="text-[10px] font-bold uppercase tracking-[0.22em] text-khaki">
-                        {searchOpen && query ? "Searching" : "Chapter"}
+                {!searchOpen && (
+                    <p className="text-base font-medium text-slate-600 mb-4">
+                        Tap any item to read more.
                     </p>
-                    <h1 className="mt-1.5 text-[2rem] font-black leading-[1.05] tracking-[-0.04em] text-licorice">
-                        {searchOpen && query ? (
-                            <>"{query}"</>
-                        ) : (
-                            <>
-                                {active}
-                                <br />
-                                <span className="italic font-serif font-bold text-khaki">
-                                    tonight
-                                </span>
-                            </>
-                        )}
-                    </h1>
-                    {!searchOpen && (
-                        <p className="mt-2 max-w-[300px] text-[12.5px] leading-[1.55] tracking-tight text-feldgrau">
-                            Tap any item to read more.
-                        </p>
-                    )}
-                </div>
+                )}
                 {/* Empty state */}
                 {loading ? (
                     <div className="mt-4 flex flex-col items-center justify-center rounded-2xl bg-white px-6 py-12 text-center shadow-[0_4px_16px_rgba(35,20,12,0.04)] ring-1 ring-isabelline">

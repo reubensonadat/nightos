@@ -187,12 +187,6 @@ export function CartScreen({ venueId, venueName, tableLabel, billId, customerSes
                         <h1 className="text-[16px] font-bold tracking-tight text-isabelline absolute left-1/2 -translate-x-1/2">
                             Your Tab
                         </h1>
-
-                        <div className="flex items-center gap-1.5 rounded-full border border-isabelline/15 bg-isabelline/5 px-3 py-2">
-                            <span className="text-[10px] font-bold uppercase tracking-wider text-isabelline">
-                                T·{tableLabel ?? "—"}
-                            </span>
-                        </div>
                     </div>
 
                     <div className="relative z-10 mt-8 mx-auto w-full max-w-7xl px-5 md:px-8 text-center">
@@ -259,34 +253,19 @@ export function CartScreen({ venueId, venueName, tableLabel, billId, customerSes
                 </div>
 
                 {/* Top bar */}
-                <div className="relative z-10 flex items-center justify-between">
-                    <div className="flex items-center gap-2.5">
-                        <button
-                            type="button"
-                            onClick={onBack}
-                            aria-label="Back"
-                            className="flex h-9 w-9 items-center justify-center rounded-full border border-isabelline/15 bg-isabelline/5 text-isabelline transition-colors hover:bg-isabelline/10 active:scale-95"
-                        >
-                            <ArrowLeftIcon className="h-4 w-4" strokeWidth={2.25} />
-                        </button>
-                        <div className="flex flex-col leading-tight">
-                            <span className="text-[12px] font-bold tracking-tight text-isabelline">
-                                Your Order
-                            </span>
-                            <span className="text-[9px] font-semibold uppercase tracking-[0.18em] text-isabelline/50">
-                                {venueName ?? "Velvet Lounge"}
-                            </span>
-                        </div>
-                    </div>
-
-                    <div className="flex items-center gap-2">
-                        <div className="flex items-center gap-1.5 rounded-full border border-isabelline/15 bg-isabelline/5 px-2.5 py-1.5">
-                            <MapPinIcon className="h-3 w-3 text-khaki" strokeWidth={2.25} />
-                            <span className="text-[10px] font-bold uppercase tracking-wider text-isabelline">
-                                T·{tableLabel ?? "—"}
-                            </span>
-                        </div>
-                    </div>
+                <div className="relative z-10 mx-auto flex w-full max-w-7xl items-center justify-between px-5 md:px-8">
+                    <button
+                        type="button"
+                        onClick={onBack}
+                        aria-label="Back"
+                        className="flex h-9 w-9 items-center justify-center rounded-full border border-isabelline/15 bg-isabelline/5 text-isabelline transition-colors hover:bg-isabelline/10 active:scale-95"
+                    >
+                        <ArrowLeftIcon className="h-4 w-4" strokeWidth={2.25} />
+                    </button>
+                    
+                    <h1 className="text-[16px] font-bold tracking-tight text-isabelline absolute left-1/2 -translate-x-1/2">
+                        Your Tab
+                    </h1>
                 </div>
 
                 {/* Hero summary */}
