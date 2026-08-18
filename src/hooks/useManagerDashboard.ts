@@ -248,7 +248,7 @@ export function useManagerDashboard(venueId: string | null, days: 7 | 30 = 7) {
     const staffOnShift = shiftStaffIds.size;
     const countRole = (roles: string[]) =>
       staff.filter((m) => roles.includes(m.role) && shiftStaffIds.has(m.id)).length;
-    const waitersOnFloor = countRole(['waiter', 'supervisor']);
+    const waitersOnFloor = countRole(['waiter']);
     const kitchenStaff = countRole(['kitchen']);
     const bartenders = countRole(['bar', 'cashier']);
 

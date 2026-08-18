@@ -35,7 +35,6 @@ type ShiftCoverageRow = {
 
 const ROLE_OPTIONS = [
     { value: "manager", label: "Manager" },
-    { value: "supervisor", label: "Supervisor" },
     { value: "waiter", label: "Waiter" },
     { value: "kitchen", label: "Kitchen" },
     { value: "bar", label: "Bartender" },
@@ -45,7 +44,6 @@ const ROLE_OPTIONS = [
 
 const ROLE_COLORS: Record<string, string> = {
     manager: "bg-licorice text-isabelline",
-    supervisor: "bg-feldgrau/20 text-feldgrau",
     waiter: "bg-khaki/20 text-khaki",
     kitchen: "bg-light-blue/20 text-licorice",
     bar: "bg-khaki/20 text-khaki",

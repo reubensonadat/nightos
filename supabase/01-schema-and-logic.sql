@@ -34,22 +34,43 @@ BEGIN
     IF EXISTS (SELECT 1 FROM public.venues WHERE id = target_venue_id AND owner_id = auth.uid()) THEN
         RETURN true;
     END IF;
-    SELECT u.phone INTO user_phone FROM auth.users u WHERE u.id = auth.uid();
+    SELECT raw_user_meta_data->>'phone' INTO user_phone
+    FROM auth.users WHERE id = auth.uid();
     IF user_phone IS NULL OR user_phone = '' THEN
-        SELECT raw_user_meta_data->>'phone' INTO user_phone
-        FROM auth.users WHERE id = auth.uid();
+        SELECT u.phone INTO user_phone FROM auth.users u WHERE u.id = auth.uid();
     END IF;
     IF user_phone IS NULL OR user_phone = '' THEN
         RETURN false;
     END IF;
     RETURN EXISTS (
         SELECT 1 FROM public.staff
-        WHERE venue_id = target_venue_id AND phone = user_phone AND is_active = true
+        WHERE venue_id = target_venue_id
+          AND public.normalise_phone(phone) = public.normalise_phone(user_phone)
+          AND is_active = true
+    ) OR EXISTS (
+        SELECT 1 FROM public.venues
+        WHERE id = target_venue_id
+          AND public.normalise_phone(phone) = public.normalise_phone(user_phone)
     );
 END;
 $$;
 
+CREATE OR REPLACE FUNCTION public.venue_by_phone(p_phone text)
+RETURNS TABLE (venue_id uuid, role text, venue jsonb) AS $$
+#variable_conflict use_column
+BEGIN
+    RETURN QUERY
+    SELECT v.id, 'owner'::text, row_to_json(v.*)::jsonb AS venue
+    FROM public.venues v
+    WHERE RIGHT(REGEXP_REPLACE(v.phone, '\D', '', 'g'), 9)
+        = RIGHT(REGEXP_REPLACE(p_phone, '\D', '', 'g'), 9)
+      AND v.is_active = true
+    LIMIT 1;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
 GRANT EXECUTE ON FUNCTION public.is_venue_member(uuid) TO anon, authenticated, service_role;
+GRANT EXECUTE ON FUNCTION public.venue_by_phone(text) TO anon, authenticated, service_role;
 
 CREATE TABLE IF NOT EXISTS public.venues (
     id uuid NOT NULL DEFAULT gen_random_uuid(),
@@ -908,6 +929,12 @@ $$;
 
 -- Normalise all existing staff phone numbers to +233XXXXXXXXX
 UPDATE public.staff
+SET phone = public.normalise_phone(phone)
+WHERE phone IS NOT NULL AND phone NOT LIKE '+233%';
+
+-- Same canonical form for the venue contact phone — the owner's sign-in
+-- number and the RLS gate compare against it.
+UPDATE public.venues
 SET phone = public.normalise_phone(phone)
 WHERE phone IS NOT NULL AND phone NOT LIKE '+233%';
 

@@ -1,21 +1,100 @@
 @import "tailwindcss";
 
-@theme {
-  /* ── Brand Color Variables — dynamically set by BrandContext ── */
-  --brand-primary: #23140C;
-  --brand-secondary: #F3F3E3;
-  --brand-accent: #D0BA98;
-  --brand-text-secondary: #606F69;
-  --brand-danger: #91040C;
-  --brand-light-blue: #A9CFE0;
+/* ══════════════════════════════════════════════════════════════════════════
+   BYSEN DESIGN SYSTEM — CENTRALIZED STYLING & BRAND VARIABLES
+   All color tokens, typography, radii, shadows, and animations are defined here
+   for easy maintainability.
+   ══════════════════════════════════════════════════════════════════════════ */
 
-  /* RGB variants for opacity/alpha usage */
+/* ── 1. Custom Font Face Declarations ── */
+@font-face {
+  font-family: 'Avalance';
+  src: url('/fonts/Avalance-Thin.ttf') format('truetype');
+  font-weight: 100;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Avalance';
+  src: url('/fonts/Avalance-ExtraLight.ttf') format('truetype');
+  font-weight: 200;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Avalance';
+  src: url('/fonts/Avalance-Light.ttf') format('truetype');
+  font-weight: 300;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Avalance';
+  src: url('/fonts/Avalance-Regular.ttf') format('truetype');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* ── 2. Global CSS Custom Properties (:root) ── */
+:root {
+  /* Brand Core Palette */
+  --brand-primary: #23140C;           /* Licorice - Dark theme bg / main text */
+  --brand-secondary: #F3F3E3;         /* Isabelline - Light theme bg / soft ivory */
+  --brand-accent: #D0BA98;            /* Khaki - Warm Amber Gold accent */
+  --brand-text-secondary: #606F69;    /* Feldgrau - Muted slate text */
+  --brand-danger: #91040C;            /* Dark Red - Critical actions & badges */
+  --brand-light-blue: #A9CFE0;        /* Light Blue - Cool highlights */
+
+  /* RGB Components (for rgba opacity calculations) */
   --brand-primary-rgb: 35, 20, 12;
   --brand-secondary-rgb: 243, 243, 227;
   --brand-accent-rgb: 208, 186, 152;
   --brand-danger-rgb: 145, 4, 12;
+  --brand-light-blue-rgb: 169, 207, 224;
 
-  /* ── Tailwind color tokens mapped to brand variables ── */
+  /* Surfaces & Borders */
+  --brand-surface-light: #FFFFFF;
+  --brand-surface-dark: #1D110A;
+  --brand-border-light: rgba(35, 20, 12, 0.08);
+  --brand-border-dark: rgba(243, 243, 227, 0.12);
+
+  /* Typography Stack */
+  --font-sans: 'Avalance', 'Plus Jakarta Sans', 'Outfit', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-serif: 'Playfair Display', Georgia, serif;
+  --font-mono: 'JetBrains Mono', 'SF Mono', 'Fira Code', monospace;
+  --font-brand: 'Avalance', 'Outfit', sans-serif;
+
+  /* Border Radii */
+  --radius-xs: 4px;
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 24px;
+  --radius-2xl: 32px;
+  --radius-pill: 9999px;
+
+  /* Box Shadows */
+  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.04);
+  --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.06);
+  --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.08);
+  --shadow-velvet-float: 0 16px 40px rgba(0, 0, 0, 0.10);
+  --shadow-velvet-soft: 0 8px 24px rgba(0, 0, 0, 0.06);
+  --shadow-velvet-card: 0 4px 16px rgba(0, 0, 0, 0.05);
+
+  /* Transitions & Timing Functions */
+  --ease-spring: cubic-bezier(0.22, 1, 0.36, 1);
+  --duration-fast: 150ms;
+  --duration-normal: 300ms;
+  --duration-slow: 600ms;
+}
+
+/* ── 3. Tailwind v4 Theme Mapping ── */
+@theme {
+  /* Color Tokens */
   --color-brand-primary: var(--brand-primary);
   --color-brand-secondary: var(--brand-secondary);
   --color-brand-accent: var(--brand-accent);
@@ -23,7 +102,7 @@
   --color-brand-danger: var(--brand-danger);
   --color-brand-light-blue: var(--brand-light-blue);
 
-  /* ── Legacy alias tokens for backward compat with existing code ── */
+  /* Legacy Color Aliases (for backward compatibility) */
   --color-isabelline: var(--brand-secondary);
   --color-white: #FFFFFF;
   --color-feldgrau: var(--brand-text-secondary);
@@ -33,19 +112,21 @@
   --color-dark-red: var(--brand-danger);
 
   /* Typography */
-  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  --font-mono: 'JetBrains Mono', 'SF Mono', 'Fira Code', monospace;
+  --font-sans: var(--font-sans);
+  --font-mono: var(--font-mono);
+  --font-serif: var(--font-serif);
+  --font-brand: var(--font-brand);
 
-  /* Border radius tokens */
-  --radius-pill: 9999px;
+  /* Border Radii */
+  --radius-pill: var(--radius-pill);
 
-  /* Shadows */
-  --shadow-velvet-float: 0 16px 40px rgba(0, 0, 0, 0.10);
-  --shadow-velvet-soft: 0 8px 24px rgba(0, 0, 0, 0.06);
-  --shadow-velvet-card: 0 4px 16px rgba(0, 0, 0, 0.05);
+  /* Custom Shadows */
+  --shadow-velvet-float: var(--shadow-velvet-float);
+  --shadow-velvet-soft: var(--shadow-velvet-soft);
+  --shadow-velvet-card: var(--shadow-velvet-card);
 }
 
-/* Base styles */
+/* ── 4. Base HTML & Body Styles ── */
 html,
 body,
 #root {
@@ -63,7 +144,8 @@ body {
   text-rendering: optimizeLegibility;
 }
 
-/* Hide scrollbar utility for horizontal category navs */
+/* ── 5. Utility Classes & Keyframe Animations ── */
+/* Scrollbar-hide utility */
 .no-scrollbar::-webkit-scrollbar {
   display: none;
 }
@@ -72,7 +154,7 @@ body {
   scrollbar-width: none;
 }
 
-/* Subtle shimmer for loading states */
+/* Shimmer animation for skeleton loaders */
 @keyframes brand-shimmer {
   0% { background-position: -200% 0; }
   100% { background-position: 200% 0; }
@@ -89,7 +171,7 @@ body {
   animation: brand-shimmer 1.6s linear infinite;
 }
 
-/* Soft entrance animation */
+/* Entrance Animations */
 @keyframes brand-rise {
   from {
     opacity: 0;
@@ -118,18 +200,18 @@ body {
 }
 
 .animate-brand-rise {
-  animation: brand-rise 600ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation: brand-rise var(--duration-slow) var(--ease-spring) both;
 }
 
 .animate-brand-fade {
-  animation: brand-fade 800ms ease-out both;
+  animation: brand-fade var(--duration-slow) ease-out both;
 }
 
 .animate-brand-scale-in {
-  animation: brand-scale-in 500ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation: brand-scale-in 500ms var(--ease-spring) both;
 }
 
-/* Respect reduced motion */
+/* Accessibility: Respect Reduced Motion */
 @media (prefers-reduced-motion: reduce) {
   .animate-brand-rise,
   .animate-brand-fade,

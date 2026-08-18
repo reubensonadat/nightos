@@ -24,10 +24,13 @@ type AuthContextValue = {
   isInitializing: boolean
   isAuthenticated: boolean
   hasVenue: boolean
-  signIn: (email: string, password: string) => Promise<{ error: AuthError | null }>
+  signIn: (email: string, password: string) => Promise<{ error: AuthError | null; role: string | null }>
   signUp: (email: string, password: string) => Promise<{ error: AuthError | null }>
   signInWithPhone: (phone: string) => Promise<{ error: AuthError | null }>
-  verifyPhoneOtp: (phone: string, token: string) => Promise<{ error: AuthError | null }>
+  signUpWithPhone: (phone: string) => Promise<{ error: AuthError | null }>
+  signInWithOAuth: (provider: 'google' | 'apple') => Promise<{ error: AuthError | null }>
+  resetPassword: (email: string) => Promise<{ error: AuthError | null }>
+  verifyPhoneOtp: (phone: string, token: string) => Promise<{ error: AuthError | null; role: string | null }>
   signOut: () => Promise<void>
   refreshVenue: () => Promise<void>
   refreshStaffSession: () => Promise<void>
@@ -39,7 +42,7 @@ const AuthContext = createContext<AuthContextValue>(null!)
  * kitchen display, everyone else on staff → the waiter dashboard. */
 // eslint-disable-next-line react-refresh/only-export-components
 export function sectorPath(role: string | null): string {
-  if (role === 'owner' || role === 'manager' || role === 'supervisor') return '/manager'
+  if (role === 'owner' || role === 'manager') return '/manager'
   if (role === 'kitchen' || role === 'bar') return '/kitchen'
   return '/waiter'
 }
@@ -56,13 +59,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const currentUserIdRef = useRef<string | null>(null)
   const lastPhoneRef = useRef<string | null>(null)
 
-  const loadUserData = async (userId: string, userPhone: string | null = null) => {
+  const loadUserData = async (userId: string, userPhone: string | null = null): Promise<string | null> => {
     if (!userId) {
       setProfile(null)
       setVenue(null)
       setRole(null)
       setStaffSession(null)
-      return
+      return null
     }
 
     const { data: v } = await authDb.venueByOwner(userId)
@@ -70,13 +73,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setVenue(v as DbVenue)
       setRole('owner')
       setStaffSession(null)
+      return 'owner'
     } else {
       const phoneToCheck = userPhone ?? lastPhoneRef.current
       if (phoneToCheck) {
         // Find staff
         const { data: staffData } = await authDb.venueByStaffPhone(phoneToCheck)
-        if (staffData) {
-          const sd = staffData as Record<string, unknown>
+        if (staffData) {          const sd = staffData as Record<string, unknown>
           setVenue(sd.venue as DbVenue)
           setRole(sd.role as string)
 
@@ -105,12 +108,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                try { await supabase.rpc('clock_in_staff', { p_staff_id: fullStaffData.id }) } catch { /* non-fatal */ }
              })()
           }
-          return
+          return sd.role as string
+        }
+        // No staff match — maybe the venue owner signed in with the
+        // venue's own phone number (or their number listed on it).
+        const { data: ownerByPhone } = await authDb.venueByPhone(phoneToCheck)
+        if (ownerByPhone) {
+          const od = ownerByPhone as Record<string, unknown>
+          setVenue(od.venue as DbVenue)
+          setRole('owner')
+          setStaffSession(null)
+          return 'owner'
         }
       }
       setVenue(null)
       setRole(null)
       setStaffSession(null)
+      return null
     }
   }
 
@@ -163,9 +177,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signIn = async (email: string, password: string) => {
     const { data, error } = await supabase.auth.signInWithPassword({ email, password })
-    if (error) return { error }
-    if (data.user) await loadUserData(data.user.id, data.user.phone)
-    return { error: null }
+    if (error) return { error, role: null }
+    if (data.user) {
+      const resolved = await loadUserData(data.user.id, data.user.phone)
+      return { error: null, role: resolved }
+    }
+    return { error: null, role: null }
   }
 
   const signInWithPhone = async (phone: string) => {
@@ -174,14 +191,36 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return { error }
   }
 
+  const signUpWithPhone = async (phone: string) => {
+    lastPhoneRef.current = phone
+    const { error } = await supabase.auth.signInWithOtp({ phone })
+    return { error }
+  }
+
+  const signInWithOAuth = async (provider: 'google' | 'apple') => {
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider,
+      options: { redirectTo: `${window.location.origin}/login` },
+    })
+    return { error }
+  }
+
+  const resetPassword = async (email: string) => {
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: `${window.location.origin}/login`,
+    })
+    return { error }
+  }
+
   const verifyPhoneOtp = async (phone: string, token: string) => {
     const { data, error } = await supabase.auth.verifyOtp({ phone, token, type: 'sms' })
-    if (error) return { error }
+    if (error) return { error, role: null }
     if (data.user) {
       lastPhoneRef.current = phone
-      await loadUserData(data.user.id, phone)
+      const resolved = await loadUserData(data.user.id, phone)
+      return { error: null, role: resolved }
     }
-    return { error: null }
+    return { error: null, role: null }
   }
 
   const signUp = async (email: string, password: string) => {
@@ -211,8 +250,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const signOut = async () => {
     await supabase.auth.signOut()
     Object.keys(localStorage)
-      .filter((k) => k.startsWith('nightos:'))
+      .filter((k) => k.startsWith('nightos:') || k.startsWith('bysen:'))
       .forEach((k) => localStorage.removeItem(k))
+    Object.keys(sessionStorage)
+      .filter((k) => k.startsWith('nightos:') || k.startsWith('bysen:'))
+      .forEach((k) => sessionStorage.removeItem(k))
     currentUserIdRef.current = null
     setUser(null)
     setSession(null)
@@ -247,6 +289,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       signIn,
       signUp,
       signInWithPhone,
+      signUpWithPhone,
+      signInWithOAuth,
+      resetPassword,
       verifyPhoneOtp,
       signOut,
       refreshVenue,

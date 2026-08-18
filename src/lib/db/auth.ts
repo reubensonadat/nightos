@@ -15,8 +15,14 @@ export const authDb = {
   venueByStaffPhone: (phone: string) =>
     supabase.rpc('get_venue_by_staff_phone', { p_phone: phone }).maybeSingle(),
 
+  venueByPhone: (phone: string) =>
+    supabase.rpc('venue_by_phone', { p_phone: phone }).maybeSingle(),
+
   checkPhoneExists: (phone: string) =>
     supabase.rpc('check_phone_exists', { p_phone: phone }),
+
+  resolveLogin: (identifier: string) =>
+    supabase.rpc('resolve_login', { identifier }).maybeSingle(),
 
   createVenue: (ownerId: string, name: string, slug: string) =>
     supabase.from('venues').insert({

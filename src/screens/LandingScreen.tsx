@@ -1,3 +1,4 @@
+import { BysenLogo } from "../components/BysenLogo";
 import {
     ArrowRightIcon,
     CalendarDaysIcon,
@@ -87,16 +88,11 @@ export function LandingScreen({ onEnterCustomer, onViewReservations, onStaffPort
                 </div>
 
                 <div className="relative z-10 mx-auto max-w-3xl">
-                    <div className="flex items-center gap-2.5">
-                        <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-isabelline text-licorice shadow-[0_4px_14px_rgba(0,0,0,0.3)]">
-                            <span className="font-serif text-[17px] font-bold leading-none">V</span>
-                        </div>
-                        <div className="flex flex-col leading-tight">
-                            <span className="text-[14px] font-bold tracking-tight text-isabelline">Bysen</span>
-                            <span className="text-[9px] font-semibold uppercase tracking-[0.18em] text-isabelline/50">
-                                Velvet Lounge · Accra
-                            </span>
-                        </div>
+                    <div className="flex items-center justify-between">
+                        <BysenLogo light size="lg" />
+                        <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-isabelline/50">
+                            Velvet Lounge · Accra
+                        </span>
                     </div>
 
                     <h1 className="mt-8 text-[2.2rem] font-black leading-[1.05] tracking-[-0.04em] text-isabelline">

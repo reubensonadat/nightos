@@ -10,7 +10,7 @@ interface OtpInputProps {
 }
 
 /**
- * OtpInput â€” accessible 6-digit code input.
+ * OtpInput — accessible 6-digit code input.
  *
  * - Large, clearly-visible boxes (warm-gray surface) so they never
  *   disappear on a light background.
@@ -82,7 +82,7 @@ export default function OtpInput({
                 next[index] = ''
                 commit(next.join(''))
             } else if (index > 0) {
-                // Nothing here â€” step back and clear the previous slot.
+                // Nothing here — step back and clear the previous slot.
                 next[index - 1] = ''
                 commit(next.join(''))
                 focusSlot(index - 1)

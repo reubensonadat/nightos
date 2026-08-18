@@ -4,10 +4,10 @@ import toast from "react-hot-toast";
 import { Toaster } from "react-hot-toast";
 import { useRealtime } from "./hooks/useRealtime";
 import { CartProvider, useCart } from "./context/CartContext";
-import { AuthProvider, useAuth } from "./context/AuthContext";
+import { AuthProvider, sectorPath, useAuth } from "./context/AuthContext";
 import { NetworkProvider } from "./context/NetworkContext";
 import { ProtectedRoute, VenueRequired } from "./screens/auth/ProtectedRoute";
-import { AuthScreen } from "./screens/auth/AuthScreen";
+import { CentralAuthScreen } from "./screens/auth/CentralAuthScreen";
 import { VerifyOtpScreen } from "./screens/auth/VerifyOtpScreen";
 import { VenueSetupScreen } from "./screens/auth/VenueSetupScreen";
 import { LandingScreen } from "./screens/LandingScreen";
@@ -613,13 +613,17 @@ function App() {
 
 function AppRoutes() {
   const location = useLocation();
+  const { isAuthenticated, isInitializing, role } = useAuth();
 
   const isAuthRoute = location.pathname === "/login" || location.pathname === "/signup";
   const isVerifyRoute = location.pathname === "/verify-otp";
   const isSetupRoute = location.pathname === "/setup";
 
   if (isAuthRoute) {
-    return <AuthScreen initialMode={location.pathname === "/signup" ? "signup" : "login"} />;
+    if (isAuthenticated && !isInitializing) {
+      return <Navigate to={role ? sectorPath(role) : "/setup"} replace />;
+    }
+    return <CentralAuthScreen initialMode={location.pathname === "/signup" ? "signup" : "login"} />;
   }
   if (isVerifyRoute) return <VerifyOtpScreen />;
   if (isSetupRoute) return <VenueSetupScreen />;

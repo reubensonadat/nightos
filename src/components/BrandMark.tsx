@@ -1,4 +1,5 @@
 import { MapPinIcon } from "@heroicons/react/24/solid";
+import { BysenIcon } from "./BysenLogo";
 
 type Props = {
     size?: "sm" | "md";
@@ -31,9 +32,12 @@ export function BrandMark({ size = "md", showLabel = true }: Props) {
                     <span className="text-[13px] font-semibold tracking-tight text-licorice">
                         Velvet Lounge
                     </span>
-                    <span className="text-[10px] font-medium uppercase tracking-[0.14em] text-feldgrau">
-                        Powered by Bysen
-                    </span>
+                    <div className="flex items-center gap-1">
+                        <BysenIcon size="xs" />
+                        <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-feldgrau">
+                            Powered by Bysen
+                        </span>
+                    </div>
                 </div>
             )}
         </div>
