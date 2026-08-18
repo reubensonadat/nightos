@@ -173,7 +173,7 @@ function ReceiptModal({ order, venueName, sessionToken, onClose }: ReceiptModalP
           vat: Number(billRes.data.vat ?? 0),
           total: Number(billRes.data.total ?? order.total),
           created_at: billRes.data.created_at,
-          tables: billRes.data.tables,
+          tables: (Array.isArray(billRes.data.tables) ? billRes.data.tables[0] : billRes.data.tables) as any,
         });
       }
       setLoading(false);

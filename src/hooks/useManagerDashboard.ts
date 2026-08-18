@@ -178,7 +178,7 @@ export function useManagerDashboard(venueId: string | null, days: 7 | 30 = 7) {
     const totalTables = tables.length;
 
     /* ── Low stock ── */
-    const lowStock = inventory.filter((i) => i.stock_qty <= i.reorder_threshold);
+    const lowStock = inventory.filter((i) => i.is_active && i.stock_qty <= i.reorder_threshold);
     const lowStockItems = lowStock.map((i) => ({
       id: i.id,
       name: i.name,

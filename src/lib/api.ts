@@ -1103,7 +1103,6 @@ export const db = {
             'id, venue_id, product_id, name, category, stock_qty, unit, reorder_threshold, unit_cost, supplier, is_active, created_at, updated_at',
           )
           .eq('venue_id', venueId)
-          .eq('is_active', true)
           .order('name'),
       `inventory:${venueId}`,
       TTL.STAFF,

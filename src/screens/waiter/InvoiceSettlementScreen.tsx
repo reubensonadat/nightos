@@ -68,15 +68,15 @@ export function InvoiceSettlementScreen({ table, staffId, onBack, onSettled }: P
         const load = async () => {
             const { data: billRow } = await db.openBillForTable(table.id);
             if (cancelled) return;
-            db.venueById(table.venue_id).then(
-                ({ data }) => { if (!cancelled && data) setVenueName(data.name); },
-                () => {},
-            );
             if (!billRow || billRow.status !== 'open') {
                 setBill(null);
                 setLoading(false);
                 return;
             }
+            db.venueById(billRow.venue_id).then(
+                ({ data }) => { if (!cancelled && data) setVenueName(data.name); },
+                () => {},
+            );
             const { data: itemRows } = await db.billItems(billRow.id);
             if (cancelled) return;
             setBill({

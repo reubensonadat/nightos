@@ -205,7 +205,7 @@ export function CheckoutScreen({ total, billId, venueId, sessionToken, onBack, o
     };
 
     const handleCheckAgain = async () => {
-        if (!lastReference) return;
+        if (!lastReference || !billId) return;
         setPaying(true);
         for (const delay of [0, 1500, 3000]) {
             if (delay) await sleep(delay);
