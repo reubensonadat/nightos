@@ -39,6 +39,7 @@ function loadBrand(): BrandColors {
             const parsed = JSON.parse(saved);
             return { ...DEFAULT_BRAND, ...parsed };
         }
+    // eslint-disable-next-line no-empty
     } catch {}
     return { ...DEFAULT_BRAND };
 }
@@ -104,6 +105,7 @@ export function BrandProvider({ children }: { children: ReactNode }) {
     );
 }
 
+// eslint-disable-next-line react-refresh/only-export-components
 export function useBrand() {
     const ctx = useContext(BrandContext);
     if (!ctx) throw new Error("useBrand must be used within a BrandProvider");

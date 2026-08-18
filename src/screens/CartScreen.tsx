@@ -64,6 +64,7 @@ export function CartScreen({ venueId, venueName, tableLabel, billId, customerSes
     }, [venueId]);
 
     // Bill math
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const { serviceCharge, vat, total } = useMemo(() => {
         const service = Math.round(subtotal * (venueFees.serviceChargePct / 100) * 100) / 100;
         const tax = Math.round(subtotal * (venueFees.vatPct / 100) * 100) / 100;

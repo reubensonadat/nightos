@@ -98,7 +98,7 @@ export default function OtpInput({
 
     const handlePaste = (e: React.ClipboardEvent<HTMLInputElement>) => {
         e.preventDefault()
-        const clip = e.clipboardData || (window as any).clipboardData
+        const clip = e.clipboardData || (window as Window & { clipboardData?: DataTransfer }).clipboardData
         const pasted = (clip ? clip.getData('text') : '').replace(/\D/g, '').slice(0, length)
         if (!pasted) return
 

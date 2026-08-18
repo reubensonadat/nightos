@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useNavigate, useOutletContext } from "react-router-dom";
 import {
     ArrowLeftIcon,
     BanknotesIcon,
@@ -34,14 +35,11 @@ type BillItem = {
 
 /* ────────────────────────── Component ────────────────────────── */
 
-type Props = {
-    table: Table;
-    staffId: string;
-    onBack: () => void;
-    onSettled: () => void;
-};
-
-export function InvoiceSettlementScreen({ table, staffId, onBack, onSettled }: Props) {
+export function InvoiceSettlementScreen() {
+    const { table, staffId, venueId } = useOutletContext<{ table: Table; venueId: string; staffId: string }>();
+    const navigate = useNavigate();
+    const onBack = () => navigate(`/waiter/table/${table.id}`);
+    const onSettled = () => navigate('/waiter');
     const [method, setMethod] = useState<PaymentMethod>("cash");
     const [cashReceived, setCashReceived] = useState<string>("");
     const [settled, setSettled] = useState(false);
@@ -68,6 +66,10 @@ export function InvoiceSettlementScreen({ table, staffId, onBack, onSettled }: P
         const load = async () => {
             const { data: billRow } = await db.openBillForTable(table.id);
             if (cancelled) return;
+db.venueById(venueId).then(
+                ({ data }) => { if (!cancelled && data) setVenueName(data.name); },
+                () => {},
+            );
             if (!billRow || billRow.status !== 'open') {
                 setBill(null);
                 setLoading(false);
@@ -99,6 +101,7 @@ export function InvoiceSettlementScreen({ table, staffId, onBack, onSettled }: P
         return () => {
             cancelled = true;
         };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [table.id]);
 
     const total = bill?.total ?? 0;

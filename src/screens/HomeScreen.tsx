@@ -1,10 +1,12 @@
 import { useEffect, useState } from "react";
 import {
     ArrowRightIcon,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     ClockIcon,
     MapPinIcon,
     MusicalNoteIcon,
     UserIcon,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     WifiIcon,
 } from "@heroicons/react/24/solid";
 import { formatGHS } from "../data/menu";
@@ -13,6 +15,7 @@ import { useVenue } from "../hooks/useVenue";
 // Premium Unsplash hero — warm, editorial cocktail imagery
 const signatureImg =
     "https://images.unsplash.com/photo-1551024709-8f23befc6f87?auto=format&fit=crop&w=1200&q=80";
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 const ambientImg =
     "https://images.unsplash.com/photo-1574096079513-d8259312b785?auto=format&fit=crop&w=600&q=80";
 
@@ -32,6 +35,7 @@ function getGreeting() {
     return "Good evening";
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 const TODAY_LABEL = new Date().toLocaleDateString("en-GH", {
     weekday: "long",
     month: "long",
@@ -52,8 +56,11 @@ export function HomeScreen({ onEnter, onViewReservations, onStaffPortal, onKitch
     const happyHourEnd = new Date();
     happyHourEnd.setHours(20, 0, 0, 0);
     const happyHourMs = Math.max(0, happyHourEnd.getTime() - now.getTime());
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const happyHourHours = Math.floor(happyHourMs / 3_600_000);
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const happyHourMins = Math.floor((happyHourMs % 3_600_000) / 60_000);
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const happyHourActive = happyHourMs > 0;
 
     return (

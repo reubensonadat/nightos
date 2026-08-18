@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useNavigate, useOutletContext } from "react-router-dom";
 import {
     ArrowLeftIcon,
     ArrowPathIcon,
@@ -29,14 +30,12 @@ type OpenBill = {
 
 /* ────────────────────────── Component ────────────────────────── */
 
-type Props = {
-    table: Table;
-    venueId: string;
-    staffId: string;
-    onBack: () => void;
-};
 
-export function TableOperationsScreen({ table, venueId, staffId, onBack }: Props) {
+
+export function TableOperationsScreen() {
+    const { table, staffId, venueId } = useOutletContext<{ table: Table; venueId: string; staffId: string }>();
+    const navigate = useNavigate();
+    const onBack = () => navigate(`/waiter/table/${table.id}`);
     const [op, setOp] = useState<Op>("transfer");
     const [tables, setTables] = useState<Table[]>([]);
     const [openBills, setOpenBills] = useState<OpenBill[]>([]);
@@ -75,11 +74,11 @@ export function TableOperationsScreen({ table, venueId, staffId, onBack }: Props
         }
     }, [venueId, table.id]);
 
-    const fetchDataRef = useRef(fetchData);
-    fetchDataRef.current = fetchData;
-
     useEffect(() => {
-        fetchData();
+        const init = async () => {
+            await fetchData();
+        };
+        init();
     }, [fetchData]);
 
     // Live refresh when any bill changes on this floor.
@@ -88,15 +87,15 @@ export function TableOperationsScreen({ table, venueId, staffId, onBack }: Props
         filter: `venue_id=eq.${venueId}`,
         onInsert: () => {
             if (reloadTimer.current) window.clearTimeout(reloadTimer.current);
-            reloadTimer.current = window.setTimeout(() => fetchDataRef.current(), 500);
+            reloadTimer.current = window.setTimeout(() => fetchData(), 500);
         },
         onUpdate: () => {
             if (reloadTimer.current) window.clearTimeout(reloadTimer.current);
-            reloadTimer.current = window.setTimeout(() => fetchDataRef.current(), 500);
+            reloadTimer.current = window.setTimeout(() => fetchData(), 500);
         },
         onDelete: () => {
             if (reloadTimer.current) window.clearTimeout(reloadTimer.current);
-            reloadTimer.current = window.setTimeout(() => fetchDataRef.current(), 500);
+            reloadTimer.current = window.setTimeout(() => fetchData(), 500);
         },
     });
 
@@ -120,6 +119,7 @@ export function TableOperationsScreen({ table, venueId, staffId, onBack }: Props
                     table: t,
                     bill: openBills.find((b) => b.table_id === t.id),
                 })),
+        // eslint-disable-next-line react-hooks/exhaustive-deps
         [tables, occupiedTableIds, openBills],
     );
 
@@ -135,8 +135,8 @@ export function TableOperationsScreen({ table, venueId, staffId, onBack }: Props
             setWorking("transfer");
             const { data, error } = await db.transferBill(bill.id, selectedDest, staffId);
             setWorking(null);
-            if (error || !data.ok) {
-                const code = (data as { error?: string }).error ?? "failed";
+            if (error || !data || !(data as Record<string, unknown>).ok) {
+                const code = data ? (data as Record<string, unknown>).error : "failed";
                 toast.error(code === "table_occupied"
                     ? "That table already has an open tab."
                     : code === "bill_not_open"
@@ -155,7 +155,7 @@ export function TableOperationsScreen({ table, venueId, staffId, onBack }: Props
             setWorking("merge");
             const { data, error } = await db.mergeBills(bill.id, dest.bill.id, staffId);
             setWorking(null);
-            if (error || !data.ok) {
+            if (error || !data || !(data as Record<string, unknown>).ok) {
                 toast.error("Merge failed — try again.");
                 return;
             }
@@ -165,7 +165,7 @@ export function TableOperationsScreen({ table, venueId, staffId, onBack }: Props
             setWorking("split");
             const { data, error } = await db.splitBill(bill.id, ways, staffId);
             setWorking(null);
-            if (error || !data.ok) {
+            if (error || !data || !(data as Record<string, unknown>).ok) {
                 toast.error("Split failed — try again.");
                 return;
             }

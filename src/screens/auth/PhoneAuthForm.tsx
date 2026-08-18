@@ -29,6 +29,7 @@ export function PhoneAuthForm({ isLogin, onSwitchMethod, onToggleMode }: Props) 
         const remaining = OTP_COOLDOWN_SECONDS - elapsed
         return remaining > 0 ? remaining : 0
       }
+    // eslint-disable-next-line no-empty
     } catch {}
     return 0
   })

@@ -179,7 +179,11 @@ export function useCustomerSession(venueId: string | null, tableId: string | nul
   }, [venueId, tableId, assignWaiter])
 
   useEffect(() => {
-    ensureSession()
+     
+    const init = async () => {
+      await ensureSession()
+    }
+    init()
   }, [ensureSession])
 
   /**

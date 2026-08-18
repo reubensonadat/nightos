@@ -1,39 +1,39 @@
-import { useState, useCallback, useRef } from 'react'
+import { useState, useCallback, useRef, useEffect } from 'react'
 
-const INITIAL = { data: null as any, error: null as any, loading: false }
-
-export function useMutation(
-  mutator: (...args: any[]) => Promise<{ data: any; error: any }>,
-  options?: { onSuccess?: (data: any) => void; onError?: (err: any) => void },
+export function useMutation<TData = unknown, TError = unknown, TArgs extends unknown[] = unknown[]>(
+  mutator: (...args: TArgs) => Promise<{ data: TData | null; error: TError | null }>,
+  options?: { onSuccess?: (data: TData) => void; onError?: (err: TError) => void },
 ) {
+  const INITIAL = { data: null as TData | null, error: null as TError | null, loading: false }
   const [state, setState] = useState(INITIAL)
   const mutatorRef = useRef(mutator)
   const onSuccessRef = useRef(options?.onSuccess)
   const onErrorRef = useRef(options?.onError)
-  mutatorRef.current = mutator
-  onSuccessRef.current = options?.onSuccess
-  onErrorRef.current = options?.onError
 
-  const mutate = useCallback(async (...args: any[]) => {
+  useEffect(() => {
+    mutatorRef.current = mutator
+    onSuccessRef.current = options?.onSuccess
+    onErrorRef.current = options?.onError
+  })
+
+  const mutate = useCallback(async (...args: TArgs) => {
     setState({ data: null, error: null, loading: true })
     try {
       const { data, error } = await mutatorRef.current(...args)
       if (error) throw error
       setState({ data, error: null, loading: false })
-      onSuccessRef.current?.(data)
+      if (data !== null) onSuccessRef.current?.(data)
       return { data, error: null }
     } catch (err) {
-      setState({ data: null, error: err, loading: false })
-      onErrorRef.current?.(err)
-      return { data: null, error: err }
+      const typedErr = err as TError
+      setState({ data: null, error: typedErr, loading: false })
+      onErrorRef.current?.(typedErr)
+      return { data: null, error: typedErr }
     }
   }, [])
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   const reset = useCallback(() => setState(INITIAL), [])
 
-  return { ...state, mutate, reset } as {
-    data: any; error: any; loading: boolean
-    mutate: (...args: any[]) => Promise<{ data: any; error: any }>
-    reset: () => void
-  }
+  return { ...state, mutate, reset }
 }

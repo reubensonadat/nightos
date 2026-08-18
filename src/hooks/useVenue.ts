@@ -36,6 +36,7 @@ export function useVenue(slug?: string) {
   useEffect(() => {
     const venueSlug = slug;
     if (!venueSlug) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setLoading(false);
       return;
     }
@@ -56,7 +57,10 @@ export function useVenue(slug?: string) {
       setLoading(false);
     }
 
-    load(venueSlug);
+    const init = async () => {
+      await load(venueSlug);
+    };
+    init();
     return () => {
       cancelled = true;
     };

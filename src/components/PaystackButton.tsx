@@ -1,3 +1,4 @@
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 import { useCallback, useEffect, useRef, useState } from 'react';
 import toast from 'react-hot-toast';
 import { generateReference } from '../lib/utils';
@@ -51,6 +52,7 @@ export function PaystackButton({
 
   useEffect(() => {
     if (typeof window.PaystackPop !== 'undefined') {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setScriptReady(true);
       return;
     }

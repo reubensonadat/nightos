@@ -357,6 +357,21 @@ export const db = {
       TTL.MENU,
     ),
 
+  tableById: (id: string) =>
+    cached<DbTable | null>(
+      () =>
+        supabase
+          .from('tables')
+          .select(
+            'id, venue_id, table_number, table_label, capacity, area, pos_x, pos_y, qr_code_url, qr_code_token, is_active, created_at',
+          )
+          .eq('id', id)
+          .eq('is_active', true)
+          .maybeSingle(),
+      `table:id:${id}`,
+      TTL.MENU,
+    ),
+
   tableByQrToken: (qrCodeToken: string) =>
     cached<DbTable | null>(
       () =>
@@ -1276,6 +1291,8 @@ export const db = {
           ? { data: data.filter((e) => e.expense_date >= sinceIso), error }
           : { data, error },
       ),
+
+
 
   /* ── Edge Functions ── */
   verifyPayment: (reference: string, billId: string) =>

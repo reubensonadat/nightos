@@ -6,6 +6,7 @@ import {
     CheckBadgeIcon,
     ChevronRightIcon,
     ExclamationTriangleIcon,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     LinkIcon,
     PlusIcon,
     ShoppingCartIcon,
@@ -43,11 +44,13 @@ function OrderStatusBadge({ status }: { status: DashboardRecentOrder["status"] }
     );
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 function formatCompact(n: number): string {
     if (n >= 1000) return `${(n / 1000).toFixed(1)}k`;
     return n.toString();
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 function formatGHSCompact(n: number): React.ReactNode {
     if (n >= 1000) {
         return (
@@ -78,6 +81,7 @@ export function LiveOpsScreen() {
     const s = useManagerDashboard(venue.id, range);
 
     const [outstanding, setOutstanding] = useState(0);
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const [landed, setLanded] = useState<Awaited<ReturnType<typeof db.landedWithoutOrders>>["data"]>([]);
     const [openBills, setOpenBills] = useState<Awaited<ReturnType<typeof db.openBillOverview>>["data"]>([]);
     const [dwellThreshold, setDwellThreshold] = useState(120);
@@ -117,8 +121,11 @@ export function LiveOpsScreen() {
     }, [venue.id]);
 
     useEffect(() => {
-        loadLive();
-    }, [loadLive]);
+        const init = async () => {
+            await loadLive();
+        };
+        init();
+        }, [loadLive]);
 
     // Live refresh — customer sessions, bills and payments drive this
     // screen; no polling.
@@ -233,10 +240,10 @@ export function LiveOpsScreen() {
             {/* ═══════════════════════════════════════════════════════════
                KPI GRID — 4 large stat cards
                ═══════════════════════════════════════════════════════════ */}
-            <div className="grid grid-cols-4 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 md:gap-6">
 
                 {/* Revenue — dark card */}
-                <div className="col-span-2 h-full rounded-[1.5rem] bg-licorice text-isabelline p-5 md:p-6 shadow-[0_8px_24px_rgba(35,20,12,0.18)] flex flex-col justify-between relative overflow-hidden">
+                <div className="md:col-span-2 h-full rounded-[1.5rem] bg-licorice text-isabelline p-5 md:p-6 shadow-[0_8px_24px_rgba(35,20,12,0.18)] flex flex-col justify-between relative overflow-hidden">
                     <div>
                         <div className="flex items-center justify-between mb-3">
                             <BanknotesIcon className="h-5 w-5 text-isabelline/50" strokeWidth={2} />
@@ -259,7 +266,7 @@ export function LiveOpsScreen() {
                 </div>
 
                 {/* Open Orders */}
-                <div className="col-span-1 h-full rounded-[1.5rem] bg-white p-5 md:p-6 shadow-sm ring-1 ring-licorice/5 flex flex-col justify-between">
+                <div className="md:col-span-1 h-full rounded-[1.5rem] bg-white p-5 md:p-6 shadow-sm ring-1 ring-licorice/5 flex flex-col justify-between">
                     <div>
                         <div className="flex items-center justify-between mb-3">
                             <ShoppingCartIcon className="h-5 w-5 text-feldgrau" strokeWidth={2} />
@@ -281,7 +288,7 @@ export function LiveOpsScreen() {
                 </div>
 
                 {/* Tables Occupied */}
-                <div className="col-span-1 h-full rounded-[1.5rem] bg-white p-5 md:p-6 shadow-sm ring-1 ring-licorice/5 flex flex-col justify-between">
+                <div className="md:col-span-1 h-full rounded-[1.5rem] bg-white p-5 md:p-6 shadow-sm ring-1 ring-licorice/5 flex flex-col justify-between">
                     <div>
                         <div className="flex items-center justify-between mb-3">
                             <TableCellsIcon className="h-5 w-5 text-feldgrau" strokeWidth={2} />
@@ -583,7 +590,7 @@ export function LiveOpsScreen() {
             {/* ═══════════════════════════════════════════════════════════
                RECENT ACTIVITIES TABLE — real order submissions
                ═══════════════════════════════════════════════════════════ */}
-            <div className="rounded-[1.5rem] bg-white p-5 md:p-6 shadow-sm ring-1 ring-licorice/5 overflow-x-auto no-scrollbar">
+            <div className="rounded-[1.5rem] bg-white p-5 md:p-6 shadow-sm ring-1 ring-licorice/5">
                 <div className="flex items-center justify-between mb-5">
                     <h2 className="text-lg font-bold text-slate-900 tracking-tight">Recent Orders</h2>
                     <button
@@ -594,6 +601,8 @@ export function LiveOpsScreen() {
                         <ChevronRightIcon className="h-3 w-3" strokeWidth={2.5} />
                     </button>
                 </div>
+
+                <div className="overflow-x-auto no-scrollbar">
 
                 <table className="w-full text-left text-xs min-w-[600px]">
                     <thead>
@@ -648,10 +657,11 @@ export function LiveOpsScreen() {
                 </table>
 
                 {s.recentOrders.length === 0 && (
-                    <div className="text-center py-12 text-feldgrau text-xs">
-                        No orders yet — share the table QR codes and orders will show up here live.
+                    <div className="py-12 text-center">
+                        <p className="text-sm text-slate-500">No orders submitted yet.</p>
                     </div>
                 )}
+                </div>
             </div>
 
             {/* ═══════════════════════════════════════════════════════════
@@ -689,14 +699,14 @@ export function LiveOpsScreen() {
                             <p className="text-sm text-slate-500">No cash fees yet.</p>
                         ) : (
                             recentFees.map((p, i) => (
-                                <div key={p.payment_id} className="grid grid-cols-4 items-center gap-4 py-3 border-b border-slate-50">
+                                <div key={p.payment_id} className="grid grid-cols-[16px_1fr_auto_auto] items-center gap-3 py-3 border-b border-slate-50 whitespace-nowrap">
                                     <span className="text-sm font-medium text-slate-900">{i + 1}</span>
                                     <span className="text-sm text-slate-500">
                                         {new Date(p.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
                                     </span>
-                                    <span className="text-sm text-slate-500">{formatGHS(p.amount)} cash</span>
-                                    <span className="text-sm font-semibold text-slate-900 tabular-nums text-right">
-                                        {formatGHS(p.platform_fee)} fee
+                                    <span className="text-sm text-slate-500 tabular-nums">{formatGHS(p.amount)}</span>
+                                    <span className="text-sm font-semibold text-slate-900 tabular-nums text-right min-w-[3rem]">
+                                        {formatGHS(p.platform_fee)}
                                     </span>
                                 </div>
                             ))

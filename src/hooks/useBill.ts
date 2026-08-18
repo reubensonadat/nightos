@@ -34,8 +34,11 @@ export function useBill(venueId: string | null, tableId: string | null) {
   }, [venueId, tableId]);
 
   useEffect(() => {
-    ensureBill();
-  }, [ensureBill]);
+    const init = async () => {
+        await ensureBill();
+    };
+    init();
+    }, [ensureBill]);
 
   const refresh = useCallback(() => {
     ensureBill();

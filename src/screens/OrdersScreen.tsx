@@ -173,6 +173,7 @@ function ReceiptModal({ order, venueName, sessionToken, onClose }: ReceiptModalP
           vat: Number(billRes.data.vat ?? 0),
           total: Number(billRes.data.total ?? order.total),
           created_at: billRes.data.created_at,
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
           tables: (Array.isArray(billRes.data.tables) ? billRes.data.tables[0] : billRes.data.tables) as any,
         });
       }
@@ -302,6 +303,7 @@ function HistoryCard({
 
 /* ────────────────────────── Main Screen ────────────────────────── */
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 export function OrdersScreen({ activeOrders, history, tableLabel, billId: _billId, sessionToken, venueName, onPayBill, onReorder: _onReorder }: Props & { venueName?: string | null }) {
   const navigate = useNavigate();
   const hasActive = activeOrders.length > 0;

@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { useNavigate, useLocation, useSearchParams } from "react-router-dom";
+import { useNavigate, useLocation, useSearchParams, Routes, Route, Navigate } from "react-router-dom";
 import toast from "react-hot-toast";
 import { Toaster } from "react-hot-toast";
 import { useRealtime } from "./hooks/useRealtime";
@@ -21,11 +21,13 @@ import { PartyPrompt } from "./components/PartyPrompt";
 import { ClockIcon } from "@heroicons/react/24/outline";
 
 import { StaffAuthScreen } from "./screens/waiter/StaffAuthScreen";
-import { TablesDashboard, type Table } from "./screens/waiter/TablesDashboard";
+ 
+import { TablesDashboard } from "./screens/waiter/TablesDashboard";
 import { OrderManagementScreen } from "./screens/waiter/OrderManagementScreen";
 import { TableOperationsScreen } from "./screens/waiter/TableOperationsScreen";
 import { InvoiceSettlementScreen } from "./screens/waiter/InvoiceSettlementScreen";
 import { ShiftPerformanceScreen } from "./screens/waiter/ShiftPerformanceScreen";
+import { TableLayout } from "./screens/waiter/TableLayout";
 
 import { KitchenDisplayScreen } from "./screens/kitchen/KitchenDisplayScreen";
 
@@ -43,27 +45,33 @@ import { ReservationsScreen } from "./screens/ReservationsScreen";
 import { useVenue } from "./hooks/useVenue";
 import { useQrTable } from "./hooks/useQrTable";
 import { useCustomerSession } from "./hooks/useCustomerSession";
-import { db, type DbTable, type DbStaffSession } from "./lib/api";
+ 
+import { db, type DbTable } from "./lib/api";
 
 type NavTab = "menu" | "cart" | "orders";
 
-type WaiterScreen =
-  | "auth"
-  | "dashboard"
-  | "order"
-  | "ops"
-  | "invoice"
-  | "shift";
+
 
 type Mode = "customer" | "waiter" | "kitchen" | "manager";
 
 /* ──────────────────── Customer Shell (bottom nav) ──────────────────── */
 
 function CustomerShell({ venueId, tableId, tableLabel }: { venueId: string; tableId: string | null; tableLabel?: string | null }) {
-  const [tab, setTab] = useState<NavTab>(() => {
-    const saved = localStorage.getItem("nightos:customer:tab");
-    return saved === "cart" || saved === "orders" ? saved : "menu";
-  });
+  const location = useLocation();
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+
+  const path = location.pathname;
+  let tab: NavTab = "menu";
+  if (path.startsWith("/cart")) tab = "cart";
+  if (path.startsWith("/orders")) tab = "orders";
+
+  const setTab = useCallback((newTab: NavTab) => {
+    const tableParam = searchParams.get("table");
+    const query = tableParam ? `?table=${tableParam}` : "";
+    navigate(`/${newTab}${query}`);
+  }, [navigate, searchParams]);
+
   const [activeOrders, setActiveOrders] = useState<OrderSummary[]>([]);
   const [history, setHistory] = useState<OrderSummary[]>([]);
   const [payingOrder, setPayingOrder] = useState<OrderSummary | null>(null);
@@ -75,21 +83,29 @@ function CustomerShell({ venueId, tableId, tableLabel }: { venueId: string; tabl
   // One-time "how many of you?" prompt per session (QR tables only)
   const [partyPromptOpen, setPartyPromptOpen] = useState(false);
   useEffect(() => {
-    if (!tableId || !session || partyPromptOpen) return;
-    try {
-      if (localStorage.getItem(`nightos:party:${session.id}`) === "1") return;
-    } catch {}
-    setPartyPromptOpen(true);
+    const init = async () => {
+      if (!tableId || !session || partyPromptOpen) return;
+      try {
+         
+        if (localStorage.getItem(`nightos:party:${session.id}`) === "1") return;
+       
+      } catch {
+        // ignore
+      }
+      setPartyPromptOpen(true);
+    };
+    init();
   }, [tableId, session, partyPromptOpen]);
 
   const handlePartyConfirm = useCallback(
     async (partySize: number, guestName?: string) => {
+       
       const { error } = await updateParty(partySize, guestName);
       if (error) {
         toast.error(String(error));
         return;
       }
-      try { localStorage.setItem(`nightos:party:${session?.id ?? ''}`, "1"); } catch {}
+      try { localStorage.setItem(`nightos:party:${session?.id ?? ''}`, "1"); } catch { /* ignore */ }
       setPartyPromptOpen(false);
     },
     [updateParty, session],
@@ -109,38 +125,51 @@ function CustomerShell({ venueId, tableId, tableLabel }: { venueId: string; tabl
     };
   }, [venueId]);
 
+   
   useEffect(() => {
-    try {
-      const stored = localStorage.getItem("nightos:orders");
-      if (stored) {
-        const parsed = JSON.parse(stored);
-        if (parsed.active) setActiveOrders(parsed.active);
-        if (parsed.past) setHistory(parsed.past);
+    const init = async () => {
+      try {
+         
+        const stored = localStorage.getItem("nightos:orders");
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          if (parsed.active) setActiveOrders(parsed.active);
+          if (parsed.past) setHistory(parsed.past);
+        }
+      } catch {
+        // ignore
       }
-    } catch {}
+    };
+    init();
   }, []);
+ 
 
   // A new scan = a new visit: wipe the orders list unless we've already
   // marked THIS session (so a page refresh mid-visit keeps its orders).
+   
   const sessionOrdersKey = session ? `nightos:orders:sid:${session.id}` : "";
   useEffect(() => {
-    if (!session) return;
-    try {
-      const marked = localStorage.getItem(sessionOrdersKey) === "1";
-      localStorage.setItem(sessionOrdersKey, "1");
-      if (!marked) {
-        setActiveOrders([]);
-        setHistory([]);
+    const init = async () => {
+      if (!session) return;
+      try {
+        const marked = localStorage.getItem(sessionOrdersKey) === "1";
+         
+        localStorage.setItem(sessionOrdersKey, "1");
+        if (!marked) {
+          setActiveOrders([]);
+          setHistory([]);
+        }
+      } catch {
+        // ignore
       }
-    } catch {}
+    };
+    init();
   }, [sessionOrdersKey, session]);
 
-  useEffect(() => {
-    try { localStorage.setItem("nightos:customer:tab", tab); } catch {}
-  }, [tab]);
+  // Removed localStorage tab sync since we use URLs now
 
   useEffect(() => {
-    try { localStorage.setItem("nightos:orders", JSON.stringify({ active: activeOrders, past: history })); } catch {}
+    try { localStorage.setItem("nightos:orders", JSON.stringify({ active: activeOrders, past: history })); } catch { /* ignore */ }
   }, [activeOrders, history]);
 
   // Live status: realtime streams pending→ready→served→cancelled
@@ -167,6 +196,7 @@ function CustomerShell({ venueId, tableId, tableLabel }: { venueId: string; tabl
         return next && next !== o.status ? { ...o, status: next as OrderSummary['status'] } : o;
       });
     });
+   
   }, [activeSubmissionIds, session?.session_token]);
 
   // Realtime: the customer's own submissions (events pass RLS for
@@ -182,7 +212,7 @@ function CustomerShell({ venueId, tableId, tableLabel }: { venueId: string; tabl
   const handleOrderSent = useCallback((order: OrderSummary) => {
     setActiveOrders((prev) => [...prev, order]);
     setTab("orders");
-  }, []);
+  }, [setTab]);
 
   const handlePaid = useCallback(() => {
     if (!payingOrder) return;
@@ -310,9 +340,8 @@ type CustomerFlowProps = {
 };
 
 function CustomerFlow({ onSwitchMode, venueId, qrTable, qrLoading, qrError }: CustomerFlowProps) {
-  // Per-visit only (never persisted): the "Customer" card on the landing hub
-  const [inShell, setInShell] = useState(false);
-  const [showReservations, setShowReservations] = useState(false);
+  const location = useLocation();
+  const navigate = useNavigate();
 
   if (qrLoading) {
     return (
@@ -340,6 +369,9 @@ function CustomerFlow({ onSwitchMode, venueId, qrTable, qrLoading, qrError }: Cu
   }
 
   if (qrTable) {
+    if (location.pathname === "/") {
+      return <Navigate to={`/menu${location.search}`} replace />;
+    }
     return (
       <CustomerShell
         venueId={qrTable.venue_id}
@@ -349,19 +381,18 @@ function CustomerFlow({ onSwitchMode, venueId, qrTable, qrLoading, qrError }: Cu
     );
   }
 
-  // No QR table → the landing hub: what Bysen is, and a doorway into
-  // every part of the system (customers never see this — their QR goes
-  // straight to the shell above).
-  if (showReservations) {
-    return <ReservationsScreen onBack={() => setShowReservations(false)} />;
+  if (location.pathname === "/reservations") {
+    return <ReservationsScreen onBack={() => navigate("/")} />;
   }
-  if (inShell) {
+
+  if (location.pathname.startsWith("/menu") || location.pathname.startsWith("/cart") || location.pathname.startsWith("/orders")) {
     return <CustomerShell venueId={venueId} tableId={null} />;
   }
+
   return (
     <LandingScreen
-      onEnterCustomer={() => setInShell(true)}
-      onViewReservations={() => setShowReservations(true)}
+      onEnterCustomer={() => navigate("/menu")}
+      onViewReservations={() => navigate("/reservations")}
       onStaffPortal={() => onSwitchMode("waiter")}
       onKitchenDisplay={() => onSwitchMode("kitchen")}
       onManagerPortal={() => onSwitchMode("manager")}
@@ -391,7 +422,16 @@ function AppShell() {
     return "customer";
   };
 
-  const [mode, setMode] = useState<Mode>(() => getModeFromPath());
+  const mode = getModeFromPath();
+  const setMode = useCallback((newMode: Mode) => {
+    const paths: Record<Mode, string> = {
+      customer: "/",
+      waiter: "/waiter",
+      kitchen: "/kitchen",
+      manager: "/manager/ops",
+    };
+    navigate(paths[newMode]);
+  }, [navigate]);
 
   // Back button safety: never let the browser leave the app's first entry
   useEffect(() => {
@@ -404,9 +444,7 @@ function AppShell() {
     return () => window.removeEventListener("popstate", onPopState);
   }, []);
 
-  const [waiterScreen, setWaiterScreen] = useState<WaiterScreen>("auth");
   const { staffSession, signOut: authSignOut, role, venue, profile } = useAuth();
-  const [selectedTable, setSelectedTable] = useState<Table | null>(null);
 
   // Manager page is URL-driven: /manager/ops, /manager/floorplan, ...
   const managerPage = useMemo<ManagerPage>(() => {
@@ -426,24 +464,9 @@ function AppShell() {
     [navigate],
   );
 
-  useEffect(() => {
-    if (staffSession || role === "owner") setWaiterScreen("dashboard");
-    else setWaiterScreen("auth");
-  }, [staffSession, role]);
 
-  useEffect(() => {
-    const paths: Record<Mode, string> = {
-      customer: "/",
-      waiter: "/waiter",
-      kitchen: "/kitchen",
-      manager: "/manager",
-    };
-    const isMatch = (p: string): boolean =>
-      mode === "manager" ? p === "/manager" || p.startsWith("/manager/") : p === paths[mode];
-    if (!isMatch(location.pathname)) {
-      navigate(paths[mode], { replace: true });
-    }
-  }, [mode, navigate, location.pathname]);
+
+
 
   // /manager defaults to the Live Ops sub-path
   useEffect(() => {
@@ -454,14 +477,12 @@ function AppShell() {
 
   const switchToCustomer = () => {
     setMode("customer");
-    setSelectedTable(null);
   };
 
   const handleStaffSignOut = () => {
     const staffId = staffSession?.id;
     if (staffId) db.clockOutStaff(staffId).catch(() => {});
     authSignOut();
-    setSelectedTable(null);
   };
 
   const handleManagerSignOut = async () => {
@@ -488,68 +509,49 @@ function AppShell() {
   return (
     <CartProvider>
       {mode === "customer" && (
-        <CustomerFlow
-          onSwitchMode={setMode}
-          venueId={venueId}
-          qrTable={qrTable}
-          qrLoading={qrLoading}
-          qrError={qrError}
-        />
+        <Routes>
+          <Route path="/*" element={
+            <CustomerFlow
+              onSwitchMode={setMode}
+              venueId={venueId}
+              qrTable={qrTable}
+              qrLoading={qrLoading}
+              qrError={qrError}
+            />
+          } />
+        </Routes>
       )}
 
       {mode === "waiter" && (
-        <>
-          {waiterScreen === "auth" && !(staffSession || role === "owner") && (
-            <StaffAuthScreen />
-          )}
-          {waiterScreen === "dashboard" && (staffSession || role === "owner") && (
-            <TablesDashboard
-              venueId={staffSession?.venue_id || venue?.id || ""}
-              staffName={staffSession?.name || profile?.name || "Manager"}
-              staffId={staffSession?.id || user?.id || ""}
-              role={staffSession?.role || "manager"}
-              onSelectTable={(table) => {
-                setSelectedTable(table);
-                setWaiterScreen("order");
-              }}
-              onSignOut={handleStaffSignOut}
-              onViewShift={() => setWaiterScreen("shift")}
-            />
-          )}
-          {waiterScreen === "order" && selectedTable && (
-            <OrderManagementScreen
-              table={selectedTable}
-              staffId={staffSession?.id || user?.id || ""}
-              venueId={staffSession?.venue_id || venue?.id || venueId}
-              onBack={() => setWaiterScreen("dashboard")}
-              onGoToTableOps={() => setWaiterScreen("ops")}
-              onGoToInvoice={() => setWaiterScreen("invoice")}
-            />
-          )}
-          {waiterScreen === "ops" && selectedTable && (
-            <TableOperationsScreen
-              table={selectedTable}
-              venueId={staffSession?.venue_id || venue?.id || venueId}
-              staffId={staffSession?.id || user?.id || ""}
-              onBack={() => setWaiterScreen("order")}
-            />
-          )}
-          {waiterScreen === "invoice" && selectedTable && (
-            <InvoiceSettlementScreen
-              table={selectedTable}
-              staffId={staffSession?.id || user?.id || ""}
-              onBack={() => setWaiterScreen("order")}
-              onSettled={() => setWaiterScreen("dashboard")}
-            />
-          )}
-          {waiterScreen === "shift" && (
+        <Routes>
+          <Route path="/waiter" element={
+            (staffSession || role === "owner") ? (
+              <TablesDashboard
+                venueId={staffSession?.venue_id || venue?.id || ""}
+                staffName={staffSession?.name || profile?.name || "Manager"}
+                staffId={staffSession?.id || user?.id || ""}
+                role={staffSession?.role || "manager"}
+                onSignOut={handleStaffSignOut}
+              />
+            ) : (
+              <Navigate to="/waiter/login" replace />
+            )
+          } />
+          <Route path="/waiter/login" element={
+            !(staffSession || role === "owner") ? <StaffAuthScreen /> : <Navigate to="/waiter" replace />
+          } />
+          <Route path="/waiter/shift" element={
             <ShiftPerformanceScreen
               staffId={staffSession?.id || user?.id || ""}
               staffName={staffSession?.name || profile?.name || "Manager"}
-              onBack={() => setWaiterScreen("dashboard")}
             />
-          )}
-        </>
+          } />
+          <Route path="/waiter/table/:tableId" element={<TableLayout />}>
+            <Route index element={<OrderManagementScreen />} />
+            <Route path="ops" element={<TableOperationsScreen />} />
+            <Route path="invoice" element={<InvoiceSettlementScreen />} />
+          </Route>
+        </Routes>
       )}
 
       {mode === "kitchen" && (

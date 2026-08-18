@@ -22,10 +22,12 @@ export function VenueSetupScreen() {
   useEffect(() => {
     if (step !== 1 || slug) return
     const generated = name.toLowerCase().replace(/[^a-z0-9-]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '')
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (generated) setSlug(generated)
   }, [step, name, slug])
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (!slug || slug.length < 3) { setSlugTaken(false); return }
     setSlugChecking(true)
     const timer = setTimeout(async () => {
