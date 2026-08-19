@@ -84,6 +84,7 @@ export function OrderManagementScreen() {
                 const { data: subs } = await db.submissionsByBill(bill.id);
                 const list = subs ?? [];
                 setSubmissions(list);
+
                 const itemMap: Record<string, DbOrderItem[]> = {};
                 await Promise.all(
                     list.map(async (s) => {
@@ -113,7 +114,6 @@ export function OrderManagementScreen() {
             }
         } catch {
             toast.error("Failed to load this table's orders");
-        } finally {
             setLoading(false);
         }
     }, [table.id, venueId, staffId]);
@@ -356,7 +356,7 @@ export function OrderManagementScreen() {
                                 <div className="h-6 w-6 animate-spin rounded-full border-2 border-licorice/20 border-t-licorice" />
                             </div>
                         ) : submissions.length === 0 ? (
-                            <div className="flex flex-col items-center justify-center rounded-2xl bg-white px-6 py-16 text-center shadow-sm ring-1 ring-isabelline">
+                            <div className="flex flex-col items-center justify-center rounded-lg bg-white px-6 py-16 text-center shadow-sm ring-1 ring-isabelline">
                                 <span className="h-1.5 w-1.5 rounded-full bg-khaki" />
                                 <h3 className="mt-4 text-[15px] font-bold tracking-tight text-licorice">
                                     Nothing ordered yet
@@ -385,7 +385,7 @@ export function OrderManagementScreen() {
                                     return (
                                         <div
                                             key={sub.id}
-                                            className="animate-velvet-rise overflow-hidden rounded-2xl bg-white shadow-[0_4px_14px_rgba(35,20,12,0.05)] ring-1 ring-isabelline"
+                                            className="animate-velvet-rise overflow-hidden rounded-lg bg-white shadow-[0_4px_14px_rgba(35,20,12,0.05)] ring-1 ring-isabelline"
                                             style={{ animationDelay: `${Math.min(idx * 30, 180)}ms` }}
                                         >
                                             <div className="flex items-center justify-between gap-2 px-3.5 py-2.5">
@@ -444,7 +444,7 @@ export function OrderManagementScreen() {
                                     <button
                                         type="button"
                                         onClick={() => setTab("add")}
-                                        className="inline-flex w-full items-center justify-center gap-1.5 rounded-2xl bg-white px-4 py-4 text-[12px] font-bold tracking-tight text-licorice shadow-sm ring-1 ring-licorice/10 transition-all hover:bg-isabelline active:scale-[0.98]"
+                                        className="inline-flex w-full items-center justify-center gap-1.5 rounded-lg bg-white px-4 py-4 text-[12px] font-bold tracking-tight text-licorice shadow-sm ring-1 ring-licorice/10 transition-all hover:bg-isabelline active:scale-[0.98]"
                                     >
                                         <PlusIcon className="h-4 w-4" strokeWidth={2.5} />
                                         Add more items to table
@@ -452,7 +452,7 @@ export function OrderManagementScreen() {
                                     <button
                                         type="button"
                                         onClick={() => navigate(`/waiter/table/${table.id}/invoice`)}
-                                        className="inline-flex w-full items-center justify-center gap-1.5 rounded-2xl bg-licorice px-4 py-4 text-[12px] font-bold tracking-tight text-white shadow-md transition-all hover:bg-licorice/90 active:scale-[0.98]"
+                                        className="inline-flex w-full items-center justify-center gap-1.5 rounded-lg bg-licorice px-4 py-4 text-[12px] font-bold tracking-tight text-white shadow-md transition-all hover:bg-licorice/90 active:scale-[0.98]"
                                     >
                                         Bill
                                     </button>
@@ -493,7 +493,7 @@ export function OrderManagementScreen() {
 
                         {/* Items grid */}
                         {filteredMenu.length === 0 ? (
-                            <div className="flex flex-col items-center justify-center rounded-2xl bg-white px-6 py-14 text-center shadow-sm ring-1 ring-isabelline">
+                            <div className="flex flex-col items-center justify-center rounded-lg bg-white px-6 py-14 text-center shadow-sm ring-1 ring-isabelline">
                                 <h3 className="text-[14px] font-bold tracking-tight text-licorice">
                                     No items in this category yet
                                 </h3>

@@ -4,6 +4,7 @@ import { GuestExperienceSection } from "./GuestExperienceSection";
 import { FAQSection } from "./FAQSection";
 import heroImage from "../assets/hero-image.jpg";
 import logoImage from "../assets/logo.png";
+import { WaiterDashboardPromoSection } from "./WaiterDashboardPromoSection";
 
 export function PromoLandingScreen() {
   const [isScrolled, setIsScrolled] = useState(false);
@@ -24,10 +25,10 @@ export function PromoLandingScreen() {
     >
       
       {/* Global Navigation (Full Width) */}
-      <div className={`fixed top-0 left-0 w-full z-50 transition-colors duration-300 py-2 md:py-4 px-5 md:px-16 lg:px-24 ${
+      <div className={`fixed top-0 left-0 w-full z-50 transition-colors duration-300 py-2 px-5 md:px-16 lg:px-24 ${
         isScrolled ? 'bg-[#1a110b] shadow-lg border-b border-white/5' : 'bg-[#1a110b]/0 border-b border-transparent'
       }`}>
-        <nav className="flex items-center justify-between w-full h-[60px] md:h-[72px]">
+        <nav className="flex items-center justify-between w-full h-[60px]">
           {/* Logo */}
           <div className="flex items-center gap-3">
             <img src={logoImage} alt="Bysen Logo" className="w-8 h-8 md:w-9 md:h-9 object-contain" />
@@ -124,6 +125,9 @@ export function PromoLandingScreen() {
         <div className="absolute inset-0 bg-gradient-to-r from-[#1a110b] to-transparent w-24"></div>
       </div>
       </div>
+
+      {/* Waiter Dashboard Promo Section */}
+      <WaiterDashboardPromoSection />
 
       {/* Guest Experience Section */}
       <GuestExperienceSection />

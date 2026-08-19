@@ -260,14 +260,14 @@ export function TableOperationsScreen() {
               ═══════════════════════════════════════════════════════════ */}
             <section className="mx-auto w-full max-w-3xl flex-1 px-5 md:px-8 pt-5 pb-[100px]">
                 {loading ? (
-                    <div className="flex flex-col items-center justify-center rounded-2xl bg-white px-6 py-16 text-center shadow-sm ring-1 ring-isabelline">
+                    <div className="flex flex-col items-center justify-center rounded-lg bg-white px-6 py-16 text-center shadow-sm ring-1 ring-isabelline">
                         <span className="h-6 w-6 animate-spin rounded-full border-2 border-licorice/20 border-t-licorice" />
                         <p className="mt-4 text-[12px] font-bold tracking-tight text-feldgrau">
                             Loading…
                         </p>
                     </div>
                 ) : !bill ? (
-                    <div className="rounded-2xl bg-white px-6 py-12 text-center shadow-sm ring-1 ring-isabelline">
+                    <div className="rounded-lg bg-white px-6 py-12 text-center shadow-sm ring-1 ring-isabelline">
                         <p className="text-[13px] font-bold tracking-tight text-licorice">
                             No open tab on this table
                         </p>
@@ -280,7 +280,7 @@ export function TableOperationsScreen() {
                         {/* ── TRANSFER ── */}
                         {op === "transfer" && (
                             <div className="animate-velvet-fade">
-                                <div className="mb-4 rounded-2xl bg-white p-4 shadow-sm ring-1 ring-isabelline">
+                                <div className="mb-4 rounded-lg bg-white p-4 shadow-sm ring-1 ring-isabelline">
                                     <div className="flex items-center gap-2">
                                         <ArrowPathIcon className="h-4 w-4 text-khaki" strokeWidth={2} />
                                         <span className="text-[12px] font-bold tracking-tight text-licorice">
@@ -296,7 +296,7 @@ export function TableOperationsScreen() {
                                     Select destination
                                 </p>
                                 {transferableTables.length === 0 ? (
-                                    <div className="rounded-2xl bg-white px-6 py-10 text-center shadow-sm ring-1 ring-isabelline">
+                                    <div className="rounded-lg bg-white px-6 py-10 text-center shadow-sm ring-1 ring-isabelline">
                                         <p className="text-[12px] font-medium tracking-tight text-feldgrau">
                                             No free tables to transfer to.
                                         </p>
@@ -311,7 +311,7 @@ export function TableOperationsScreen() {
                                                     type="button"
                                                     onClick={() => setSelectedDest(t.id)}
                                                     className={`
-                                                        flex flex-col items-center rounded-xl py-3
+                                                        flex flex-col items-center rounded-lg py-3
                                                         transition-all duration-150 active:scale-95
                                                         ${isSelected
                                                             ? "bg-licorice text-isabelline shadow-[0_4px_12px_rgba(35,20,12,0.18)]"
@@ -339,7 +339,7 @@ export function TableOperationsScreen() {
                         {/* ── MERGE ── */}
                         {op === "merge" && (
                             <div className="animate-velvet-fade">
-                                <div className="mb-4 rounded-2xl bg-white p-4 shadow-sm ring-1 ring-isabelline">
+                                <div className="mb-4 rounded-lg bg-white p-4 shadow-sm ring-1 ring-isabelline">
                                     <div className="flex items-center gap-2">
                                         <Squares2X2Icon className="h-4 w-4 text-khaki" strokeWidth={2} />
                                         <span className="text-[12px] font-bold tracking-tight text-licorice">
@@ -352,7 +352,7 @@ export function TableOperationsScreen() {
                                 </div>
 
                                 {mergeableTables.length === 0 ? (
-                                    <div className="rounded-2xl bg-white px-6 py-10 text-center shadow-sm ring-1 ring-isabelline">
+                                    <div className="rounded-lg bg-white px-6 py-10 text-center shadow-sm ring-1 ring-isabelline">
                                         <p className="text-[12px] font-medium tracking-tight text-feldgrau">
                                             No other occupied tables to merge with.
                                         </p>
@@ -371,7 +371,7 @@ export function TableOperationsScreen() {
                                                         type="button"
                                                         onClick={() => setSelectedMerge(t.id)}
                                                         className={`
-                                                            flex items-center justify-between rounded-xl px-4 py-3
+                                                            flex items-center justify-between rounded-lg px-4 py-3
                                                             transition-all duration-150 active:scale-[0.98]
                                                             ${isSelected
                                                                 ? "bg-licorice text-isabelline shadow-[0_4px_12px_rgba(35,20,12,0.18)]"
@@ -399,7 +399,7 @@ export function TableOperationsScreen() {
                                         </div>
 
                                         {selectedMerge && (
-                                            <div className="mt-4 rounded-xl bg-khaki/12 px-4 py-3">
+                                            <div className="mt-4 rounded-lg bg-khaki/12 px-4 py-3">
                                                 <p className="text-[10px] font-bold uppercase tracking-wider text-khaki">
                                                     Combined Tab
                                                 </p>
@@ -416,7 +416,7 @@ export function TableOperationsScreen() {
                         {/* ── SPLIT ── */}
                         {op === "split" && (
                             <div className="animate-velvet-fade">
-                                <div className="mb-4 rounded-2xl bg-white p-4 shadow-sm ring-1 ring-isabelline">
+                                <div className="mb-4 rounded-lg bg-white p-4 shadow-sm ring-1 ring-isabelline">
                                     <div className="flex items-center gap-2">
                                         <UserGroupIcon className="h-4 w-4 text-khaki" strokeWidth={2} />
                                         <span className="text-[12px] font-bold tracking-tight text-licorice">
@@ -429,7 +429,7 @@ export function TableOperationsScreen() {
                                 </div>
 
                                 {/* Bill total card */}
-                                <div className="mb-4 rounded-2xl bg-licorice p-5 text-isabelline shadow-[0_12px_28px_rgba(35,20,12,0.20)]">
+                                <div className="mb-4 rounded-lg bg-licorice p-5 text-isabelline shadow-[0_12px_28px_rgba(35,20,12,0.20)]">
                                     <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-isabelline/60">
                                         Total Bill
                                     </p>
@@ -439,7 +439,7 @@ export function TableOperationsScreen() {
                                 </div>
 
                                 {/* Ways picker */}
-                                <div className="mb-4 rounded-2xl bg-white p-4 shadow-sm ring-1 ring-isabelline">
+                                <div className="mb-4 rounded-lg bg-white p-4 shadow-sm ring-1 ring-isabelline">
                                     <div className="flex items-center justify-between">
                                         <span className="text-[12px] font-bold tracking-tight text-licorice">
                                             Number of bills
@@ -469,7 +469,7 @@ export function TableOperationsScreen() {
                                 </div>
 
                                 {/* Per bill amount */}
-                                <div className="rounded-2xl bg-khaki/12 p-5">
+                                <div className="rounded-lg bg-khaki/12 p-5">
                                     <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-khaki">
                                         Per Bill
                                     </p>
@@ -535,7 +535,7 @@ export function TableOperationsScreen() {
             {confirmClose && bill && (
                 <div className="fixed inset-0 z-50 flex items-end justify-center bg-ink/40 p-6" onClick={() => setConfirmClose(false)}>
                     <div
-                        className="w-full max-w-sm rounded-2xl bg-white p-5 shadow-xl"
+                        className="w-full max-w-sm rounded-lg bg-white p-5 shadow-xl"
                         onClick={(e) => e.stopPropagation()}
                     >
                         <p className="text-[14px] font-bold text-licorice">Close this table?</p>

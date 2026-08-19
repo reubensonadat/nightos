@@ -1,15 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import {
-    ArrowLeftIcon,
-    ArrowTrendingUpIcon,
-    BanknotesIcon,
-    ChartBarIcon,
-    ClockIcon,
-    TableCellsIcon,
-    UserGroupIcon,
-} from "@heroicons/react/24/outline";
-import { formatGHS } from "../../data/menu";
+import { ArrowLeftIcon } from "@heroicons/react/24/outline";
 import { db } from "../../lib/api";
 
 /* ────────────────────────── Types ────────────────────────── */
@@ -80,7 +71,7 @@ export function ShiftPerformanceScreen({ staffId, staffName }: Props) {
         // eslint-disable-next-line react-hooks/exhaustive-deps
         }, [staffId]);
 
-    const hoursOnShift = summary ? summary.shift_seconds / 3600 : 0;
+
     const avgBill =
         summary && summary.tables_served > 0
             ? summary.sales / summary.tables_served
@@ -118,7 +109,7 @@ export function ShiftPerformanceScreen({ staffId, staffName }: Props) {
               ═══════════════════════════════════════════════════════════ */}
             <section className="mx-auto w-full max-w-3xl px-5 md:px-8 pt-5 pb-8">
                 {loading && (
-                    <div className="rounded-2xl bg-white p-10 text-center shadow-sm ring-1 ring-isabelline">
+                    <div className="rounded-lg bg-white p-10 text-center shadow-sm ring-1 ring-isabelline">
                         <div className="mx-auto h-6 w-6 animate-spin rounded-full border-2 border-khaki border-t-transparent" />
                         <p className="mt-3 text-[11px] font-bold uppercase tracking-wider text-feldgrau">
                             Loading your shift…
@@ -127,7 +118,7 @@ export function ShiftPerformanceScreen({ staffId, staffName }: Props) {
                 )}
 
                 {!loading && error === 'staff_not_found' && (
-                    <div className="flex flex-col items-center justify-center p-8 text-center bg-white rounded-2xl border border-slate-100 shadow-sm mt-6">
+                    <div className="flex flex-col items-center justify-center p-8 text-center bg-white rounded-lg border border-slate-100 shadow-sm mt-6">
                         {/* Typography */}
                         <h3 className="text-xl font-bold text-slate-900 mb-2">No tables yet</h3>
                         <p className="text-sm text-slate-500 mb-8 max-w-[250px] mx-auto">
@@ -137,14 +128,14 @@ export function ShiftPerformanceScreen({ staffId, staffName }: Props) {
                         {/* Action: Redirect to Floor */}
                         <button 
                             onClick={onBack}
-                            className="w-full py-2.5 rounded-xl bg-[#2A1A17] text-white font-bold text-base transition-colors active:scale-[0.98]">
+                            className="w-full py-2.5 rounded-lg bg-[#2A1A17] text-white font-bold text-base transition-colors active:scale-[0.98]">
                             Back to Floorplan
                         </button>
                     </div>
                 )}
 
                 {!loading && error && error !== 'staff_not_found' && (
-                    <div className="rounded-2xl bg-white p-8 text-center shadow-sm ring-1 ring-isabelline">
+                    <div className="rounded-lg bg-white p-8 text-center shadow-sm ring-1 ring-isabelline">
                         <p className="text-[12px] font-bold text-licorice">{error}</p>
                         <button
                             type="button"
@@ -159,100 +150,68 @@ export function ShiftPerformanceScreen({ staffId, staffName }: Props) {
                 {!loading && !error && summary && (
                     <>
                         {/* ── Hero stats card ── */}
-                        <div className="overflow-hidden rounded-2xl bg-licorice text-isabelline shadow-[0_12px_28px_rgba(35,20,12,0.20)]">
-                            <div className="px-5 pt-5 pb-4">
-                                <div className="flex items-center justify-between">
-                                    <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-isabelline/60">
-                                        Today's Sales
-                                    </p>
-                                    <span className="inline-flex items-center gap-1 rounded-full bg-khaki/20 px-2 py-0.5 text-[8px] font-bold uppercase tracking-wider text-khaki">
-                                        <ArrowTrendingUpIcon className="h-2.5 w-2.5" strokeWidth={2.5} />
-                                        Live
-                                    </span>
-                                </div>
-                                <p className="mt-1.5 font-mono text-[32px] font-black leading-none tabular-nums">
-                                    {formatGHS(summary.sales)}
+                        <div className="overflow-hidden rounded-xl bg-licorice text-isabelline shadow-[0_12px_28px_rgba(35,20,12,0.20)]">
+                            <div className="px-5 py-5">
+                                <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-isabelline/60">
+                                    Today's Sales
                                 </p>
-                                <p className="mt-1.5 text-[10.5px] font-medium tracking-tight text-isabelline/60">
+                                <p className="mt-2 font-mono text-[32px] font-black leading-none tabular-nums">
+                                    <span className="text-xl font-bold opacity-75">GH₵</span> {summary.sales.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}
+                                </p>
+                                <p className="mt-2 text-[10.5px] font-medium tracking-tight text-isabelline/60">
                                     Settled payments on your bills this shift
                                 </p>
-                            </div>
-
-                            {/* Shift duration bar */}
-                            <div className="border-t border-isabelline/10 px-5 py-3">
-                                <div className="flex items-center justify-between">
-                                    <div className="flex items-center gap-1.5">
-                                        <ClockIcon className="h-3.5 w-3.5 text-isabelline/60" strokeWidth={2} />
-                                        <span className="text-[10px] font-bold uppercase tracking-wider text-isabelline/60">
-                                            On Shift
-                                        </span>
-                                    </div>
-                                    <span className="font-mono text-[12px] font-bold tabular-nums text-isabelline">
-                                        {Math.floor(hoursOnShift)}h {Math.round((hoursOnShift % 1) * 60)}m
-                                    </span>
-                                </div>
-                                {/* Shift progress bar (8 hour shift) */}
-                                <div className="mt-2 h-1 overflow-hidden rounded-full bg-isabelline/10">
-                                    <div
-                                        className="h-full rounded-full bg-khaki transition-all duration-500"
-                                        style={{ width: `${Math.min(100, (hoursOnShift / 8) * 100)}%` }}
-                                    />
-                                </div>
                             </div>
                         </div>
 
                         {/* ── KPI grid ── */}
                         <div className="mt-4 grid grid-cols-3 gap-2">
-                            <div className="rounded-2xl bg-white p-3 shadow-sm ring-1 ring-isabelline">
-                                <TableCellsIcon className="h-4 w-4 text-khaki" strokeWidth={2} />
-                                <p className="mt-2 font-mono text-[18px] font-black tabular-nums text-licorice">
+                            <div className="rounded-lg bg-white p-5 flex flex-col items-center justify-center text-center shadow-sm ring-1 ring-isabelline">
+                                <p className="font-mono text-[18px] font-black tabular-nums text-licorice">
                                     {summary.tables_served}
                                 </p>
-                                <p className="text-[9px] font-bold uppercase tracking-wider text-feldgrau">
+                                <p className="mt-1 text-[9px] font-bold uppercase tracking-wider text-feldgrau">
                                     Tables
                                 </p>
                             </div>
-                            <div className="rounded-2xl bg-white p-3 shadow-sm ring-1 ring-isabelline">
-                                <ChartBarIcon className="h-4 w-4 text-khaki" strokeWidth={2} />
-                                <p className="mt-2 font-mono text-[18px] font-black tabular-nums text-licorice">
-                                    {formatGHS(avgBill)}
+                            <div className="rounded-lg bg-white p-5 flex flex-col items-center justify-center text-center shadow-sm ring-1 ring-isabelline">
+                                <p className="font-mono text-[18px] font-black tabular-nums text-licorice">
+                                    <span className="text-[11px] font-bold opacity-75">GH₵</span> {avgBill.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}
                                 </p>
-                                <p className="text-[9px] font-bold uppercase tracking-wider text-feldgrau">
+                                <p className="mt-1 text-[9px] font-bold uppercase tracking-wider text-feldgrau">
                                     Avg Bill
                                 </p>
                             </div>
-                            <div className="rounded-2xl bg-white p-3 shadow-sm ring-1 ring-isabelline">
-                                <UserGroupIcon className="h-4 w-4 text-khaki" strokeWidth={2} />
-                                <p className="mt-2 font-mono text-[18px] font-black tabular-nums text-licorice">
+                            <div className="rounded-lg bg-white p-5 flex flex-col items-center justify-center text-center shadow-sm ring-1 ring-isabelline">
+                                <p className="font-mono text-[18px] font-black tabular-nums text-licorice">
                                     {summary.items_sold}
                                 </p>
-                                <p className="text-[9px] font-bold uppercase tracking-wider text-feldgrau">
+                                <p className="mt-1 text-[9px] font-bold uppercase tracking-wider text-feldgrau">
                                     Items
                                 </p>
                             </div>
                         </div>
 
                         {/* ── Earnings card ── */}
-                        <div className="mt-4 overflow-hidden rounded-2xl bg-white shadow-[0_4px_16px_rgba(35,20,12,0.06)] ring-1 ring-isabelline">
+                        <div className="mt-4 overflow-hidden rounded-lg bg-white shadow-[0_4px_16px_rgba(35,20,12,0.06)] ring-1 ring-isabelline">
                             <div className="border-b border-isabelline px-5 py-3">
                                 <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-khaki">
                                     My Earnings
                                 </p>
                                 <p className="mt-1 font-mono text-[24px] font-black tabular-nums text-licorice">
-                                    {formatGHS(commission)}
+                                    <span className="text-base font-bold opacity-75">GH₵</span> {commission.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}
                                 </p>
                             </div>
 
                             <div className="divide-y divide-isabelline">
                                 <div className="flex items-center justify-between px-5 py-2.5">
                                     <div className="flex items-center gap-2">
-                                        <BanknotesIcon className="h-3.5 w-3.5 text-feldgrau" strokeWidth={2} />
                                         <span className="text-[11px] font-medium tracking-tight text-feldgrau">
                                             Commission (3% of sales)
                                         </span>
                                     </div>
                                     <span className="font-mono text-[12px] font-bold tabular-nums text-licorice">
-                                        {formatGHS(commission)}
+                                        <span className="text-[10px] font-bold opacity-75">GH₵</span> {commission.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}
                                     </span>
                                 </div>
                             </div>
@@ -263,7 +222,7 @@ export function ShiftPerformanceScreen({ staffId, staffName }: Props) {
                             <p className="mb-2 px-1 text-[10px] font-bold uppercase tracking-[0.18em] text-feldgrau">
                                 Recent Activity
                             </p>
-                            <div className="overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-isabelline">
+                            <div className="overflow-hidden rounded-lg bg-white shadow-sm ring-1 ring-isabelline">
                                 {summary.activity.length === 0 && (
                                     <div className="px-4 py-8 text-center">
                                         <p className="text-[11px] font-semibold tracking-tight text-feldgrau">
@@ -295,8 +254,8 @@ export function ShiftPerformanceScreen({ staffId, staffName }: Props) {
                                             </div>
                                         </div>
                                         {entry.amount > 0 && (
-                                            <span className="font-mono text-[12px] font-bold tabular-nums text-licorice">
-                                                {formatGHS(entry.amount)}
+                                            <span className="font-mono text-[12px] font-black tabular-nums text-licorice">
+                                                <span className="text-[10px] font-bold opacity-75">GH₵</span> {entry.amount.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}
                                             </span>
                                         )}
                                     </div>

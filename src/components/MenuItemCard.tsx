@@ -34,7 +34,7 @@ export function MenuItemCard({
             style={{ animationDelay: `${animationDelayMs}ms` }}
         >
             {/* Image Section (Completely separate from text) */}
-            <div className="relative aspect-square w-full shrink-0 overflow-hidden rounded-[24px] bg-black/5 shadow-sm">
+            <div className="relative aspect-square w-full shrink-0 overflow-hidden rounded-lg bg-black/5 shadow-sm">
                 <button
                     type="button"
                     onClick={onClick}
