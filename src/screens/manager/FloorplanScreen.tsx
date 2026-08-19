@@ -193,19 +193,19 @@ export function FloorplanScreen() {
         <div className="mx-auto w-full max-w-7xl space-y-6">
             {/* ── Header summary ── */}
             <div className="grid grid-cols-2 gap-3 md:grid-cols-4 md:gap-4">
-                <div className="rounded-2xl bg-white p-4 shadow-sm border border-slate-100 flex flex-col gap-1">
+                <div className="rounded-lg bg-white p-4 shadow-sm border border-slate-100 flex flex-col gap-1">
                     <p className="text-xs font-bold uppercase tracking-wider text-slate-500">Total Tables</p>
                     <p className="text-4xl font-bold tabular-nums text-slate-900">{tables.length}</p>
                 </div>
-                <div className="rounded-2xl bg-white p-4 shadow-sm border border-slate-100 flex flex-col gap-1">
+                <div className="rounded-lg bg-white p-4 shadow-sm border border-slate-100 flex flex-col gap-1">
                     <p className="text-xs font-bold uppercase tracking-wider text-slate-500">Occupied</p>
                     <p className="text-4xl font-bold tabular-nums text-slate-900">{occupiedCount}</p>
                 </div>
-                <div className="rounded-2xl bg-white p-4 shadow-sm border border-slate-100 flex flex-col gap-1">
+                <div className="rounded-lg bg-white p-4 shadow-sm border border-slate-100 flex flex-col gap-1">
                     <p className="text-xs font-bold uppercase tracking-wider text-slate-500">Total Capacity</p>
                     <p className="text-4xl font-bold tabular-nums text-slate-900">{totalCapacity}</p>
                 </div>
-                <div className="rounded-2xl bg-white p-4 shadow-sm border border-slate-100 flex flex-col gap-1">
+                <div className="rounded-lg bg-white p-4 shadow-sm border border-slate-100 flex flex-col gap-1">
                     <p className="text-xs font-bold uppercase tracking-wider text-slate-500">Active Guests</p>
                     <p className="text-4xl font-bold tabular-nums text-slate-900">
                         {tables.filter(t => t.status === "occupied").reduce((sum, t) => sum + (t.guests || 0), 0)}

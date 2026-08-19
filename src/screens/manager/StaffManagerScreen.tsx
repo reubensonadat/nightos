@@ -221,15 +221,15 @@ export function StaffManagerScreen() {
         <div className="mx-auto w-full max-w-7xl space-y-6">
             {/* ── Stats row (real) ── */}
             <div className="grid grid-cols-2 gap-3 md:grid-cols-3 md:gap-4">
-                <div className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-isabelline flex flex-col gap-1">
+                <div className="rounded-lg bg-white p-4 shadow-sm ring-1 ring-isabelline flex flex-col gap-1">
                     <p className="text-xs font-bold uppercase tracking-wider text-feldgrau">Total Staff</p>
                     <p className="text-4xl font-bold tabular-nums text-licorice">{loading ? "…" : totalCount}</p>
                 </div>
-                <div className="rounded-2xl bg-licorice p-4 text-isabelline shadow-[0_8px_24px_rgba(35,20,12,0.15)] flex flex-col gap-1">
+                <div className="rounded-lg bg-licorice p-4 text-isabelline shadow-[0_8px_24px_rgba(35,20,12,0.15)] flex flex-col gap-1">
                     <p className="text-xs font-bold uppercase tracking-wider text-isabelline/60">On Shift Now</p>
                     <p className="text-4xl font-bold tabular-nums text-khaki">{loading ? "…" : onShift}</p>
                 </div>
-                <div className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-isabelline flex flex-col gap-1">
+                <div className="rounded-lg bg-white p-4 shadow-sm ring-1 ring-isabelline flex flex-col gap-1">
                     <p className="text-xs font-bold uppercase tracking-wider text-feldgrau">Active</p>
                     <p className="text-4xl font-bold tabular-nums text-licorice">{loading ? "…" : activeCount}</p>
                 </div>
