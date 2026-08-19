@@ -247,7 +247,7 @@ export function TablesDashboard({ venueId, staffName, staffId, onSignOut }: Prop
                             <button
                                 type="button"
                                 onClick={() => setIsSignOutModalOpen(true)}
-                                className="w-10 h-10 rounded-full bg-red-50 text-red-600 flex items-center justify-center active:bg-red-100 transition-colors"
+                                className="w-10 h-10 rounded-lg bg-red-50 text-red-600 flex items-center justify-center active:bg-red-100 transition-colors"
                             >
                                 <img src={signoutBlackIcon} alt="Sign Out" className="h-4 w-4" />
                             </button>
@@ -257,7 +257,7 @@ export function TablesDashboard({ venueId, staffName, staffId, onSignOut }: Prop
 
                 {/* Summary bar */}
                 <div className="mx-auto w-full max-w-7xl px-5 md:px-8 pb-3">
-                    <div className="grid grid-cols-3 gap-2 rounded-2xl bg-white p-3 shadow-sm ring-1 ring-licorice/8">
+                    <div className="grid grid-cols-3 gap-2 rounded-xl bg-white p-3 shadow-sm ring-1 ring-licorice/8">
                         <div className="text-center">
                             <p className="font-mono text-[18px] font-black tabular-nums text-licorice">
                                 {summary.occupied}
@@ -298,7 +298,7 @@ export function TablesDashboard({ venueId, staffName, staffId, onSignOut }: Prop
                                     key={f.id}
                                     type="button"
                                     onClick={() => setFilter(f.id)}
-                                    className={`flex-1 inline-flex items-center justify-center rounded-full px-4 py-2 text-[11px] font-bold tracking-tight transition-all duration-200 ${isActive
+                                    className={`flex-1 inline-flex items-center justify-center rounded-lg px-4 py-2 text-[11px] font-bold tracking-tight transition-all duration-200 ${isActive
                                         ? "bg-licorice text-isabelline"
                                         : "bg-white text-feldgrau ring-1 ring-licorice/8 hover:text-licorice"
                                         }`}
@@ -316,14 +316,14 @@ export function TablesDashboard({ venueId, staffName, staffId, onSignOut }: Prop
               ═══════════════════════════════════════════════════════════ */}
             <section className="mx-auto w-full max-w-7xl px-5 md:px-8 pt-5 pb-8">
                 {loading ? (
-                    <div className="flex flex-col items-center justify-center rounded-2xl bg-white px-6 py-16 text-center shadow-sm ring-1 ring-isabelline">
+                    <div className="flex flex-col items-center justify-center rounded-xl bg-white px-6 py-16 text-center shadow-sm ring-1 ring-isabelline">
                         <span className="h-6 w-6 animate-spin rounded-full border-2 border-licorice/20 border-t-licorice" />
                         <p className="mt-4 text-[12px] font-bold tracking-tight text-feldgrau">
                             Loading tables…
                         </p>
                     </div>
                 ) : tables.length === 0 ? (
-                    <div className="flex flex-col items-center justify-center rounded-2xl bg-white px-6 py-16 text-center shadow-sm ring-1 ring-isabelline">
+                    <div className="flex flex-col items-center justify-center rounded-xl bg-white px-6 py-16 text-center shadow-sm ring-1 ring-isabelline">
                         <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-feldgrau">
                             No tables yet
                         </span>
@@ -337,7 +337,7 @@ export function TablesDashboard({ venueId, staffName, staffId, onSignOut }: Prop
                         </p>
                     </div>
                 ) : filteredTables.length === 0 ? (
-                    <div className="flex flex-col items-center justify-center rounded-2xl bg-white px-6 py-16 text-center shadow-sm ring-1 ring-isabelline">
+                    <div className="flex flex-col items-center justify-center rounded-xl bg-white px-6 py-16 text-center shadow-sm ring-1 ring-isabelline">
                         <p className="text-[12px] font-bold tracking-tight text-feldgrau">
                             No {filter} tables right now.
                         </p>
@@ -351,7 +351,7 @@ export function TablesDashboard({ venueId, staffName, staffId, onSignOut }: Prop
                                 onClick={() => navigate(`/waiter/table/${table.id}`)}
                                 className={`
                                 animate-velvet-rise
-                                group flex flex-col rounded-2xl
+                                group flex flex-col rounded-lg
                                 shadow-[0_4px_16px_rgba(35,20,12,0.06)]
                                 transition-all duration-200 ease-out
                                 hover:shadow-[0_12px_28px_rgba(35,20,12,0.10)]
@@ -374,9 +374,9 @@ export function TablesDashboard({ venueId, staffName, staffId, onSignOut }: Prop
                                     </div>
                                     {table.status === "reserved" && (
                                         <span
-                                            className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[8px] font-bold uppercase tracking-[0.14em] ${statusBg(table.status)}`}
+                                            className={`inline-flex items-center gap-1 rounded-lg px-2 py-0.5 text-[8px] font-bold uppercase tracking-[0.14em] ${statusBg(table.status)}`}
                                         >
-                                            <span className={`h-1.5 w-1.5 rounded-full ${statusDot(table.status)}`} />
+                                            <span className={`h-1.5 w-1.5 rounded-lg ${statusDot(table.status)}`} />
                                             {statusLabel(table.status)}
                                         </span>
                                     )}
