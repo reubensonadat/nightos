@@ -11,6 +11,7 @@ import { CentralAuthScreen } from "./screens/auth/CentralAuthScreen";
 import { VerifyOtpScreen } from "./screens/auth/VerifyOtpScreen";
 import { VenueSetupScreen } from "./screens/auth/VenueSetupScreen";
 import { LandingScreen } from "./screens/LandingScreen";
+import { PromoLandingScreen } from "./screens/PromoLandingScreen";
 import { MenuScreen } from "./screens/MenuScreen";
 import { CartScreen } from "./screens/CartScreen";
 import { CheckoutScreen } from "./screens/CheckoutScreen";
@@ -618,6 +619,9 @@ function AppRoutes() {
   const isAuthRoute = location.pathname === "/login" || location.pathname === "/signup";
   const isVerifyRoute = location.pathname === "/verify-otp";
   const isSetupRoute = location.pathname === "/setup";
+  const isPromoRoute = location.pathname === "/landingpage";
+
+  if (isPromoRoute) return <PromoLandingScreen />;
 
   if (isAuthRoute) {
     if (isAuthenticated && !isInitializing) {
