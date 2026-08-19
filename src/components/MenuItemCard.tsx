@@ -1,6 +1,5 @@
 import React from 'react';
-import { HeartIcon as HeartIconSolid } from '@heroicons/react/24/solid';
-import { HeartIcon, PlusIcon } from '@heroicons/react/24/outline';
+import { PlusIcon } from '@heroicons/react/24/outline';
 import { formatGHS } from '../data/menu';
 
 export interface MenuItemCardProps {
@@ -25,8 +24,6 @@ export function MenuItemCard({
     description,
     category,
     abv,
-    isFavorite,
-    onToggleFavorite,
     onClick,
     onAdd,
     animationDelayMs = 0,

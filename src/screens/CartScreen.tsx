@@ -38,7 +38,7 @@ function estimatePrepMinutes(itemCount: number): string {
     return `${min}–${min + 4} min`;
 }
 
-export function CartScreen({ venueId, venueName, tableLabel, billId, customerSessionId, sessionToken, onBack, onContinueShopping, onOrderSent }: Props) {
+export function CartScreen({ venueId, tableLabel, billId, customerSessionId, sessionToken, onBack, onContinueShopping, onOrderSent }: Props) {
     const { lines, itemCount, subtotal, setQty, remove, clear } = useCart();
     const [orderNotes, setOrderNotes] = useState("");
     const [sending, setSending] = useState(false);
