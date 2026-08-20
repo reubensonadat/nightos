@@ -249,18 +249,7 @@ export type DbStaffShift = {
   created_at: string;
 };
 
-/** Result of the `staff_lookup` RPC — used to decide sign-in vs PIN setup. */
-export type DbStaffLookup = {
-  id: string;
-  name: string;
-  role: DbStaff['role'];
-  venue_id: string;
-  venue_name: string;
-  venue_slug: string;
-  pin_set: boolean;
-};
-
-/** Result of the `staff_sign_in` RPC — the staff session (no PIN ever). */
+/** Staff session shape (restored from the auth session; no PIN). */
 export type DbStaffSession = {
   id: string;
   name: string;
@@ -700,35 +689,6 @@ export const db = {
   },
 
   /* ── Payments ── */
-  createPayment: (
-    billId: string,
-    venueId: string,
-    amount: number,
-    method: DbPayment['method'],
-    reference?: string,
-    payerName?: string,
-    sessionToken?: string | null,
-  ) => {
-    cacheInvalidate('bills:');
-    // NOTE: no .select() here — customers have no SELECT policy on payments,
-    // so a select-back would fail under RLS even though the insert succeeds.
-    // The DB trigger closes the bill; the client doesn't need the row back.
-    return withSession(
-      supabase
-        .from('payments')
-        .insert({
-          bill_id: billId,
-          venue_id: venueId,
-          amount,
-          method,
-          reference: reference || null,
-          payer_name: payerName || null,
-          status: 'success',
-        }),
-      sessionToken,
-    );
-  },
-
   paymentsByBill: (billId: string) =>
     supabase
       .from('payments')
@@ -790,9 +750,6 @@ export const db = {
       .eq('phone', phone)
       .maybeSingle(),
 
-  staffByPhoneRpc: (phone: string) =>
-    supabase.rpc('get_staff_by_phone', { p_phone: phone }),
-
   staffByVenue: (venueId: string) =>
     cached<DbStaff[]>(
       () =>
@@ -806,20 +763,6 @@ export const db = {
       `staff:${venueId}`,
       TTL.STAFF,
     ),
-
-  /* ── Staff PIN sign-in (no Supabase Auth — staff are DB rows only) ── */
-  staffLookup: (phone: string) =>
-    supabase.rpc('staff_lookup', { p_phone: phone }).maybeSingle<DbStaffLookup>(),
-
-  setStaffPin: async (phone: string, pin: string) => {
-    const { data, error } = await supabase
-      .rpc('set_staff_pin', { p_phone: phone, p_pin: pin });
-    // RETURNS boolean → PostgREST returns the scalar directly (not a wrapped object).
-    return { data: (data as boolean) ?? false, error };
-  },
-
-  staffSignIn: (phone: string, pin: string) =>
-    supabase.rpc('staff_sign_in', { p_phone: phone, p_pin: pin }).maybeSingle<DbStaffSession>(),
 
   staffNamesByIds: (ids: string[]) => {
     if (ids.length === 0) return Promise.resolve({ data: [] as DbStaff[], error: null });

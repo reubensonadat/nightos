@@ -274,7 +274,7 @@ export function TablesDashboard({ venueId, staffName, staffId, onSignOut }: Prop
                                 {formatGHS(summary.openTabs)}
                             </p>
                             <p className="text-[9px] font-bold uppercase tracking-wider text-feldgrau">
-                                Open Tabs
+                                Owed
                             </p>
                         </div>
                         <div className="text-center">
@@ -437,7 +437,7 @@ export function TablesDashboard({ venueId, staffName, staffId, onSignOut }: Prop
                                             ? "Manage"
                                             : table.status === "reserved"
                                                 ? "View"
-                                                : "Open"}
+                                                : "Start"}
                                     </span>
                                     <ArrowRightIcon
                                         className="h-3.5 w-3.5 text-feldgrau transition-transform group-hover:translate-x-0.5 group-hover:text-licorice"

@@ -139,10 +139,10 @@ db.venueById(venueId).then(
                         </button>
                         <div className="flex flex-col items-center leading-tight">
                             <span className="text-[13px] font-bold tracking-tight text-licorice">
-                                Settled
+                                Payment collected
                             </span>
                             <span className="text-[9px] font-semibold uppercase tracking-[0.18em] text-feldgrau">
-                                Invoice
+                                Cash
                             </span>
                         </div>
                         <div className="w-9" />
@@ -309,7 +309,7 @@ db.venueById(venueId).then(
                             Table {String(table.number).padStart(2, "0")}
                         </span>
                         <span className="text-[9px] font-semibold uppercase tracking-[0.18em] text-feldgrau">
-                            Invoice & Settlement
+                            Collect Payment
                         </span>
                     </div>
 
@@ -523,7 +523,7 @@ db.venueById(venueId).then(
                         </p>
                         <p className="mt-1 text-[11px] leading-[1.5] tracking-tight text-feldgrau">
                             Card & MoMo are paid on the customer's phone — the platform takes its fee
-                            automatically at checkout. Cash is settled here.
+                            automatically at checkout. Cash is recorded here.
                         </p>
                     </div>
                 )}
@@ -536,7 +536,7 @@ db.venueById(venueId).then(
                             Mobile Money
                         </p>
                         <p className="mt-1 text-[11px] leading-[1.5] tracking-tight text-feldgrau">
-                            The customer pays from their own phone after checkout. Cash is settled here.
+                            The customer pays from their own phone after checkout. Cash is recorded here.
                         </p>
                     </div>
                 )}
@@ -555,7 +555,7 @@ db.venueById(venueId).then(
                 <div className="mx-auto flex w-full max-w-3xl items-center justify-between gap-3 px-5 md:px-8 pt-3 pb-[max(env(safe-area-inset-bottom),16px)]">
                     <div className="flex min-w-0 flex-col">
                         <span className="text-[9px] font-bold uppercase tracking-wider text-feldgrau">
-                            To Settle
+                            To Collect
                         </span>
                         <span className="font-mono text-[15px] sm:text-[16px] font-black tabular-nums text-licorice">
                             {formatGHS(total)}
@@ -587,7 +587,7 @@ db.venueById(venueId).then(
                                 Recording…
                             </>
                         ) : method === "cash"
-                            ? "Settle Cash"
+                            ? "Confirm Cash"
                             : "Paid on customer's phone"}
                     </button>
                 </div>

@@ -2,11 +2,9 @@ import { useEffect, useMemo, useState } from "react";
 import {
     ArrowLeftIcon,
     BanknotesIcon,
-    BuildingLibraryIcon,
     CheckIcon,
     CreditCardIcon,
     DevicePhoneMobileIcon,
-    WalletIcon,
 } from "@heroicons/react/24/outline";
 import { CheckCircleIcon } from "@heroicons/react/24/solid";
 import toast from "react-hot-toast";
@@ -29,7 +27,7 @@ const verifyOnce = async (reference: string, billId: string): Promise<boolean> =
 
 /* ────────────────────────── Payment methods ────────────────────────── */
 
-type PaymentMethod = "card" | "momo" | "bank" | "wallet" | "cash";
+type PaymentMethod = "card" | "momo" | "cash";
 
 type PaymentOption = {
     id: PaymentMethod;
@@ -52,21 +50,9 @@ const PAYMENT_OPTIONS: PaymentOption[] = [
         icon: CreditCardIcon,
     },
     {
-        id: "bank",
-        label: "Bank Transfer",
-        description: "Direct transfer to Velvet Lounge",
-        icon: BuildingLibraryIcon,
-    },
-    {
-        id: "wallet",
-        label: "Digital Wallet",
-        description: "Apple Pay · Google Pay · Hubtel",
-        icon: WalletIcon,
-    },
-    {
         id: "cash",
         label: "Cash",
-        description: "Pay your server directly",
+        description: "Your waiter will confirm",
         icon: BanknotesIcon,
     },
 ];
@@ -82,7 +68,7 @@ type Props = {
     onPaid: () => void;
 };
 
-export function CheckoutScreen({ total, billId, venueId, sessionToken, onBack, onPaid }: Props) {
+export function CheckoutScreen({ total, billId, venueId, onBack, onPaid }: Props) {
     const [bill, setBill] = useState<DbBill | null>(null);
     const [venue, setVenue] = useState<DbVenue | null>(null);
     const [tableLabel, setTableLabel] = useState<string | null>(null);
@@ -94,6 +80,7 @@ export function CheckoutScreen({ total, billId, venueId, sessionToken, onBack, o
     const [canReCheck, setCanReCheck] = useState(false);
     const [countdownLeft, setCountdownLeft] = useState<number | null>(null);
     const [lastReference, setLastReference] = useState<string | null>(null);
+    const [cashRequested, setCashRequested] = useState(false);
 
     useEffect(() => {
         if (!billId) return;
@@ -149,36 +136,18 @@ export function CheckoutScreen({ total, billId, venueId, sessionToken, onBack, o
         };
     }, [bill, total]);
 
-    const handlePay = async () => {
-        if (!billId || !venueId) {
+    // Cash never charges the customer — a waiter confirms the payment on their
+    // own device (Invariant 10 / §1.6.3). The customer-side CTA is only a
+    // request for the waiter; no money is written from the browser.
+    const handleCashRequest = async () => {
+        if (!billId) {
             toast.error("Something went wrong — please try again.");
             return;
         }
         setPaying(true);
-
-        try {
-            const { error } = await db.createPayment(
-                billId,
-                venueId,
-                payAmount,
-                method === 'card' ? 'card' : method === 'momo' ? 'mobile_money' : method === 'bank' ? 'bank_transfer' : method === 'wallet' ? 'digital_wallet' : 'cash',
-                undefined,
-                undefined,
-                sessionToken,
-            );
-            if (error) throw error;
-
-            if (payAmount >= billTotal) {
-                await db.updateBill(billId, { status: 'paid', closed_at: new Date().toISOString() }, sessionToken);
-            }
-            setPaying(false);
-            setPaid(true);
-            window.setTimeout(onPaid, 1800);
-        } catch (err) {
-            console.error("Payment failed:", err);
-            toast.error("Payment failed. Please try again.");
-            setPaying(false);
-        }
+        setCashRequested(true);
+        setPaying(false);
+        toast.success("Your waiter will come over to confirm your cash payment.");
     };
 
     const handlePaystackSuccess = async (reference: string) => {
@@ -329,7 +298,7 @@ export function CheckoutScreen({ total, billId, venueId, sessionToken, onBack, o
                 {/* ── Title Section ── */}
                 <div className="mb-6">
                     <p className="text-[10px] font-bold uppercase tracking-[0.22em] text-khaki">
-                        Settle Up
+                        Pay Your Bill
                     </p>
                     <h1 className="mt-1.5 text-[2rem] font-black leading-[1.05] tracking-[-0.04em] text-licorice">
                         Your bill
@@ -564,11 +533,11 @@ export function CheckoutScreen({ total, billId, venueId, sessionToken, onBack, o
                             <CheckIcon className="h-4 w-4" strokeWidth={3} />
                         </span>
                     </PaystackButton>
-                ) : (
+                ) : method === 'cash' ? (
                     <button
                         type="button"
-                        onClick={handlePay}
-                        disabled={paying}
+                        onClick={handleCashRequest}
+                        disabled={cashRequested}
                         className="
                             group flex w-full max-w-md md:max-w-2xl items-center justify-between
                             gap-3 rounded-full bg-licorice px-6 py-4
@@ -578,28 +547,49 @@ export function CheckoutScreen({ total, billId, venueId, sessionToken, onBack, o
                             hover:bg-licorice/95 hover:shadow-[0_24px_60px_rgba(35,20,12,0.30)]
                             active:scale-[0.985]
                             focus:outline-none focus-visible:ring-2 focus-visible:ring-khaki
-                            disabled:opacity-90
+                            disabled:opacity-70
                         "
                     >
                         <span className="flex flex-col items-start leading-tight">
                             <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-khaki">
-                                {paying ? "Processing…" : "Confirm"}
+                                {cashRequested ? "Waiter notified" : "Pay with cash"}
                             </span>
                             <span className="text-[15px] font-bold tracking-tight text-isabelline">
-                                {paying
-                                    ? `Paying via ${PAYMENT_OPTIONS.find((p) => p.id === method)?.label}`
-                                    : <span className="flex items-center gap-1">Pay {formatGHS(payAmount)}</span>}
+                                {cashRequested
+                                    ? "Your waiter will confirm the payment"
+                                    : `Confirm ${formatGHS(payAmount)} with your waiter`}
                             </span>
                         </span>
                         <span className="flex h-9 w-9 items-center justify-center rounded-full bg-isabelline text-licorice">
-                            {paying ? (
-                                <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none">
-                                    <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" strokeOpacity="0.25" />
-                                    <path d="M22 12a10 10 0 0 1-10 10" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
-                                </svg>
-                            ) : (
+                            {cashRequested ? (
                                 <CheckIcon className="h-4 w-4" strokeWidth={3} />
+                            ) : (
+                                <BanknotesIcon className="h-4 w-4" strokeWidth={2} />
                             )}
+                        </span>
+                    </button>
+                ) : (
+                    <button
+                        type="button"
+                        disabled
+                        className="
+                            group flex w-full max-w-md md:max-w-2xl items-center justify-between
+                            gap-3 rounded-full bg-licorice px-6 py-4
+                            shadow-[0_20px_50px_rgba(35,20,12,0.25)]
+                            ring-1 ring-licorice/80
+                            disabled:opacity-70
+                        "
+                    >
+                        <span className="flex flex-col items-start leading-tight">
+                            <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-khaki">
+                                Unavailable
+                            </span>
+                            <span className="text-[15px] font-bold tracking-tight text-isabelline">
+                                Please scan your table's QR code to pay
+                            </span>
+                        </span>
+                        <span className="flex h-9 w-9 items-center justify-center rounded-full bg-isabelline text-licorice">
+                            <CheckIcon className="h-4 w-4" strokeWidth={3} />
                         </span>
                     </button>
                 )}

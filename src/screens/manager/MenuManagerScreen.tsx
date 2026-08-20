@@ -161,29 +161,29 @@ export function MenuManagerScreen() {
     return (
         <div className="mx-auto w-full max-w-7xl space-y-6">
             <div className="grid grid-cols-2 gap-3 md:flex md:flex-row md:overflow-x-auto md:no-scrollbar md:gap-4">
-                <div className="col-span-2 md:shrink-0 md:min-w-[320px] rounded-lg bg-white p-4 shadow-sm ring-1 ring-isabelline flex flex-col gap-1">
+                <div className="col-span-2 md:shrink-0 md:min-w-[320px] rounded-[1.5rem] bg-white p-4 shadow-sm ring-1 ring-isabelline flex flex-col gap-1">
                     <p className="text-xs font-bold uppercase tracking-wider text-feldgrau">Inv. Value</p>
                     <p className="text-4xl font-bold tabular-nums text-licorice">{formatGHS(totalInventoryValue)}</p>
                 </div>
-                <div className="rounded-lg bg-white p-4 shadow-sm ring-1 ring-isabelline flex flex-col gap-1 md:shrink-0 md:min-w-[180px] md:flex-1">
+                <div className="rounded-[1.5rem] bg-white p-4 shadow-sm ring-1 ring-isabelline flex flex-col gap-1 md:shrink-0 md:min-w-[180px] md:flex-1">
                     <p className="text-xs font-bold uppercase tracking-wider text-feldgrau">Total Items</p>
                     <p className="text-4xl font-bold tabular-nums text-licorice">{totalItems}</p>
                 </div>
-                <div className="rounded-lg bg-white p-4 shadow-sm ring-1 ring-isabelline flex flex-col gap-1 md:shrink-0 md:min-w-[180px] md:flex-1">
+                <div className="rounded-[1.5rem] bg-white p-4 shadow-sm ring-1 ring-isabelline flex flex-col gap-1 md:shrink-0 md:min-w-[180px] md:flex-1">
                     <p className="text-xs font-bold uppercase tracking-wider text-feldgrau">Available</p>
                     <p className="text-4xl font-bold tabular-nums text-khaki">{items.filter((i) => i.is_active).length}</p>
                 </div>
-                <div className="rounded-lg bg-licorice p-4 text-isabelline shadow-[0_8px_24px_rgba(35,20,12,0.15)] flex flex-col gap-1 md:shrink-0 md:min-w-[180px] md:flex-1">
+                <div className="rounded-[1.5rem] bg-licorice p-4 text-isabelline shadow-[0_8px_24px_rgba(35,20,12,0.15)] flex flex-col gap-1 md:shrink-0 md:min-w-[180px] md:flex-1">
                     <p className="text-xs font-bold uppercase tracking-wider text-isabelline/60">Low Stock</p>
                     <p className="text-4xl font-bold tabular-nums text-khaki">{lowStock}</p>
                 </div>
-                <div className="rounded-lg bg-white p-4 shadow-sm ring-1 ring-isabelline flex flex-col gap-1 md:shrink-0 md:min-w-[180px] md:flex-1">
+                <div className="rounded-[1.5rem] bg-white p-4 shadow-sm ring-1 ring-isabelline flex flex-col gap-1 md:shrink-0 md:min-w-[180px] md:flex-1">
                     <p className="text-xs font-bold uppercase tracking-wider text-feldgrau">Out of Stock</p>
                     <p className="text-4xl font-bold tabular-nums text-dark-red">{outOfStock}</p>
                 </div>
             </div>
 
-            <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-white p-4 shadow-sm ring-1 ring-isabelline">
+            <div className="flex flex-wrap items-center justify-between gap-3 rounded-[1.5rem] bg-white p-4 shadow-sm ring-1 ring-isabelline">
                 <div className="flex min-w-0 flex-1 items-center gap-2 rounded-xl bg-isabelline px-3.5 py-2 ring-1 ring-licorice/8 focus-within:ring-2 focus-within:ring-licorice/20">
                     <MagnifyingGlassIcon className="h-4 w-4 shrink-0 text-feldgrau" strokeWidth={2} />
                     <input type="text" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search inventory items…" className="min-w-0 flex-1 bg-transparent text-[12px] text-licorice placeholder:text-feldgrau/50 focus:outline-none" />
@@ -206,12 +206,12 @@ export function MenuManagerScreen() {
             </div>
 
             {loading ? (
-                <div className="flex flex-col items-center justify-center rounded-2xl bg-white px-6 py-16 text-center shadow-sm ring-1 ring-isabelline">
+                <div className="flex flex-col items-center justify-center rounded-[1.5rem] bg-white px-6 py-16 text-center shadow-sm ring-1 ring-isabelline">
                     <span className="h-6 w-6 animate-spin rounded-full border-2 border-licorice/20 border-t-licorice" />
                     <p className="mt-4 text-[12px] font-bold tracking-tight text-feldgrau">Loading inventory…</p>
                 </div>
             ) : (
-                <div className="overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-isabelline">
+                <div className="overflow-hidden rounded-[1.5rem] bg-white shadow-sm ring-1 ring-isabelline">
                     <table className="hidden md:table w-full">
                         <thead className="border-b border-isabelline bg-isabelline/50">
                             <tr className="text-left">
@@ -385,7 +385,7 @@ function ItemModal({ item, onSave, onClose, onDelete }: {
     return (
         <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center px-4">
             <div className="absolute inset-0 bg-licorice/50 backdrop-blur-sm" onClick={onClose} />
-            <div className="relative w-full max-w-md max-h-[90vh] overflow-y-auto rounded-t-2xl md:rounded-2xl bg-white shadow-2xl">
+            <div className="relative w-full max-w-md max-h-[90vh] overflow-y-auto rounded-t-[1.5rem] md:rounded-[1.5rem] bg-white shadow-2xl">
                 <div className="sticky top-0 flex items-center justify-between border-b border-isabelline bg-white px-5 py-3">
                     <div>
                         <p className="text-xs font-bold uppercase text-feldgrau">{item ? "Edit Item" : "New Item"}</p>

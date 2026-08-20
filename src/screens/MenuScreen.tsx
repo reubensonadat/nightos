@@ -13,11 +13,12 @@ import {
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 import { HeartIcon as HeartIconSolid } from "@heroicons/react/24/solid";
 import { formatGHS, formatGHSString } from "../data/menu";
-import type { MenuCategory, MenuItem } from "../data/menu";
+import type { MenuCategory, MenuItem, ModifierGroup } from "../data/menu";
 import { MenuItemCard } from "../components/MenuItemCard";
 import { useCart } from "../context/CartContext";
 import { ItemDetailsSheet } from "../components/ItemDetailsSheet";
-import { db, type DbProduct } from "../lib/api";
+import { db, type DbProduct, type DbModifierOption } from "../lib/api";
+import { supabase } from "../lib/supabase";
 
 type Props = {
     venueId?: string;
@@ -36,21 +37,72 @@ async function fetchProducts(venueId: string): Promise<MenuItem[]> {
     const { data: categories } = await db.menuCategories(venueId);
     const categoryMap = new Map(categories?.map(c => [c.id, c.name]) || []);
 
-    return data.map((p: DbProduct) => ({
-        id: p.id,
-        name: p.name,
-        description: p.description || '',
-        longDescription: p.long_description || undefined,
-        price: p.price,
-        category: p.category_id ? categoryMap.get(p.category_id) || "Other" : "Other",
-        station: p.station,  // 'kitchen' | 'bar' | 'both' — used by CartScreen for station routing
-        image: p.images?.[0] || '',
-        tags: ((p.tags ?? []) as string[]).filter((t) =>
-            ['Popular', 'New', "Chef's Pick", 'Vegetarian'].includes(t)
-        ) as MenuItem['tags'] | undefined,
-        abv: p.abv || undefined,
-        origin: p.origin || undefined,
-    }));
+    // Fetch all modifier infrastructure in one batch
+    const productIds = data.map(p => p.id);
+    const [groupsResult, linksResult] = await Promise.all([
+        db.modifierGroups(venueId),
+        productIds.length > 0
+            ? supabase.from('product_modifiers').select('product_id, group_id').in('product_id', productIds)
+            : { data: [] },
+    ]);
+    const allGroups = groupsResult.data ?? [];
+    const links = (linksResult.data ?? []) as { product_id: string; group_id: string }[];
+
+    // Product → group IDs map
+    const productGroupIds = new Map<string, string[]>();
+    for (const link of links) {
+        if (!productGroupIds.has(link.product_id)) productGroupIds.set(link.product_id, []);
+        productGroupIds.get(link.product_id)!.push(link.group_id);
+    }
+
+    // Fetch all options for all referenced groups in one call
+    const allGroupIds = [...new Set(links.map(l => l.group_id))];
+    const optionsResult = allGroupIds.length > 0
+        ? await db.modifierOptions(allGroupIds)
+        : { data: [] };
+    const allOptions = (optionsResult.data ?? []) as DbModifierOption[];
+
+    // Group → options map
+    const groupOptions = new Map<string, DbModifierOption[]>();
+    for (const opt of allOptions) {
+        if (!groupOptions.has(opt.group_id)) groupOptions.set(opt.group_id, []);
+        groupOptions.get(opt.group_id)!.push(opt);
+    }
+
+    return data.map((p: DbProduct) => {
+        const gids = productGroupIds.get(p.id) ?? [];
+        return {
+            id: p.id,
+            name: p.name,
+            description: p.description || '',
+            longDescription: p.long_description || undefined,
+            price: p.price,
+            category: p.category_id ? categoryMap.get(p.category_id) || "Other" : "Other",
+            station: p.station,
+            image: p.images?.[0] || '',
+            tags: ((p.tags ?? []) as string[]).filter((t) =>
+                ['Popular', 'New', "Chef's Pick", 'Vegetarian'].includes(t)
+            ) as MenuItem['tags'] | undefined,
+            abv: p.abv || undefined,
+            origin: p.origin || undefined,
+            modifiers: gids.map(gid => {
+                const g = allGroups.find(g => g.id === gid);
+                const opts = groupOptions.get(gid) ?? [];
+                return {
+                    id: g?.id ?? gid,
+                    title: g?.name ?? '',
+                    required: g?.required ?? false,
+                    multiSelect: g?.multi_select ?? false,
+                    max: g?.max_select ?? undefined,
+                    options: opts.map(o => ({
+                        id: o.id,
+                        name: o.name,
+                        priceDelta: o.price_delta || undefined,
+                    })),
+                } satisfies ModifierGroup;
+            }),
+        };
+    });
 
 }
 

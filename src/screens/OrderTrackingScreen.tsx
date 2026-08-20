@@ -305,7 +305,7 @@ export function OrderTrackingScreen({ order, onBackToMenu, onPayBill }: Props) {
                     >
                         <div className="flex flex-col items-start leading-tight">
                             <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-khaki">
-                                Settle up
+                                Pay
                             </span>
                             <span className="text-[15px] font-bold tracking-tight text-isabelline">
                                 Pay {formatGHS(order.total)}
