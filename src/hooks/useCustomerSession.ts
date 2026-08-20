@@ -53,6 +53,32 @@ export function useCustomerSession(venueId: string | null, tableId: string | nul
     setState((s) => ({ ...s, waiter: staff ? { id: staff.id, name: staff.name } : null }))
   }, [])
 
+  /** Flip a non-active session back to `active` (its tab is still live). */
+  const reviveSession = useCallback(async (owner: CustomerSession): Promise<CustomerSession | null> => {
+    const { data: revived } = await supabase
+      .from('customer_sessions')
+      .update({ status: 'active', last_active_at: new Date().toISOString() })
+      .setHeader('x-session-token', owner.session_token)
+      .eq('id', owner.id)
+      .select()
+      .single()
+    return revived ? (revived as CustomerSession) : null
+  }, [])
+
+  /**
+   * Revive the session only if the bill it owns is still open/settling
+   * (unpaid). If the bill is gone or settled, the session stays dead.
+   */
+  const reviveIfBillOpen = useCallback(
+    async (owner: CustomerSession): Promise<CustomerSession | null> => {
+      if (!owner.bill_id) return null
+      const { data: ownerBill } = await db.billById(owner.bill_id)
+      if (!ownerBill || (ownerBill.status !== 'open' && ownerBill.status !== 'settling')) return null
+      return reviveSession(owner)
+    },
+    [reviveSession],
+  )
+
   const ensureSession = useCallback(async () => {
     if (!venueId || !tableId) return
 
@@ -93,8 +119,9 @@ export function useCustomerSession(venueId: string | null, tableId: string | nul
     }
 
     // 1b. Session expired (20 min, never ordered) → block ordering until the
-    // customer re-scans the table QR code. The waiter/manager keeps seeing
-    // the expired session as "landed, never ordered".
+    // customer re-scans the table QR code. Exception: if the expired session
+    // still owns an OPEN bill, the tab is live — revive it instead of
+    // blocking, so the party can keep ordering.
     if (!session) {
       const { data: latestSession } = await supabase
         .from('customer_sessions')
@@ -106,14 +133,43 @@ export function useCustomerSession(venueId: string | null, tableId: string | nul
         .maybeSingle()
 
       if (latestSession && latestSession.status === 'expired') {
-        setState((s) => ({ ...s, session: latestSession as CustomerSession, bill: null, loading: false, error: null }))
-        return
+        const revived = await reviveIfBillOpen(latestSession as CustomerSession)
+        if (revived) {
+          session = revived
+        } else {
+          setState((s) => ({ ...s, session: latestSession as CustomerSession, bill: null, loading: false, error: null }))
+          return
+        }
+      }
+    }
+
+    // 1c. No active session, but the table has an open (unpaid) bill — the
+    // previous party's tab is still live. NEVER assign a new session to an
+    // unpaid bill: revive the session that owns it. Only fall through to a
+    // new session when the open bill is truly orphaned (no owning session —
+    // e.g. a waiter-opened bill).
+    if (!session) {
+      const { data: openBill } = await db.openBillForTable(tableId)
+      if (openBill) {
+        const { data: owner } = await supabase
+          .from('customer_sessions')
+          .select('*')
+          .eq('bill_id', openBill.id)
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle()
+        if (owner) {
+          const revived = owner.status === 'active'
+            ? (owner as CustomerSession)
+            : await reviveSession(owner as CustomerSession)
+          if (revived) session = revived
+        }
       }
     }
 
     let bill = null
 
-    // 2. If no active session, create one
+    // 2. Only create a session when there's NO live tab on the table
     if (!session) {
       const { data: newSession, error: createErr } = await supabase
         .from('customer_sessions')
@@ -192,7 +248,7 @@ export function useCustomerSession(venueId: string | null, tableId: string | nul
 
     // 4. Make sure the bill has a waiter (idempotent, people-weighted)
     if (bill) assignWaiter(bill.id, token)
-  }, [venueId, tableId, assignWaiter])
+  }, [venueId, tableId, assignWaiter, reviveSession, reviveIfBillOpen])
 
   useEffect(() => {
      

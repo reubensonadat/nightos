@@ -125,7 +125,7 @@ export default function OtpInput({
                     disabled={disabled}
                     className={
                         inputClassName ||
-                        'flex-1 min-w-0 h-14 sm:h-16 text-center text-2xl sm:text-3xl font-display font-medium text-[var(--color-foreground)] bg-[var(--color-background)] border-2 border-[var(--color-border)] rounded-2xl focus:border-[#111] focus:bg-[var(--color-surface)] focus:ring-2 focus:ring-[#111]/15 transition-all outline-none disabled:opacity-50 disabled:cursor-not-allowed'
+                        'flex-1 min-w-0 h-14 sm:h-16 text-center text-2xl sm:text-3xl font-display font-medium text-[var(--color-foreground)] bg-[var(--color-background)] border-2 border-[var(--color-border)] rounded-md focus:border-[#111] focus:bg-[var(--color-surface)] focus:ring-2 focus:ring-[#111]/15 transition-all outline-none disabled:opacity-50 disabled:cursor-not-allowed'
                     }
                 />
             ))}

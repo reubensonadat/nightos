@@ -50,6 +50,9 @@ END;
 $$;
 
 -- ── 2. staff_list: any active venue member can read it ─────────────
+-- DROP first: the live DB has an older staff_list with a different
+-- OUT-parameter row type, and CREATE OR REPLACE cannot change it (42P13).
+DROP FUNCTION IF EXISTS public.staff_list(uuid);
 CREATE OR REPLACE FUNCTION public.staff_list(p_venue_id uuid)
 RETURNS TABLE(
     id uuid, name text, phone text, email text, role text,

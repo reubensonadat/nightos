@@ -45,7 +45,7 @@ function OtpInput({ length, value, onChange, onComplete, disabled }: {
           }}
           data-otp={i}
           disabled={disabled}
-          className="w-11 h-12 text-center text-lg font-bold rounded-lg bg-isabelline text-licorice ring-1 ring-licorice/8 focus:outline-none focus:ring-2 focus:ring-licorice/20 disabled:opacity-50"
+          className="w-11 h-12 text-center text-lg font-bold rounded-md bg-isabelline text-licorice ring-1 ring-licorice/8 focus:outline-none focus:ring-2 focus:ring-licorice/20 disabled:opacity-50"
         />
       ))}
     </div>
