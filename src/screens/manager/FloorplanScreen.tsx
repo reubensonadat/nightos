@@ -193,19 +193,19 @@ export function FloorplanScreen() {
         <div className="mx-auto w-full max-w-7xl space-y-6">
             {/* ── Header summary ── */}
             <div className="grid grid-cols-2 gap-3 md:grid-cols-4 md:gap-4">
-                <div className="rounded-lg bg-white p-4 shadow-sm border border-slate-100 flex flex-col gap-1">
+                <div className="rounded-[1.5rem] bg-white p-4 shadow-sm border border-slate-100 flex flex-col gap-1">
                     <p className="text-xs font-bold uppercase tracking-wider text-slate-500">Total Tables</p>
                     <p className="text-4xl font-bold tabular-nums text-slate-900">{tables.length}</p>
                 </div>
-                <div className="rounded-lg bg-white p-4 shadow-sm border border-slate-100 flex flex-col gap-1">
+                <div className="rounded-[1.5rem] bg-white p-4 shadow-sm border border-slate-100 flex flex-col gap-1">
                     <p className="text-xs font-bold uppercase tracking-wider text-slate-500">Occupied</p>
                     <p className="text-4xl font-bold tabular-nums text-slate-900">{occupiedCount}</p>
                 </div>
-                <div className="rounded-lg bg-white p-4 shadow-sm border border-slate-100 flex flex-col gap-1">
+                <div className="rounded-[1.5rem] bg-white p-4 shadow-sm border border-slate-100 flex flex-col gap-1">
                     <p className="text-xs font-bold uppercase tracking-wider text-slate-500">Total Capacity</p>
                     <p className="text-4xl font-bold tabular-nums text-slate-900">{totalCapacity}</p>
                 </div>
-                <div className="rounded-lg bg-white p-4 shadow-sm border border-slate-100 flex flex-col gap-1">
+                <div className="rounded-[1.5rem] bg-white p-4 shadow-sm border border-slate-100 flex flex-col gap-1">
                     <p className="text-xs font-bold uppercase tracking-wider text-slate-500">Active Guests</p>
                     <p className="text-4xl font-bold tabular-nums text-slate-900">
                         {tables.filter(t => t.status === "occupied").reduce((sum, t) => sum + (t.guests || 0), 0)}
@@ -216,18 +216,18 @@ export function FloorplanScreen() {
             {/* ── Floorplan + Details ── */}
             <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
                 {/* Floorplan grid */}
-                <div className="lg:col-span-2 rounded-2xl bg-white p-5 shadow-sm ring-1 ring-isabelline">
+                <div className="lg:col-span-2 rounded-[1.5rem] bg-white p-5 shadow-sm ring-1 ring-isabelline">
                     <div>
-                        <h2 className="text-lg font-bold text-slate-900 tracking-tight">Floorplan</h2>
+                        <h2 className="text-lg font-bold text-slate-900 tracking-tight">Tables</h2>
                     </div>
 
                     {loading ? (
-                        <div className="mt-5 flex flex-col items-center justify-center rounded-2xl bg-isabelline px-6 py-16 text-center">
+                        <div className="mt-5 flex flex-col items-center justify-center rounded-[1.5rem] bg-isabelline px-6 py-16 text-center">
                             <span className="h-6 w-6 animate-spin rounded-full border-2 border-licorice/20 border-t-licorice" />
                             <p className="mt-4 text-[12px] font-bold tracking-tight text-feldgrau">Loading tables…</p>
                         </div>
                     ) : tables.length === 0 ? (
-                        <div className="mt-5 flex flex-col items-center justify-center rounded-2xl bg-isabelline px-6 py-16 text-center">
+                        <div className="mt-5 flex flex-col items-center justify-center rounded-[1.5rem] bg-isabelline px-6 py-16 text-center">
                             <p className="text-[12px] font-bold tracking-tight text-feldgrau">No tables yet</p>
                             <p className="mt-1 text-xs tracking-tight text-feldgrau/70">
                                 Re-run supabase/seed-velvet.sql to create Tables 1–8.
@@ -287,7 +287,7 @@ export function FloorplanScreen() {
                 </div>
 
                 {/* Details panel */}
-                <div className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-isabelline">
+                <div className="rounded-[1.5rem] bg-white p-5 shadow-sm ring-1 ring-isabelline">
                     <p className="text-xs font-bold uppercase text-feldgrau">Table Details</p>
                     {selected ? (
                         <div className="mt-4">
@@ -360,7 +360,7 @@ export function FloorplanScreen() {
                         className="absolute inset-0 bg-licorice/50 backdrop-blur-sm"
                         onClick={() => setShowQrFor(null)}
                     />
-                    <div className="relative w-full max-w-sm overflow-hidden rounded-2xl bg-white shadow-2xl">
+                    <div className="relative w-full max-w-sm overflow-hidden rounded-[1.5rem] bg-white shadow-2xl">
                         <div className="flex items-center justify-between border-b border-isabelline px-5 py-3">
                             <div>
                                 <p className="text-xs font-bold uppercase text-feldgrau">QR Code</p>

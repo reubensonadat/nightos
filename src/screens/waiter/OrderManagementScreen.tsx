@@ -31,6 +31,7 @@ type WItem = {
     category: string;
     price: number;
     image: string | null;
+    station?: 'kitchen' | 'bar' | 'both';
 };
 
 type Tab = "order" | "add";
@@ -168,6 +169,7 @@ export function OrderManagementScreen() {
                 category: catNameById[p.category_id as string],
                 price: p.price,
                 image: p.images?.[0] ?? null,
+                station: p.station,
             }))
             .sort((a, b) => a.category.localeCompare(b.category));
     }, [products, catNameById]);
@@ -218,10 +220,13 @@ export function OrderManagementScreen() {
             setBillId(bill.id);
 
             const notes = order.map((l) => l.notes).filter(Boolean).join("; ") || undefined;
+            const hasKitchen = order.some((l) => !l.menuItem.station || l.menuItem.station === 'kitchen' || l.menuItem.station === 'both');
+            const hasBar = order.some((l) => l.menuItem.station === 'bar' || l.menuItem.station === 'both');
+            const station: 'kitchen' | 'bar' = hasKitchen ? 'kitchen' : hasBar ? 'bar' : 'kitchen';
             const { data: submission } = await db.createOrderSubmission(
                 bill.id,
                 bill.venue_id,
-                "kitchen",
+                station,
                 notes,
             );
             if (!submission) {

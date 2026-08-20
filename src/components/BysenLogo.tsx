@@ -48,7 +48,7 @@ export function BysenIcon({
 }
 
 /**
- * Universal Bysen Brand Logo Component featuring clean BYSEN logo & Avalance typography.
+ * Universal Bysen Brand Logo Component featuring clean BYSEN logo & Inter typography.
  */
 export function BysenLogo({
   size = "md",
@@ -79,7 +79,7 @@ export function BysenLogo({
         <BysenIcon size="xs" light={light} />
         <span
           className="font-black uppercase tracking-widest text-black"
-          style={{ fontFamily: "'Avalance', 'Outfit', 'Plus Jakarta Sans', sans-serif" }}
+          style={{ fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" }}
         >
           BYSEN
         </span>
@@ -96,7 +96,7 @@ export function BysenLogo({
             className={`font-sans font-black uppercase ${textClass} ${
               light ? "text-isabelline" : "text-licorice"
             }`}
-            style={{ fontFamily: "'Avalance', 'Outfit', 'Plus Jakarta Sans', sans-serif" }}
+            style={{ fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" }}
           >
             BYSEN
           </span>

@@ -271,12 +271,12 @@ export function LiveOpsScreen() {
                         <div className="flex items-center justify-between mb-3">
                             <ShoppingCartIcon className="h-5 w-5 text-feldgrau" strokeWidth={2} />
                         </div>
-                        <p className="text-xs font-medium uppercase tracking-wide text-slate-500">Open Orders</p>
+                        <p className="text-xs font-medium uppercase tracking-wide text-slate-500">Orders Being Made</p>
                         <h2 className="mt-1 text-[28px] md:text-[32px] font-bold tabular-nums leading-none text-licorice">
                             {s.openOrders}
                         </h2>
                         <p className="mt-1.5 text-xs font-medium tracking-tight text-feldgrau">
-                            across kitchen &middot; bar
+                            in the kitchen &amp; bar
                         </p>
                     </div>
                     <div className="mt-6 h-1.5 overflow-hidden rounded-full bg-isabelline">
@@ -293,7 +293,7 @@ export function LiveOpsScreen() {
                         <div className="flex items-center justify-between mb-3">
                             <TableCellsIcon className="h-5 w-5 text-feldgrau" strokeWidth={2} />
                         </div>
-                        <p className="text-xs font-medium uppercase tracking-wide text-slate-500">Tables Occupied</p>
+                        <p className="text-xs font-medium uppercase tracking-wide text-slate-500">Tables in Use</p>
                         <h2 className="mt-1 text-[28px] md:text-[32px] font-bold tabular-nums leading-none text-licorice">
                             {s.occupiedTables}
                             <span className="text-[16px] font-bold text-feldgrau">/{s.totalTables}</span>
@@ -451,7 +451,7 @@ export function LiveOpsScreen() {
                         <div className="py-10 text-center">
                             <CheckBadgeIcon className="mx-auto h-8 w-8 text-slate-400 fill-none" strokeWidth={1.5} />
                             <p className="mt-2 text-sm font-bold text-feldgrau">All clear</p>
-                            <p className="text-xs text-feldgrau/70 mt-1">No stock, wait-time or idle-table issues.</p>
+                            <p className="text-xs text-feldgrau/70 mt-1">Nothing needs your attention.</p>
                         </div>
                     ) : (
                         <div className="space-y-2">
@@ -502,7 +502,7 @@ export function LiveOpsScreen() {
                                     <div className="min-w-0 flex-1">
                                         <p className="text-sm font-bold tracking-tight text-licorice">{a.label}</p>
                                         <p className="text-xs tracking-tight text-feldgrau">
-                                            Idle {formatDwell(a.dwell)} · no activity since {formatDwell(a.dwell)} ago
+                                            No activity for {formatDwell(a.dwell)}
                                         </p>
                                     </div>
                                 </div>
@@ -671,7 +671,7 @@ export function LiveOpsScreen() {
             <div className="flex flex-col gap-8 bg-white p-6 rounded-2xl shadow-sm border border-slate-100 w-full">
                 {/* Header Block */}
                 <div className="flex items-center justify-between">
-                    <h2 className="text-lg font-bold text-slate-900 tracking-tight">Platform Fees</h2>
+                    <h2 className="text-lg font-bold text-slate-900 tracking-tight">Bysen Fees</h2>
                 </div>
 
                 {/* Primary KPI Block */}
@@ -691,12 +691,12 @@ export function LiveOpsScreen() {
                 {/* Cash Fee Ledger Table */}
                 <div className="flex flex-col gap-4 mt-2">
                     <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 border-b border-slate-100 pb-2">
-                        Cash Fee Ledger
+                        Recent Fees
                     </h3>
 
                     <div className="flex flex-col">
                         {recentFees.length === 0 ? (
-                            <p className="text-sm text-slate-500">No cash fees yet.</p>
+                            <p className="text-sm text-slate-500">No fees yet.</p>
                         ) : (
                             recentFees.map((p, i) => (
                                 <div key={p.payment_id} className="grid grid-cols-[16px_1fr_auto_auto] items-center gap-3 py-3 border-b border-slate-50 whitespace-nowrap">

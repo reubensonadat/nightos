@@ -178,8 +178,8 @@ type NavItem = {
 };
 
 const NAV_ITEMS: NavItem[] = [
-    { id: "ops", label: "Live Ops", icon: Squares2X2Icon },
-    { id: "floorplan", label: "Floorplan", icon: MapIcon },
+    { id: "ops", label: "Dashboard", icon: Squares2X2Icon },
+    { id: "floorplan", label: "Tables", icon: MapIcon },
     { id: "menu", label: "Menu & Inventory", icon: ClipboardDocumentCheckIcon },
     { id: "staff", label: "Staff & Roles", icon: UsersIcon },
     { id: "finance", label: "Financial Reports", icon: BanknotesIcon },

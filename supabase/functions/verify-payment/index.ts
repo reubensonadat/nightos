@@ -1,11 +1,14 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { corsHeaders } from '../_shared/cors.ts'
-import { expectedBillAmountPesewas } from '../_shared/fees.ts'
+import { expectedBillAmountPesewas, mapPaystackChannel } from '../_shared/fees.ts'
 
 const PAYSTACK_SECRET_KEY = Deno.env.get('PAYSTACK_SECRET_KEY')
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
+
+// GHS rounding tolerance for "is the bill covered" (matches the DB trigger).
+const COVERED_TOLERANCE_PESEWAS = 0.5
 
 function getMetadataField(metadata: Record<string, unknown> | null | undefined, field: string): string | null {
   if (!metadata) return null
@@ -81,7 +84,7 @@ serve(async (req) => {
     // 2. Load the bill — the server-side source of truth for the amount.
     const { data: bill } = await supabase
       .from('bills')
-      .select('total, venue_id, status')
+      .select('total, amount_paid, venue_id, status')
       .eq('id', bill_id)
       .single()
 
@@ -103,22 +106,23 @@ serve(async (req) => {
       )
     }
 
-    // 4. Already-paid bill: a replay of a valid reference must not re-credit.
-    if (bill.status === 'paid') {
+    // 4. Already-covered bill: a replay of a valid reference must not re-credit.
+    const remainingPesewas = expectedBillAmountPesewas(bill)
+    if (bill.status === 'paid' || remainingPesewas <= COVERED_TOLERANCE_PESEWAS) {
       return new Response(
-        JSON.stringify({ success: true, message: 'Bill already paid', deduped: true, newStatus: 'paid' }),
+        JSON.stringify({ success: true, message: 'Bill already paid', deduped: true, newStatus: bill.status }),
         { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
 
-    // 5. Amount gate — reject forged low-amount transactions claiming a bigger bill.
-    const expectedAmountPesewas = expectedBillAmountPesewas(bill)
-    if (data.amount !== expectedAmountPesewas) {
-      console.error(`[verify-payment] Amount mismatch: expected ${expectedAmountPesewas}, got ${data.amount}`)
+    // 5. Amount gate — remaining balance only. Rejects forged low-amount
+    //    transactions AND overpayment (a payment bigger than what's owed).
+    if (data.amount !== remainingPesewas) {
+      console.error(`[verify-payment] Amount mismatch: expected ${remainingPesewas}, got ${data.amount}`)
       return new Response(
         JSON.stringify({
           error: 'Amount mismatch',
-          detail: `Expected ${expectedAmountPesewas} pesewas, received ${data.amount}.`,
+          detail: `Expected ${remainingPesewas} pesewas (remaining balance), received ${data.amount}.`,
         }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
@@ -134,7 +138,7 @@ serve(async (req) => {
           bill_id: bill_id,
           venue_id: bill.venue_id,
           amount: data.amount / 100,
-          method: data.channel === 'ussd' ? 'mobile_money' : data.channel === 'card' ? 'card' : data.channel === 'bank' ? 'bank_transfer' : 'digital_wallet',
+          method: mapPaystackChannel(data.channel),
           reference: reference,
           status: 'success',
           paystack_data: data,
@@ -166,6 +170,8 @@ serve(async (req) => {
     }
 
     // 7. Audit log (bill auto-close is a DB trigger, not duplicated here).
+    //    Composite key (reference, event_type) lets the webhook's charge.success
+    //    and this manual_verify both survive (§4.2.8).
     await supabase
       .from('payment_events')
       .upsert(
@@ -174,8 +180,9 @@ serve(async (req) => {
           bill_id: bill_id,
           event_type: 'manual_verify',
           amount_pesewas: data.amount,
+          raw_payload: data,
         },
-        { onConflict: 'paystack_reference', ignoreDuplicates: true }
+        { onConflict: 'paystack_reference,event_type', ignoreDuplicates: true }
       )
 
     const { data: updatedBill } = await supabase

@@ -132,23 +132,23 @@ export function CrmScreen() {
         <div className="mx-auto w-full max-w-7xl space-y-6">
             {/* ── Stats ── */}
             <div className="grid grid-cols-2 gap-3 md:grid-cols-5 md:gap-4">
-                <div className="rounded-lg bg-white p-4 shadow-sm ring-1 ring-isabelline flex flex-col gap-1">
+                <div className="rounded-[1.5rem] bg-white p-4 shadow-sm ring-1 ring-isabelline flex flex-col gap-1">
                     <p className="text-xs font-bold uppercase tracking-wider text-feldgrau">Customers</p>
                     <p className="text-4xl font-bold tabular-nums text-licorice">{totalCustomers}</p>
                 </div>
-                <div className="rounded-lg bg-licorice p-4 text-isabelline shadow-[0_8px_24px_rgba(35,20,12,0.15)] flex flex-col gap-1">
+                <div className="rounded-[1.5rem] bg-licorice p-4 text-isabelline shadow-[0_8px_24px_rgba(35,20,12,0.15)] flex flex-col gap-1">
                     <p className="text-xs font-bold uppercase tracking-wider text-isabelline/60">VIP Members</p>
                     <p className="text-4xl font-bold tabular-nums text-khaki">{vipCount}</p>
                 </div>
-                <div className="rounded-lg bg-white p-4 shadow-sm ring-1 ring-isabelline flex flex-col gap-1">
+                <div className="rounded-[1.5rem] bg-white p-4 shadow-sm ring-1 ring-isabelline flex flex-col gap-1">
                     <p className="text-xs font-bold uppercase tracking-wider text-feldgrau">Total Spend</p>
                     <p className="text-4xl font-bold tabular-nums text-licorice">{formatGHS(totalSpend)}</p>
                 </div>
-                <div className="rounded-lg bg-white p-4 shadow-sm ring-1 ring-isabelline flex flex-col gap-1">
+                <div className="rounded-[1.5rem] bg-white p-4 shadow-sm ring-1 ring-isabelline flex flex-col gap-1">
                     <p className="text-xs font-bold uppercase tracking-wider text-feldgrau">Avg / Customer</p>
                     <p className="text-4xl font-bold tabular-nums text-licorice">{formatGHS(avgSpend)}</p>
                 </div>
-                <div className="rounded-lg bg-white p-4 shadow-sm ring-1 ring-isabelline flex flex-col gap-1">
+                <div className="rounded-[1.5rem] bg-white p-4 shadow-sm ring-1 ring-isabelline flex flex-col gap-1">
                     <p className="text-xs font-bold uppercase tracking-wider text-feldgrau">New Signups</p>
                     <p className="text-4xl font-bold tabular-nums text-khaki">{newCustomers.length}</p>
                 </div>
@@ -179,7 +179,7 @@ export function CrmScreen() {
             )}
 
             {/* ── Toolbar ── */}
-            <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-white p-4 shadow-sm ring-1 ring-isabelline">
+            <div className="flex flex-wrap items-center justify-between gap-3 rounded-[1.5rem] bg-white p-4 shadow-sm ring-1 ring-isabelline">
                 <div className="flex min-w-0 flex-1 items-center gap-2 rounded-xl bg-isabelline px-3.5 py-2 ring-1 ring-licorice/8 focus-within:ring-2 focus-within:ring-licorice/20">
                     <MagnifyingGlassIcon className="h-4 w-4 shrink-0 text-feldgrau" strokeWidth={2} />
                     <input
@@ -221,7 +221,7 @@ export function CrmScreen() {
             </div>
 
             {/* ── Customer table ── */}
-            <div className="overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-isabelline">
+            <div className="overflow-hidden rounded-[1.5rem] bg-white shadow-sm ring-1 ring-isabelline">
                 {loading ? (
                     <div className="flex flex-col items-center justify-center px-6 py-16 text-center">
                         <span className="h-6 w-6 animate-spin rounded-full border-2 border-licorice/20 border-t-licorice" />
@@ -379,7 +379,7 @@ function CustomerDetailDrawer({ customer, onClose, onToggleVip }: {
     return (
         <div className="fixed inset-0 z-50 flex items-end md:items-center justify-end md:justify-center">
             <div className="absolute inset-0 bg-licorice/50 backdrop-blur-sm" onClick={onClose} />
-            <div className="relative w-full md:max-w-md max-h-[90vh] overflow-y-auto rounded-t-2xl md:rounded-2xl bg-white shadow-2xl">
+            <div className="relative w-full md:max-w-md max-h-[90vh] overflow-y-auto rounded-t-[1.5rem] md:rounded-[1.5rem] bg-white shadow-2xl">
                 <div className="flex items-center justify-between border-b border-isabelline px-5 py-3">
                     <p className="text-xs font-bold uppercase text-feldgrau">Customer Profile</p>
                     <button type="button" onClick={onClose} className="flex h-8 w-8 items-center justify-center rounded-full bg-isabelline text-licorice">
@@ -558,7 +558,7 @@ function CampaignModal({ venueId, vipCount, totalCount, onClose }: {
         return (
             <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
                 <div className="absolute inset-0 bg-licorice/50 backdrop-blur-sm" />
-                <div className="relative w-full max-w-sm rounded-2xl bg-white p-8 text-center shadow-2xl">
+                <div className="relative w-full max-w-sm rounded-[1.5rem] bg-white p-8 text-center shadow-2xl">
                     <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-khaki/15">
                         <CheckIcon className="h-7 w-7 text-khaki" strokeWidth={2.5} />
                     </div>
@@ -581,7 +581,7 @@ function CampaignModal({ venueId, vipCount, totalCount, onClose }: {
     return (
         <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center px-4">
             <div className="absolute inset-0 bg-licorice/50 backdrop-blur-sm" onClick={onClose} />
-            <div className="relative w-full max-w-md max-h-[90vh] overflow-y-auto rounded-t-2xl md:rounded-2xl bg-white shadow-2xl">
+            <div className="relative w-full max-w-md max-h-[90vh] overflow-y-auto rounded-t-[1.5rem] md:rounded-[1.5rem] bg-white shadow-2xl">
                 <div className="flex items-center justify-between border-b border-isabelline px-5 py-3">
                     <div>
                         <p className="text-xs font-bold uppercase text-feldgrau">SMS Campaign</p>

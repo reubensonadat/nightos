@@ -242,10 +242,10 @@ function CustomerShell({ venueId, tableId, tableLabel }: { venueId: string; tabl
           <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-ink/5">
             <ClockIcon className="h-7 w-7 text-ink/50" />
           </div>
-          <p className="text-ink font-semibold text-lg">Session expired</p>
+          <p className="text-ink font-semibold text-lg">Your visit timed out</p>
           <p className="text-ink/60 text-sm mt-1 leading-relaxed">
-            This table's session at {venueName ?? "Velvet Lounge"} ({tableLabel ?? "this table"}) ended because no
-            order was placed within 20 minutes. Re-scan the QR code on the table to start a fresh session.
+            {venueName ?? "Velvet Lounge"} ({tableLabel ?? "this table"}) ended this visit because no
+            order was placed within 20 minutes. Scan the QR code on the table again to start over.
           </p>
           <button
             onClick={() => window.location.reload()}
@@ -263,7 +263,7 @@ function CustomerShell({ venueId, tableId, tableLabel }: { venueId: string; tabl
       return (
         <div className="min-h-svh bg-isabelline flex items-center justify-center px-8">
           <div className="text-center">
-            <p className="text-ink font-semibold text-lg">Couldn't start your session</p>
+            <p className="text-ink font-semibold text-lg">Couldn't start your visit</p>
             <p className="text-ink/60 text-sm mt-1">Please check your connection and try again.</p>
             <button
               onClick={() => window.location.reload()}

@@ -76,6 +76,22 @@ export function useCustomerSession(venueId: string | null, tableId: string | nul
 
     let session = existingSession as CustomerSession | null
 
+    // If the session is still active but its bill is paid/cancelled,
+    // the previous visit is over — close it and start a fresh one
+    // so new guests never see the previous party's items or bill.
+    if (session && session.bill_id) {
+      const { data: linkedBill } = await db.billById(session.bill_id)
+      if (linkedBill && (linkedBill.status === 'paid' || linkedBill.status === 'cancelled')) {
+        await supabase
+          .from('customer_sessions')
+          .update({ status: 'closed' })
+          .eq('id', session.id)
+        session = null
+        // Clear the stale cart so the next party starts empty
+        try { localStorage.removeItem('nightos:cart') } catch { /* noop */ }
+      }
+    }
+
     // 1b. Session expired (20 min, never ordered) → block ordering until the
     // customer re-scans the table QR code. The waiter/manager keeps seeing
     // the expired session as "landed, never ordered".

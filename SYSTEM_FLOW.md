@@ -660,6 +660,82 @@ both. `is_merged` = secondary only.
 - Opt-out: STOP reply suppresses future sends (provider-level where
   supported, else suppression list). ➕
 
+## 5.7 Inventory — owner-friendly intake, outflow classification & reconciliation
+
+**Why.** The person doing inventory is the owner themselves, on a phone, often
+after hours. Excel flows break them — they avoid a zone they don't have
+expertise in — so stock never gets updated and "is my stock accurate?" can't
+be answered. Two promises:
+1. **Getting stock IN must be near-zero-effort** (photo of the receipt, or a
+   30-second mobile entry).
+2. **The system answers "does what left match what should have left?" from
+   home**, knowing that not everything that leaves is a sale.
+
+### 5.7.1 Intake — what goes IN (➕)
+
+**Photo intake of receipts/invoices (➕, the owner's #1 wish).**
+- Owner photographs the supplier receipt/invoice → photo is **always saved**
+  as a purchase record (never lost, E-I1) → the system proposes stock-in
+  lines (item, qty, unit cost, supplier, date).
+- Owner confirms or corrects on the phone before it lands in stock.
+- ❓ Extraction engine: **v1 = the app proposes lines by matching known
+  products + free-text for new ones** (cheap, reliable); full OCR comes later
+  (v1.5). Camera-to-photo is the v1 deliverable; the photo is the record.
+
+**Manual quick-add (➕).** One screen, one line = item + qty + cost (+ supplier
+optional). Built for "bought 10 crates of mineral today" — 30 seconds, no
+spreadsheet, no expertise. Same flow on the phone app (PWA ✅ / native later).
+
+### 5.7.2 Outflow — everything that leaves is classified (➕)
+
+Every stock decrement carries a reason bucket — nothing leaves silently
+(Invariant 6):
+
+| Bucket | Meaning | Wired to |
+|---|---|---|
+| `sale` | consumed by an order (deduct on `served` only — 5.3 recommendation) | `inventory_transactions` on served |
+| `debt` | taken by a customer on credit — leaves stock but isn't a sale | customer profile + `outstanding_balance` RPC ✅ |
+| `destroyed` | waste / spoilage / damage | spillage flow (2.5), schema ✅ |
+| `other` | owner usage, inter-venue transfer, supplier short-ship | audit entry |
+
+- Every outflow is a visible ledger row (who, when, why) — the ledger IS the
+  truth (Invariant 6).
+- Paying off a debt does **not** "un-leave" stock — it reconciles the
+  customer's outstanding balance (E-I4).
+
+### 5.7.3 End-of-day reconciliation — the "from home" view (➕)
+
+**Nightly snapshot (cron, Batch 9):** for every item —
+`expected remaining = previous balance + Σ intake − Σ outflow (sale+debt+destroyed)`.
+
+**Stock-check screen:** per item — opened stock, intake today, sold, debt,
+destroyed, expected remaining, **counted remaining** (the owner types what
+they physically counted) → **variance**.
+
+- Variance = 0 → ✅ "accurate".
+- Variance ≠ 0 → the item is flagged with a drill-down to the exact ledger
+  lines (every intake and outflow, timestamped, attributed). The owner decides
+  (theft? miscount? short-ship?) and corrects with a `variance` adjustment
+  (audited, becomes the new baseline — E-I3).
+- Variance over a threshold (❓ venue setting, e.g. 2% or 1 unit) surfaces on
+  LiveOps + optional nightly SMS to the owner.
+
+**Edge cases.**
+- E-I1: Blurry/unreadable receipt photo → photo still saved as a purchase
+  record; owner adds lines manually later.
+- E-I2: Sale deduction + waste must never double-count → deduct on `served`
+  only; waste never re-deducts.
+- E-I3: Counted at home ≠ venue count → owner picks the trusted count as the
+  new baseline (variance adjustment); next snapshot starts from it.
+- E-I4: Debt taken, paid later → debt stays as a ledger record; the payment
+  reconciles the profile's outstanding balance.
+- E-I5: Nightly snapshot missed (server down) → reconciliation recomputes
+  from the last snapshot + ledger since (idempotent).
+
+**Build order.** Manual quick-add + photo attach → outflow buckets (debt /
+destroyed wires) → nightly snapshot + stock-check screen → variance flags →
+photo line OCR (v1.5).
+
 ---
 
 # BATCH 6 · SMS ARCHITECTURE
@@ -739,6 +815,7 @@ then write aggregates back as truth.
 | Wait-time + revenue snapshots | 10 min | ➕ |
 | Low-stock alerts | hourly | ➕ |
 | Auto clock-out abandoned shifts | EOD | ✅ (migrate-auto-shifts) |
+| Nightly stock reconciliation snapshot (5.7.3) | daily (00:05) | ➕ |
 | Expire/close stale settling bills (paid + never closed, e.g. webhook missed) | hourly | ➕ |
 
 ---
@@ -804,7 +881,7 @@ then write aggregates back as truth.
 | Table merge | ✅ schema columns | ➕ merge/unmerge RPC + UI (verify RPC existence) |
 | Manager LiveOps | ✅ live occupancy/revenue/fees read | ➕ mark-settled, alerts feed, wait-time, dead buttons |
 | Floorplan | ✅ read-only + QR | ➕ table CRUD |
-| Menu & inventory mgmt | ✅ inventory CRUD | ➕ product/category/modifier CRUD, on/off wiring to customer menu |
+| Menu & inventory mgmt | ✅ inventory CRUD | ➕ product/category/modifier CRUD, on/off wiring to customer menu; ➕ owner intake (receipt photo + quick-add), outflow buckets (sale/debt/destroyed), nightly reconciliation (5.7) |
 | Staff mgmt | ✅ CRUD + shifts + approval | ❓ PIN vs OTP login gap |
 | Finance | ✅ real math | 🛠 expense-month, custom-range, export bugs |
 | CRM | ✅ profiles, SMS send | ➕ segments, char counter, opt-out, history |
