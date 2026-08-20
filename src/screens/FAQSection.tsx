@@ -34,7 +34,7 @@ export function FAQSection() {
   return (
     <section className="w-full bg-white text-[#1a110b] py-24 px-8 md:px-16 lg:px-24 flex justify-center">
       <div className="w-full max-w-3xl">
-        <h2 className="font-['Plus_Jakarta_Sans'] text-[35px] font-bold mb-12 text-center md:text-left">
+        <h2 className="font-brand text-[35px] font-bold mb-12 text-center md:text-left">
           Frequently Asked Questions
         </h2>
         
@@ -47,7 +47,7 @@ export function FAQSection() {
                   onClick={() => toggleFAQ(index)}
                   className="w-full py-6 flex items-center justify-between text-left focus:outline-none group"
                 >
-                  <span className="font-['Plus_Jakarta_Sans'] text-[16px] font-bold group-hover:text-[#c9935a] transition-colors pr-8">
+                  <span className="font-brand text-[16px] font-bold group-hover:text-[#c9935a] transition-colors pr-8">
                     {faq.question}
                   </span>
                   <div className="flex-shrink-0 ml-4">

@@ -5,6 +5,7 @@ import { FAQSection } from "./FAQSection";
 import heroImage from "../assets/hero-image.jpg";
 import logoImage from "../assets/logo.png";
 import { WaiterDashboardPromoSection } from "./WaiterDashboardPromoSection";
+import { KitchenDisplayPromoSection } from "./KitchenDisplayPromoSection";
 
 export function PromoLandingScreen() {
   const [isScrolled, setIsScrolled] = useState(false);
@@ -32,7 +33,7 @@ export function PromoLandingScreen() {
           {/* Logo */}
           <div className="flex items-center gap-3">
             <img src={logoImage} alt="Bysen Logo" className="w-8 h-8 md:w-9 md:h-9 object-contain" />
-            <span className="font-['Plus_Jakarta_Sans'] text-[18px] md:text-[21.6px] font-semibold tracking-tight text-[#c9935a]">
+            <span className="font-brand text-[18px] md:text-[21.6px] font-semibold tracking-tight text-[#c9935a]">
               Bysen
             </span>
           </div>
@@ -62,18 +63,28 @@ export function PromoLandingScreen() {
         </nav>
 
         {/* Mobile Dropdown Menu */}
-        {isMobileMenuOpen && (
-          <div className="lg:hidden absolute top-full left-0 w-full bg-[#1a110b] border-t border-white/5 shadow-2xl py-6 px-5 flex flex-col gap-6">
-            <a href="#" className="text-[16px] font-medium hover:text-white transition-colors">Platform</a>
-            <a href="#" className="text-[16px] font-medium hover:text-white transition-colors">Pricing</a>
-            <a href="#" className="text-[16px] font-medium hover:text-white transition-colors">Integrations</a>
-            <a href="#" className="text-[16px] font-medium hover:text-white transition-colors">About</a>
-            <button className="bg-[#c9935a] text-[#1a110b] w-full py-3 mt-2 rounded text-[15px] font-semibold hover:bg-[#d8a46b] transition-colors">
-              Book a Demo
-            </button>
-          </div>
-        )}
+        <div className={`lg:hidden absolute top-full left-0 w-full bg-[#1a110b] border-t border-white/5 shadow-2xl py-6 px-5 flex flex-col gap-6 transition-all duration-300 ease-in-out ${
+          isMobileMenuOpen 
+            ? 'opacity-100 translate-y-0 pointer-events-auto' 
+            : 'opacity-0 -translate-y-4 pointer-events-none'
+        }`}>
+          <a href="#" className="text-[16px] font-medium hover:text-white transition-colors">Platform</a>
+          <a href="#" className="text-[16px] font-medium hover:text-white transition-colors">Pricing</a>
+          <a href="#" className="text-[16px] font-medium hover:text-white transition-colors">Integrations</a>
+          <a href="#" className="text-[16px] font-medium hover:text-white transition-colors">About</a>
+          <button className="bg-[#c9935a] text-[#1a110b] w-full py-3 mt-2 rounded text-[15px] font-semibold hover:bg-[#d8a46b] transition-colors">
+            Book a Demo
+          </button>
+        </div>
       </div>
+
+      {/* Mobile Menu Backdrop Blur Overlay */}
+      <div 
+        className={`lg:hidden fixed inset-0 bg-black/60 backdrop-blur-md z-40 transition-all duration-300 ease-in-out ${
+          isMobileMenuOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
+        }`}
+        onClick={() => setIsMobileMenuOpen(false)}
+      />
 
       {/* Hero Section */}
       <div className="relative flex flex-col md:flex-row w-full min-h-[85vh] md:min-h-screen">
@@ -93,7 +104,7 @@ export function PromoLandingScreen() {
         
         {/* Hero Content */}
         <div className="flex flex-col justify-center max-w-[540px]">
-          <h1 className="font-['Plus_Jakarta_Sans'] text-[42px] md:text-[52px] font-extrabold leading-[1.1] mb-6">
+          <h1 className="font-brand text-[42px] md:text-[52px] font-extrabold leading-[1.1] mb-6">
             The Operating System for Modern Venues.
           </h1>
           
@@ -129,6 +140,9 @@ export function PromoLandingScreen() {
       {/* Waiter Dashboard Promo Section */}
       <WaiterDashboardPromoSection />
 
+      {/* Kitchen Display Promo Section */}
+      <KitchenDisplayPromoSection />
+
       {/* Guest Experience Section */}
       <GuestExperienceSection />
 
@@ -142,7 +156,7 @@ export function PromoLandingScreen() {
           <div className="flex flex-col gap-6 md:max-w-sm">
             <div className="flex items-center gap-3">
               <img src={logoImage} alt="Bysen Logo" className="w-10 h-10 object-contain" />
-              <span className="font-['Plus_Jakarta_Sans'] text-[24px] font-semibold tracking-tight text-[#c9935a]">
+              <span className="font-brand text-[24px] font-semibold tracking-tight text-[#c9935a]">
                 Bysen
               </span>
             </div>

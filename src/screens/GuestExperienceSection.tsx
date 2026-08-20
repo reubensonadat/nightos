@@ -10,7 +10,7 @@ export function GuestExperienceSection() {
           <p className="text-[#c9935a] font-['Inter'] font-bold text-[18px] mb-4">
             Guest Experience
           </p>
-          <h2 className="font-['Plus_Jakarta_Sans'] text-[35px] font-bold text-[#1a110b] leading-tight">
+          <h2 className="font-brand text-[35px] font-bold text-[#1a110b] leading-tight">
             Three steps to a frictionless night out.
           </h2>
         </div>
@@ -26,7 +26,7 @@ export function GuestExperienceSection() {
             <p className="text-[#c9935a] font-['Inter'] font-bold text-[11px] uppercase tracking-wider mb-2">
               Step 1: Scan
             </p>
-            <h3 className="font-['Plus_Jakarta_Sans'] text-[22px] font-bold text-[#1a110b] mb-4">
+            <h3 className="font-brand text-[22px] font-bold text-[#1a110b] mb-4">
               Scan
             </h3>
             <p className="text-[#6b5f54] font-['Inter'] text-[15px] leading-relaxed">
@@ -42,7 +42,7 @@ export function GuestExperienceSection() {
             <p className="text-[#c9935a] font-['Inter'] font-bold text-[11px] uppercase tracking-wider mb-2">
               Step 2: Order
             </p>
-            <h3 className="font-['Plus_Jakarta_Sans'] text-[22px] font-bold text-[#1a110b] mb-4">
+            <h3 className="font-brand text-[22px] font-bold text-[#1a110b] mb-4">
               Order
             </h3>
             <p className="text-[#6b5f54] font-['Inter'] text-[15px] leading-relaxed">
@@ -58,7 +58,7 @@ export function GuestExperienceSection() {
             <p className="text-[#c9935a] font-['Inter'] font-bold text-[11px] uppercase tracking-wider mb-2">
               Step 3: Pay
             </p>
-            <h3 className="font-['Plus_Jakarta_Sans'] text-[22px] font-bold text-[#1a110b] mb-4">
+            <h3 className="font-brand text-[22px] font-bold text-[#1a110b] mb-4">
               Pay
             </h3>
             <p className="text-[#6b5f54] font-['Inter'] text-[15px] leading-relaxed">
