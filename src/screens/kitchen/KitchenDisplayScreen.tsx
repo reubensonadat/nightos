@@ -333,7 +333,7 @@ export function KitchenDisplayScreen({ venueId, staffId, staffName, onExit, onSi
                                     {/* Cards */}
                                     <div className="flex flex-col gap-3 flex-1">
                                         {colOrders.length === 0 ? (
-                                            <div className="flex flex-col items-center justify-center h-full min-h-[200px] rounded-2xl border-2 border-dashed border-licorice/10 px-6 py-12 text-center">
+                                            <div className="flex flex-col items-center justify-center h-full min-h-[200px] rounded-xl border-2 border-dashed border-licorice/10 px-6 py-12 text-center">
                                                 <p className="mt-3 text-base font-bold uppercase tracking-wider text-feldgrau/60">
                                                     No orders
                                                 </p>

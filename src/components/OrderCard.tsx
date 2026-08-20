@@ -103,7 +103,7 @@ export function OrderCard({ order, now, onAdvance, onMarkReady, onMarkServed }: 
         <article
             className={`
                 animate-velvet-rise
-                flex flex-col overflow-hidden rounded-2xl bg-white
+                flex flex-col overflow-hidden rounded-xl bg-white
                 shadow-[0_4px_16px_rgba(35,20,12,0.08)]
                 ring-1 ${styles.ring}
                 transition-all duration-200
@@ -113,7 +113,7 @@ export function OrderCard({ order, now, onAdvance, onMarkReady, onMarkServed }: 
             {/* ── Top row: Table + station + timer ── */}
             <header className="flex items-center justify-between border-b border-isabelline px-4 py-2.5">
                 <div className="flex items-center gap-2.5">
-                    <div className="flex flex-col items-center justify-center rounded-lg bg-licorice px-2 py-1 text-isabelline">
+                    <div className="flex flex-col items-center justify-center rounded-md bg-licorice px-2 py-1 text-isabelline">
                         <span className="text-[10px] font-bold uppercase tracking-[0.14em] text-isabelline/60">
                             Table
                         </span>
@@ -168,7 +168,7 @@ export function OrderCard({ order, now, onAdvance, onMarkReady, onMarkServed }: 
                         aria-label="Start preparing"
                         className="
                             flex w-full items-center justify-center gap-1.5
-                            rounded-xl bg-licorice px-4 py-2.5
+                            rounded-lg bg-licorice px-4 py-2.5
                             text-base font-bold tracking-tight text-isabelline
                             shadow-[0_4px_12px_rgba(35,20,12,0.18)]
                             transition-all duration-150
@@ -187,7 +187,7 @@ export function OrderCard({ order, now, onAdvance, onMarkReady, onMarkServed }: 
                         aria-label="Mark as ready"
                         className="
                             flex w-full items-center justify-center gap-1.5
-                            rounded-xl bg-khaki px-4 py-2.5
+                            rounded-lg bg-khaki px-4 py-2.5
                             text-base font-bold tracking-tight text-licorice
                             shadow-[0_4px_12px_rgba(143,106,55,0.25)]
                             transition-all duration-150
@@ -207,7 +207,7 @@ export function OrderCard({ order, now, onAdvance, onMarkReady, onMarkServed }: 
                             aria-label="Mark as served"
                             className="
                                 flex w-full items-center justify-center gap-1.5
-                                rounded-xl bg-feldgrau px-4 py-2.5
+                                rounded-lg bg-feldgrau px-4 py-2.5
                                 text-base font-bold tracking-tight text-isabelline
                                 shadow-[0_4px_12px_rgba(58,66,63,0.25)]
                                 transition-all duration-150
@@ -218,7 +218,7 @@ export function OrderCard({ order, now, onAdvance, onMarkReady, onMarkServed }: 
                             Mark Served
                         </button>
                     ) : (
-                        <div className="flex items-center justify-center gap-1.5 rounded-xl bg-khaki/15 px-4 py-2.5 text-base font-bold tracking-tight text-khaki">
+                        <div className="flex items-center justify-center gap-1.5 rounded-lg bg-khaki/15 px-4 py-2.5 text-base font-bold tracking-tight text-khaki">
                             Ready for pickup
                         </div>
                     ))}
