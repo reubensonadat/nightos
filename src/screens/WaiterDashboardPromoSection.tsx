@@ -133,7 +133,7 @@ export function WaiterDashboardPromoSection() {
   // --- STATE 4: PERFORMANCE REVIEW ---
   const renderPerformanceMockup = () => {
     return (
-      <div className="absolute inset-0 flex flex-col bg-[#e6e2d6] overflow-y-auto no-scrollbar">
+      <div className="absolute inset-0 flex flex-col bg-[#e6e2d6] overflow-hidden no-scrollbar">
         {/* Top Header */}
         <div className="flex items-center justify-between px-4 pt-5 pb-4">
           <div className="w-8 h-8 bg-white rounded-full flex items-center justify-center shadow-sm">
@@ -268,7 +268,7 @@ export function WaiterDashboardPromoSection() {
         <div className="w-full h-px bg-licorice/5 shrink-0" />
 
         {/* Content */}
-        <div className="flex-1 px-5 pt-4 overflow-y-auto no-scrollbar relative flex flex-col pb-24">
+        <div className="flex-1 px-5 pt-4 overflow-hidden no-scrollbar relative flex flex-col pb-24">
             {/* Categories */}
             <div className="flex gap-2 mb-4 shrink-0">
                 <div className="rounded-full bg-[#1a110b] text-[#f4f3e8] px-3.5 py-1.5 text-[11px] font-bold tracking-tight shadow-[0_4px_12px_rgba(35,20,12,0.18)]">
@@ -479,7 +479,7 @@ export function WaiterDashboardPromoSection() {
             <div ref={block2Ref} data-index="1" className="min-h-screen flex flex-col justify-center max-w-md mx-auto md:mx-0 py-12 md:py-0">
                <h3 className="text-4xl font-bold text-[#1A110B] mb-4 font-['Inter']">Order Entry</h3>
                <p className="text-lg text-[#1A110B]/70 font-['Inter'] leading-relaxed">
-                 Built for the speed of a Friday night shift. Waitstaff can take complex orders, add modifiers, and fire tickets directly to the kitchen or bar in seconds—all from the smartphones they already have in their pockets.
+                 Built for the speed of a Friday night shift. Waitstaff can take complex orders, add modifiers, and fire tickets directly to the kitchen or bar in seconds. All from the smartphones they already have in their pockets.
                </p>
                <div className="md:hidden mt-10 relative w-full max-w-[320px] h-[580px] mx-auto bg-[#e6e2d6] rounded-[32px] overflow-hidden shadow-2xl border-[8px] border-[#e8e4d9]/50 ring-1 ring-white/50 shrink-0">
                  {renderOrderEntryMockup()}

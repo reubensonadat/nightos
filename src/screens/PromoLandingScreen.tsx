@@ -6,6 +6,7 @@ import heroImage from "../assets/hero-image.jpg";
 import logoImage from "../assets/logo.png";
 import { WaiterDashboardPromoSection } from "./WaiterDashboardPromoSection";
 import { KitchenDisplayPromoSection } from "./KitchenDisplayPromoSection";
+import { ManagerDashboardPromoSection } from "./ManagerDashboardPromoSection";
 
 export function PromoLandingScreen() {
   const [isScrolled, setIsScrolled] = useState(false);
@@ -142,6 +143,9 @@ export function PromoLandingScreen() {
 
       {/* Kitchen Display Promo Section */}
       <KitchenDisplayPromoSection />
+
+      {/* Manager Dashboard Promo Section */}
+      <ManagerDashboardPromoSection />
 
       {/* Guest Experience Section */}
       <GuestExperienceSection />

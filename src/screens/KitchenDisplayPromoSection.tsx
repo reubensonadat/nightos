@@ -50,9 +50,9 @@ export function KitchenDisplayPromoSection() {
               </div>
               
               {/* Ticket Card */}
-              <article className="flex flex-col rounded-xl bg-white shadow-[0_4px_16px_rgba(35,20,12,0.08)] ring-1 ring-[#8c1c13]/50 w-full overflow-hidden">
+              <article className="flex flex-col rounded-lg bg-white shadow-[0_4px_16px_rgba(35,20,12,0.08)] ring-1 ring-[#8c1c13]/50 w-full overflow-hidden">
                 <header className="flex items-center justify-between border-b border-[#f4f3e8] px-4 py-3">
-                  <div className="flex flex-col items-center justify-center rounded bg-[#23140c] px-2.5 py-1 text-[#f4f3e8]">
+                  <div className="flex flex-col items-center justify-center rounded-md bg-[#23140c] px-2.5 py-1 text-[#f4f3e8]">
                     <span className="text-[10px] font-bold uppercase tracking-[0.14em] text-[#f4f3e8]/60">Table</span>
                     <span className="font-sans font-bold text-lg tabular-nums leading-none tracking-[-0.04em]">01</span>
                   </div>
@@ -105,9 +105,9 @@ export function KitchenDisplayPromoSection() {
               </div>
               
               {/* Ticket Card */}
-              <article className="flex flex-col rounded-xl bg-white shadow-[0_4px_16px_rgba(35,20,12,0.08)] ring-1 ring-[#8c1c13]/50 w-full overflow-hidden">
+              <article className="flex flex-col rounded-lg bg-white shadow-[0_4px_16px_rgba(35,20,12,0.08)] ring-1 ring-[#8c1c13]/50 w-full overflow-hidden">
                 <header className="flex items-center justify-between border-b border-[#f4f3e8] px-4 py-3">
-                  <div className="flex flex-col items-center justify-center rounded bg-[#23140c] px-2.5 py-1 text-[#f4f3e8]">
+                  <div className="flex flex-col items-center justify-center rounded-md bg-[#23140c] px-2.5 py-1 text-[#f4f3e8]">
                     <span className="text-[10px] font-bold uppercase tracking-[0.14em] text-[#f4f3e8]/60">Table</span>
                     <span className="font-sans font-bold text-lg tabular-nums leading-none tracking-[-0.04em]">01</span>
                   </div>
