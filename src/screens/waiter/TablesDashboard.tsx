@@ -9,10 +9,12 @@ import { db } from "../../lib/api";
 import { useRealtime } from "../../hooks/useRealtime";
 import signoutBlackIcon from "../../assets/sign-out-black.svg";
 import { SignOutModal } from "../../components/SignOutModal";
+import toast from "react-hot-toast";
+import { sounds } from "../../lib/sound";
 
 /* ────────────────────────── Table types ────────────────────────── */
 
-export type TableStatus = "available" | "occupied" | "reserved";
+export type TableStatus = "available" | "occupied" | "paid" | "reserved";
 
 export type Table = {
     id: string;
@@ -36,6 +38,8 @@ function statusLabel(status: TableStatus): string {
             return "Available";
         case "occupied":
             return "Occupied";
+        case "paid":
+            return "Bill Paid";
         case "reserved":
             return "Reserved";
     }
@@ -47,6 +51,8 @@ function statusBg(status: TableStatus): string {
             return "bg-feldgrau/10 text-feldgrau";
         case "occupied":
             return "bg-khaki/20 text-licorice";
+        case "paid":
+            return "bg-emerald-100 text-emerald-900 ring-1 ring-emerald-500/30";
         case "reserved":
             return "bg-light-blue/20 text-licorice";
     }
@@ -58,20 +64,21 @@ function statusDot(status: TableStatus): string {
             return "bg-feldgrau";
         case "occupied":
             return "bg-khaki";
+        case "paid":
+            return "bg-emerald-500 animate-pulse";
         case "reserved":
             return "bg-light-blue";
     }
 }
 
-
-
 /* ────────────────────────── Filter chips ────────────────────────── */
 
-type Filter = "all" | "occupied" | "available" | "reserved";
+type Filter = "all" | "occupied" | "paid" | "available" | "reserved";
 
 const FILTERS: { id: Filter; label: string }[] = [
     { id: "all", label: "All" },
     { id: "occupied", label: "Occupied" },
+    { id: "paid", label: "Paid" },
     { id: "available", label: "Available" },
     { id: "reserved", label: "Reserved" },
 ];
@@ -97,11 +104,12 @@ function transformToTables(dbTables: Record<string, unknown>[], openBills: Recor
             const guestCount = (bill.guest_count as number) ?? 1;
             const seatedAt = bill.created_at as string;
             const waiterId = bill.waiter_id as string | null;
+            const isPaid = bill.status === 'paid' || (Number(bill.amount_paid || 0) >= Number(bill.total || 0) && Number(bill.total || 0) > 0);
             return {
                 id: t.id as string,
                 number: t.table_number as number,
                 label: t.table_label as string,
-                status: 'occupied' as const,
+                status: (isPaid ? 'paid' : 'occupied') as TableStatus,
                 guests: guestCount,
                 tabTotal: bill.total as number,
                 seatedAt,
@@ -188,7 +196,24 @@ export function TablesDashboard({ venueId, staffName, staffId, onSignOut }: Prop
         table: "bills",
         filter: `venue_id=eq.${venueId}`,
         onInsert: scheduleReload,
-        onUpdate: scheduleReload,
+        onUpdate: (payload: { new?: Record<string, unknown>; old?: Record<string, unknown> }) => {
+            const updated = payload?.new;
+            const previous = payload?.old;
+            if (
+                updated &&
+                (updated.status === 'paid' || (Number(updated.amount_paid || 0) >= Number(updated.total || 0) && Number(updated.total || 0) > 0)) &&
+                previous?.status !== 'paid'
+            ) {
+                sounds.playPaymentSuccess();
+                const matchedTable = tables.find((t) => t.id === updated.table_id);
+                const tableText = matchedTable?.label ? matchedTable.label : (matchedTable?.number ? `Table ${matchedTable.number}` : 'Table');
+                toast.success(`💳 ${tableText}: Bill of ${formatGHS(Number(updated.total || 0))} has been PAID by guest!`, {
+                    duration: 8000,
+                    icon: '🛎️',
+                });
+            }
+            scheduleReload();
+        },
         onDelete: scheduleReload,
     });
 
@@ -358,7 +383,11 @@ export function TablesDashboard({ venueId, staffName, staffId, onSignOut }: Prop
                                 hover:ring-khaki/50
                                 active:scale-[0.98]
                                 text-left
-                                ${table.status === "occupied" ? "bg-khaki/20 border border-[#D4C4B7]" : "bg-white ring-1 ring-isabelline"}
+                                ${table.status === "paid"
+                                    ? "bg-emerald-50/90 border-2 border-emerald-500/60 ring-2 ring-emerald-500/20 shadow-emerald-500/10"
+                                    : table.status === "occupied"
+                                        ? "bg-khaki/20 border border-[#D4C4B7]"
+                                        : "bg-white ring-1 ring-isabelline"}
                             `}
                                 style={{ animationDelay: `${Math.min(idx * 40, 240)}ms` }}
                             >
@@ -372,7 +401,7 @@ export function TablesDashboard({ venueId, staffName, staffId, onSignOut }: Prop
                                             {String(table.number).padStart(2, "0")}
                                         </p>
                                     </div>
-                                    {table.status === "reserved" && (
+                                    {(table.status === "reserved" || table.status === "paid") && (
                                         <span
                                             className={`inline-flex items-center gap-1 rounded-lg px-2 py-0.5 text-[8px] font-bold uppercase tracking-[0.14em] ${statusBg(table.status)}`}
                                         >
@@ -384,6 +413,23 @@ export function TablesDashboard({ venueId, staffName, staffId, onSignOut }: Prop
 
                                 {/* Details */}
                                 <div className="flex-1 px-3.5 pb-3.5 pt-3">
+                                    {table.status === "paid" && (
+                                        <div>
+                                            <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-emerald-700">
+                                                <span className="h-2 w-2 rounded-full bg-emerald-500 animate-ping" />
+                                                Bill Paid in Full
+                                            </div>
+                                            {table.tabTotal !== undefined && (
+                                                <p className="mt-1.5 text-xl font-black tabular-nums tracking-tight text-emerald-950">
+                                                    {formatGHS(table.tabTotal)}
+                                                </p>
+                                            )}
+                                            <p className="mt-1 text-[10px] font-semibold text-emerald-800/80">
+                                                {table.server ? `Served by ${table.server}` : "Guest paid via mobile"}
+                                            </p>
+                                        </div>
+                                    )}
+
                                     {table.status === "occupied" && (() => {
                                         return (
                                             <>
@@ -432,12 +478,14 @@ export function TablesDashboard({ venueId, staffName, staffId, onSignOut }: Prop
 
                                 {/* Action arrow */}
                                 <div className="flex items-center justify-between border-t border-isabelline px-3.5 py-2">
-                                    <span className="text-[10px] font-bold tracking-tight text-feldgrau">
-                                        {table.status === "occupied"
-                                            ? "Manage"
-                                            : table.status === "reserved"
-                                                ? "View"
-                                                : "Start"}
+                                    <span className={`text-[10px] font-bold tracking-tight ${table.status === "paid" ? "text-emerald-800 font-extrabold" : "text-feldgrau"}`}>
+                                        {table.status === "paid"
+                                            ? "Clear Table →"
+                                            : table.status === "occupied"
+                                                ? "Manage"
+                                                : table.status === "reserved"
+                                                    ? "View"
+                                                    : "Start"}
                                     </span>
                                     <ArrowRightIcon
                                         className="h-3.5 w-3.5 text-feldgrau transition-transform group-hover:translate-x-0.5 group-hover:text-licorice"

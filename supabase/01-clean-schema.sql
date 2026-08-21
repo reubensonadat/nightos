@@ -214,6 +214,7 @@ CREATE TABLE public.bills (
     created_at timestamptz NOT NULL DEFAULT now(),
     updated_at timestamptz NOT NULL DEFAULT now(),
     closed_at timestamptz,
+    table_pin text,
     last_activity_at timestamptz NOT NULL DEFAULT now()
 );
 
@@ -858,6 +859,19 @@ BEGIN
     WHERE bill_id = p_bill_id;
 
     RETURN FOUND;
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION public.set_bill_pin(
+    p_bill_id uuid,
+    p_pin text
+)
+RETURNS boolean LANGUAGE plpgsql SECURITY DEFINER AS $$
+BEGIN
+    UPDATE public.bills
+    SET table_pin = p_pin, updated_at = now()
+    WHERE id = p_bill_id AND (table_pin IS NULL OR table_pin = '');
+    RETURN true;
 END;
 $$;
 
