@@ -636,6 +636,119 @@ BEGIN
 END;
 $$;
 
+-- ── 4.10 Staff Management RPCs ──
+DROP FUNCTION IF EXISTS public.approve_shift(uuid, boolean) CASCADE;
+DROP FUNCTION IF EXISTS public.approve_shift(uuid) CASCADE;
+DROP FUNCTION IF EXISTS public.approve_shift CASCADE;
+
+DROP FUNCTION IF EXISTS public.set_staff_active(uuid, boolean, uuid) CASCADE;
+DROP FUNCTION IF EXISTS public.set_staff_active(uuid, boolean) CASCADE;
+DROP FUNCTION IF EXISTS public.set_staff_active CASCADE;
+
+DROP FUNCTION IF EXISTS public.update_staff(uuid, uuid, text, text, numeric, text, numeric, int, text, boolean) CASCADE;
+DROP FUNCTION IF EXISTS public.update_staff(uuid, text, text, numeric, text, numeric, int, text, boolean) CASCADE;
+DROP FUNCTION IF EXISTS public.update_staff CASCADE;
+
+DROP FUNCTION IF EXISTS public.create_staff(uuid, text, text, text, text, numeric, int, text, text, numeric) CASCADE;
+DROP FUNCTION IF EXISTS public.create_staff(uuid, text, text, text, text, numeric, int, text) CASCADE;
+DROP FUNCTION IF EXISTS public.create_staff CASCADE;
+
+CREATE OR REPLACE FUNCTION public.create_staff(
+    p_venue_id uuid,
+    p_name text,
+    p_phone text,
+    p_role text,
+    p_email text DEFAULT NULL,
+    p_hourly_rate numeric DEFAULT 0,
+    p_max_tables int DEFAULT 6,
+    p_area_assignment text DEFAULT NULL,
+    p_pay_model text DEFAULT 'hourly',
+    p_salary_amount numeric DEFAULT NULL
+)
+RETURNS jsonb
+LANGUAGE plpgsql SECURITY DEFINER AS $$
+DECLARE
+    v_new_id uuid;
+BEGIN
+    IF p_role NOT IN ('owner', 'manager', 'supervisor', 'waiter', 'kitchen', 'bar', 'cashier') THEN
+        RETURN jsonb_build_object('ok', false, 'error', 'invalid_role');
+    END IF;
+    
+    IF EXISTS (SELECT 1 FROM public.staff WHERE venue_id = p_venue_id AND phone = p_phone) THEN
+        RETURN jsonb_build_object('ok', false, 'error', 'phone_exists');
+    END IF;
+
+    INSERT INTO public.staff (
+        venue_id, name, phone, email, role, is_active,
+        max_tables, area_assignment, hourly_rate, pay_model, salary_amount
+    )
+    VALUES (
+        p_venue_id, p_name, p_phone, p_email, p_role, true,
+        COALESCE(p_max_tables, 6), p_area_assignment, COALESCE(p_hourly_rate, 0), 
+        COALESCE(p_pay_model, 'hourly'), p_salary_amount
+    )
+    RETURNING id INTO v_new_id;
+
+    RETURN jsonb_build_object('ok', true, 'id', v_new_id);
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION public.update_staff(
+    p_staff_id uuid,
+    p_venue_id uuid DEFAULT NULL,
+    p_role text DEFAULT NULL,
+    p_email text DEFAULT NULL,
+    p_hourly_rate numeric DEFAULT NULL,
+    p_pay_model text DEFAULT NULL,
+    p_salary_amount numeric DEFAULT NULL,
+    p_max_tables int DEFAULT NULL,
+    p_area_assignment text DEFAULT NULL,
+    p_is_active boolean DEFAULT NULL
+)
+RETURNS jsonb
+LANGUAGE plpgsql SECURITY DEFINER AS $$
+BEGIN
+    UPDATE public.staff
+    SET role = COALESCE(p_role, role),
+        email = COALESCE(p_email, email),
+        hourly_rate = COALESCE(p_hourly_rate, hourly_rate),
+        pay_model = COALESCE(p_pay_model, pay_model),
+        salary_amount = COALESCE(p_salary_amount, salary_amount),
+        max_tables = COALESCE(p_max_tables, max_tables),
+        area_assignment = COALESCE(p_area_assignment, area_assignment),
+        is_active = COALESCE(p_is_active, is_active)
+    WHERE id = p_staff_id;
+
+    RETURN jsonb_build_object('ok', true);
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION public.set_staff_active(
+    p_staff_id uuid, 
+    p_active boolean,
+    p_venue_id uuid DEFAULT NULL
+)
+RETURNS boolean
+LANGUAGE plpgsql SECURITY DEFINER AS $$
+BEGIN
+    UPDATE public.staff SET is_active = p_active WHERE id = p_staff_id;
+    RETURN true;
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION public.approve_shift(p_shift_id uuid, p_approve boolean)
+RETURNS boolean
+LANGUAGE plpgsql SECURITY DEFINER AS $$
+BEGIN
+    IF p_approve THEN
+        UPDATE public.staff_shifts SET status = 'active' WHERE id = p_shift_id;
+    ELSE
+        UPDATE public.staff_shifts SET status = 'closed', clock_out = now() WHERE id = p_shift_id;
+    END IF;
+    RETURN true;
+END;
+$$;
+
 -- ── 4.10 Platform Convenience Fee (Tiered GHS 1, 2, 3, 4, 5) ──
 CREATE OR REPLACE FUNCTION public.compute_convenience_fee(subtotal numeric)
 RETURNS numeric(10,2) AS $$
