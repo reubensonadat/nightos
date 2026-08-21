@@ -8,27 +8,59 @@ export type WaiterSignOutModalProps = {
 export function WaiterSignOutModal({ isOpen, pendingTicketsCount, onClose, onSignOut }: WaiterSignOutModalProps) {
     if (!isOpen) return null;
 
-    return (
-        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-            <div className="bg-white rounded-2xl p-6 w-full max-w-sm shadow-xl flex flex-col items-center text-center">
-                <h2 className="text-xl font-bold text-slate-900 tracking-tight mb-2">Active Orders Pending</h2>
-                <p className="text-sm text-slate-500 mb-6 px-4">
-                    You currently have <span className="font-bold text-slate-900">{pendingTicketsCount} ticket{pendingTicketsCount !== 1 && 's'}</span> in the kitchen. Are you sure you want to leave?
-                </p>
+    const hasPending = pendingTicketsCount > 0;
 
-                <div className="flex flex-col w-full gap-3">
-                    {/* Primary Action (Safe Path) */}
-                    <button 
+    return (
+        <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center">
+            {/* Backdrop */}
+            <button
+                type="button"
+                onClick={onClose}
+                className="absolute inset-0 cursor-default bg-licorice/40 backdrop-blur-sm"
+                aria-label="Close"
+            />
+
+            {/* Sheet */}
+            <div className="relative z-10 w-full max-w-sm mx-4 md:mx-auto rounded-t-[28px] md:rounded-[1.5rem] bg-isabelline shadow-[0_-16px_48px_rgba(35,20,12,0.22)] ring-1 ring-white/60 overflow-hidden">
+                {/* Handle - mobile only */}
+                <div className="flex justify-center pt-3 pb-1 md:hidden">
+                    <span className="h-1 w-10 rounded-full bg-licorice/15" />
+                </div>
+
+                <div className="px-6 pt-5 pb-2 md:pt-6">
+                    <h2 className="text-[17px] font-bold tracking-tight text-licorice">
+                        {hasPending ? "Active orders pending" : "Sign out?"}
+                    </h2>
+                    <p className="mt-2 text-[13px] leading-relaxed text-feldgrau">
+                        {hasPending ? (
+                            <>
+                                You have{" "}
+                                <span className="font-bold text-licorice">
+                                    {pendingTicketsCount} ticket{pendingTicketsCount !== 1 && "s"}
+                                </span>{" "}
+                                still in the kitchen. Sign out anyway?
+                            </>
+                        ) : (
+                            "You'll be taken back to the login screen."
+                        )}
+                    </p>
+                </div>
+
+                <div className="flex flex-col gap-2 px-6 pt-4 pb-[max(env(safe-area-inset-bottom),24px)]">
+                    {/* Safe path — stay */}
+                    <button
+                        type="button"
                         onClick={onClose}
-                        className="w-full py-3.5 rounded-xl bg-[#2A1A17] text-white font-bold text-base cursor-pointer transition-colors hover:bg-licorice/90 active:scale-[0.98]"
+                        className="w-full rounded-full bg-licorice py-3.5 text-[13px] font-bold tracking-tight text-khaki transition-all hover:bg-licorice/90 active:scale-[0.98]"
                     >
                         Stay and Complete
                     </button>
 
-                    {/* Terminal Action (Destructive Path) */}
-                    <button 
+                    {/* Danger path — sign out */}
+                    <button
+                        type="button"
                         onClick={onSignOut}
-                        className="w-full py-3.5 rounded-xl bg-red-50 text-red-700 font-bold text-base cursor-pointer transition-colors hover:bg-red-100 active:scale-[0.98]"
+                        className="w-full rounded-full bg-white py-3.5 text-[13px] font-bold tracking-tight text-dark-red ring-1 ring-licorice/8 transition-all hover:bg-dark-red/5 active:scale-[0.98]"
                     >
                         Sign Out Anyway
                     </button>

@@ -14,6 +14,7 @@ import { db } from "../../lib/api";
 import { useVenue } from "../../hooks/useVenue";
 import { normalizeGhanaPhone } from "../../lib/utils";
 import clsx from "clsx";
+import { ConfirmModal } from "../../components/ConfirmModal";
 
 /* ═══════════════════════════════════════════════════════════════════════════
    STAFF & ROLES — fully real: rows come from the staff table, sign-in is by
@@ -66,6 +67,7 @@ export function StaffManagerScreen() {
     const [selectedStaff, setSelectedStaff] = useState<StaffRow | null>(null);
     const [editingStaff, setEditingStaff] = useState<StaffRow | null>(null);
     const [coverage, setCoverage] = useState<ShiftCoverageRow[] | null>(null);
+    const [deactivateConfirmStaff, setDeactivateConfirmStaff] = useState<StaffRow | null>(null);
 
     const load = useCallback(async () => {
         // Wait until we have a real venue UUID (not the default placeholder).
@@ -131,6 +133,15 @@ export function StaffManagerScreen() {
         if (error || !ok) {
             setStaff(prev);
             toast.error("Could not update this staff member.");
+        }
+    };
+
+    /** Guard: intercept deactivation only. Activation fires immediately. */
+    const requestDeactivate = (staffMember: StaffRow) => {
+        if (staffMember.is_active) {
+            setDeactivateConfirmStaff(staffMember);
+        } else {
+            void toggleActive(staffMember.id, staffMember.is_active);
         }
     };
 
@@ -467,7 +478,11 @@ export function StaffManagerScreen() {
                     staff={selectedStaff}
                     onShift={shiftStaffIds.has(selectedStaff.id)}
                     onClose={() => setSelectedStaff(null)}
-                    onToggleActive={toggleActive}
+                    onToggleActive={(id, active) => {
+                        const s = staff.find((x) => x.id === id);
+                        if (s) requestDeactivate(s);
+                        else void toggleActive(id, active);
+                    }}
                     onEdit={() => setEditingStaff(selectedStaff)}
                 />
             )}
@@ -491,6 +506,24 @@ export function StaffManagerScreen() {
                     onClose={() => setEditingStaff(null)}
                 />
             )}
+
+            {/* M4 — Deactivate staff confirm */}
+            <ConfirmModal
+                isOpen={deactivateConfirmStaff !== null}
+                title={`Deactivate ${deactivateConfirmStaff?.name}?`}
+                body="They won't be able to log in or serve tables until you reactivate them. Any tables they currently hold will remain open."
+                confirmLabel="Deactivate"
+                cancelLabel="Cancel"
+                isDanger
+                onConfirm={() => {
+                    if (deactivateConfirmStaff) {
+                        void toggleActive(deactivateConfirmStaff.id, deactivateConfirmStaff.is_active);
+                        setSelectedStaff(null);
+                    }
+                    setDeactivateConfirmStaff(null);
+                }}
+                onClose={() => setDeactivateConfirmStaff(null)}
+            />
         </div>
     );
 }

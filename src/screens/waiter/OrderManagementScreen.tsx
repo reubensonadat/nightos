@@ -13,6 +13,7 @@ import { formatGHS } from "../../data/menu";
 import { db, type DbOrderSubmission, type DbOrderItem, type DbProduct, type DbMenuCategory } from "../../lib/api";
 import type { Table } from "./TablesDashboard";
 import { MenuItemCard } from "../../components/MenuItemCard";
+import { ConfirmModal } from "../../components/ConfirmModal";
 
 /* ────────────────────────── Types ────────────────────────── */
 
@@ -71,6 +72,7 @@ export function OrderManagementScreen() {
     const [itemsBySubmission, setItemsBySubmission] = useState<Record<string, DbOrderItem[]>>({});
     const [loading, setLoading] = useState(true);
     const [cancellingId, setCancellingId] = useState<string | null>(null);
+    const [cancelConfirmId, setCancelConfirmId] = useState<string | null>(null);
 
     const load = useCallback(async () => {
         setLoading(true);
@@ -432,9 +434,9 @@ export function OrderManagementScreen() {
                                                 <div className="flex items-center justify-end border-t border-isabelline px-3.5 py-2">
                                                     <button
                                                         type="button"
-                                                        onClick={() => cancelSubmission(sub.id)}
+                                                        onClick={() => setCancelConfirmId(sub.id)}
                                                         disabled={cancellingId !== null}
-                                                        className="inline-flex items-center gap-1 rounded-full bg-red-50 px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-red-600 ring-1 ring-red-200 transition-all hover:bg-red-100 active:scale-95 disabled:opacity-50"
+                                                        className="inline-flex items-center gap-1 rounded-full bg-dark-red/10 px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-dark-red ring-1 ring-dark-red/20 transition-all hover:bg-dark-red/20 active:scale-95 disabled:opacity-50"
                                                     >
                                                         <XMarkIcon className="h-3 w-3" strokeWidth={2.5} />
                                                         {cancellingId === sub.id ? "Cancelling…" : "Cancel Order"}
@@ -571,6 +573,21 @@ export function OrderManagementScreen() {
                     </div>
                 </div>
             )}
+            {/* W2 — Cancel order confirm */}
+            <ConfirmModal
+                isOpen={cancelConfirmId !== null}
+                title="Cancel this order?"
+                body="The kitchen will be told to stop preparing these items. This can't be undone — use this only if the guest has changed their mind."
+                confirmLabel="Yes, Cancel Order"
+                cancelLabel="Never mind"
+                isDanger
+                loading={cancellingId !== null}
+                onConfirm={() => {
+                    if (cancelConfirmId) void cancelSubmission(cancelConfirmId);
+                    setCancelConfirmId(null);
+                }}
+                onClose={() => setCancelConfirmId(null)}
+            />
         </main>
     );
 }

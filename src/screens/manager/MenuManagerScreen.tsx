@@ -14,6 +14,7 @@ import { db, type DbInventoryItem } from "../../lib/api";
 import { supabase } from "../../lib/supabase";
 import { useVenue } from "../../hooks/useVenue";
 import clsx from "clsx";
+import { ConfirmModal } from "../../components/ConfirmModal";
 
 type InventoryRow = DbInventoryItem & {
     sellingPrice: number;
@@ -27,6 +28,7 @@ export function MenuManagerScreen() {
     const [editing, setEditing] = useState<InventoryRow | null>(null);
     const [creating, setCreating] = useState(false);
     const [loading, setLoading] = useState(true);
+    const [pendingToggleItem, setPendingToggleItem] = useState<InventoryRow | null>(null);
 
     const fetchData = useCallback(async () => {
         if (!venue.id || venue.id === "00000000-0000-0000-0000-000000000000") return;
@@ -78,6 +80,15 @@ export function MenuManagerScreen() {
         }
         setItems((prev) => prev.map((i) => (i.id === item.id ? { ...i, is_active: next } : i)));
         toast.success(next ? `${item.name} is back on the menu.` : `${item.name} hidden from the menu.`);
+    };
+
+    /** Guard: only intercept deactivation. Re-activating fires immediately. */
+    const requestToggleOff = (item: InventoryRow) => {
+        if (item.is_active) {
+            setPendingToggleItem(item);
+        } else {
+            void toggleActive(item);
+        }
     };
 
     const restockItem = async (item: InventoryRow) => {
@@ -267,7 +278,7 @@ export function MenuManagerScreen() {
                                             </div>
                                         </td>
                                         <td className="px-4 py-2.5">
-                                            <button type="button" onClick={() => toggleActive(item)}
+                                            <button type="button" onClick={() => requestToggleOff(item)}
                                                 className={clsx("relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors", item.is_active ? "bg-khaki" : "bg-feldgrau/20")}>
                                                 <span className={clsx("inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow transition-transform", item.is_active ? "translate-x-5" : "translate-x-1")} />
                                             </button>
@@ -316,7 +327,7 @@ export function MenuManagerScreen() {
                                             )}
                                         </div>
                                     </div>
-                                    <button type="button" onClick={() => toggleActive(item)}
+                                    <button type="button" onClick={() => requestToggleOff(item)}
                                         className={clsx("relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors", item.is_active ? "bg-khaki" : "bg-feldgrau/20")}>
                                         <span className={clsx("inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow transition-transform", item.is_active ? "translate-x-5" : "translate-x-1")} />
                                     </button>
@@ -342,6 +353,21 @@ export function MenuManagerScreen() {
                     onClose={() => { setEditing(null); setCreating(false); }}
                     onDelete={editing ? () => deleteItem(editing.id) : undefined} />
             )}
+
+            {/* M3 — Hide item confirm */}
+            <ConfirmModal
+                isOpen={pendingToggleItem !== null}
+                title={`Hide "${pendingToggleItem?.name}" from guests?`}
+                body="Customers won't be able to order this item until you turn it back on."
+                confirmLabel="Hide Item"
+                cancelLabel="Keep Visible"
+                isDanger={false}
+                onConfirm={() => {
+                    if (pendingToggleItem) void toggleActive(pendingToggleItem);
+                    setPendingToggleItem(null);
+                }}
+                onClose={() => setPendingToggleItem(null)}
+            />
         </div>
     );
 }
@@ -363,6 +389,7 @@ function ItemModal({ item, onSave, onClose, onDelete }: {
     onClose: () => void;
     onDelete?: () => void;
 }) {
+    const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
     const [draft, setDraft] = useState<InventoryRow>(item ?? {
         // eslint-disable-next-line react-hooks/purity
         id: `inv-${Date.now()}`,
@@ -448,7 +475,7 @@ function ItemModal({ item, onSave, onClose, onDelete }: {
                 </div>
                 <div className="sticky bottom-0 flex items-center justify-between gap-2 border-t border-isabelline bg-white px-5 py-3">
                     {onDelete ? (
-                        <button type="button" onClick={onDelete} className="inline-flex items-center gap-1 rounded-full bg-dark-red/10 px-3 py-2 text-xs font-bold uppercase tracking-wider text-dark-red transition-colors hover:bg-dark-red/20">
+                        <button type="button" onClick={() => setDeleteConfirmOpen(true)} className="inline-flex items-center gap-1 rounded-full bg-dark-red/10 px-3 py-2 text-xs font-bold uppercase tracking-wider text-dark-red transition-colors hover:bg-dark-red/20">
                             <TrashIcon className="h-3.5 w-3.5" strokeWidth={2} /> Delete
                         </button>
                     ) : <div />}
@@ -461,6 +488,18 @@ function ItemModal({ item, onSave, onClose, onDelete }: {
                     </div>
                 </div>
             </div>
+
+            {/* M2 — Delete item confirm (layered over the edit sheet) */}
+            <ConfirmModal
+                isOpen={deleteConfirmOpen}
+                title={`Delete "${item?.name}"?`}
+                body="This item will be permanently removed from your menu and inventory. Orders already placed won't be affected."
+                confirmLabel="Delete Item"
+                cancelLabel="Keep It"
+                isDanger
+                onConfirm={() => { setDeleteConfirmOpen(false); onDelete?.(); }}
+                onClose={() => setDeleteConfirmOpen(false)}
+            />
         </div>
     );
 }

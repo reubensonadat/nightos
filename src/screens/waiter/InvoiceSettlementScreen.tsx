@@ -13,6 +13,7 @@ import { db } from "../../lib/api";
 import { ReceiptDownloader } from "../../components/ReceiptDownloader";
 import { ProfessionalReceipt } from "../../components/ProfessionalReceipt";
 import type { Table } from "./TablesDashboard";
+import { ConfirmModal } from "../../components/ConfirmModal";
 
 /* ────────────────────────── Payment methods ────────────────────────── */
 
@@ -59,6 +60,7 @@ export function InvoiceSettlementScreen() {
     const [invoiceNo] = useState(() => `VL-${Date.now().toString(36).slice(-6).toUpperCase()}`);
     const [showInvoice, setShowInvoice] = useState(false);
     const [venueName, setVenueName] = useState<string | null>(null);
+    const [settleConfirmOpen, setSettleConfirmOpen] = useState(false);
 
     /* ── Load the real open bill for this table ── */
     useEffect(() => {
@@ -564,7 +566,13 @@ db.venueById(venueId).then(
 
                     <button
                         type="button"
-                        onClick={handleSettle}
+                        onClick={() => {
+                            if (method === "cash") {
+                                setSettleConfirmOpen(true);
+                            } else {
+                                void handleSettle();
+                            }
+                        }}
                         disabled={!canSettle || settling}
                         className="
                             inline-flex shrink-0 items-center justify-center gap-1.5
@@ -592,6 +600,21 @@ db.venueById(venueId).then(
                     </button>
                 </div>
             </div>
+            {/* W7 — Settle bill confirm */}
+            <ConfirmModal
+                isOpen={settleConfirmOpen}
+                title={`Confirm ${formatGHS(total)} cash?`}
+                body={`Change due to guest: ${formatGHS(Math.max(0, change))}. This closes the bill and can't be reversed.`}
+                confirmLabel="Collect & Close Bill"
+                cancelLabel="Go Back"
+                isDanger={false}
+                loading={settling}
+                onConfirm={() => {
+                    setSettleConfirmOpen(false);
+                    void handleSettle();
+                }}
+                onClose={() => setSettleConfirmOpen(false)}
+            />
         </main>
     );
 }

@@ -6,6 +6,7 @@ import { OrderCard, type KitchenOrder, type OrderStatus } from "../../components
 import { db, type DbKitchenOrderRow } from "../../lib/api";
 import signoutIcon from "../../assets/sign-out.svg";
 import { WaiterSignOutModal } from "../../components/WaiterSignOutModal";
+import { ConfirmModal } from "../../components/ConfirmModal";
 
 /* ────────────────────────── Station filter ────────────────────────── */
 
@@ -100,6 +101,7 @@ export function KitchenDisplayScreen({ venueId, staffId, staffName, onExit, onSi
     const [showSignOutModal, setShowSignOutModal] = useState(false);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
+    const [serveConfirmId, setServeConfirmId] = useState<string | null>(null);
 
     /* ── Load real orders ── */
     const load = useCallback(async () => {
@@ -244,14 +246,7 @@ export function KitchenDisplayScreen({ venueId, staffId, staffName, onExit, onSi
                             {onExit && (
                                 <button
                                     type="button"
-                                    onClick={() => {
-                                        const activeTickets = pendingCount + preparingCount;
-                                        if (activeTickets > 0) {
-                                            setShowSignOutModal(true);
-                                        } else {
-                                            onExit();
-                                        }
-                                    }}
+                                    onClick={() => setShowSignOutModal(true)}
                                     className="flex items-center gap-1.5 rounded-full bg-isabelline/10 px-3 py-1.5 text-xs font-bold uppercase tracking-wider text-isabelline/80 transition-colors hover:bg-isabelline/20"
                                 >
                                     <img src={signoutIcon} alt="" className="h-4 w-4 opacity-80" />
@@ -353,7 +348,7 @@ export function KitchenDisplayScreen({ venueId, staffId, staffName, onExit, onSi
                                                     now={now}
                                                     onAdvance={(id) => changeStatus(id, "preparing")}
                                                     onMarkReady={(id) => changeStatus(id, "ready")}
-                                                    onMarkServed={(id) => changeStatus(id, "served")}
+                                                    onMarkServed={(id) => setServeConfirmId(id)}
                                                 />
                                             ))
                                         )}
@@ -370,6 +365,21 @@ export function KitchenDisplayScreen({ venueId, staffId, staffName, onExit, onSi
                 pendingTicketsCount={pendingCount + preparingCount}
                 onClose={() => setShowSignOutModal(false)}
                 onSignOut={onExit || (() => {})}
+            />
+
+            {/* K4 — Mark Served confirm */}
+            <ConfirmModal
+                isOpen={serveConfirmId !== null}
+                title="Mark as served?"
+                body="This ticket will be removed from the board. Make sure the food has actually reached the table before confirming."
+                confirmLabel="Mark Served"
+                cancelLabel="Not Yet"
+                isDanger={false}
+                onConfirm={() => {
+                    if (serveConfirmId) void changeStatus(serveConfirmId, "served");
+                    setServeConfirmId(null);
+                }}
+                onClose={() => setServeConfirmId(null)}
             />
         </main>
     );
