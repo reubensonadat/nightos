@@ -408,7 +408,7 @@ function AppShell() {
   const navigate = useNavigate();
   const location = useLocation();
   const [searchParams] = useSearchParams();
-  const { user, signOut, staffSession, signOut: authSignOut, role, venue: authVenue, profile } = useAuth();
+  const { user, signOut, staffSession, role, venue: authVenue, profile } = useAuth();
 
   const targetSlug = authVenue?.slug || "velvet-lounge";
   const { venue: loadedVenue, loading: venueLoading, error: venueError } = useVenue(targetSlug);
@@ -525,7 +525,7 @@ function AppShell() {
           <Route path="/waiter" element={
             (staffSession || role === "owner") ? (
               <TablesDashboard
-                venueId={staffSession?.venue_id || venue?.id || ""}
+                venueId={staffSession?.venue_id || authVenue?.id || venueId || ""}
                 staffName={staffSession?.name || profile?.name || "Manager"}
                 staffId={staffSession?.id || user?.id || ""}
                 role={staffSession?.role || "manager"}
@@ -555,7 +555,7 @@ function AppShell() {
       {mode === "kitchen" && (
         (staffSession || role === "owner") ? (
           <KitchenDisplayScreen
-            venueId={staffSession?.venue_id || venue?.id || ""}
+            venueId={staffSession?.venue_id || authVenue?.id || venueId || ""}
             staffId={staffSession?.id || user?.id || ""}
             staffName={staffSession?.name || profile?.name || "Manager"}
             onExit={switchToCustomer}
