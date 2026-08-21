@@ -30,7 +30,7 @@ export function GuestExperienceSection() {
               Scan
             </h3>
             <p className="text-[#6b5f54] font-['Inter'] text-[15px] leading-relaxed">
-              Guests scan the table QR with any smartphone camera — no app download, no account required. They land directly on your branded menu.
+              Guests scan the table QR with any smartphone camera. No app download, no account required. They land directly on your branded menu.
             </p>
           </div>
 
@@ -46,7 +46,7 @@ export function GuestExperienceSection() {
               Order
             </h3>
             <p className="text-[#6b5f54] font-['Inter'] text-[15px] leading-relaxed">
-              A rich, photo-led digital menu lets guests browse, customise, and add to their order at their own pace — no rushed interactions with staff.
+              A rich, photo-led digital menu lets guests browse, customise, and add to their order at their own pace. No rushed interactions with staff.
             </p>
           </div>
 
