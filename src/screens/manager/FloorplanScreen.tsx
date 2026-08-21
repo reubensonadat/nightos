@@ -72,8 +72,9 @@ export function FloorplanScreen() {
                 db.billsByVenue(venue.id),
             ]);
             if (tablesResult.error) throw tablesResult.error;
-            const billRows = billsResult.data ?? [];
-            const billMap = new Map(billRows.map((b) => [b.table_id, b]));
+            const allBills = billsResult.data ?? [];
+            const activeBills = allBills.filter((b) => b.status === 'open' || b.status === 'settling');
+            const billMap = new Map(activeBills.map((b) => [b.table_id, b]));
 
             const rows: FloorTable[] = (tablesResult.data ?? []).map((t) => {
                 const bill = billMap.get(t.id);
@@ -97,7 +98,7 @@ export function FloorplanScreen() {
 
             const waiterIds = [
                 ...new Set(
-                    billRows
+                    activeBills
                         .map((b) => b.waiter_id)
                         .filter((id): id is string => typeof id === "string" && id.length > 0),
                 ),

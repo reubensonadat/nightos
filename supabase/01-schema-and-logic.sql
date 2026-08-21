@@ -574,7 +574,7 @@ CREATE POLICY "Venue owner can manage expenses" ON public.expenses FOR ALL
 CREATE TABLE IF NOT EXISTS public.activity_logs (
     id uuid NOT NULL DEFAULT gen_random_uuid(),
     venue_id uuid NOT NULL REFERENCES public.venues(id) ON DELETE CASCADE,
-    actor_type text NOT NULL CHECK (actor_type IN ('staff', 'system', 'customer')),
+    actor_type text NOT NULL DEFAULT 'staff' CHECK (actor_type IN ('staff', 'system', 'customer')),
     actor_name text,
     action text NOT NULL,
     entity_type text NOT NULL,
@@ -583,6 +583,8 @@ CREATE TABLE IF NOT EXISTS public.activity_logs (
     created_at timestamptz NOT NULL DEFAULT now(),
     CONSTRAINT activity_logs_pkey PRIMARY KEY (id)
 );
+ALTER TABLE public.activity_logs ADD COLUMN IF NOT EXISTS actor_type text DEFAULT 'staff';
+ALTER TABLE public.activity_logs ALTER COLUMN entity_id TYPE text USING entity_id::text;
 ALTER TABLE public.activity_logs ENABLE ROW LEVEL security;
 CREATE POLICY "Venue owner can read logs" ON public.activity_logs FOR SELECT
     USING (auth.uid() = (SELECT owner_id FROM public.venues WHERE id = venue_id));
@@ -1126,7 +1128,7 @@ BEGIN
     END IF;
 
     INSERT INTO public.activity_logs (venue_id, actor_type, actor_name, action, entity_type, entity_id, details)
-    VALUES (v_bill.venue_id, 'staff', v_staff_name, 'cash_payment_recorded', 'bill', v_bill.id::text,
+    VALUES (v_bill.venue_id, 'staff', v_staff_name, 'cash_payment_recorded', 'bill', v_bill.id,
             jsonb_build_object('amount', p_amount, 'platform_fee', v_fee, 'remaining', GREATEST(v_new_paid - v_bill.total, 0)));
 
     RETURN jsonb_build_object('ok', true, 'fee', v_fee, 'bill_status', v_status,
