@@ -5,10 +5,8 @@ import {
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     HeartIcon,
     MagnifyingGlassIcon,
-    MapPinIcon,
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     PlusIcon,
-    UserIcon,
 } from "@heroicons/react/24/outline";
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 import { HeartIcon as HeartIconSolid } from "@heroicons/react/24/solid";
@@ -109,7 +107,6 @@ async function fetchProducts(venueId: string): Promise<MenuItem[]> {
 export function MenuScreen({ venueId, venueName, tableLabel, waiterName, onBack, onViewCart }: Props) {
     const [active, setActive] = useState<MenuCategory>("Signatures");
     const [query, setQuery] = useState("");
-    const [searchOpen, setSearchOpen] = useState(false);
     const [activeItemId, setActiveItemId] = useState<string | null>(null);
     const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
     const [loading, setLoading] = useState(true);
@@ -166,8 +163,10 @@ export function MenuScreen({ venueId, venueName, tableLabel, waiterName, onBack,
                 LIGHT EDITORIAL HEADER — clean, like a printed menu
               ═══════════════════════════════════════════════════════════ */}
             <header className="sticky top-0 z-30 bg-isabelline/95 backdrop-blur-xl border-b border-licorice/8">
-                {/* ── Top Bar ── */}
-                <div className="mx-auto flex w-full max-w-7xl items-center justify-between px-5 md:px-8 pt-[max(env(safe-area-inset-top),14px)] pb-2">
+
+                {/* ── Row 1: Venue & Status ── */}
+                <div className="mx-auto flex w-full max-w-7xl items-center justify-between px-5 md:px-8 pt-[max(env(safe-area-inset-top),14px)] pb-2.5">
+                    {/* Left: back + avatar + name */}
                     <div className="flex items-center gap-2.5">
                         {onBack && (
                             <button
@@ -180,65 +179,59 @@ export function MenuScreen({ venueId, venueName, tableLabel, waiterName, onBack,
                             </button>
                         )}
                         <div className="flex items-center gap-2.5">
-                            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-licorice text-isabelline shadow-[0_4px_14px_rgba(35,20,12,0.25)]">
-                                <span className="font-serif text-[15px] font-bold leading-none tracking-tight">
-                                    V
-                                </span>
+                            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-licorice text-isabelline shadow-[0_4px_14px_rgba(35,20,12,0.25)]">
+                                <span className="font-serif text-[15px] font-bold leading-none tracking-tight">V</span>
                             </div>
-                            <div className="flex flex-col leading-tight">
-                                <span className="text-[13px] font-bold tracking-tight text-licorice">
-                                    {venueName || "Velvet Lounge"}
-                                </span>
-                                {tableLabel && (
-                                    <span className="text-[9px] font-semibold uppercase tracking-[0.18em] text-feldgrau">
-                                        Table {tableLabel}
-                                    </span>
-                                )}
-                            </div>
+                            <span className="text-[13px] font-bold tracking-tight text-licorice">
+                                {venueName || "Velvet Lounge"}
+                            </span>
                         </div>
                     </div>
 
-                    <div className="flex items-center gap-2">
-                        {tableLabel && (
-                            <div className="flex items-center gap-1.5 rounded-full bg-white px-3 py-2 shadow-sm ring-1 ring-licorice/8">
-                                <MapPinIcon className="h-3 w-3 text-dark-red" strokeWidth={2.25} />
-                                <span className="text-[10px] font-bold uppercase tracking-wider text-licorice">
-                                    T·{tableLabel}
-                                </span>
+                    {/* Right: single consolidated pill */}
+                    {(tableLabel || waiterName) && (() => {
+                        const shortTable = tableLabel
+                            ? `T-${tableLabel.replace(/^table\s*/i, "").trim()}`
+                            : null;
+                        const cleanServer = waiterName
+                            ? waiterName.replace(/\s*\([^)]*\)/g, "").trim()
+                            : null;
+                        const parts = cleanServer ? cleanServer.split(/\s+/) : [];
+                        const formattedServer = cleanServer
+                            ? parts.length > 1
+                                ? `${parts[0]} ${parts[parts.length - 1][0].toUpperCase()}.`
+                                : cleanServer
+                            : null;
+
+                        return (
+                            <div className="flex items-center gap-1.5 rounded-full bg-white px-3 py-1.5 shadow-sm ring-1 ring-licorice/8 whitespace-nowrap shrink-0">
+                                {shortTable && (
+                                    <span className="text-[12px] font-black tracking-tight text-licorice">
+                                        {shortTable}
+                                    </span>
+                                )}
+                                {shortTable && formattedServer && (
+                                    <span className="mx-1 h-3.5 w-px bg-licorice/20" />
+                                )}
+                                {formattedServer && (
+                                    <span className="text-[10px] font-semibold tracking-tight text-feldgrau">
+                                        Server: {formattedServer}
+                                    </span>
+                                )}
                             </div>
-                        )}
-                        {waiterName && (
-                            <div className="flex items-center gap-1.5 rounded-full bg-white px-3 py-2 shadow-sm ring-1 ring-licorice/8">
-                                <UserIcon className="h-3 w-3 text-khaki" strokeWidth={2.25} />
-                                <span className="text-[10px] font-bold uppercase tracking-wider text-licorice">
-                                    {waiterName}
-                                </span>
-                            </div>
-                        )}
-                        <button
-                            type="button"
-                            onClick={() => setSearchOpen((v) => !v)}
-                            aria-label={searchOpen ? "Close search" : "Open search"}
-                            className="flex h-9 w-9 items-center justify-center rounded-full bg-white text-licorice shadow-sm ring-1 ring-licorice/8 transition-colors hover:bg-isabelline active:scale-95"
-                        >
-                        <MagnifyingGlassIcon className="h-4 w-4" strokeWidth={2.25} />
-                    </button>
-                    </div>
+                        );
+                    })()}
                 </div>
 
-                {/* Search input */}
-                {searchOpen && (
-                <div className="mx-auto w-full max-w-7xl px-5 md:px-8 pb-3 animate-velvet-fade">
-                    <div className="flex items-center gap-2 rounded-full bg-white px-4 py-2.5 shadow-sm ring-1 ring-licorice/8">
-                        <MagnifyingGlassIcon
-                            className="h-4 w-4 text-feldgrau"
-                            strokeWidth={2.25}
-                        />
+                {/* ── Row 2: Always-visible search ── */}
+                <div className="mx-auto w-full max-w-7xl px-5 md:px-8 pb-2.5">
+                    <div className="flex items-center gap-2 rounded-xl bg-white px-4 py-2.5 shadow-sm ring-1 ring-licorice/8">
+                        <MagnifyingGlassIcon className="h-4 w-4 shrink-0 text-feldgrau" strokeWidth={2.25} />
                         <input
                             value={query}
                             onChange={(e) => setQuery(e.target.value)}
-                            placeholder="Search cocktails, wines, plates…"
-                            className="flex-1 bg-transparent text-[13px] text-licorice placeholder:text-feldgrau/70 focus:outline-none"
+                            placeholder="Search the menu..."
+                            className="flex-1 bg-transparent text-[13px] text-licorice placeholder:text-feldgrau/60 focus:outline-none"
                         />
                         {query && (
                             <button
@@ -251,9 +244,8 @@ export function MenuScreen({ venueId, venueName, tableLabel, waiterName, onBack,
                         )}
                     </div>
                 </div>
-                )}
 
-                {/* ── Category pills ── */}
+                {/* ── Row 3: Category pills (unchanged) ── */}
                 <nav className="mx-auto w-full max-w-7xl px-5 md:px-8 pb-3">
                     <div className="no-scrollbar -mx-1 flex items-center gap-2 overflow-x-auto px-1 pb-1">
                         {categories.map((cat) => {
@@ -283,11 +275,7 @@ export function MenuScreen({ venueId, venueName, tableLabel, waiterName, onBack,
                 CONTENT — editorial title + cards, flows naturally
               ═══════════════════════════════════════════════════════════ */}
             <section className="mx-auto w-full max-w-7xl px-5 md:px-8 pt-6 pb-[calc(200px+env(safe-area-inset-bottom))]">
-                {!searchOpen && (
-                    <p className="text-base font-medium text-slate-600 mb-4">
-                        Tap any item to read more.
-                    </p>
-                )}
+
                 {/* Empty state */}
                 {loading ? (
                     <div className="mt-4 flex flex-col items-center justify-center rounded-2xl bg-white px-6 py-12 text-center shadow-[0_4px_16px_rgba(35,20,12,0.04)] ring-1 ring-isabelline">
