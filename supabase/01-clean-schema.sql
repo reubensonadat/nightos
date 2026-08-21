@@ -247,6 +247,7 @@ CREATE TABLE public.order_items (
     modifier_snapshot jsonb NOT NULL DEFAULT '[]'::jsonb,
     modifier_price_adjustment numeric(10,2) NOT NULL DEFAULT 0,
     line_total numeric(10,2) NOT NULL DEFAULT 0,
+    status text NOT NULL DEFAULT 'confirmed' CHECK (status IN ('pending', 'confirmed', 'preparing', 'ready', 'served', 'cancelled')),
     notes text,
     guest_name text,
     created_at timestamptz NOT NULL DEFAULT now()
@@ -634,7 +635,63 @@ BEGIN
 END;
 $$;
 
--- ── 4.10 Recent Cash Fees Ledger ──
+-- ── 4.10 Order Status & Bill Closure ──
+CREATE OR REPLACE FUNCTION public.set_order_status(
+    p_submission_id uuid,
+    p_status text,
+    p_staff_id uuid DEFAULT NULL
+)
+RETURNS boolean LANGUAGE plpgsql SECURITY DEFINER AS $$
+BEGIN
+    IF p_status NOT IN ('pending', 'confirmed', 'preparing', 'ready', 'served', 'cancelled') THEN
+        RETURN false;
+    END IF;
+
+    UPDATE public.order_submissions
+    SET status = p_status, updated_at = now()
+    WHERE id = p_submission_id;
+
+    RETURN FOUND;
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION public.close_bill(
+    p_bill_id uuid,
+    p_staff_id uuid DEFAULT NULL
+)
+RETURNS boolean LANGUAGE plpgsql SECURITY DEFINER AS $$
+BEGIN
+    UPDATE public.bills
+    SET status = 'cancelled', closed_at = now(), updated_at = now()
+    WHERE id = p_bill_id;
+
+    UPDATE public.customer_sessions
+    SET status = 'closed', closed_at = now()
+    WHERE bill_id = p_bill_id;
+
+    RETURN FOUND;
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION public.set_order_item_status(
+    p_item_id uuid,
+    p_status text
+)
+RETURNS boolean LANGUAGE plpgsql SECURITY DEFINER AS $$
+BEGIN
+    IF p_status NOT IN ('pending', 'confirmed', 'preparing', 'ready', 'served', 'cancelled') THEN
+        RETURN false;
+    END IF;
+
+    UPDATE public.order_items
+    SET status = p_status
+    WHERE id = p_item_id;
+
+    RETURN FOUND;
+END;
+$$;
+
+-- ── 4.11 Recent Cash Fees Ledger ──
 CREATE OR REPLACE FUNCTION public.recent_cash_fees(p_venue_id uuid, p_limit int DEFAULT 10)
 RETURNS TABLE(
     payment_id uuid,

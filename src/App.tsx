@@ -87,16 +87,16 @@ function CustomerShell({ venueId, tableId, tableLabel }: { venueId: string; tabl
     const init = async () => {
       if (!tableId || !session || partyPromptOpen) return;
       try {
-         
         if (localStorage.getItem(`nightos:party:${session.id}`) === "1") return;
-       
+        // If an open bill already exists on the table or session already configured, do NOT prompt again
+        if (bill || (session.party_size && session.party_size > 1)) return;
       } catch {
         // ignore
       }
       setPartyPromptOpen(true);
     };
     init();
-  }, [tableId, session, partyPromptOpen]);
+  }, [tableId, session, bill, partyPromptOpen]);
 
   const handlePartyConfirm = useCallback(
     async (partySize: number, guestName?: string) => {
