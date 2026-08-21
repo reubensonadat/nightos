@@ -9,10 +9,11 @@ export function TableLayout() {
     const { tableId } = useParams<{ tableId: string }>();
     const navigate = useNavigate();
     const [table, setTable] = useState<Table | null>(null);
+    const [tableVenueId, setTableVenueId] = useState<string>("");
     const [loading, setLoading] = useState(true);
     const { staffSession, user, venue } = useAuth();
 
-    const venueId = staffSession?.venue_id || venue?.id || "";
+    const venueId = tableVenueId || staffSession?.venue_id || venue?.id || "a0000000-0000-0000-0000-000000000001";
     const staffId = staffSession?.id || user?.id || "";
 
     useEffect(() => {
@@ -29,6 +30,7 @@ export function TableLayout() {
                 if (error || !data) {
                     setTable(null);
                 } else {
+                    setTableVenueId(data.venue_id);
                     // Map DbTable to the Table format expected by child screens
                     setTable({
                         id: data.id,

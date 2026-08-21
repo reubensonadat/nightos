@@ -100,9 +100,10 @@ export function OrderManagementScreen() {
                 setItemsBySubmission({});
             }
 
+            const effectiveVenueId = venueId || "a0000000-0000-0000-0000-000000000001";
             const [{ data: cats }, { data: prods }] = await Promise.all([
-                db.menuCategories(venueId),
-                db.products(venueId),
+                db.menuCategories(effectiveVenueId),
+                db.products(effectiveVenueId),
             ]);
             const catList = cats ?? [];
             setCategories(catList);
@@ -113,8 +114,10 @@ export function OrderManagementScreen() {
                     return stillExists ? prev : catList[0].id;
                 });
             }
-        } catch {
+        } catch (e) {
+            console.error("Failed to load table orders:", e);
             toast.error("Failed to load this table's orders");
+        } finally {
             setLoading(false);
         }
     }, [table.id, venueId, staffId]);
