@@ -107,21 +107,30 @@ export function FinancialReportsScreen() {
 
             const billIds = [...new Set(inRange.map((p) => p.bill_id).filter((b): b is string => !!b))];
             if (billIds.length > 0) {
-                const [{ data: itemRows }, { data: subRows }] = await Promise.all([
-                    supabaseItemsFor(billIds),
-                    supabaseSubsFor(billIds),
-                ]);
-                setItems(itemRows ?? []);
-                setSubmissions(subRows ?? []);
+                try {
+                    const [{ data: itemRows }, { data: subRows }] = await Promise.all([
+                        supabaseItemsFor(billIds),
+                        supabaseSubsFor(billIds),
+                    ]);
+                    setItems(itemRows ?? []);
+                    setSubmissions(subRows ?? []);
+                } catch {
+                    setItems([]);
+                    setSubmissions([]);
+                }
             } else {
                 setItems([]);
                 setSubmissions([]);
             }
 
-            const { data: custRows, error: custErr } = await supabaseCustomers(venue.id);
-            if (custErr) throw custErr;
-            setCustomers(custRows ?? []);
+            try {
+                const { data: custRows } = await supabaseCustomers(venue.id);
+                setCustomers(custRows ?? []);
+            } catch {
+                setCustomers([]);
+            }
         } catch (e) {
+            console.error("[FinancialReports] Error loading financial data:", e);
             setError(e instanceof Error ? e.message : "Could not load financial data.");
         } finally {
             setLoading(false);
