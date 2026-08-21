@@ -114,6 +114,7 @@ export type DbBill = {
   status: 'open' | 'settling' | 'paid' | 'cancelled';
   payment_model: 'PREPAY' | 'POSTPAY';
   subtotal: number;
+  convenience_fee?: number;
   service_charge: number;
   vat: number;
   total: number;
@@ -143,6 +144,7 @@ export type DbOrderItem = {
   id: string;
   submission_id: string;
   bill_id: string;
+  customer_session_id?: string | null;
   product_id: string;
   product_name: string;
   quantity: number;
@@ -150,6 +152,7 @@ export type DbOrderItem = {
   modifier_snapshot: Record<string, unknown>[];
   modifier_price_adjustment: number;
   line_total: number;
+  status: 'pending' | 'confirmed' | 'preparing' | 'ready' | 'served' | 'cancelled';
   notes: string | null;
   guest_name: string | null;
   created_at: string;
@@ -631,7 +634,7 @@ export const db = {
     supabase
       .from('order_items')
       .select(
-        'id, submission_id, bill_id, product_id, product_name, quantity, unit_price, modifier_snapshot, modifier_price_adjustment, line_total, notes, guest_name, customer_session_id, created_at',
+        'id, submission_id, bill_id, product_id, product_name, quantity, unit_price, modifier_snapshot, modifier_price_adjustment, line_total, status, notes, guest_name, customer_session_id, created_at',
       )
       .eq('submission_id', submissionId),
 
@@ -642,7 +645,7 @@ export const db = {
       supabase
         .from('order_items')
         .select(
-          'id, submission_id, bill_id, product_id, product_name, quantity, unit_price, modifier_snapshot, modifier_price_adjustment, line_total, notes, guest_name, customer_session_id, created_at',
+          'id, submission_id, bill_id, product_id, product_name, quantity, unit_price, modifier_snapshot, modifier_price_adjustment, line_total, status, notes, guest_name, customer_session_id, created_at',
         )
         .eq('bill_id', billId)
         .order('created_at', { ascending: true }),

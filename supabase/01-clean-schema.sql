@@ -204,6 +204,7 @@ CREATE TABLE public.bills (
     status text NOT NULL DEFAULT 'open' CHECK (status IN ('open', 'settling', 'paid', 'cancelled')),
     payment_model text NOT NULL DEFAULT 'POSTPAY' CHECK (payment_model IN ('PREPAY', 'POSTPAY')),
     subtotal numeric(10,2) NOT NULL DEFAULT 0,
+    convenience_fee numeric(10,2) NOT NULL DEFAULT 0,
     service_charge numeric(10,2) NOT NULL DEFAULT 0,
     vat numeric(10,2) NOT NULL DEFAULT 0,
     total numeric(10,2) NOT NULL DEFAULT 0,
@@ -635,13 +636,76 @@ BEGIN
 END;
 $$;
 
--- ── 4.10 Order Status & Bill Closure ──
+-- ── 4.10 Platform Convenience Fee (Tiered GHS 1, 2, 3, 4, 5) ──
+CREATE OR REPLACE FUNCTION public.compute_convenience_fee(subtotal numeric)
+RETURNS numeric(10,2) AS $$
+BEGIN
+    IF subtotal IS NULL OR subtotal <= 0 THEN
+        RETURN 0.00;
+    ELSIF subtotal <= 50 THEN
+        RETURN 1.00;
+    ELSIF subtotal <= 100 THEN
+        RETURN 2.00;
+    ELSIF subtotal <= 150 THEN
+        RETURN 3.00;
+    ELSIF subtotal <= 200 THEN
+        RETURN 4.00;
+    ELSE
+        RETURN 5.00;
+    END IF;
+END;
+$$ LANGUAGE plpgsql IMMUTABLE;
+
+CREATE OR REPLACE FUNCTION public.recalculate_single_bill(p_bill_id uuid)
+RETURNS void LANGUAGE plpgsql SECURITY DEFINER AS $$
+DECLARE
+    v_subtotal numeric(10,2);
+    v_fee numeric(10,2) := 0;
+    v_total numeric(10,2) := 0;
+    v_paid numeric(10,2) := 0;
+BEGIN
+    SELECT COALESCE(SUM(oi.line_total), 0) INTO v_subtotal
+    FROM public.order_items oi
+    JOIN public.order_submissions os ON os.id = oi.submission_id
+    WHERE oi.bill_id = p_bill_id
+      AND COALESCE(oi.status, 'confirmed') != 'cancelled'
+      AND COALESCE(os.status, 'confirmed') != 'cancelled';
+
+    -- Tiered Platform Fee: 1, 2, 3, 4, 5
+    v_fee := public.compute_convenience_fee(v_subtotal);
+    v_total := v_subtotal + v_fee;
+
+    SELECT COALESCE(SUM(amount), 0) INTO v_paid
+    FROM public.payments
+    WHERE bill_id = p_bill_id AND status = 'success';
+
+    UPDATE public.bills
+    SET subtotal = v_subtotal,
+        convenience_fee = v_fee,
+        service_charge = 0.00,
+        vat = 0.00,
+        total = v_total,
+        amount_paid = v_paid,
+        status = CASE
+            WHEN v_paid >= (v_total - 0.01) AND v_total > 0 THEN 'paid'
+            WHEN v_paid > 0 THEN 'settling'
+            WHEN status = 'paid' AND v_paid < (v_total - 0.01) THEN 'open'
+            ELSE status
+        END,
+        closed_at = CASE WHEN v_paid >= (v_total - 0.01) AND v_total > 0 THEN now() ELSE closed_at END,
+        updated_at = now()
+    WHERE id = p_bill_id;
+END;
+$$;
+
 CREATE OR REPLACE FUNCTION public.set_order_status(
     p_submission_id uuid,
     p_status text,
     p_staff_id uuid DEFAULT NULL
 )
 RETURNS boolean LANGUAGE plpgsql SECURITY DEFINER AS $$
+DECLARE
+    v_bill_id uuid;
 BEGIN
     IF p_status NOT IN ('pending', 'confirmed', 'preparing', 'ready', 'served', 'cancelled') THEN
         RETURN false;
@@ -649,7 +713,18 @@ BEGIN
 
     UPDATE public.order_submissions
     SET status = p_status, updated_at = now()
-    WHERE id = p_submission_id;
+    WHERE id = p_submission_id
+    RETURNING bill_id INTO v_bill_id;
+
+    IF p_status = 'cancelled' THEN
+        UPDATE public.order_items
+        SET status = 'cancelled'
+        WHERE submission_id = p_submission_id;
+    END IF;
+
+    IF v_bill_id IS NOT NULL THEN
+        PERFORM public.recalculate_single_bill(v_bill_id);
+    END IF;
 
     RETURN FOUND;
 END;
@@ -678,6 +753,8 @@ CREATE OR REPLACE FUNCTION public.set_order_item_status(
     p_status text
 )
 RETURNS boolean LANGUAGE plpgsql SECURITY DEFINER AS $$
+DECLARE
+    v_bill_id uuid;
 BEGIN
     IF p_status NOT IN ('pending', 'confirmed', 'preparing', 'ready', 'served', 'cancelled') THEN
         RETURN false;
@@ -685,7 +762,12 @@ BEGIN
 
     UPDATE public.order_items
     SET status = p_status
-    WHERE id = p_item_id;
+    WHERE id = p_item_id
+    RETURNING bill_id INTO v_bill_id;
+
+    IF v_bill_id IS NOT NULL THEN
+        PERFORM public.recalculate_single_bill(v_bill_id);
+    END IF;
 
     RETURN FOUND;
 END;
@@ -721,19 +803,11 @@ LANGUAGE sql STABLE SECURITY DEFINER AS $$
     LIMIT p_limit;
 $$;
 
--- ── 4.11 Recalculate Bill Totals Trigger ──
+-- ── 4.12 Recalculate Bill Totals Trigger ──
 CREATE OR REPLACE FUNCTION public.recalculate_bill_totals()
 RETURNS trigger LANGUAGE plpgsql AS $$
 DECLARE
     v_bill_id uuid;
-    v_subtotal numeric(10,2);
-    v_service_charge_pct numeric(4,2);
-    v_vat_pct numeric(4,2);
-    v_tax_inclusive boolean;
-    v_sc numeric(10,2) := 0;
-    v_vat numeric(10,2) := 0;
-    v_total numeric(10,2) := 0;
-    v_paid numeric(10,2) := 0;
 BEGIN
     IF TG_OP = 'DELETE' THEN
         v_bill_id := OLD.bill_id;
@@ -741,45 +815,9 @@ BEGIN
         v_bill_id := NEW.bill_id;
     END IF;
 
-    -- Compute line totals
-    SELECT COALESCE(SUM(line_total), 0) INTO v_subtotal
-    FROM public.order_items
-    WHERE bill_id = v_bill_id;
-
-    -- Venue tax rates
-    SELECT v.service_charge_pct, v.vat_pct, v.tax_inclusive
-    INTO v_service_charge_pct, v_vat_pct, v_tax_inclusive
-    FROM public.venues v
-    JOIN public.bills b ON b.venue_id = v.id
-    WHERE b.id = v_bill_id;
-
-    IF v_tax_inclusive THEN
-        v_sc := ROUND((v_subtotal * (v_service_charge_pct / 100)), 2);
-        v_total := v_subtotal + v_sc;
-    ELSE
-        v_sc := ROUND((v_subtotal * (COALESCE(v_service_charge_pct, 10.00) / 100)), 2);
-        v_vat := ROUND((v_subtotal * (COALESCE(v_vat_pct, 12.50) / 100)), 2);
-        v_total := v_subtotal + v_sc + v_vat;
+    IF v_bill_id IS NOT NULL THEN
+        PERFORM public.recalculate_single_bill(v_bill_id);
     END IF;
-
-    SELECT COALESCE(SUM(amount), 0) INTO v_paid
-    FROM public.payments
-    WHERE bill_id = v_bill_id AND status = 'success';
-
-    UPDATE public.bills
-    SET subtotal = v_subtotal,
-        service_charge = v_sc,
-        vat = v_vat,
-        total = v_total,
-        amount_paid = v_paid,
-        status = CASE
-            WHEN v_paid >= (v_total - 0.01) AND v_total > 0 THEN 'paid'
-            WHEN v_paid > 0 THEN 'settling'
-            ELSE status
-        END,
-        closed_at = CASE WHEN v_paid >= (v_total - 0.01) AND v_total > 0 THEN now() ELSE closed_at END,
-        updated_at = now()
-    WHERE id = v_bill_id;
 
     RETURN NULL;
 END;
@@ -788,6 +826,11 @@ $$;
 DROP TRIGGER IF EXISTS trg_recalc_bill_order_items ON public.order_items;
 CREATE TRIGGER trg_recalc_bill_order_items
 AFTER INSERT OR UPDATE OR DELETE ON public.order_items
+FOR EACH ROW EXECUTE FUNCTION public.recalculate_bill_totals();
+
+DROP TRIGGER IF EXISTS trg_recalc_bill_order_submissions ON public.order_submissions;
+CREATE TRIGGER trg_recalc_bill_order_submissions
+AFTER INSERT OR UPDATE OF status ON public.order_submissions
 FOR EACH ROW EXECUTE FUNCTION public.recalculate_bill_totals();
 
 DROP TRIGGER IF EXISTS trg_recalc_bill_payments ON public.payments;
