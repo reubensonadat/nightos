@@ -1047,7 +1047,7 @@ $$;
 CREATE OR REPLACE FUNCTION public.record_cash_payment(
     p_bill_id uuid,
     p_amount numeric,
-    p_staff_id uuid,
+    p_staff_id uuid DEFAULT NULL,
     p_payer_name text DEFAULT NULL
 )
 RETURNS jsonb
@@ -1058,6 +1058,8 @@ DECLARE
     v_new_paid numeric;
     v_status text;
     v_fee numeric;
+    v_collected_by uuid := NULL;
+    v_staff_name text := 'Staff';
 BEGIN
     IF p_amount <= 0 THEN
         RETURN jsonb_build_object('ok', false, 'error', 'amount');
@@ -1068,9 +1070,34 @@ BEGIN
         RETURN jsonb_build_object('ok', false, 'error', 'bill_not_open');
     END IF;
 
-    SELECT * INTO v_staff FROM public.staff WHERE id = p_staff_id AND is_active = true LIMIT 1;
-    IF NOT FOUND OR v_staff.venue_id IS DISTINCT FROM v_bill.venue_id THEN
-        RETURN jsonb_build_object('ok', false, 'error', 'staff_venue_mismatch');
+    IF p_staff_id IS NOT NULL THEN
+        SELECT * INTO v_staff FROM public.staff WHERE id = p_staff_id AND is_active = true LIMIT 1;
+        IF FOUND THEN
+            IF v_staff.venue_id IS DISTINCT FROM v_bill.venue_id THEN
+                RETURN jsonb_build_object('ok', false, 'error', 'staff_venue_mismatch');
+            END IF;
+            v_collected_by := v_staff.id;
+            v_staff_name := v_staff.name;
+        ELSE
+            -- Check if it's the venue owner / manager
+            IF NOT EXISTS (SELECT 1 FROM public.venues WHERE id = v_bill.venue_id AND owner_id = p_staff_id) THEN
+                IF v_bill.waiter_id IS NOT NULL THEN
+                    SELECT * INTO v_staff FROM public.staff WHERE id = v_bill.waiter_id LIMIT 1;
+                    IF FOUND THEN
+                        v_collected_by := v_staff.id;
+                        v_staff_name := v_staff.name;
+                    END IF;
+                END IF;
+            ELSE
+                v_staff_name := 'Owner';
+            END IF;
+        END IF;
+    ELSIF v_bill.waiter_id IS NOT NULL THEN
+        SELECT * INTO v_staff FROM public.staff WHERE id = v_bill.waiter_id LIMIT 1;
+        IF FOUND THEN
+            v_collected_by := v_staff.id;
+            v_staff_name := v_staff.name;
+        END IF;
     END IF;
 
     v_fee := public.platform_fee_for(p_amount);
@@ -1082,7 +1109,7 @@ BEGIN
     VALUES (
         v_bill.id, v_bill.venue_id, p_amount, 'cash',
         'CASH-' || upper(substr(md5(random()::text), 1, 8)),
-        p_payer_name, v_staff.id, 'success', v_fee, false
+        p_payer_name, v_collected_by, 'success', v_fee, false
     );
 
     v_new_paid := v_bill.amount_paid + p_amount;
@@ -1099,13 +1126,15 @@ BEGIN
     END IF;
 
     INSERT INTO public.activity_logs (venue_id, actor_type, actor_name, action, entity_type, entity_id, details)
-    VALUES (v_bill.venue_id, 'staff', v_staff.name, 'cash_payment_recorded', 'bill', v_bill.id::text,
+    VALUES (v_bill.venue_id, 'staff', v_staff_name, 'cash_payment_recorded', 'bill', v_bill.id::text,
             jsonb_build_object('amount', p_amount, 'platform_fee', v_fee, 'remaining', GREATEST(v_new_paid - v_bill.total, 0)));
 
     RETURN jsonb_build_object('ok', true, 'fee', v_fee, 'bill_status', v_status,
                               'remaining', GREATEST(v_bill.total - v_new_paid, 0));
 END;
 $$;
+
+GRANT EXECUTE ON FUNCTION public.record_cash_payment(uuid, numeric, uuid, text) TO anon, authenticated, service_role;
 
 -- â”€â”€ B3. WAITER-ONLY ORDER STATUS / CANCELLATION â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 CREATE OR REPLACE FUNCTION public.set_order_status(

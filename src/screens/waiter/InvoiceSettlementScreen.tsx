@@ -140,7 +140,11 @@ export function InvoiceSettlementScreen() {
         const { data, error: dbError } = await db.recordCashPayment(bill.id, total, staffId);
         setSettling(false);
         if (dbError || !data?.ok) {
-            setError(dbError ? "Couldn't record the payment — check your connection." : "That bill is no longer open.");
+            console.error('[InvoiceSettlement] Settle payment error:', dbError || data?.error);
+            const msg = dbError
+                ? (typeof dbError === 'object' && 'message' in dbError ? String((dbError as { message: string }).message) : "Couldn't record the payment — check your connection.")
+                : (data?.error ? `Payment failed: ${data.error.replace(/_/g, ' ')}` : "That bill is no longer open.");
+            setError(msg);
             return;
         }
         setFee(data.fee ?? null);

@@ -912,34 +912,35 @@ export const db = {
       .eq('bill_id', billId)
       .order('created_at'),
 
-  recordCashPayment: async (billId: string, amount: number, staffId: string, payerName?: string) => {
+  recordCashPayment: async (billId: string, amount: number, staffId?: string | null, payerName?: string) => {
     cacheInvalidate('bills:');
     cacheInvalidate('payments:');
-    const { data, error } = await supabase
-      .rpc('record_cash_payment', {
-        p_bill_id: billId,
-        p_amount: amount,
-        p_staff_id: staffId,
-        p_payer_name: payerName ?? null,
-      })
-      .single<{
+    const { data, error } = await supabase.rpc('record_cash_payment', {
+      p_bill_id: billId,
+      p_amount: amount,
+      p_staff_id: staffId && staffId.trim() ? staffId : null,
+      p_payer_name: payerName ?? null,
+    });
+    return {
+      data: (data ?? { ok: false, error: 'no_response' }) as {
         ok: boolean;
         error?: string;
         fee?: number;
         bill_status?: string;
         remaining?: number;
-      }>();
-    return { data: data ?? { ok: false, error: 'no_response' }, error };
+      },
+      error,
+    };
   },
 
-  expireStaleSessions: () =>
-    supabase.rpc('expire_stale_sessions').single<{ expire_stale_sessions: number }>(),
+  expireStaleSessions: async () => {
+    const { data, error } = await supabase.rpc('expire_stale_sessions');
+    return { data: typeof data === 'number' ? data : 0, error };
+  },
 
   outstandingBalance: async (venueId: string) => {
-    const { data, error } = await supabase
-      .rpc('outstanding_balance', { p_venue_id: venueId })
-      .single<{ outstanding_balance: number }>();
-    return { data: data?.outstanding_balance ?? 0, error };
+    const { data, error } = await supabase.rpc('outstanding_balance', { p_venue_id: venueId });
+    return { data: typeof data === 'number' ? data : Number(data ?? 0), error };
   },
 
   landedWithoutOrders: async (venueId: string) => {
@@ -989,42 +990,36 @@ export const db = {
   },
 
   /* ── Table operations (waiter) ── */
-  transferBill: async (billId: string, destTableId: string, staffId: string) => {
+  transferBill: async (billId: string, destTableId: string, staffId?: string | null) => {
     cacheInvalidate('bills:');
-    const { data, error } = await supabase
-      .rpc('transfer_bill', {
-        p_bill_id: billId,
-        p_dest_table_id: destTableId,
-        p_staff_id: staffId,
-      })
-      .single<{ ok: boolean; error?: string }>();
-    return { data: data ?? { ok: false, error: 'no_response' }, error };
+    const { data, error } = await supabase.rpc('transfer_bill', {
+      p_bill_id: billId,
+      p_dest_table_id: destTableId,
+      p_staff_id: staffId && staffId.trim() ? staffId : null,
+    });
+    return { data: (data ?? { ok: false, error: 'no_response' }) as { ok: boolean; error?: string }, error };
   },
 
-  mergeBills: async (sourceBillId: string, destBillId: string, staffId: string) => {
+  mergeBills: async (sourceBillId: string, destBillId: string, staffId?: string | null) => {
     cacheInvalidate('bills:');
     cacheInvalidate('orders:');
-    const { data, error } = await supabase
-      .rpc('merge_bills', {
-        p_source_bill_id: sourceBillId,
-        p_dest_bill_id: destBillId,
-        p_staff_id: staffId,
-      })
-      .single<{ ok: boolean; error?: string }>();
-    return { data: data ?? { ok: false, error: 'no_response' }, error };
+    const { data, error } = await supabase.rpc('merge_bills', {
+      p_source_bill_id: sourceBillId,
+      p_dest_bill_id: destBillId,
+      p_staff_id: staffId && staffId.trim() ? staffId : null,
+    });
+    return { data: (data ?? { ok: false, error: 'no_response' }) as { ok: boolean; error?: string }, error };
   },
 
-  splitBill: async (billId: string, ways: number, staffId: string) => {
+  splitBill: async (billId: string, ways: number, staffId?: string | null) => {
     cacheInvalidate('bills:');
     cacheInvalidate('orders:');
-    const { data, error } = await supabase
-      .rpc('split_bill', {
-        p_bill_id: billId,
-        p_ways: ways,
-        p_staff_id: staffId,
-      })
-      .single<{ ok: boolean; error?: string }>();
-    return { data: data ?? { ok: false, error: 'no_response' }, error };
+    const { data, error } = await supabase.rpc('split_bill', {
+      p_bill_id: billId,
+      p_ways: ways,
+      p_staff_id: staffId && staffId.trim() ? staffId : null,
+    });
+    return { data: (data ?? { ok: false, error: 'no_response' }) as { ok: boolean; error?: string }, error };
   },
 
   /* ── Manager Dashboard (raw rows, math done in the frontend) ── */
@@ -1137,21 +1132,22 @@ export const db = {
         notes: notes || null,
       }),
 
-  reservationsByPhone: (phone: string) =>
-    supabase
-      .rpc('reservations_by_phone', { p_phone: phone })
-      .single<
-        {
-          id: string;
-          customer_name: string;
-          guest_count: number;
-          seating_area: string | null;
-          reservation_date: string;
-          reservation_time: string;
-          status: string;
-          created_at: string;
-        }[]
-      >(),
+  reservationsByPhone: async (phone: string) => {
+    const { data, error } = await supabase.rpc('reservations_by_phone', { p_phone: phone });
+    return {
+      data: (data ?? []) as {
+        id: string;
+        customer_name: string;
+        guest_count: number;
+        seating_area: string | null;
+        reservation_date: string;
+        reservation_time: string;
+        status: string;
+        created_at: string;
+      }[],
+      error,
+    };
+  },
 
   /* ── Event ticket stock (What's On tab) ── */
   eventTickets: (venueId: string) =>
@@ -1205,16 +1201,23 @@ export const db = {
   },
 
   /* ── Staff shift summary (real waiter performance) ── */
-  staffShiftSummary: (staffId: string) =>
-    supabase.rpc('staff_shift_summary', { p_staff_id: staffId }).single<{
-      ok: boolean;
-      error?: string;
-      sales: number;
-      tables_served: number;
-      items_sold: number;
-      shift_seconds: number;
-      activity: { type: 'settlement' | 'table' | 'tip'; label: string; amount: number; ts: string }[];
-    }>(),
+  staffShiftSummary: async (staffId: string) => {
+    const { data, error } = await supabase.rpc('staff_shift_summary', {
+      p_staff_id: staffId && staffId.trim() ? staffId : null,
+    });
+    return {
+      data: (data ?? { ok: false, error: 'no_response' }) as {
+        ok: boolean;
+        error?: string;
+        sales: number;
+        tables_served: number;
+        items_sold: number;
+        shift_seconds: number;
+        activity: { type: 'settlement' | 'table' | 'tip'; label: string; amount: number; ts: string }[];
+      },
+      error,
+    };
+  },
 
   /* ── Payments & expenses (financial reports) ── */
   paymentsAll: (venueId: string, from = 0, to = 499, sinceIso?: string) =>
