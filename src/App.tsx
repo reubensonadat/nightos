@@ -631,12 +631,14 @@ function App() {
 
 function AppRoutes() {
   const location = useLocation();
+  const [searchParams] = useSearchParams();
   const { isAuthenticated, isInitializing, role } = useAuth();
 
   const isAuthRoute = location.pathname === "/login" || location.pathname === "/signup";
   const isVerifyRoute = location.pathname === "/verify-otp";
   const isSetupRoute = location.pathname === "/setup";
-  const isPromoRoute = location.pathname === "/";
+  const isTableScan = Boolean(searchParams.get("table"));
+  const isPromoRoute = location.pathname === "/" && !isTableScan;
   const isSwitcherRoute = location.pathname === "/switcher";
 
   if (isPromoRoute) return <PromoLandingScreen />;
