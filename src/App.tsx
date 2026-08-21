@@ -408,10 +408,12 @@ function AppShell() {
   const navigate = useNavigate();
   const location = useLocation();
   const [searchParams] = useSearchParams();
-  const { user, signOut } = useAuth();
+  const { user, signOut, staffSession, signOut: authSignOut, role, venue: authVenue, profile } = useAuth();
 
-  const { venue: loadedVenue, loading: venueLoading, error: venueError } = useVenue("velvet-lounge");
-  const venueId = loadedVenue.id;
+  const targetSlug = authVenue?.slug || "velvet-lounge";
+  const { venue: loadedVenue, loading: venueLoading, error: venueError } = useVenue(targetSlug);
+  const currentVenue = authVenue || loadedVenue;
+  const venueId = currentVenue.id;
 
   const qrToken = searchParams.get("table");
   const { table: qrTable, loading: qrLoading, error: qrError } = useQrTable(qrToken);
@@ -446,8 +448,6 @@ function AppShell() {
     return () => window.removeEventListener("popstate", onPopState);
   }, []);
 
-  const { staffSession, signOut: authSignOut, role, venue, profile } = useAuth();
-
   // Manager page is URL-driven: /manager/ops, /manager/floorplan, ...
   const managerPage = useMemo<ManagerPage>(() => {
     const seg = location.pathname.split("/")[2];
@@ -466,10 +466,6 @@ function AppShell() {
     [navigate],
   );
 
-
-
-
-
   // /manager defaults to the Live Ops sub-path
   useEffect(() => {
     if (mode === "manager" && (location.pathname === "/manager" || location.pathname === "/manager/")) {
@@ -484,7 +480,7 @@ function AppShell() {
   const handleStaffSignOut = () => {
     const staffId = staffSession?.id;
     if (staffId) db.clockOutStaff(staffId).catch(() => {});
-    authSignOut();
+    signOut();
   };
 
   const handleManagerSignOut = async () => {
@@ -493,14 +489,14 @@ function AppShell() {
     navigate("/", { replace: true });
   };
 
-  if (!venueLoading && venueError) {
+  if (!authVenue && !venueLoading && venueError) {
     return (
       <div className="min-h-svh bg-isabelline flex items-center justify-center px-8">
         <div className="max-w-md text-center">
           <p className="text-ink font-semibold text-lg">Venue not found</p>
           <p className="text-ink/60 text-sm mt-2 leading-relaxed">
             The venue <strong>velvet-lounge</strong> doesn't exist in your database yet. Open the Supabase SQL
-            Editor and run <code className="rounded bg-ink/5 px-1.5 py-0.5 font-mono text-xs">supabase/seed-velvet.sql</code>,
+            Editor and run <code className="rounded bg-ink/5 px-1.5 py-0.5 font-mono text-xs">supabase/02-clean-seed.sql</code>,
             then reload this page.
           </p>
         </div>
