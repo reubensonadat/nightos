@@ -153,6 +153,7 @@ function ReceiptModal({ order, venueName, sessionToken, onClose }: ReceiptModalP
     subtotal: number;
     vat: number;
     total: number;
+    status?: string;
     created_at: string;
     tables?: { table_label?: string; table_number?: number } | null;
   } | null>(null);
@@ -166,12 +167,14 @@ function ReceiptModal({ order, venueName, sessionToken, onClose }: ReceiptModalP
         order.billId ? db.customerBill(order.billId, sessionToken) : Promise.resolve({ data: null }),
       ]);
       if (cancelled) return;
-      setItems(itemsRes.data && itemsRes.data.length > 0 ? itemsRes.data : null);
+      const activeItems = (itemsRes.data ?? []).filter((i) => i.status !== 'cancelled');
+      setItems(activeItems.length > 0 ? activeItems : null);
       if (billRes.data) {
         setBill({
           subtotal: Number(billRes.data.subtotal ?? 0),
           vat: Number(billRes.data.vat ?? 0),
           total: Number(billRes.data.total ?? order.total),
+          status: billRes.data.status,
           created_at: billRes.data.created_at,
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
           tables: (Array.isArray(billRes.data.tables) ? billRes.data.tables[0] : billRes.data.tables) as any,
@@ -195,6 +198,15 @@ function ReceiptModal({ order, venueName, sessionToken, onClose }: ReceiptModalP
   const vat = bill ? bill.vat : Math.max(0, Math.round((receiptTotal - itemsSubtotal) * 100) / 100);
   const stamp = bill?.created_at ?? new Date(order.sentAt).toISOString();
 
+  const rawLabel = bill?.tables?.table_label;
+  const formattedTable = rawLabel
+    ? (rawLabel.trim().toLowerCase().startsWith("table") ? rawLabel : `Table ${rawLabel}`)
+    : (venueName || "Bysen");
+
+  const statusDisplay = bill
+    ? (bill.status === "paid" ? "Paid" : bill.status === "settling" ? "Partially Paid" : "Unpaid")
+    : statusLabelFor(order);
+
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center">
       <button
@@ -211,7 +223,7 @@ function ReceiptModal({ order, venueName, sessionToken, onClose }: ReceiptModalP
             <div>
               <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-khaki">Your receipt</p>
               <p className="text-[15px] font-black tracking-[-0.02em] text-licorice">
-                {bill?.tables?.table_label ? `Table ${bill.tables.table_label}` : venueName || "Bysen"}
+                {formattedTable}
               </p>
             </div>
             <button
@@ -236,12 +248,8 @@ function ReceiptModal({ order, venueName, sessionToken, onClose }: ReceiptModalP
                 venueName={venueName || "Bysen"}
                 refCode={order.orderNumber}
                 dateISO={stamp}
-                statusLabel={bill ? "Paid" : statusLabelFor(order)}
-                servedLabel={
-                  bill?.tables?.table_label
-                    ? `Table ${bill.tables.table_label}`
-                    : undefined
-                }
+                statusLabel={statusDisplay}
+                servedLabel={formattedTable}
                 items={shownItems}
                 subtotal={itemsSubtotal}
                 vat={vat}

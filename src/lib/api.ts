@@ -114,12 +114,14 @@ export type DbBill = {
   status: 'open' | 'settling' | 'paid' | 'cancelled';
   payment_model: 'PREPAY' | 'POSTPAY';
   subtotal: number;
+  convenience_fee?: number;
   service_charge: number;
   vat: number;
   total: number;
   amount_paid: number;
   is_merged: boolean;
   merged_into_bill_id: string | null;
+  table_pin?: string | null;
   created_at: string;
   updated_at: string;
   closed_at: string | null;
@@ -143,6 +145,7 @@ export type DbOrderItem = {
   id: string;
   submission_id: string;
   bill_id: string;
+  customer_session_id?: string | null;
   product_id: string;
   product_name: string;
   quantity: number;
@@ -150,6 +153,7 @@ export type DbOrderItem = {
   modifier_snapshot: Record<string, unknown>[];
   modifier_price_adjustment: number;
   line_total: number;
+  status: 'pending' | 'confirmed' | 'preparing' | 'ready' | 'served' | 'cancelled';
   notes: string | null;
   guest_name: string | null;
   created_at: string;
@@ -446,11 +450,12 @@ export const db = {
     ),
 
   /* ── Bills ── */
+  /* ── Bills ── */
   openBillForTable: (tableId: string) =>
     supabase
       .from('bills')
       .select(
-        'id, venue_id, table_id, waiter_id, guest_count, status, payment_model, subtotal, service_charge, vat, total, amount_paid, is_merged, merged_into_bill_id, created_at, updated_at, closed_at, last_activity_at',
+        'id, venue_id, table_id, waiter_id, guest_count, status, payment_model, subtotal, convenience_fee, service_charge, vat, total, amount_paid, is_merged, merged_into_bill_id, table_pin, created_at, updated_at, closed_at, last_activity_at',
       )
       .eq('table_id', tableId)
       .in('status', ['open', 'settling'])
@@ -471,7 +476,7 @@ export const db = {
     return supabase
       .from('bills')
       .select(
-        'id, venue_id, table_id, waiter_id, guest_count, status, payment_model, subtotal, service_charge, vat, total, amount_paid, is_merged, merged_into_bill_id, created_at, updated_at, closed_at, last_activity_at',
+        'id, venue_id, table_id, waiter_id, guest_count, status, payment_model, subtotal, convenience_fee, service_charge, vat, total, amount_paid, is_merged, merged_into_bill_id, table_pin, created_at, updated_at, closed_at, last_activity_at',
       )
       .eq('id', billId)
       .maybeSingle();
@@ -481,21 +486,26 @@ export const db = {
     supabase
       .from('bills')
       .select(
-        'id, venue_id, table_id, waiter_id, guest_count, status, payment_model, subtotal, service_charge, vat, total, amount_paid, is_merged, merged_into_bill_id, created_at, updated_at, closed_at, last_activity_at',
+        'id, venue_id, table_id, waiter_id, guest_count, status, payment_model, subtotal, convenience_fee, service_charge, vat, total, amount_paid, is_merged, merged_into_bill_id, table_pin, created_at, updated_at, closed_at, last_activity_at',
       )
       .eq('id', id)
       .maybeSingle(),
 
-  createBill: (venueId: string, tableId: string, guestCount = 1, sessionToken?: string | null) => {
+  createBill: (venueId: string, tableId: string, guestCount = 1, sessionToken?: string | null, tablePin?: string | null) => {
     cacheInvalidate('bills:');
     return withSession(
       supabase
         .from('bills')
-        .insert({ venue_id: venueId, table_id: tableId, guest_count: guestCount }),
+        .insert({ venue_id: venueId, table_id: tableId, guest_count: guestCount, table_pin: tablePin || null }),
       sessionToken,
     )
       .select()
       .single();
+  },
+
+  setBillPin: async (billId: string, pin: string) => {
+    cacheInvalidate('bills:');
+    return supabase.rpc('set_bill_pin', { p_bill_id: billId, p_pin: pin });
   },
 
   /**
@@ -509,15 +519,15 @@ export const db = {
       .from('bills')
       .select('id', { count: 'exact', head: true })
       .eq('venue_id', venueId)
-      .in('status', ['open', 'settling']);
+      .in('status', ['open', 'settling', 'paid']);
     if (countErr) return { data: null, error: countErr, total: 0 };
     const { data, error } = await supabase
       .from('bills')
       .select(
-        'id, venue_id, table_id, waiter_id, guest_count, status, payment_model, subtotal, service_charge, vat, total, amount_paid, is_merged, merged_into_bill_id, created_at, updated_at, closed_at, last_activity_at',
+        'id, venue_id, table_id, waiter_id, guest_count, status, payment_model, subtotal, convenience_fee, service_charge, vat, total, amount_paid, is_merged, merged_into_bill_id, table_pin, created_at, updated_at, closed_at, last_activity_at',
       )
       .eq('venue_id', venueId)
-      .in('status', ['open', 'settling'])
+      .in('status', ['open', 'settling', 'paid'])
       .order('created_at', { ascending: false })
       .range(from, to);
     return { data, error, total: count ?? 0 };
@@ -631,7 +641,7 @@ export const db = {
     supabase
       .from('order_items')
       .select(
-        'id, submission_id, bill_id, product_id, product_name, quantity, unit_price, modifier_snapshot, modifier_price_adjustment, line_total, notes, guest_name, customer_session_id, created_at',
+        'id, submission_id, bill_id, product_id, product_name, quantity, unit_price, modifier_snapshot, modifier_price_adjustment, line_total, status, notes, guest_name, customer_session_id, created_at',
       )
       .eq('submission_id', submissionId),
 
@@ -642,7 +652,7 @@ export const db = {
       supabase
         .from('order_items')
         .select(
-          'id, submission_id, bill_id, product_id, product_name, quantity, unit_price, modifier_snapshot, modifier_price_adjustment, line_total, notes, guest_name, customer_session_id, created_at',
+          'id, submission_id, bill_id, product_id, product_name, quantity, unit_price, modifier_snapshot, modifier_price_adjustment, line_total, status, notes, guest_name, customer_session_id, created_at',
         )
         .eq('bill_id', billId)
         .order('created_at', { ascending: true }),
@@ -655,21 +665,24 @@ export const db = {
       supabase
         .from('bills')
         .select(
-          'id, venue_id, table_id, waiter_id, guest_count, status, payment_model, subtotal, service_charge, vat, total, amount_paid, created_at, updated_at, closed_at, tables(id, table_number, table_label)',
+          'id, venue_id, table_id, waiter_id, guest_count, status, payment_model, subtotal, convenience_fee, service_charge, vat, total, amount_paid, created_at, updated_at, closed_at, tables(id, table_number, table_label)',
         )
         .eq('id', billId)
         .maybeSingle(),
       sessionToken,
     ),
 
-  submissionsByBill: (billId: string) =>
-    supabase
-      .from('order_submissions')
-      .select(
-        'id, bill_id, venue_id, guest_name, status, station, priority, notes, customer_session_id, created_at, updated_at',
-      )
-      .eq('bill_id', billId)
-      .order('created_at', { ascending: false }),
+  submissionsByBill: (billId: string, sessionToken?: string | null) =>
+    withSession(
+      supabase
+        .from('order_submissions')
+        .select(
+          'id, bill_id, venue_id, guest_name, status, station, priority, notes, customer_session_id, created_at, updated_at',
+        )
+        .eq('bill_id', billId)
+        .order('created_at', { ascending: false }),
+      sessionToken,
+    ),
 
   billWithTable: (billId: string) =>
     supabase

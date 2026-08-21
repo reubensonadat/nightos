@@ -19,6 +19,8 @@ import { type OrderSummary } from "./screens/OrderTrackingScreen";
 import { OrdersScreen } from "./screens/OrdersScreen";
 import { CustomerBottomNav } from "./components/CustomerBottomNav";
 import { PartyPrompt } from "./components/PartyPrompt";
+import { TablePinBanner } from "./components/TablePinBanner";
+import { TablePinModal } from "./components/TablePinModal";
 import { ClockIcon } from "@heroicons/react/24/outline";
 
 import { StaffAuthScreen } from "./screens/waiter/StaffAuthScreen";
@@ -81,26 +83,41 @@ function CustomerShell({ venueId, tableId, tableLabel }: { venueId: string; tabl
 
   const { session, bill, waiter, loading: sessionLoading, error: sessionError, updateParty } = useCustomerSession(venueId, tableId);
 
+  // Table PIN Security State
+  const [pinInputVerified, setPinInputVerified] = useState<boolean>(false);
+  const pinUnlocked = useMemo(() => {
+    if (!bill?.table_pin) return true;
+    if (pinInputVerified) return true;
+    try {
+      return localStorage.getItem(`nightos:table_pin:${bill.id}`) === bill.table_pin;
+    } catch {
+      return false;
+    }
+  }, [bill, pinInputVerified]);
+
   // One-time "how many of you?" prompt per session (QR tables only)
   const [partyPromptOpen, setPartyPromptOpen] = useState(false);
   useEffect(() => {
+    let cancelled = false;
     const init = async () => {
       if (!tableId || !session || partyPromptOpen) return;
       try {
-         
         if (localStorage.getItem(`nightos:party:${session.id}`) === "1") return;
-       
+        // If an open bill already exists on the table or session already configured, do NOT prompt again
+        if (bill || (session.party_size && session.party_size > 1)) return;
       } catch {
         // ignore
       }
-      setPartyPromptOpen(true);
+      if (!cancelled) setPartyPromptOpen(true);
     };
     init();
-  }, [tableId, session, partyPromptOpen]);
+    return () => {
+      cancelled = true;
+    };
+  }, [tableId, session, bill, partyPromptOpen]);
 
   const handlePartyConfirm = useCallback(
     async (partySize: number, guestName?: string) => {
-       
       const { error } = await updateParty(partySize, guestName);
       if (error) {
         toast.error(String(error));
@@ -126,88 +143,75 @@ function CustomerShell({ venueId, tableId, tableLabel }: { venueId: string; tabl
     };
   }, [venueId]);
 
-   
-  useEffect(() => {
-    const init = async () => {
-      try {
-         
-        const stored = localStorage.getItem("nightos:orders");
-        if (stored) {
-          const parsed = JSON.parse(stored);
-          if (parsed.active) setActiveOrders(parsed.active);
-          if (parsed.past) setHistory(parsed.past);
-        }
-      } catch {
-        // ignore
-      }
-    };
-    init();
-  }, []);
- 
+  // ── Load live orders for this table's open bill from the database ──
+  const [ordersRevision, setOrdersRevision] = useState(0);
+  const triggerReload = useCallback(() => setOrdersRevision((r) => r + 1), []);
 
-  // A new scan = a new visit: wipe the orders list unless we've already
-  // marked THIS session (so a page refresh mid-visit keeps its orders).
-   
-  const sessionOrdersKey = session ? `nightos:orders:sid:${session.id}` : "";
   useEffect(() => {
-    const init = async () => {
-      if (!session) return;
+    let cancelled = false;
+    const billId = bill?.id;
+    const sessionToken = session?.session_token;
+    if (!billId) return;
+
+    const fetchOrders = async () => {
       try {
-        const marked = localStorage.getItem(sessionOrdersKey) === "1";
-         
-        localStorage.setItem(sessionOrdersKey, "1");
-        if (!marked) {
+        const { data: subs } = await db.submissionsByBill(billId, sessionToken);
+        if (cancelled) return;
+        if (!subs || subs.length === 0) {
           setActiveOrders([]);
           setHistory([]);
+          return;
         }
+
+        const summaries: OrderSummary[] = await Promise.all(
+          subs.map(async (s) => {
+            const { data: items } = await db.orderItemsBySubmission(s.id);
+            const itemList = items ?? [];
+            const total = itemList.reduce((sum, i) => sum + Number(i.line_total || 0), 0);
+            const count = itemList.reduce((sum, i) => sum + i.quantity, 0);
+            return {
+              orderNumber: s.id.slice(0, 8).toUpperCase(),
+              billId: s.bill_id,
+              submissionId: s.id,
+              sentAt: new Date(s.created_at).getTime(),
+              status: (s.status === 'pending' ? 'confirmed' : s.status) as OrderSummary['status'],
+              cancelled: s.status === 'cancelled',
+              itemCount: count,
+              total,
+              items: itemList.map((i) => ({
+                name: i.product_name,
+                qty: i.quantity,
+                image: '',
+                lineTotal: Number(i.line_total || 0),
+              })),
+            };
+          }),
+        );
+
+        if (cancelled) return;
+        const active = summaries.filter((o) => o.status && ['pending', 'confirmed', 'preparing', 'ready'].includes(o.status));
+        const past = summaries.filter((o) => o.status && ['served', 'cancelled'].includes(o.status));
+
+        setActiveOrders(active);
+        setHistory(past);
       } catch {
         // ignore
       }
     };
-    init();
-  }, [sessionOrdersKey, session]);
 
-  // Removed localStorage tab sync since we use URLs now
+    fetchOrders();
+    return () => {
+      cancelled = true;
+    };
+  }, [bill, session, ordersRevision]);
 
-  useEffect(() => {
-    try { localStorage.setItem("nightos:orders", JSON.stringify({ active: activeOrders, past: history })); } catch { /* ignore */ }
-  }, [activeOrders, history]);
-
-  // Live status: realtime streams pending→ready→served→cancelled
-  // (anon kitchen policy covers every status, so no polling needed).
-  const activeSubmissionIds = useMemo(
-    () => activeOrders.filter((o) => o.submissionId).map((o) => o.submissionId as string),
-    [activeOrders],
-  );
-  const refreshStatuses = useCallback(async () => {
-    if (activeSubmissionIds.length === 0) return;
-    const { data, error } = await db.orderSubmissionStatuses(activeSubmissionIds, session?.session_token);
-    if (error || !data) return;
-    const statusMap = new Map(data.map((d) => [d.id, d.status]));
-    setActiveOrders((prev) => {
-      const stillActive = prev.filter((o) => o.submissionId && statusMap.get(o.submissionId) !== "cancelled");
-      const newlyCancelled = prev
-        .filter((o) => o.submissionId && statusMap.get(o.submissionId) === "cancelled")
-        .map((o) => ({ ...o, status: "cancelled" as const, cancelled: true }));
-      if (newlyCancelled.length > 0) {
-        queueMicrotask(() => setHistory((h) => [...newlyCancelled, ...h]));
-      }
-      return stillActive.map((o) => {
-        const next = o.submissionId ? statusMap.get(o.submissionId) : undefined;
-        return next && next !== o.status ? { ...o, status: next as OrderSummary['status'] } : o;
-      });
-    });
-   
-  }, [activeSubmissionIds, session?.session_token]);
-
-  // Realtime: the customer's own submissions (events pass RLS for
-  // every status via the anon kitchen policy).
+  // Live refresh: kitchen order updates stream in realtime
   useRealtime({
     table: 'order_submissions',
     filter: bill?.id ? `bill_id=eq.${bill.id}` : undefined,
-    onInsert: refreshStatuses,
-    onUpdate: refreshStatuses,
-    onDelete: refreshStatuses,
+    onInsert: triggerReload,
+    onUpdate: triggerReload,
+    onDelete: triggerReload,
   });
 
   const handleOrderSent = useCallback((order: OrderSummary) => {
@@ -283,7 +287,12 @@ function CustomerShell({ venueId, tableId, tableLabel }: { venueId: string; tabl
   }
 
   return (
-    <div className="min-h-svh bg-isabelline">
+    <div className="min-h-svh bg-isabelline pb-20">
+      {/* Table PIN Banner (shows for host and table members once unlocked) */}
+      {pinUnlocked && bill?.table_pin && (
+        <TablePinBanner pin={bill.table_pin} tableLabel={tableLabel} />
+      )}
+
       {tab === "menu" && (
         <MenuScreen
           venueId={venueId}
@@ -319,7 +328,19 @@ function CustomerShell({ venueId, tableId, tableLabel }: { venueId: string; tabl
       )}
       <CustomerBottomNav activeTab={tab} onTabChange={setTab} cartCount={itemCount} />
 
-      {partyPromptOpen && (
+      {/* PIN Protection Modal for anyone joining an active table */}
+      {!pinUnlocked && bill?.table_pin && (
+        <TablePinModal
+          tableLabel={tableLabel}
+          expectedPin={bill.table_pin}
+          onSuccess={() => {
+            try { localStorage.setItem(`nightos:table_pin:${bill.id}`, bill.table_pin ?? ""); } catch { /* noop */ }
+            setPinInputVerified(true);
+          }}
+        />
+      )}
+
+      {partyPromptOpen && pinUnlocked && (
         <PartyPrompt
           venueName={venueName ?? "Velvet Lounge"}
           tableLabel={tableLabel}
@@ -408,10 +429,12 @@ function AppShell() {
   const navigate = useNavigate();
   const location = useLocation();
   const [searchParams] = useSearchParams();
-  const { user, signOut } = useAuth();
+  const { user, signOut, staffSession, role, venue: authVenue, profile } = useAuth();
 
-  const { venue: loadedVenue, loading: venueLoading, error: venueError } = useVenue("velvet-lounge");
-  const venueId = loadedVenue.id;
+  const targetSlug = authVenue?.slug || "velvet-lounge";
+  const { venue: loadedVenue, loading: venueLoading, error: venueError } = useVenue(targetSlug);
+  const currentVenue = authVenue || loadedVenue;
+  const venueId = currentVenue.id;
 
   const qrToken = searchParams.get("table");
   const { table: qrTable, loading: qrLoading, error: qrError } = useQrTable(qrToken);
@@ -446,8 +469,6 @@ function AppShell() {
     return () => window.removeEventListener("popstate", onPopState);
   }, []);
 
-  const { staffSession, signOut: authSignOut, role, venue, profile } = useAuth();
-
   // Manager page is URL-driven: /manager/ops, /manager/floorplan, ...
   const managerPage = useMemo<ManagerPage>(() => {
     const seg = location.pathname.split("/")[2];
@@ -466,10 +487,6 @@ function AppShell() {
     [navigate],
   );
 
-
-
-
-
   // /manager defaults to the Live Ops sub-path
   useEffect(() => {
     if (mode === "manager" && (location.pathname === "/manager" || location.pathname === "/manager/")) {
@@ -484,7 +501,7 @@ function AppShell() {
   const handleStaffSignOut = () => {
     const staffId = staffSession?.id;
     if (staffId) db.clockOutStaff(staffId).catch(() => {});
-    authSignOut();
+    signOut();
   };
 
   const handleManagerSignOut = async () => {
@@ -493,14 +510,14 @@ function AppShell() {
     navigate("/", { replace: true });
   };
 
-  if (!venueLoading && venueError) {
+  if (!authVenue && !venueLoading && venueError) {
     return (
       <div className="min-h-svh bg-isabelline flex items-center justify-center px-8">
         <div className="max-w-md text-center">
           <p className="text-ink font-semibold text-lg">Venue not found</p>
           <p className="text-ink/60 text-sm mt-2 leading-relaxed">
             The venue <strong>velvet-lounge</strong> doesn't exist in your database yet. Open the Supabase SQL
-            Editor and run <code className="rounded bg-ink/5 px-1.5 py-0.5 font-mono text-xs">supabase/seed-velvet.sql</code>,
+            Editor and run <code className="rounded bg-ink/5 px-1.5 py-0.5 font-mono text-xs">supabase/02-clean-seed.sql</code>,
             then reload this page.
           </p>
         </div>
@@ -529,7 +546,7 @@ function AppShell() {
           <Route path="/waiter" element={
             (staffSession || role === "owner") ? (
               <TablesDashboard
-                venueId={staffSession?.venue_id || venue?.id || ""}
+                venueId={staffSession?.venue_id || authVenue?.id || venueId || ""}
                 staffName={staffSession?.name || profile?.name || "Manager"}
                 staffId={staffSession?.id || user?.id || ""}
                 role={staffSession?.role || "manager"}
@@ -559,7 +576,7 @@ function AppShell() {
       {mode === "kitchen" && (
         (staffSession || role === "owner") ? (
           <KitchenDisplayScreen
-            venueId={staffSession?.venue_id || venue?.id || ""}
+            venueId={staffSession?.venue_id || authVenue?.id || venueId || ""}
             staffId={staffSession?.id || user?.id || ""}
             staffName={staffSession?.name || profile?.name || "Manager"}
             onExit={switchToCustomer}

@@ -12,6 +12,9 @@ import { formatGHS } from "../../data/menu";
 import { db } from "../../lib/api";
 import { ReceiptDownloader } from "../../components/ReceiptDownloader";
 import { ProfessionalReceipt } from "../../components/ProfessionalReceipt";
+import { useRealtime } from "../../hooks/useRealtime";
+import { sounds } from "../../lib/sound";
+import toast from "react-hot-toast";
 import type { Table } from "./TablesDashboard";
 import { ConfirmModal } from "../../components/ConfirmModal";
 
@@ -62,17 +65,20 @@ export function InvoiceSettlementScreen() {
     const [venueName, setVenueName] = useState<string | null>(null);
     const [settleConfirmOpen, setSettleConfirmOpen] = useState(false);
 
-    /* ── Load the real open bill for this table ── */
+    /* ── Load the real open/paid bill for this table ── */
+    const [revision, setRevision] = useState(0);
+    const triggerReload = () => setRevision((r) => r + 1);
+
     useEffect(() => {
         let cancelled = false;
-        const load = async () => {
+        const init = async () => {
             const { data: billRow } = await db.openBillForTable(table.id);
             if (cancelled) return;
-db.venueById(venueId).then(
+            db.venueById(venueId).then(
                 ({ data }) => { if (!cancelled && data) setVenueName(data.name); },
                 () => {},
             );
-            if (!billRow || billRow.status !== 'open') {
+            if (!billRow || (billRow.status !== 'open' && billRow.status !== 'settling' && billRow.status !== 'paid')) {
                 setBill(null);
                 setLoading(false);
                 return;
@@ -91,6 +97,9 @@ db.venueById(venueId).then(
                 total: Number(billRow.total),
                 status: billRow.status,
             });
+            if (billRow.status === 'paid' || (Number(billRow.amount_paid || 0) >= Number(billRow.total || 0) && Number(billRow.total || 0) > 0)) {
+                setSettled(true);
+            }
             setItems((itemRows ?? []).map((r) => ({
                 id: r.id,
                 product_name: r.product_name,
@@ -99,12 +108,25 @@ db.venueById(venueId).then(
             })));
             setLoading(false);
         };
-        load();
+        init();
         return () => {
             cancelled = true;
         };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [table.id]);
+    }, [table.id, venueId, revision]);
+
+    useRealtime({
+        table: 'bills',
+        filter: bill?.id ? `id=eq.${bill.id}` : undefined,
+        onUpdate: (payload: { new?: Record<string, unknown> }) => {
+            const updated = payload?.new;
+            if (updated && (updated.status === 'paid' || (Number(updated.amount_paid || 0) >= Number(updated.total || 0) && Number(updated.total || 0) > 0))) {
+                sounds.playPaymentSuccess();
+                toast.success("💳 Bill has been paid by guest!", { duration: 6000, icon: '🛎️' });
+                setSettled(true);
+            }
+            triggerReload();
+        },
+    });
 
     const total = bill?.total ?? 0;
     const received = parseFloat(cashReceived) || 0;

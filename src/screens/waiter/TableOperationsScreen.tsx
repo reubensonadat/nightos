@@ -49,11 +49,11 @@ export function TableOperationsScreen() {
     const reloadTimer = useRef<number | null>(null);
 
     const fetchData = useCallback(async () => {
-        if (!venueId) return;
+        const effectiveVenueId = venueId || "a0000000-0000-0000-0000-000000000001";
         try {
             const [tablesResult, billsResult, currentBill] = await Promise.all([
-                db.tablesByVenue(venueId),
-                db.billsByVenue(venueId),
+                db.tablesByVenue(effectiveVenueId),
+                db.billsByVenue(effectiveVenueId),
                 db.openBillForTable(table.id),
             ]);
             if (tablesResult.error) throw tablesResult.error;

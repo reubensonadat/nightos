@@ -224,17 +224,20 @@ export function useCustomerSession(venueId: string | null, tableId: string | nul
           session = { ...session, bill_id: existingBill.id }
         }
       } else {
+        const autoPin = Math.floor(1000 + Math.random() * 9000).toString();
         const { data: newBill, error: createBillErr } = await db.createBill(
           venueId,
           tableId,
           session.party_size || 1,
           token,
+          autoPin,
         )
         if (createBillErr || !newBill) {
           setState((s) => ({ ...s, session, bill: null, loading: false, error: 'Failed to create bill' }))
           return
         }
         bill = newBill
+        try { localStorage.setItem(`nightos:table_pin:${newBill.id}`, autoPin); } catch { /* noop */ }
         await supabase
           .from('customer_sessions')
           .update({ bill_id: newBill.id })
@@ -242,6 +245,15 @@ export function useCustomerSession(venueId: string | null, tableId: string | nul
           .eq('id', session.id)
         session = { ...session, bill_id: newBill.id }
       }
+    }
+
+    if (bill?.table_pin) {
+      // If the bill already had a PIN and we own the session, save to local storage
+      try {
+        if (session && localStorage.getItem(`nightos:party:${session.id}`) === '1') {
+          localStorage.setItem(`nightos:table_pin:${bill.id}`, bill.table_pin);
+        }
+      } catch { /* noop */ }
     }
 
     setState((s) => ({ ...s, session, bill, loading: false, error: null }))
@@ -279,13 +291,20 @@ export function useCustomerSession(venueId: string | null, tableId: string | nul
 
       if (error) return { error: 'Failed to save party size' }
 
-      const { error: billErr } = await db.updateBill(bill.id, { guest_count: partySize }, session.session_token)
+      const tablePin = bill.table_pin || Math.floor(1000 + Math.random() * 9000).toString();
+      const { error: billErr } = await db.updateBill(
+        bill.id,
+        { guest_count: partySize, table_pin: tablePin },
+        session.session_token,
+      )
       if (billErr) return { error: 'Failed to save party size' }
+
+      try { localStorage.setItem(`nightos:table_pin:${bill.id}`, tablePin); } catch { /* noop */ }
 
       setState((s) => ({
         ...s,
         session: { ...(updated as CustomerSession), bill_id: s.session?.bill_id ?? null },
-        bill: bill ? { ...bill, guest_count: partySize } : bill,
+        bill: bill ? { ...bill, guest_count: partySize, table_pin: tablePin } : bill,
       }))
 
       await assignWaiter(bill.id, session.session_token)

@@ -8,12 +8,14 @@ import {
     XMarkIcon,
     Cog8ToothIcon,
 } from "@heroicons/react/24/outline";
+import { CheckCircleIcon } from "@heroicons/react/24/solid";
 import toast from "react-hot-toast";
 import { formatGHS } from "../../data/menu";
-import { db, type DbOrderSubmission, type DbOrderItem, type DbProduct, type DbMenuCategory } from "../../lib/api";
+import { db, type DbBill, type DbOrderSubmission, type DbOrderItem, type DbProduct, type DbMenuCategory } from "../../lib/api";
 import type { Table } from "./TablesDashboard";
 import { MenuItemCard } from "../../components/MenuItemCard";
 import { ConfirmModal } from "../../components/ConfirmModal";
+import { sounds } from "../../lib/sound";
 
 /* ────────────────────────── Types ────────────────────────── */
 
@@ -67,6 +69,7 @@ export function OrderManagementScreen() {
     const [products, setProducts] = useState<DbProduct[]>([]);
 
     // ── Real bill + submissions for this table ──
+    const [currentBill, setCurrentBill] = useState<DbBill | null>(null);
     const [billId, setBillId] = useState<string | null>(null);
     const [submissions, setSubmissions] = useState<DbOrderSubmission[]>([]);
     const [itemsBySubmission, setItemsBySubmission] = useState<Record<string, DbOrderItem[]>>({});
@@ -79,6 +82,7 @@ export function OrderManagementScreen() {
         try {
             const { data: bill } = await db.openBillForTable(table.id);
             if (bill) {
+                setCurrentBill(bill);
                 const billId =
                     bill.waiter_id
                         ? bill.id
@@ -97,14 +101,16 @@ export function OrderManagementScreen() {
                 );
                 setItemsBySubmission(itemMap);
             } else {
+                setCurrentBill(null);
                 setBillId(null);
                 setSubmissions([]);
                 setItemsBySubmission({});
             }
 
+            const effectiveVenueId = venueId || "a0000000-0000-0000-0000-000000000001";
             const [{ data: cats }, { data: prods }] = await Promise.all([
-                db.menuCategories(venueId),
-                db.products(venueId),
+                db.menuCategories(effectiveVenueId),
+                db.products(effectiveVenueId),
             ]);
             const catList = cats ?? [];
             setCategories(catList);
@@ -115,8 +121,10 @@ export function OrderManagementScreen() {
                     return stillExists ? prev : catList[0].id;
                 });
             }
-        } catch {
+        } catch (e) {
+            console.error("Failed to load table orders:", e);
             toast.error("Failed to load this table's orders");
+        } finally {
             setLoading(false);
         }
     }, [table.id, venueId, staffId]);
@@ -149,10 +157,25 @@ export function OrderManagementScreen() {
         table: 'order_items',
         onInsert: scheduleReload,
     });
-
     useRealtime({
-        table: 'order_items',
-        onInsert: scheduleReload,
+        table: 'bills',
+        filter: currentBill?.id ? `id=eq.${currentBill.id}` : undefined,
+        onUpdate: (payload: { new?: Record<string, unknown>; old?: Record<string, unknown> }) => {
+            const updated = payload?.new;
+            const previous = payload?.old;
+            if (
+                updated &&
+                (updated.status === 'paid' || (Number(updated.amount_paid || 0) >= Number(updated.total || 0) && Number(updated.total || 0) > 0)) &&
+                previous?.status !== 'paid'
+            ) {
+                sounds.playPaymentSuccess();
+                toast.success(`💳 Table ${table.number} Bill Paid: ${formatGHS(Number(updated.total || 0))} has been paid by guest!`, {
+                    duration: 8000,
+                    icon: '🛎️',
+                });
+            }
+            scheduleReload();
+        },
     });
 
     const catNameById = useMemo(() => {
@@ -313,6 +336,32 @@ export function OrderManagementScreen() {
                         </button>
                     </div>
                 </div>
+
+                {/* Paid Bill Alert Banner */}
+                {currentBill && (currentBill.status === 'paid' || (Number(currentBill.amount_paid || 0) >= Number(currentBill.total || 0) && Number(currentBill.total || 0) > 0)) && (
+                    <div className="mx-auto w-full max-w-7xl px-5 md:px-8 pb-3">
+                        <div className="flex items-center justify-between rounded-2xl bg-emerald-50 border border-emerald-500/30 p-3.5 shadow-sm">
+                            <div className="flex items-center gap-3">
+                                <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-600 text-white shadow-sm">
+                                    <CheckCircleIcon className="h-5 w-5" />
+                                </div>
+                                <div>
+                                    <p className="text-[10px] font-bold uppercase tracking-wider text-emerald-800">Bill Settled · Paid</p>
+                                    <p className="text-[13px] font-black text-emerald-950">
+                                        Paid in full ({formatGHS(Number(currentBill.total || 0))})
+                                    </p>
+                                </div>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={() => navigate(`/waiter/table/${table.id}/settle`)}
+                                className="rounded-xl bg-emerald-700 px-3.5 py-2 text-[11px] font-bold text-white shadow-sm transition-all hover:bg-emerald-800 active:scale-95"
+                            >
+                                Settle / Close Tab →
+                            </button>
+                        </div>
+                    </div>
+                )}
 
                 {/* Tab bar */}
                 <nav className="mx-auto w-full max-w-7xl px-5 md:px-8 pb-3">
