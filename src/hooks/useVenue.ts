@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { db, type DbVenue } from '../lib/api';
 
 const DEFAULT_VENUE: DbVenue = {
-  id: '00000000-0000-0000-0000-000000000000',
+  id: 'a0000000-0000-0000-0000-000000000001',
   owner_id: '',
   name: 'Velvet Lounge',
   slug: 'velvet-lounge',

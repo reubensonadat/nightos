@@ -184,10 +184,12 @@ CREATE TABLE public.customer_sessions (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     venue_id uuid NOT NULL REFERENCES public.venues(id) ON DELETE CASCADE,
     table_id uuid NOT NULL REFERENCES public.tables(id) ON DELETE CASCADE,
+    bill_id uuid,
     session_token text NOT NULL UNIQUE DEFAULT encode(gen_random_bytes(16), 'hex'),
     guest_name text DEFAULT 'Guest',
     party_size int NOT NULL DEFAULT 1,
     status text NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'closed', 'expired')),
+    last_active_at timestamptz NOT NULL DEFAULT now(),
     created_at timestamptz NOT NULL DEFAULT now(),
     closed_at timestamptz
 );
@@ -214,10 +216,16 @@ CREATE TABLE public.bills (
     last_activity_at timestamptz NOT NULL DEFAULT now()
 );
 
+-- Add foreign key from customer_sessions to bills now that bills exists
+ALTER TABLE public.customer_sessions
+    ADD CONSTRAINT fk_customer_sessions_bill
+    FOREIGN KEY (bill_id) REFERENCES public.bills(id) ON DELETE SET NULL;
+
 CREATE TABLE public.order_submissions (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     bill_id uuid NOT NULL REFERENCES public.bills(id) ON DELETE CASCADE,
     venue_id uuid NOT NULL REFERENCES public.venues(id) ON DELETE CASCADE,
+    customer_session_id uuid REFERENCES public.customer_sessions(id) ON DELETE SET NULL,
     guest_name text,
     status text NOT NULL DEFAULT 'confirmed' CHECK (status IN ('pending', 'confirmed', 'preparing', 'ready', 'served', 'cancelled')),
     station text NOT NULL DEFAULT 'kitchen' CHECK (station IN ('kitchen', 'bar', 'both')),
@@ -231,6 +239,7 @@ CREATE TABLE public.order_items (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     submission_id uuid NOT NULL REFERENCES public.order_submissions(id) ON DELETE CASCADE,
     bill_id uuid NOT NULL REFERENCES public.bills(id) ON DELETE CASCADE,
+    customer_session_id uuid REFERENCES public.customer_sessions(id) ON DELETE SET NULL,
     product_id uuid NOT NULL REFERENCES public.products(id),
     product_name text NOT NULL,
     quantity int NOT NULL DEFAULT 1,
