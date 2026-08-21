@@ -450,7 +450,7 @@ function AppShell() {
   const mode = getModeFromPath();
   const setMode = useCallback((newMode: Mode) => {
     const paths: Record<Mode, string> = {
-      customer: "/app",
+      customer: "/switcher",
       waiter: "/waiter",
       kitchen: "/kitchen",
       manager: "/manager/ops",
@@ -637,10 +637,10 @@ function AppRoutes() {
   const isVerifyRoute = location.pathname === "/verify-otp";
   const isSetupRoute = location.pathname === "/setup";
   const isPromoRoute = location.pathname === "/";
-  const isAppRoute = location.pathname === "/app";
+  const isSwitcherRoute = location.pathname === "/switcher";
 
   if (isPromoRoute) return <PromoLandingScreen />;
-  if (isAppRoute) return <AppShell />;
+  if (isSwitcherRoute) return <AppShell />;
 
   if (isAuthRoute) {
     if (isAuthenticated && !isInitializing) {
