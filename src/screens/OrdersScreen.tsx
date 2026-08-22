@@ -47,7 +47,7 @@ function ActiveOrderCard({ order }: { order: OrderSummary }) {
 
   if (order.status === "cancelled" || order.cancelled) {
     return (
-      <div className="overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-red-100">
+      <div className="overflow-hidden rounded-xl bg-white shadow-sm ring-1 ring-red-100">
         <div className="flex items-center justify-between px-4 py-3">
           <div>
             <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-red-500">Cancelled by staff</p>
@@ -68,7 +68,7 @@ function ActiveOrderCard({ order }: { order: OrderSummary }) {
   }
 
   return (
-    <div className="overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-isabelline">
+    <div className="overflow-hidden rounded-xl bg-white shadow-sm ring-1 ring-isabelline">
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-3">
         <div>
@@ -162,25 +162,30 @@ function ReceiptModal({ order, venueName, sessionToken, onClose }: ReceiptModalP
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      const [itemsRes, billRes] = await Promise.all([
-        order.billId ? db.orderItemsByBill(order.billId, sessionToken) : Promise.resolve({ data: null }),
-        order.billId ? db.customerBill(order.billId, sessionToken) : Promise.resolve({ data: null }),
-      ]);
-      if (cancelled) return;
-      const activeItems = (itemsRes.data ?? []).filter((i) => i.status !== 'cancelled');
-      setItems(activeItems.length > 0 ? activeItems : null);
-      if (billRes.data) {
-        setBill({
-          subtotal: Number(billRes.data.subtotal ?? 0),
-          vat: Number(billRes.data.vat ?? 0),
-          total: Number(billRes.data.total ?? order.total),
-          status: billRes.data.status,
-          created_at: billRes.data.created_at,
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-          tables: (Array.isArray(billRes.data.tables) ? billRes.data.tables[0] : billRes.data.tables) as any,
-        });
+      try {
+        const [itemsRes, billRes] = await Promise.all([
+          order.billId ? db.orderItemsByBill(order.billId, sessionToken) : Promise.resolve({ data: null }),
+          order.billId ? db.customerBill(order.billId, sessionToken) : Promise.resolve({ data: null }),
+        ]);
+        if (cancelled) return;
+        const activeItems = (itemsRes.data ?? []).filter((i) => i.status !== 'cancelled');
+        setItems(activeItems.length > 0 ? activeItems : null);
+        if (billRes.data) {
+          setBill({
+            subtotal: Number(billRes.data.subtotal ?? 0),
+            vat: Number(billRes.data.vat ?? 0),
+            total: Number(billRes.data.total ?? order.total),
+            status: billRes.data.status,
+            created_at: billRes.data.created_at,
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            tables: (Array.isArray(billRes.data.tables) ? billRes.data.tables[0] : billRes.data.tables) as any,
+          });
+        }
+      } catch (err) {
+        console.error("Error loading receipt details:", err);
+      } finally {
+        if (!cancelled) setLoading(false);
       }
-      setLoading(false);
     })();
     return () => {
       cancelled = true;
@@ -215,7 +220,7 @@ function ReceiptModal({ order, venueName, sessionToken, onClose }: ReceiptModalP
         onClick={onClose}
         className="absolute inset-0 bg-licorice/60 backdrop-blur-sm"
       />
-      <div className="relative z-10 w-full max-w-md animate-velvet-scale-in rounded-t-3xl sm:rounded-3xl bg-isabelline shadow-[0_24px_80px_rgba(35,20,12,0.35)] max-h-[92svh] overflow-y-auto pb-6">
+      <div className="relative z-10 w-full max-w-md animate-velvet-scale-in rounded-t-3xl sm:rounded-3xl bg-isabelline shadow-[0_24px_80px_rgba(35,20,12,0.35)] max-h-[92svh] overflow-y-auto no-scrollbar pb-6">
         {/* Handle + header */}
         <div className="sticky top-0 z-10 rounded-t-3xl sm:rounded-t-3xl border-b border-licorice/8 bg-isabelline/95 backdrop-blur-xl px-5 pt-3 pb-3">
           <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-licorice/15" />
@@ -355,10 +360,6 @@ export function OrdersScreen({ activeOrders, history, tableLabel, billId: _billI
       {hasActive && (
         <div className="mb-8">
           <div className="mb-3 flex items-center gap-2">
-            <span className="relative flex h-2 w-2">
-              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-khaki opacity-70" />
-              <span className="relative inline-flex h-2 w-2 rounded-full bg-khaki" />
-            </span>
             <h2 className="text-[11px] font-bold uppercase tracking-[0.18em] text-licorice">
               Active {activeOrders.length > 1 ? `(${activeOrders.length})` : ""}
             </h2>

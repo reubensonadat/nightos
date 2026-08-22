@@ -244,21 +244,16 @@ export function OrderManagementScreen() {
             }
             setBillId(bill.id);
 
-            const notes = order.map((l) => l.notes).filter(Boolean).join("; ") || undefined;
-            const hasKitchen = order.some((l) => !l.menuItem.station || l.menuItem.station === 'kitchen' || l.menuItem.station === 'both');
-            const hasBar = order.some((l) => l.menuItem.station === 'bar' || l.menuItem.station === 'both');
-            const station: 'kitchen' | 'bar' = hasKitchen ? 'kitchen' : hasBar ? 'bar' : 'kitchen';
-            const { data: submission } = await db.createOrderSubmission(
-                bill.id,
-                bill.venue_id,
-                station,
-                notes,
-            );
-            if (!submission) {
-                toast.error("Could not create the order");
-                return;
-            }
             for (const line of order) {
+                const station: 'kitchen' | 'bar' = line.menuItem.station === 'bar' ? 'bar' : 'kitchen';
+                const { data: submission } = await db.createOrderSubmission(
+                    bill.id,
+                    bill.venue_id,
+                    station,
+                    line.notes || undefined,
+                );
+                if (!submission) continue;
+
                 await db.createOrderItem(
                     submission.id,
                     bill.id,

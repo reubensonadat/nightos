@@ -88,28 +88,22 @@ export function CartScreen({ venueId, tableLabel, billId, customerSessionId, ses
         setSending(true);
 
         try {
-            // Determine the station from the items' station field (set in DB).
-            // A cart with any bar-only items goes to 'bar'; all kitchen → 'kitchen'.
-            // Falls back to 'kitchen' if station is unset (backwards compatible).
-            const hasKitchen = lines.some((l) => !l.item.station || l.item.station === 'kitchen' || l.item.station === 'both');
-            const hasBar = lines.some((l) => l.item.station === 'bar' || l.item.station === 'both');
-            const station = hasKitchen ? 'kitchen' : hasBar ? 'bar' : 'kitchen';
-
-            const { data: submission, error: subErr } = await db.createOrderSubmission(
-                billId,
-                venueId,
-                station,
-                orderNotes || undefined,
-                customerSessionId,
-                undefined,
-                sessionToken,
-            );
-
-            if (subErr || !submission) {
-                throw subErr || new Error("Failed to submit order");
-            }
-
             for (const line of lines) {
+                const station: 'kitchen' | 'bar' = line.item.station === 'bar' ? 'bar' : 'kitchen';
+                const { data: submission, error: subErr } = await db.createOrderSubmission(
+                    billId,
+                    venueId,
+                    station,
+                    line.notes || orderNotes || undefined,
+                    customerSessionId,
+                    undefined,
+                    sessionToken,
+                );
+
+                if (subErr || !submission) {
+                    throw subErr || new Error("Failed to submit order");
+                }
+
                 const unitPrice = getLineUnitPrice(line);
                 const { error: itemErr } = await db.createOrderItem(
                     submission.id,
@@ -126,33 +120,34 @@ export function CartScreen({ venueId, tableLabel, billId, customerSessionId, ses
                     sessionToken,
                 );
                 if (itemErr) throw itemErr;
+
+                const orderNumber = submission.id.slice(0, 8).toUpperCase();
+                const lineTotal = unitPrice * line.qty;
+
+                const order: OrderSummary = {
+                    orderNumber,
+                    items: [
+                        {
+                            name: line.item.name,
+                            qty: line.qty,
+                            image: line.item.image,
+                            lineTotal,
+                        },
+                    ],
+                    total: lineTotal,
+                    itemCount: line.qty,
+                    sentAt: Date.now(),
+                    venueId,
+                    billId,
+                    submissionId: submission.id,
+                    status: "confirmed",
+                };
+
+                onOrderSent?.(order);
             }
 
-            const orderNumber = submission.id.slice(0, 8).toUpperCase();
-
-            const order: OrderSummary = {
-                orderNumber,
-                items: lines.map((line) => {
-                    const unitPrice = getLineUnitPrice(line);
-                    return {
-                        name: line.item.name,
-                        qty: line.qty,
-                        image: line.item.image,
-                        lineTotal: unitPrice * line.qty,
-                    };
-                }),
-                total,
-                itemCount,
-                sentAt: Date.now(),
-                venueId,
-                billId,
-                submissionId: submission.id,
-                status: "confirmed",
-            };
-
             clear();
-            toast.success(`Order ${orderNumber} sent to ${station === 'kitchen' ? 'the kitchen' : 'the bar'}`);
-            onOrderSent?.(order);
+            toast.success(`Sent ${lines.length} ${lines.length === 1 ? "item" : "items"} to kitchen`);
         } catch (err) {
             console.error("Failed to send order:", err);
             toast.error("Couldn't send your order. Please try again.");

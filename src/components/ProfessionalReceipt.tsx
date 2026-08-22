@@ -1,3 +1,4 @@
+import { useMemo } from "react";
 import { formatGHS } from "../data/menu";
 
 export type ReceiptLine = {
@@ -44,6 +45,21 @@ export function ProfessionalReceipt({
         minute: "2-digit",
     });
 
+    // Aggregate duplicate items into single combined rows
+    const displayItems = useMemo(() => {
+        const map = new Map<string, ReceiptLine>();
+        for (const item of items) {
+            const existing = map.get(item.name);
+            if (existing) {
+                existing.qty += item.qty;
+                existing.lineTotal += item.lineTotal;
+            } else {
+                map.set(item.name, { ...item });
+            }
+        }
+        return Array.from(map.values());
+    }, [items]);
+
     return (
         <div className="bg-white text-[#111111] font-sans">
             {/* ── Header ── */}
@@ -89,43 +105,45 @@ export function ProfessionalReceipt({
             </div>
 
             {/* ── Item table ── */}
-            <table className="mt-8 w-full border-collapse px-7">
-                <thead>
-                    <tr>
-                        <th className="border-b border-licorice/10 pb-3 text-left text-[10px] font-bold uppercase tracking-[0.15em] text-feldgrau/50">
-                            Item
-                        </th>
-                        <th className="border-b border-licorice/10 pb-3 text-right text-[10px] font-bold uppercase tracking-[0.15em] text-feldgrau/50">
-                            Qty
-                        </th>
-                        <th className="border-b border-licorice/10 pb-3 text-right text-[10px] font-bold uppercase tracking-[0.15em] text-feldgrau/50">
-                            Total
-                        </th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {items.length === 0 && (
+            <div className="mt-8 px-7">
+                <table className="w-full border-collapse">
+                    <thead>
                         <tr>
-                            <td className="border-b border-licorice/5 py-4 text-[13px] text-feldgrau/50" colSpan={3}>
-                                No items on this receipt.
-                            </td>
+                            <th className="border-b border-licorice/10 pb-3 text-left text-[10px] font-bold uppercase tracking-[0.15em] text-feldgrau/50">
+                                Item
+                            </th>
+                            <th className="border-b border-licorice/10 pb-3 text-center text-[10px] font-bold uppercase tracking-[0.15em] text-feldgrau/50 w-16 whitespace-nowrap">
+                                Qty
+                            </th>
+                            <th className="border-b border-licorice/10 pb-3 text-right text-[10px] font-bold uppercase tracking-[0.15em] text-feldgrau/50 w-28 whitespace-nowrap">
+                                Total
+                            </th>
                         </tr>
-                    )}
-                    {items.map((item, i) => (
-                        <tr key={i}>
-                            <td className="border-b border-licorice/5 py-3.5 text-[14px] font-medium text-licorice">
-                                {item.name}
-                            </td>
-                            <td className="border-b border-licorice/5 py-3.5 text-right text-[14px] text-feldgrau/70">
-                                {item.qty}
-                            </td>
-                            <td className="border-b border-licorice/5 py-3.5 text-right text-[14px] text-licorice">
-                                {formatGHS(item.lineTotal)}
-                            </td>
-                        </tr>
-                    ))}
-                </tbody>
-            </table>
+                    </thead>
+                    <tbody>
+                        {displayItems.length === 0 && (
+                            <tr>
+                                <td className="border-b border-licorice/5 py-4 text-[13px] text-feldgrau/50" colSpan={3}>
+                                    No items on this receipt.
+                                </td>
+                            </tr>
+                        )}
+                        {displayItems.map((item, i) => (
+                            <tr key={i}>
+                                <td className="border-b border-licorice/5 py-3.5 pr-3 text-[14px] font-medium text-licorice align-top">
+                                    {item.name}
+                                </td>
+                                <td className="border-b border-licorice/5 py-3.5 px-2 text-center text-[14px] text-feldgrau/70 align-top w-16 whitespace-nowrap font-mono tabular-nums">
+                                    {item.qty}
+                                </td>
+                                <td className="border-b border-licorice/5 py-3.5 pl-3 text-right text-[14px] text-licorice align-top w-28 whitespace-nowrap font-mono tabular-nums">
+                                    {formatGHS(item.lineTotal)}
+                                </td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+            </div>
 
             {/* ── Totals (no service charge, no delivery fee) ── */}
             <div className="px-7 pt-4 pb-6">

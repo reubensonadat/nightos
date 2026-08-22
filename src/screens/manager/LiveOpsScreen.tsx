@@ -458,7 +458,7 @@ export function LiveOpsScreen() {
                             {s.lowStockItems.map((item) => (
                                 <div
                                     key={item.id}
-                                    className={`flex items-start gap-3 rounded-xl border-l-2 px-3 py-2.5 ${item.stock <= item.threshold / 2 ? "border-dark-red bg-dark-red/5" : "border-khaki bg-khaki/5"
+                                    className={`flex items-start gap-3 rounded-lg px-3 py-2.5 ${item.stock <= item.threshold / 2 ? "bg-dark-red/5" : "bg-khaki/5"
                                         }`}
                                 >
                                     <span
@@ -478,7 +478,7 @@ export function LiveOpsScreen() {
                             {waitAlerts.map((o) => (
                                 <div
                                     key={o.id}
-                                    className="flex items-start gap-3 rounded-xl border-l-2 border-khaki bg-khaki/5 px-3 py-2.5"
+                                    className="flex items-start gap-3 rounded-lg bg-khaki/5 px-3 py-2.5"
                                 >
                                     <span className="mt-0.5 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-khaki/20 text-xs font-bold uppercase text-khaki">
                                         TIM
@@ -494,7 +494,7 @@ export function LiveOpsScreen() {
                             {dwellAlerts.map((a) => (
                                 <div
                                     key={`dwell-${a.label}`}
-                                    className="flex items-start gap-3 rounded-xl border-l-2 border-dark-red bg-dark-red/5 px-3 py-2.5"
+                                    className="flex items-start gap-3 rounded-lg bg-dark-red/5 px-3 py-2.5"
                                 >
                                     <span className="mt-0.5 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-dark-red/15 text-xs font-bold uppercase text-dark-red">
                                         TBL

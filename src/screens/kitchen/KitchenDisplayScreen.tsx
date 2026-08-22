@@ -95,13 +95,20 @@ type Props = {
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 export function KitchenDisplayScreen({ venueId, staffId, staffName, onExit, onSignOut }: Props) {
     const [orders, setOrders] = useState<KitchenOrder[]>([]);
-    // eslint-disable-next-line react-hooks/purity
-    const [now, setNow] = useState(Date.now());
+    const [now, setNow] = useState(() => Date.now());
     const [stationFilter, setStationFilter] = useState<StationFilter>("all");
     const [showSignOutModal, setShowSignOutModal] = useState(false);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [serveConfirmId, setServeConfirmId] = useState<string | null>(null);
+
+    /* ── Live frontend timer tick (1 second, 0 DB cost) ── */
+    useEffect(() => {
+        const interval = setInterval(() => {
+            setNow(Date.now());
+        }, 1000);
+        return () => clearInterval(interval);
+    }, []);
 
     /* ── Load real orders ── */
     const load = useCallback(async () => {
