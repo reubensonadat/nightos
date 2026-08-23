@@ -14,6 +14,7 @@ import { db, type DbOrderItem } from "../lib/api";
 import { ReceiptDownloader } from "../components/ReceiptDownloader";
 import { STAGES, statusStage, type OrderSummary } from "./OrderTrackingScreen";
 import { ProfessionalReceipt } from "../components/ProfessionalReceipt";
+import { TablePinBanner } from "../components/TablePinBanner";
 
 function formatDate(ts: number): string {
   return new Date(ts).toLocaleDateString("en-GH", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
@@ -30,6 +31,7 @@ type Props = {
   activeOrders: OrderSummary[];
   history: OrderSummary[];
   tableLabel?: string | null;
+  tablePin?: string | null;
   billId?: string | null;
   sessionToken?: string | null;
   onPayBill: (order: OrderSummary) => void;
@@ -316,17 +318,21 @@ function HistoryCard({
 
 /* ────────────────────────── Main Screen ────────────────────────── */
 
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-export function OrdersScreen({ activeOrders, history, tableLabel, billId: _billId, sessionToken, venueName, onPayBill, onReorder: _onReorder, onBack }: Props & { venueName?: string | null; onBack?: () => void }) {
+export function OrdersScreen({ activeOrders, history, tableLabel, tablePin, billId: _billId, sessionToken, venueName, onPayBill, onReorder: _onReorder, onBack }: Props & { venueName?: string | null; onBack?: () => void }) {
   const navigate = useNavigate();
   const hasActive = activeOrders.length > 0;
   const hasHistory = history.length > 0;
 
   return (
-    <main className="relative min-h-svh w-full overflow-x-hidden bg-isabelline font-sans text-licorice antialiased">
+    <main className="relative min-h-svh w-full bg-isabelline font-sans text-licorice antialiased">
       {/* ── Top Bar ── */}
       <header className="sticky top-0 z-30 bg-isabelline/95 backdrop-blur-xl border-b border-licorice/8">
-        <div className="mx-auto flex w-full max-w-7xl items-center justify-between px-5 md:px-8 pt-[max(env(safe-area-inset-top),16px)] pb-3 relative">
+        {tablePin && (
+          <div className="pt-[max(env(safe-area-inset-top),0px)]">
+            <TablePinBanner pin={tablePin} tableLabel={tableLabel} />
+          </div>
+        )}
+        <div className={`mx-auto flex w-full max-w-7xl items-center justify-between px-5 md:px-8 ${!tablePin ? 'pt-[max(env(safe-area-inset-top),16px)]' : 'pt-3'} pb-3 relative`}>
           <button
             type="button"
             onClick={() => onBack ? onBack() : navigate(-1)}

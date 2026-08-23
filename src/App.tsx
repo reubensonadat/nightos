@@ -288,17 +288,13 @@ function CustomerShell({ venueId, tableId, tableLabel }: { venueId: string; tabl
 
   return (
     <div className="min-h-svh bg-isabelline pb-20">
-      {/* Table PIN Banner (shows for host and table members once unlocked) */}
-      {pinUnlocked && bill?.table_pin && (
-        <TablePinBanner pin={bill.table_pin} tableLabel={tableLabel} />
-      )}
-
       {tab === "menu" && (
         <MenuScreen
           venueId={venueId}
           venueName={venueName}
           tableLabel={tableLabel}
           waiterName={waiter?.name ?? null}
+          tablePin={pinUnlocked && bill?.table_pin ? bill.table_pin : null}
           onViewCart={() => setTab("tab")}
         />
       )}
@@ -307,6 +303,7 @@ function CustomerShell({ venueId, tableId, tableLabel }: { venueId: string; tabl
           venueId={venueId}
           venueName={venueName ?? undefined}
           tableLabel={tableLabel ?? undefined}
+          tablePin={pinUnlocked && bill?.table_pin ? bill.table_pin : null}
           billId={bill?.id}
           customerSessionId={session?.id}
           sessionToken={session?.session_token}
@@ -319,6 +316,7 @@ function CustomerShell({ venueId, tableId, tableLabel }: { venueId: string; tabl
           activeOrders={activeOrders}
           history={history}
           tableLabel={tableLabel}
+          tablePin={pinUnlocked && bill?.table_pin ? bill.table_pin : null}
           venueName={venueName}
           billId={bill?.id ?? null}
           sessionToken={session?.session_token}

@@ -18,11 +18,14 @@ import { ItemDetailsSheet } from "../components/ItemDetailsSheet";
 import { db, type DbProduct, type DbModifierOption } from "../lib/api";
 import { supabase } from "../lib/supabase";
 
+import { TablePinBanner } from "../components/TablePinBanner";
+
 type Props = {
     venueId?: string;
     venueName?: string | null;
     tableLabel?: string | null;
     waiterName?: string | null;
+    tablePin?: string | null;
     onBack?: () => void;
     onViewCart?: () => void;
 };
@@ -104,7 +107,7 @@ async function fetchProducts(venueId: string): Promise<MenuItem[]> {
 
 }
 
-export function MenuScreen({ venueId, venueName, tableLabel, waiterName, onBack, onViewCart }: Props) {
+export function MenuScreen({ venueId, venueName, tableLabel, waiterName, tablePin, onBack, onViewCart }: Props) {
     const [active, setActive] = useState<MenuCategory>("Signatures");
     const [query, setQuery] = useState("");
     const [activeItemId, setActiveItemId] = useState<string | null>(null);
@@ -158,14 +161,20 @@ export function MenuScreen({ venueId, venueName, tableLabel, waiterName, onBack,
     const gridItems = visibleItems;
 
     return (
-        <main className="relative min-h-svh w-full overflow-x-hidden bg-isabelline font-sans text-licorice antialiased">
+        <main className="relative min-h-svh w-full bg-isabelline font-sans text-licorice antialiased">
             {/* ═══════════════════════════════════════════════════════════
                 LIGHT EDITORIAL HEADER — clean, like a printed menu
               ═══════════════════════════════════════════════════════════ */}
             <header className="sticky top-0 z-30 bg-isabelline/95 backdrop-blur-xl border-b border-licorice/8">
+                {/* ── Table PIN Banner ── */}
+                {tablePin && (
+                    <div className="pt-[max(env(safe-area-inset-top),0px)]">
+                        <TablePinBanner pin={tablePin} tableLabel={tableLabel} />
+                    </div>
+                )}
 
                 {/* ── Row 1: Venue & Status ── */}
-                <div className="mx-auto flex w-full max-w-7xl items-center justify-between px-5 md:px-8 pt-[max(env(safe-area-inset-top),14px)] pb-2.5">
+                <div className={`mx-auto flex w-full max-w-7xl items-center justify-between px-5 md:px-8 ${!tablePin ? 'pt-[max(env(safe-area-inset-top),14px)]' : 'pt-2'} pb-2.5`}>
                     {/* Left: back + avatar + name */}
                     <div className="flex items-center gap-2.5">
                         {onBack && (

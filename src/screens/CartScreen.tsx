@@ -17,11 +17,14 @@ import type { OrderSummary } from "./OrderTrackingScreen";
 import { db, type DbOrderItem } from "../lib/api";
 import { useRealtime } from "../hooks/useRealtime";
 
+import { TablePinBanner } from "../components/TablePinBanner";
+
 type Props = {
     venueId: string;
     venueName?: string;
     tableLabel?: string;
     tableId?: string;
+    tablePin?: string | null;
     billId?: string | null;
     customerSessionId?: string | null;
     sessionToken?: string | null;
@@ -39,7 +42,7 @@ function estimatePrepMinutes(itemCount: number): string {
     return `${min}–${min + 4} min`;
 }
 
-export function CartScreen({ venueId, tableLabel, billId, customerSessionId, sessionToken, onBack, onContinueShopping, onOrderSent }: Props) {
+export function CartScreen({ venueId, tableLabel, tablePin, billId, customerSessionId, sessionToken, onBack, onContinueShopping, onOrderSent }: Props) {
     const { lines, itemCount, subtotal, setQty, remove, clear } = useCart();
     const [orderNotes, setOrderNotes] = useState("");
     const [sending, setSending] = useState(false);
@@ -230,18 +233,14 @@ export function CartScreen({ venueId, tableLabel, billId, customerSessionId, ses
     // ── Empty state ── (only show if NO draft items AND NO placed session items exist)
     if (!hasDraft && !hasPlaced && !loadingPlaced) {
         return (
-            <main className="relative min-h-svh w-full overflow-x-hidden bg-isabelline font-sans text-licorice antialiased">
-                {/* Dark hero */}
-                <div className="relative overflow-hidden bg-gradient-to-b from-licorice via-licorice to-licorice/95 pt-[max(env(safe-area-inset-top),20px)] pb-20">
-                    <div
-                        aria-hidden="true"
-                        className="pointer-events-none absolute inset-0"
-                    >
-                        <div className="absolute -top-16 -right-12 h-56 w-56 rounded-full bg-khaki mix-blend-screen blur-[70px] opacity-20" />
-                        <div className="absolute top-20 -left-16 h-48 w-48 rounded-full bg-light-blue mix-blend-screen blur-[70px] opacity-15" />
-                    </div>
-
-                    <div className="relative z-10 mx-auto flex w-full max-w-7xl items-center justify-between px-5 md:px-8">
+            <main className="relative min-h-svh w-full bg-isabelline font-sans text-licorice antialiased">
+                <header className="sticky top-0 z-50 bg-licorice">
+                    {tablePin && (
+                        <div className="pt-[max(env(safe-area-inset-top),0px)] pb-2">
+                            <TablePinBanner pin={tablePin} tableLabel={tableLabel} />
+                        </div>
+                    )}
+                    <div className={`relative z-10 mx-auto flex w-full max-w-7xl items-center justify-between px-5 md:px-8 ${!tablePin ? 'pt-[max(env(safe-area-inset-top),14px)]' : 'pt-0'} pb-3`}>
                         <button
                             type="button"
                             onClick={onBack}
@@ -255,8 +254,18 @@ export function CartScreen({ venueId, tableLabel, billId, customerSessionId, ses
                             Your Tab
                         </h1>
                     </div>
+                </header>
+                {/* Dark hero */}
+                <div className="relative overflow-hidden bg-gradient-to-b from-licorice via-licorice to-licorice/95 pt-8 pb-20">
+                    <div
+                        aria-hidden="true"
+                        className="pointer-events-none absolute inset-0"
+                    >
+                        <div className="absolute -top-16 -right-12 h-56 w-56 rounded-full bg-khaki mix-blend-screen blur-[70px] opacity-20" />
+                        <div className="absolute top-20 -left-16 h-48 w-48 rounded-full bg-light-blue mix-blend-screen blur-[70px] opacity-15" />
+                    </div>
 
-                    <div className="relative z-10 mt-8 mx-auto w-full max-w-7xl px-5 md:px-8 text-center">
+                    <div className="relative z-10 mx-auto w-full max-w-7xl px-5 md:px-8 text-center">
                         <h1 className="mt-2 text-[2rem] font-black leading-tight tracking-[-0.04em] text-isabelline">
                             Nothing here
                             <br />
@@ -305,22 +314,14 @@ export function CartScreen({ venueId, tableLabel, billId, customerSessionId, ses
 
     // ── Main cart view ──
     return (
-        <main className="relative min-h-svh w-full overflow-x-hidden bg-isabelline font-sans text-licorice antialiased">
-            {/* ═══════════════════════════════════════════════════════════
-                DARK LICORICE HERO
-              ═══════════════════════════════════════════════════════════ */}
-            <header className="relative overflow-hidden bg-gradient-to-b from-licorice via-licorice to-licorice/95 pt-[max(env(safe-area-inset-top),20px)] pb-20">
-                {/* Blur orbs */}
-                <div
-                    aria-hidden="true"
-                    className="pointer-events-none absolute inset-0"
-                >
-                    <div className="absolute -top-16 -right-12 h-56 w-56 rounded-full bg-khaki mix-blend-screen blur-[70px] opacity-20" />
-                    <div className="absolute top-20 -left-16 h-48 w-48 rounded-full bg-light-blue mix-blend-screen blur-[70px] opacity-15" />
-                </div>
-
-                {/* Top bar */}
-                <div className="relative z-10 mx-auto flex w-full max-w-7xl items-center justify-between px-5 md:px-8">
+        <main className="relative min-h-svh w-full bg-isabelline font-sans text-licorice antialiased">
+            <header className="sticky top-0 z-50 bg-licorice">
+                {tablePin && (
+                    <div className="pt-[max(env(safe-area-inset-top),0px)] pb-2">
+                        <TablePinBanner pin={tablePin} tableLabel={tableLabel} />
+                    </div>
+                )}
+                <div className={`relative z-10 mx-auto flex w-full max-w-7xl items-center justify-between px-5 md:px-8 ${!tablePin ? 'pt-[max(env(safe-area-inset-top),14px)]' : 'pt-0'} pb-3`}>
                     <button
                         type="button"
                         onClick={onBack}
@@ -334,13 +335,23 @@ export function CartScreen({ venueId, tableLabel, billId, customerSessionId, ses
                         Your Tab
                     </h1>
                 </div>
+            </header>
+            {/* ═══════════════════════════════════════════════════════════
+                DARK LICORICE HERO
+              ═══════════════════════════════════════════════════════════ */}
+            <div className="relative overflow-hidden bg-gradient-to-b from-licorice via-licorice to-licorice/95 pt-8 pb-20">
+                {/* Blur orbs */}
+                <div
+                    aria-hidden="true"
+                    className="pointer-events-none absolute inset-0"
+                >
+                    <div className="absolute -top-16 -right-12 h-56 w-56 rounded-full bg-khaki mix-blend-screen blur-[70px] opacity-20" />
+                    <div className="absolute top-20 -left-16 h-48 w-48 rounded-full bg-light-blue mix-blend-screen blur-[70px] opacity-15" />
+                </div>
 
                 {/* Hero summary */}
-                <div className="relative z-10 mt-7 mx-auto w-full max-w-7xl px-5 md:px-8">
-                    <p className="text-[11px] font-bold uppercase tracking-[0.22em] text-khaki">
-                        {displayItemCount} {displayItemCount === 1 ? "item" : "items"} {hasDraft ? "ready" : "on tab"}
-                    </p>
-                    <h1 className="mt-2 text-[2rem] font-black leading-[1.05] tracking-[-0.04em] text-isabelline">
+                <div className="relative z-10 mx-auto w-full max-w-7xl px-5 md:px-8">
+                    <h1 className="text-[2rem] font-black leading-[1.05] tracking-[-0.04em] text-isabelline">
                         {hasDraft ? (
                             <>
                                 Review &
@@ -362,32 +373,7 @@ export function CartScreen({ venueId, tableLabel, billId, customerSessionId, ses
                     </h1>
                 </div>
 
-                {/* Widget strip — quiet, just two pills */}
-                <div className="relative z-10 mt-5 mx-auto flex w-full max-w-7xl flex-wrap gap-2 px-5 md:px-8">
-                    <div className="inline-flex items-center gap-1.5 rounded-2xl border border-khaki/30 bg-khaki/10 px-3 py-2 backdrop-blur-md">
-                        <ClockIcon className="h-3.5 w-3.5 text-khaki" strokeWidth={2.25} />
-                        <div className="flex flex-col leading-tight">
-                            <span className="text-[9px] font-bold uppercase tracking-wider text-khaki">
-                                Est. Prep
-                            </span>
-                            <span className="text-[11px] font-bold text-isabelline">
-                                {estimatePrepMinutes(displayItemCount)}
-                            </span>
-                        </div>
-                    </div>
-                    <div className="inline-flex items-center gap-1.5 rounded-2xl border border-isabelline/15 bg-isabelline/5 px-3 py-2 backdrop-blur-md">
-                        <MapPinIcon className="h-3.5 w-3.5 text-isabelline/70" strokeWidth={2.25} />
-                        <div className="flex flex-col leading-tight">
-                            <span className="text-[9px] font-bold uppercase tracking-wider text-isabelline/60">
-                                Table
-                            </span>
-                            <span className="text-[11px] font-bold text-isabelline">
-                                {tableLabel ?? "—"}
-                            </span>
-                        </div>
-                    </div>
-                </div>
-            </header>
+            </div>
 
             {/* ═══════════════════════════════════════════════════════════
                 OVERLAPPING CONTENT
@@ -404,7 +390,7 @@ export function CartScreen({ venueId, tableLabel, billId, customerSessionId, ses
                                     key={line.lineId}
                                     className="
                                         animate-velvet-rise
-                                        relative overflow-hidden rounded-2xl bg-white p-3
+                                        relative overflow-hidden rounded-xl bg-white p-3
                                         shadow-[0_4px_16px_rgba(35,20,12,0.06)]
                                         ring-1 ring-isabelline
                                     "
@@ -528,7 +514,7 @@ export function CartScreen({ venueId, tableLabel, billId, customerSessionId, ses
                         {placedItems.map((item) => (
                             <div
                                 key={item.id}
-                                className="relative overflow-hidden rounded-2xl bg-white p-3.5 shadow-[0_4px_16px_rgba(35,20,12,0.06)] ring-1 ring-isabelline"
+                                className="relative overflow-hidden rounded-xl bg-white p-3.5 shadow-[0_4px_16px_rgba(35,20,12,0.06)] ring-1 ring-isabelline"
                             >
                                 <div className="flex items-center justify-between">
                                     <div className="min-w-0 flex-1 pr-3">
@@ -568,7 +554,7 @@ export function CartScreen({ venueId, tableLabel, billId, customerSessionId, ses
                     onClick={onContinueShopping}
                     className="
                         mt-3 flex w-full items-center justify-center gap-1.5
-                        rounded-2xl bg-white/70 px-4 py-3
+                        rounded-xl bg-white/70 px-4 py-3
                         text-[12px] font-bold tracking-tight text-licorice
                         ring-1 ring-isabelline backdrop-blur-md
                         transition-all hover:bg-white hover:ring-khaki/30 active:scale-[0.99]
@@ -580,7 +566,7 @@ export function CartScreen({ venueId, tableLabel, billId, customerSessionId, ses
 
                 {/* ── Order notes (for new draft items) ── */}
                 {hasDraft && (
-                    <div className="mt-4 rounded-2xl bg-white p-4 shadow-[0_4px_16px_rgba(35,20,12,0.04)] ring-1 ring-isabelline">
+                    <div className="mt-4 rounded-xl bg-white p-4 shadow-[0_4px_16px_rgba(35,20,12,0.04)] ring-1 ring-isabelline">
                         <div className="flex items-center justify-between">
                             <div className="flex items-center gap-2">
                                 <div className="flex h-7 w-7 items-center justify-center rounded-full bg-khaki/15">
@@ -616,7 +602,7 @@ export function CartScreen({ venueId, tableLabel, billId, customerSessionId, ses
                 )}
 
                 {/* ── Bill summary ── */}
-                <div className="mt-4 overflow-hidden rounded-2xl bg-licorice text-isabelline shadow-[0_12px_32px_rgba(35,20,12,0.18)]">
+                <div className="mt-4 overflow-hidden rounded-xl bg-licorice text-isabelline shadow-[0_12px_32px_rgba(35,20,12,0.18)]">
                     {/* Header */}
                     <div className="flex items-center justify-between border-b border-isabelline/10 px-4 py-3">
                         <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-khaki">
