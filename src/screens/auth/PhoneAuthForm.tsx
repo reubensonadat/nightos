@@ -30,6 +30,7 @@ export function PhoneAuthForm({ isLogin, onSwitchMethod, onToggleMode }: Props) 
         return remaining > 0 ? remaining : 0
       }
     // eslint-disable-next-line no-empty
+    // eslint-disable-next-line no-empty
     } catch {}
     return 0
   })

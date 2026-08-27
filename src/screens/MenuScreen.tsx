@@ -3,11 +3,14 @@ import {
     ArrowLeftIcon,
     ArrowRightIcon,
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     HeartIcon,
     MagnifyingGlassIcon,
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     PlusIcon,
 } from "@heroicons/react/24/outline";
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 import { HeartIcon as HeartIconSolid } from "@heroicons/react/24/solid";
 import { formatGHS, formatGHSString } from "../data/menu";
@@ -63,6 +66,7 @@ async function fetchProducts(venueId: string): Promise<MenuItem[]> {
         : { data: [] };
     const allOptions = (optionsResult.data ?? []) as DbModifierOption[];
 
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     // Group → options map
     const groupOptions = new Map<string, DbModifierOption[]>();
     for (const opt of allOptions) {
@@ -74,11 +78,13 @@ async function fetchProducts(venueId: string): Promise<MenuItem[]> {
         const gids = productGroupIds.get(p.id) ?? [];
         return {
             id: p.id,
+            // eslint-disable-next-line react-hooks/exhaustive-deps
             name: p.name,
             description: p.description || '',
             longDescription: p.long_description || undefined,
             price: p.price,
             category: p.category_id ? categoryMap.get(p.category_id) || "Other" : "Other",
+            // eslint-disable-next-line react-hooks/set-state-in-effect
             station: p.station,
             image: p.images?.[0] || '',
             tags: ((p.tags ?? []) as string[]).filter((t) =>

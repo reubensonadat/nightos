@@ -277,8 +277,8 @@ export type DbKitchenOrderRow = {
   created_at: string;
   order_items: Pick<DbOrderItem, 'product_name' | 'quantity' | 'notes'>[];
   bills:
-    | { id: string; waiter_id: string | null; tables: { table_number: number; table_label: string } | null }
-    | { id: string; waiter_id: string | null; tables: { table_number: number; table_label: string }[] }[]
+    | { id: string; waiter_id: string | null; status: string; tables: { table_number: number; table_label: string } | null }
+    | { id: string; waiter_id: string | null; status: string; tables: { table_number: number; table_label: string }[] }[]
     | null;
 };
 
@@ -859,7 +859,7 @@ export const db = {
       .select(
         `id, bill_id, guest_name, status, station, priority, notes, created_at,
          order_items(product_name, quantity, notes),
-         bills!inner(id, waiter_id, tables!inner(table_number, table_label))`,
+         bills!inner(id, waiter_id, status, tables!inner(table_number, table_label))`,
       )
       .eq('venue_id', venueId)
       .in('status', ['pending', 'confirmed', 'preparing', 'ready'])

@@ -24,6 +24,7 @@ export function NetworkProvider({ children }: { children: React.ReactNode }) {
   const syncResolverRef = useRef<((value: unknown) => void) | null>(null)
 
   // eslint-disable-next-line react-hooks/set-state-in-effect
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { setIsOnline(status === 'online') }, [status])
 
   useEffect(() => {

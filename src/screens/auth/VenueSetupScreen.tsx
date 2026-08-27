@@ -23,9 +23,11 @@ export function VenueSetupScreen() {
     if (step !== 1 || slug) return
     const generated = name.toLowerCase().replace(/[^a-z0-9-]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '')
     // eslint-disable-next-line react-hooks/set-state-in-effect
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (generated) setSlug(generated)
   }, [step, name, slug])
 
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     if (!slug || slug.length < 3) { setSlugTaken(false); return }

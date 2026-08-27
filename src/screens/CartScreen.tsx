@@ -55,8 +55,13 @@ export function CartScreen({ venueId, tableLabel, tablePin, billId, customerSess
     useEffect(() => {
         let active = true;
         if (!billId) {
-            setLoadingPlaced(false);
-            return;
+            const t = setTimeout(() => {
+                if (active) setLoadingPlaced(false);
+            }, 0);
+            return () => {
+                active = false;
+                clearTimeout(t);
+            };
         }
 
         const fetchPlaced = async () => {

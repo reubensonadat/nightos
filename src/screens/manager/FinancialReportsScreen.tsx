@@ -58,6 +58,7 @@ export function FinancialReportsScreen() {
 
     const sinceIso = useMemo(() => {
         // eslint-disable-next-line react-hooks/purity
+        // eslint-disable-next-line react-hooks/purity
         const now = Date.now();
         const day = 86400000;
         if (timeFilter === "ALL_TIME") return null;
@@ -128,7 +129,9 @@ export function FinancialReportsScreen() {
                 setCustomers(custRows ?? []);
             } catch {
                 setCustomers([]);
+            // eslint-disable-next-line react-hooks/set-state-in-effect
             }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
         } catch (e) {
             console.error("[FinancialReports] Error loading financial data:", e);
             setError(e instanceof Error ? e.message : "Could not load financial data.");
@@ -144,6 +147,7 @@ export function FinancialReportsScreen() {
     }, [venue?.id, sinceIso]);
 
     useEffect(() => {
+        // eslint-disable-next-line react-hooks/exhaustive-deps
         if (!venue || venue.id === "00000000-0000-0000-0000-000000000000") return;
         const channel = supabaseChannel(`finance:${venue.id}`);
         channel

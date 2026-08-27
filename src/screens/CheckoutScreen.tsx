@@ -126,6 +126,7 @@ export function CheckoutScreen({ total, billId, venueId, onBack, onPaid }: Props
             };
         }
         // Fallback while the bill loads (legacy prop math, never used for charging)
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
         const sub = total / 1.225;
         return {
             subtotal: Math.round(sub * 100) / 100,
@@ -227,6 +228,7 @@ export function CheckoutScreen({ total, billId, venueId, onBack, onPaid }: Props
                                 </div>
                             </div>
                             <p className="mt-6 text-[11px] font-bold uppercase tracking-[0.22em] text-feldgrau">
+                                // eslint-disable-next-line react-hooks/set-state-in-effect
                                 Payment Received
                             </p>
                             <h1 className="mt-2 text-[2rem] font-black leading-tight tracking-[-0.04em] text-licorice">

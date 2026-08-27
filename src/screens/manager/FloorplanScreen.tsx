@@ -11,6 +11,7 @@ import { formatGHS } from "../../data/menu";
 import { db, type DbTable } from "../../lib/api";
 import { useVenue } from "../../hooks/useVenue";
 import { useRealtime } from "../../hooks/useRealtime";
+import { ConfirmModal } from "../../components/ConfirmModal";
 
 /* ────────────────────────── Types ────────────────────────── */
 
@@ -21,6 +22,7 @@ type FloorTable = DbTable & {
     seatedAt?: string;
     waiterName?: string | null;
     ageMinutes?: number;
+    billId?: string;
 };
 
 /* ────────────────────────── Real QR Code ────────────────────────── */
@@ -52,15 +54,149 @@ function RealQrCode({ url, size = 200 }: { url: string; size?: number }) {
     return <canvas ref={canvasRef} />;
 }
 
+/* ────────────────────────── Active Orders ────────────────────────── */
+
+function TableActiveOrders({ billId, waiterName }: { billId: string; waiterName?: string | null }) {
+    const [items, setItems] = useState<Awaited<ReturnType<typeof db.orderItemsByBill>>["data"]>([]);
+    const [loading, setLoading] = useState(true);
+    const [now, setNow] = useState(() => Date.now());
+
+    useEffect(() => {
+        const interval = setInterval(() => setNow(Date.now()), 30000);
+        return () => clearInterval(interval);
+    }, []);
+
+    const fetchData = useCallback(() => {
+        let mounted = true;
+        // Skip setting loading to true synchronously to avoid cascading renders
+        db.orderItemsByBill(billId).then((res) => {
+            if (mounted && res.data) setItems(res.data);
+            if (mounted) setLoading(false);
+        });
+        return () => { mounted = false; };
+    }, [billId]);
+
+    useEffect(() => {
+        return fetchData();
+    }, [fetchData]);
+
+    useRealtime({
+        table: "order_items",
+        filter: `bill_id=eq.${billId}`,
+        onInsert: fetchData,
+        onUpdate: fetchData,
+        onDelete: fetchData,
+    });
+
+    if (loading) {
+        return (
+            <div className="rounded-[1.5rem] bg-white p-5 shadow-sm ring-1 ring-isabelline animate-pulse">
+                <div className="h-6 w-32 bg-slate-200 rounded mb-4" />
+                <div className="h-10 bg-slate-100 rounded" />
+            </div>
+        );
+    }
+
+    if (!items || items.length === 0) {
+        return (
+            <div className="mt-6 flex flex-col items-center justify-center rounded-[1.5rem] border-2 border-dashed border-licorice/10 bg-white px-4 py-10 text-center shadow-sm">
+                <span className="h-2 w-2 rounded-full bg-licorice/20" />
+                <p className="mt-4 text-sm font-bold uppercase tracking-wider text-feldgrau">No orders yet</p>
+                <p className="mt-1 text-xs tracking-tight text-feldgrau/70">
+                    Guests at this table haven't placed any orders.
+                </p>
+            </div>
+        );
+    }
+
+    return (
+        <div className="rounded-[1.5rem] bg-white p-5 shadow-sm ring-1 ring-isabelline">
+            <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-bold text-slate-900 tracking-tight">Active Orders</h3>
+                {waiterName ? (
+                    <span className="inline-flex items-center gap-1.5 rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700">
+                        <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                        Server: {waiterName}
+                    </span>
+                ) : (
+                    <span className="inline-flex items-center gap-1.5 rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-500">
+                        <span className="h-1.5 w-1.5 rounded-full bg-slate-400" />
+                        Self-Service
+                    </span>
+                // eslint-disable-next-line react-hooks/refs
+                )}
+            </div>
+            <div className="overflow-x-auto no-scrollbar">
+                <table className="w-full text-left text-xs">
+                    <thead>
+                        <tr className="uppercase tracking-wide text-xs font-medium text-slate-500 border-b border-isabelline">
+                            <th className="pb-3 font-normal">Item</th>
+                            <th className="pb-3 font-normal">Qty</th>
+                            <th className="pb-3 font-normal">Price</th>
+                            <th className="pb-3 font-normal">Time</th>
+                            <th className="pb-3 font-normal text-right">Status</th>
+                        </tr>
+                    </thead>
+                    <tbody className="divide-y divide-isabelline/60 text-sm text-slate-700">
+                        {items.map((item) => {
+                            const minutesInKitchen = Math.max(0, Math.floor((now - new Date(item.created_at).getTime()) / 60000));
+                            return (
+                                <tr key={item.id} className="group hover:bg-isabelline/30 transition-colors">
+                                    <td className="py-3 pr-2">
+                                        <span className="font-medium text-slate-900">{item.product_name}</span>
+                                        {item.notes && <p className="text-xs text-slate-500 mt-0.5">{item.notes}</p>}
+                                    </td>
+                                    <td className="py-3 pr-2">
+                                        <span className="tabular-nums">{item.quantity}</span>
+                                    </td>
+                                    <td className="py-3 pr-2">
+                                        <span className="tabular-nums">{formatGHS(item.unit_price)}</span>
+                                    </td>
+                                    <td className="py-3 pr-2">
+                                        <span className="inline-flex items-center gap-1 text-xs font-medium text-slate-500 tabular-nums">
+                                            <ClockIcon className="h-3.5 w-3.5 text-slate-400" strokeWidth={2} />
+                                            {minutesInKitchen}m
+                                        </span>
+                                    </td>
+                                    <td className="py-3 text-right">
+                                        <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider ${
+                                            item.status === 'pending' ? 'bg-amber-100 text-amber-800' :
+                                            item.status === 'confirmed' ? 'bg-sky-100 text-sky-800' :
+                                            item.status === 'preparing' ? 'bg-blue-100 text-blue-800' :
+                                            item.status === 'ready' ? 'bg-indigo-100 text-indigo-800' :
+                                            item.status === 'served' ? 'bg-emerald-100 text-emerald-800' :
+                                            'bg-red-100 text-red-800'
+                                        }`}>
+                                            {item.status}
+                                        </span>
+                                    </td>
+                                </tr>
+                            );
+                        })}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    );
+}
+
 /* ────────────────────────── Component ────────────────────────── */
 
 export function FloorplanScreen() {
     const { venue } = useVenue("velvet-lounge");
     const [tables, setTables] = useState<FloorTable[]>([]);
     const [loading, setLoading] = useState(true);
-    const [selected, setSelected] = useState<FloorTable | null>(null);
+    const [selectedId, setSelectedId] = useState<string | null>(null);
+    const selected = useMemo(() => tables.find(t => t.id === selectedId) ?? null, [tables, selectedId]);
+
     const [showQrFor, setShowQrFor] = useState<FloorTable | null>(null);
     const [copied, setCopied] = useState(false);
+    
+    // Force Close Table state
+    const [closingTable, setClosingTable] = useState<FloorTable | null>(null);
+    const [closingItems, setClosingItems] = useState<Awaited<ReturnType<typeof db.orderItemsByBill>>["data"] | null>(null);
+    const [closingLoading, setClosingLoading] = useState(false);
+
     const reloadTimer = useRef<number | null>(null);
     const waiterNamesRef = useRef<Record<string, string>>({});
 
@@ -69,12 +205,19 @@ export function FloorplanScreen() {
         try {
             const [tablesResult, billsResult] = await Promise.all([
                 db.tablesByVenue(venue.id),
-                db.billsByVenue(venue.id),
+                db.billsByVenue(venue.id, 0, 500),
             ]);
             if (tablesResult.error) throw tablesResult.error;
             const allBills = billsResult.data ?? [];
             const activeBills = allBills.filter((b) => b.status === 'open' || b.status === 'settling');
-            const billMap = new Map(activeBills.map((b) => [b.table_id, b]));
+            
+            // activeBills is sorted newest first. Map keeps the oldest if we map directly, so we use a loop to keep the first (newest)
+            const billMap = new Map<string, typeof activeBills[0]>();
+            for (const b of activeBills) {
+                if (!billMap.has(b.table_id)) {
+                    billMap.set(b.table_id, b);
+                }
+            }
 
             const rows: FloorTable[] = (tablesResult.data ?? []).map((t) => {
                 const bill = billMap.get(t.id);
@@ -82,6 +225,7 @@ export function FloorplanScreen() {
                     return {
                         ...t,
                         status: "occupied" as const,
+                        billId: bill.id,
                         guests: bill.guest_count,
                         tabTotal: bill.total,
                         seatedAt: bill.created_at,
@@ -255,7 +399,7 @@ export function FloorplanScreen() {
                                                     <button
                                                         key={table.id}
                                                         type="button"
-                                                        onClick={() => setSelected(table)}
+                                                        onClick={() => setSelectedId(table.id)}
                                                         className={`
                                                             flex flex-col items-center justify-center rounded-xl border p-4
                                                             transition-all duration-150 active:scale-95
@@ -343,6 +487,23 @@ export function FloorplanScreen() {
                                 <LinkIcon className="h-3.5 w-3.5" strokeWidth={2} />
                                 Generate QR Code
                             </button>
+
+                            {selected.status === "occupied" && selected.billId && (
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        setClosingTable(selected);
+                                        setClosingLoading(true);
+                                        db.orderItemsByBill(selected.billId!).then((res) => {
+                                            setClosingItems(res.data);
+                                            setClosingLoading(false);
+                                        });
+                                    }}
+                                    className="mt-2 inline-flex w-full items-center justify-center gap-1.5 rounded-full bg-white px-4 py-2.5 text-xs font-bold tracking-tight text-dark-red ring-1 ring-dark-red/20 shadow-sm transition-all hover:bg-dark-red/5 active:scale-[0.98]"
+                                >
+                                    End Session
+                                </button>
+                            )}
                         </div>
                     ) : (
                         <div className="mt-4 flex flex-col items-center justify-center rounded-xl border-2 border-dashed border-licorice/10 px-4 py-10 text-center">
@@ -353,6 +514,21 @@ export function FloorplanScreen() {
                     )}
                 </div>
             </div>
+
+            {/* ── Active Table Orders ── */}
+            {selected && (
+                selected.billId ? (
+                    <TableActiveOrders billId={selected.billId} />
+                ) : (
+                    <div className="mt-6 flex flex-col items-center justify-center rounded-[1.5rem] border-2 border-dashed border-licorice/10 bg-white px-4 py-10 text-center shadow-sm">
+                        <span className="h-2 w-2 rounded-full bg-licorice/20" />
+                        <p className="mt-4 text-sm font-bold uppercase tracking-wider text-feldgrau">Table Available</p>
+                        <p className="mt-1 text-xs tracking-tight text-feldgrau/70">
+                            This table is currently empty. No active orders.
+                        </p>
+                    </div>
+                )
+            )}
 
             {/* ── QR Modal ── */}
             {showQrFor && (
@@ -406,6 +582,50 @@ export function FloorplanScreen() {
                     </div>
                 </div>
             )}
+
+            {/* ── End Session Modal ── */}
+            <ConfirmModal
+                isOpen={!!closingTable}
+                title="End Table Session"
+                body={
+                    closingLoading && !closingItems ? (
+                        "Loading..."
+                    ) : (
+                        <div className="space-y-3">
+                            <p>Are you sure you want to force close this table?</p>
+                            <div className="rounded-lg bg-red-50 p-3 text-dark-red space-y-1">
+                                <p className="font-bold">
+                                    Outstanding Tab: {formatGHS(closingTable?.tabTotal ?? 0)}
+                                </p>
+                                {(closingItems?.filter(i => ['pending', 'confirmed', 'preparing'].includes(i.status)).length ?? 0) > 0 && (
+                                    <p className="font-bold">
+                                        {closingItems!.filter(i => ['pending', 'confirmed', 'preparing'].includes(i.status)).length} items still unfulfilled
+                                    </p>
+                                )}
+                            </div>
+                        </div>
+                    )
+                }
+                confirmLabel="Force Close Table"
+                cancelLabel="Cancel"
+                isDanger
+                swapButtons
+                loading={closingLoading && !!closingItems}
+                onConfirm={async () => {
+                    if (!closingTable?.billId) return;
+                    setClosingLoading(true);
+                    await db.updateBill(closingTable.billId, { status: "cancelled" });
+                    setClosingTable(null);
+                    setClosingItems(null);
+                    setSelectedId(null);
+                    setClosingLoading(false);
+                    fetchData();
+                }}
+                onClose={() => {
+                    setClosingTable(null);
+                    setClosingItems(null);
+                }}
+            />
         </div>
     );
 }

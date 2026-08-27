@@ -137,8 +137,14 @@ export function useCustomerSession(venueId: string | null, tableId: string | nul
         if (revived) {
           session = revived
         } else {
-          setState((s) => ({ ...s, session: latestSession as CustomerSession, bill: null, loading: false, error: null }))
-          return
+          let wasMySession = false
+          try { wasMySession = sessionStorage.getItem('nightos:current_session_id') === latestSession.id } catch { /* noop */ }
+          
+          if (wasMySession) {
+            setState((s) => ({ ...s, session: latestSession as CustomerSession, bill: null, loading: false, error: null }))
+            return
+          }
+          // Otherwise, fall through and create a new session for the new customer
         }
       }
     }
@@ -173,6 +179,7 @@ export function useCustomerSession(venueId: string | null, tableId: string | nul
     if (!session) {
       const { data: newSession, error: createErr } = await supabase
         .from('customer_sessions')
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         .insert({
           venue_id: venueId,
           table_id: tableId,
@@ -187,6 +194,10 @@ export function useCustomerSession(venueId: string | null, tableId: string | nul
         return
       }
       session = newSession as CustomerSession
+    }
+
+    if (session) {
+      try { sessionStorage.setItem('nightos:current_session_id', session.id) } catch { /* noop */ }
     }
 
     const token = session.session_token

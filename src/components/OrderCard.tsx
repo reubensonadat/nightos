@@ -1,6 +1,9 @@
 import {
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     CheckIcon,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     ClockIcon,
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -27,6 +30,7 @@ export type KitchenOrder = {
     /** ISO timestamp when the order was placed */
     placedAt: string;
     server: string;
+    isCancelled?: boolean;
 };
 
 type Props = {
@@ -36,6 +40,7 @@ type Props = {
     onAdvance: (orderId: string) => void;
     onMarkReady: (orderId: string) => void;
     onMarkServed?: (orderId: string) => void;
+    onDismiss?: (orderId: string) => void;
 };
 
 /* ────────────────────────── Helpers ────────────────────────── */
@@ -89,8 +94,9 @@ const STATUS_LABEL: Record<OrderStatus, string> = {
 
 /* ────────────────────────── Component ────────────────────────── */
 
-export function OrderCard({ order, now, onAdvance, onMarkReady, onMarkServed }: Props) {
+export function OrderCard({ order, now, onAdvance, onMarkReady, onMarkServed, onDismiss }: Props) {
     const elapsedSeconds = secondsSince(order.placedAt, now);
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const elapsedMinutes = Math.floor(elapsedSeconds / 60);
     const urgency = getUrgency(elapsedMinutes);
     const styles = URGENCY_STYLES[urgency];
@@ -99,15 +105,16 @@ export function OrderCard({ order, now, onAdvance, onMarkReady, onMarkServed }: 
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const hasNotes = order.items.some((item) => item.notes);
 
+    const isCancelled = order.isCancelled;
+
     return (
         <article
             className={`
                 animate-velvet-rise
                 flex flex-col overflow-hidden rounded-xl bg-white
                 shadow-[0_4px_16px_rgba(35,20,12,0.08)]
-                ring-1 ${styles.ring}
                 transition-all duration-200
-                hover:shadow-[0_12px_28px_rgba(35,20,12,0.12)]
+                ${isCancelled ? "opacity-60 grayscale ring-1 ring-slate-200" : `ring-1 ${styles.ring} hover:shadow-[0_12px_28px_rgba(35,20,12,0.12)]`}
             `}
         >
             {/* ── Top row: Table + station + timer ── */}
@@ -161,7 +168,23 @@ export function OrderCard({ order, now, onAdvance, onMarkReady, onMarkServed }: 
 
             {/* ── Status action button ── */}
             <div className="border-t border-isabelline p-2">
-                {order.status === "pending" && (
+                {isCancelled ? (
+                    <button
+                        type="button"
+                        onClick={() => onDismiss?.(order.id)}
+                        aria-label="Dismiss cancelled order"
+                        className="
+                            flex w-full items-center justify-center gap-1.5
+                            rounded-lg bg-slate-200 px-4 py-2.5
+                            text-base font-bold tracking-tight text-slate-500
+                            transition-all duration-150
+                            hover:bg-slate-300
+                            active:scale-[0.98]
+                        "
+                    >
+                        Dismiss
+                    </button>
+                ) : order.status === "pending" && (
                     <button
                         type="button"
                         onClick={() => onAdvance(order.id)}

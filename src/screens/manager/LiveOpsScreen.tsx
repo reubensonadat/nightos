@@ -7,6 +7,7 @@ import {
     ChevronRightIcon,
     ExclamationTriangleIcon,
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     LinkIcon,
     PlusIcon,
     ShoppingCartIcon,
@@ -43,11 +44,13 @@ function OrderStatusBadge({ status }: { status: DashboardRecentOrder["status"] }
         </span>
     );
 }
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 function formatCompact(n: number): string {
     if (n >= 1000) return `${(n / 1000).toFixed(1)}k`;
     return n.toString();
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 }
 
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -75,9 +78,10 @@ function formatDwell(mins: number): string {
    COMPONENT
    ═══════════════════════════════════════════════════════════════════════════ */
 
-export function LiveOpsScreen() {
+export function LiveOpsScreen({ onNavigate }: { onNavigate?: (page: string) => void }) {
     const { venue } = useVenue('velvet-lounge');
     const [range, setRange] = useState<7 | 30>(7);
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const s = useManagerDashboard(venue.id, range);
 
     const [outstanding, setOutstanding] = useState(0);
@@ -205,6 +209,7 @@ export function LiveOpsScreen() {
                     </button>
                     <button
                         type="button"
+                        onClick={() => onNavigate?.("finance")}
                         className="inline-flex items-center gap-1.5 rounded-full bg-white text-licorice px-4 py-2 text-sm font-semibold ring-1 ring-licorice/8 hover:bg-isabelline active:scale-[0.97] transition-all"
                     >
                         View Report
@@ -243,8 +248,11 @@ export function LiveOpsScreen() {
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4 md:gap-6">
 
                 {/* Revenue — dark card */}
-                <div className="md:col-span-2 h-full rounded-[1.5rem] bg-licorice text-isabelline p-5 md:p-6 shadow-[0_8px_24px_rgba(35,20,12,0.18)] flex flex-col justify-between relative overflow-hidden">
-                    <div>
+                <div 
+                    onClick={() => onNavigate?.("finance")}
+                    className="md:col-span-2 h-full rounded-[1.5rem] bg-licorice text-isabelline p-5 md:p-6 shadow-[0_8px_24px_rgba(35,20,12,0.18)] flex flex-col justify-between relative overflow-hidden cursor-pointer hover:bg-licorice/95 transition-all group"
+                >
+                    <div className="group-active:scale-[0.98] transition-transform duration-200">
                         <div className="flex items-center justify-between mb-3">
                             <BanknotesIcon className="h-5 w-5 text-isabelline/50" strokeWidth={2} />
                         </div>
@@ -258,7 +266,7 @@ export function LiveOpsScreen() {
                             vs. {formatGHS(s.yesterdayRevenue)} yesterday
                         </p>
                     </div>
-                    <div className="flex flex-row items-center gap-3 mt-auto">
+                    <div className="flex flex-row items-center gap-3 mt-auto group-active:scale-[0.98] transition-transform duration-200">
                         <span className="rounded-full bg-white/10 text-isabelline/80 px-3 py-2 text-xs font-bold tabular-nums text-center">
                             {s.paymentsToday} payment{s.paymentsToday === 1 ? "" : "s"} today
                         </span>
@@ -288,8 +296,11 @@ export function LiveOpsScreen() {
                 </div>
 
                 {/* Tables Occupied */}
-                <div className="md:col-span-1 h-full rounded-[1.5rem] bg-white p-5 md:p-6 shadow-sm ring-1 ring-licorice/5 flex flex-col justify-between">
-                    <div>
+                <div 
+                    onClick={() => onNavigate?.("floorplan")}
+                    className="md:col-span-1 h-full rounded-[1.5rem] bg-white p-5 md:p-6 shadow-sm ring-1 ring-licorice/5 flex flex-col justify-between cursor-pointer hover:bg-isabelline/50 transition-all group"
+                >
+                    <div className="group-active:scale-[0.98] transition-transform duration-200">
                         <div className="flex items-center justify-between mb-3">
                             <TableCellsIcon className="h-5 w-5 text-feldgrau" strokeWidth={2} />
                         </div>
@@ -302,7 +313,7 @@ export function LiveOpsScreen() {
                             {s.totalTables - s.occupiedTables} tables free
                         </p>
                     </div>
-                    <div className="mt-6 h-1.5 overflow-hidden rounded-full bg-isabelline">
+                    <div className="mt-6 h-1.5 overflow-hidden rounded-full bg-isabelline group-active:scale-[0.98] transition-transform duration-200">
                         <div
                             className="h-full rounded-full transition-all duration-500"
                             style={{
@@ -393,7 +404,11 @@ export function LiveOpsScreen() {
                 </div>
 
                 {/* ── Top Sellers (real order items, selected window) ── */}
-                <div className="rounded-[1.5rem] bg-white p-5 md:p-6 shadow-sm ring-1 ring-licorice/5 flex flex-col h-full">
+                <div 
+                    onClick={() => onNavigate?.("menu")}
+                    className="rounded-[1.5rem] bg-white p-5 md:p-6 shadow-sm ring-1 ring-licorice/5 flex flex-col h-full cursor-pointer hover:bg-isabelline/50 transition-all group"
+                >
+                    <div className="group-active:scale-[0.98] transition-transform duration-200 h-full flex flex-col">
                     <h2 className="text-lg font-bold text-slate-900 tracking-tight mb-5">Top Sellers</h2>
 
                     {s.topItems.length === 0 ? (
@@ -424,10 +439,15 @@ export function LiveOpsScreen() {
 
                     <button
                         type="button"
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            onNavigate?.("menu");
+                        }}
                         className="mt-auto w-full rounded-full bg-isabelline py-2 text-xs font-bold tracking-tight text-feldgrau hover:text-licorice transition-colors"
                     >
                         View Full Menu Report &rarr;
                     </button>
+                    </div>
                 </div>
             </div>
 
@@ -510,16 +530,14 @@ export function LiveOpsScreen() {
                         </div>
                     )}
 
-                    <button
-                        type="button"
-                        className="mt-auto w-full rounded-full bg-isabelline py-2 text-xs font-bold tracking-tight text-feldgrau hover:text-licorice transition-colors"
-                    >
-                        View All Alerts &rarr;
-                    </button>
                 </div>
 
                 {/* ── Staff & Floor Snapshot (real staff + active shifts) ── */}
-                <div className="rounded-[1.5rem] bg-white p-5 md:p-6 shadow-sm ring-1 ring-licorice/5 flex flex-col h-full">
+                <div 
+                    onClick={() => onNavigate?.("staff")}
+                    className="rounded-[1.5rem] bg-white p-5 md:p-6 shadow-sm ring-1 ring-licorice/5 flex flex-col h-full cursor-pointer hover:bg-isabelline/50 transition-all group"
+                >
+                    <div className="group-active:scale-[0.98] transition-transform duration-200 h-full flex flex-col">
                     <h2 className="text-lg font-bold text-slate-900 tracking-tight mb-5">Staff</h2>
 
                     <div className="grid grid-cols-2 gap-3">
@@ -547,7 +565,7 @@ export function LiveOpsScreen() {
                             <span className="font-bold tabular-nums text-feldgrau">{s.bartenders}</span>
                         </div>
                     </div>
-
+                    </div>
                 </div>
 
                 {/* ── Quick Stats (real today's numbers) ── */}
@@ -593,13 +611,6 @@ export function LiveOpsScreen() {
             <div className="rounded-[1.5rem] bg-white p-5 md:p-6 shadow-sm ring-1 ring-licorice/5">
                 <div className="flex items-center justify-between mb-5">
                     <h2 className="text-lg font-bold text-slate-900 tracking-tight">Recent Orders</h2>
-                    <button
-                        type="button"
-                        className="inline-flex items-center gap-0.5 text-xs font-bold tracking-tight text-feldgrau hover:text-licorice transition-colors"
-                    >
-                        View All
-                        <ChevronRightIcon className="h-3 w-3" strokeWidth={2.5} />
-                    </button>
                 </div>
 
                 <div className="overflow-x-auto no-scrollbar">

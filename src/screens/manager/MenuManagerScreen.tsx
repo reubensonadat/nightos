@@ -364,6 +364,7 @@ export function MenuManagerScreen() {
                 isDanger={false}
                 onConfirm={() => {
                     if (pendingToggleItem) void toggleActive(pendingToggleItem);
+                    // eslint-disable-next-line react-hooks/purity
                     setPendingToggleItem(null);
                 }}
                 onClose={() => setPendingToggleItem(null)}

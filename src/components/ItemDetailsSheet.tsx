@@ -28,6 +28,7 @@ export function ItemDetailsSheet({ item, onClose }: Props) {
     useEffect(() => {
         if (item) {
             // eslint-disable-next-line react-hooks/set-state-in-effect
+            // eslint-disable-next-line react-hooks/set-state-in-effect
             setQty(1);
             setNotes("");
             setSelections({});

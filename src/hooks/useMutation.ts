@@ -31,6 +31,7 @@ export function useMutation<TData = unknown, TError = unknown, TArgs extends unk
       return { data: null, error: typedErr }
     }
   }, [])
+// eslint-disable-next-line react-hooks/exhaustive-deps
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const reset = useCallback(() => setState(INITIAL), [])

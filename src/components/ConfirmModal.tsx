@@ -8,6 +8,8 @@ export type ConfirmModalProps = {
     cancelLabel?: string;
     /** true → dark-red destructive confirm; false (default) → licorice+khaki primary */
     isDanger?: boolean;
+    /** swaps the visual style of confirm/cancel and places cancel on top */
+    swapButtons?: boolean;
     /** disables the confirm button while async work is in flight */
     loading?: boolean;
     onConfirm: () => void;
@@ -21,6 +23,7 @@ export function ConfirmModal({
     confirmLabel,
     cancelLabel = "Cancel",
     isDanger = false,
+    swapButtons = false,
     loading = false,
     onConfirm,
     onClose,
@@ -56,34 +59,67 @@ export function ConfirmModal({
 
                 {/* Actions */}
                 <div className="flex flex-col gap-2 px-6 pt-4 pb-[max(env(safe-area-inset-bottom),24px)]">
-                    <button
-                        type="button"
-                        onClick={onConfirm}
-                        disabled={loading}
-                        className={
-                            isDanger
-                                ? "w-full rounded-full py-3.5 text-[13px] font-bold tracking-tight transition-all active:scale-[0.98] disabled:opacity-40 bg-dark-red/10 text-dark-red hover:bg-dark-red/20"
-                                : "w-full rounded-full py-3.5 text-[13px] font-bold tracking-tight transition-all active:scale-[0.98] disabled:opacity-40 bg-licorice text-khaki hover:bg-licorice/90"
-                        }
-                    >
-                        {loading ? (
-                            <span className="inline-flex items-center justify-center gap-2">
-                                <span className="h-3.5 w-3.5 rounded-full border-2 border-current border-t-transparent animate-spin" />
-                                Working...
-                            </span>
-                        ) : (
-                            confirmLabel
-                        )}
-                    </button>
-
-                    <button
-                        type="button"
-                        onClick={onClose}
-                        disabled={loading}
-                        className="w-full rounded-full bg-white py-3.5 text-[13px] font-bold text-feldgrau ring-1 ring-licorice/8 transition-colors hover:text-licorice disabled:opacity-40"
-                    >
-                        {cancelLabel}
-                    </button>
+                    {swapButtons ? (
+                        <>
+                            <button
+                                type="button"
+                                onClick={onClose}
+                                disabled={loading}
+                                className="w-full rounded-full py-3.5 text-[13px] font-bold tracking-tight transition-all active:scale-[0.98] disabled:opacity-40 bg-licorice text-khaki hover:bg-licorice/90"
+                            >
+                                {cancelLabel}
+                            </button>
+                            <button
+                                type="button"
+                                onClick={onConfirm}
+                                disabled={loading}
+                                className={
+                                    isDanger
+                                        ? "w-full rounded-full bg-white py-3.5 text-[13px] font-bold text-dark-red ring-1 ring-dark-red/20 transition-colors hover:bg-dark-red/5 disabled:opacity-40"
+                                        : "w-full rounded-full bg-white py-3.5 text-[13px] font-bold text-feldgrau ring-1 ring-licorice/8 transition-colors hover:text-licorice disabled:opacity-40"
+                                }
+                            >
+                                {loading ? (
+                                    <span className="inline-flex items-center justify-center gap-2">
+                                        <span className="h-3.5 w-3.5 rounded-full border-2 border-current border-t-transparent animate-spin" />
+                                        Working...
+                                    </span>
+                                ) : (
+                                    confirmLabel
+                                )}
+                            </button>
+                        </>
+                    ) : (
+                        <>
+                            <button
+                                type="button"
+                                onClick={onConfirm}
+                                disabled={loading}
+                                className={
+                                    isDanger
+                                        ? "w-full rounded-full py-3.5 text-[13px] font-bold tracking-tight transition-all active:scale-[0.98] disabled:opacity-40 bg-dark-red/10 text-dark-red hover:bg-dark-red/20"
+                                        : "w-full rounded-full py-3.5 text-[13px] font-bold tracking-tight transition-all active:scale-[0.98] disabled:opacity-40 bg-licorice text-khaki hover:bg-licorice/90"
+                                }
+                            >
+                                {loading ? (
+                                    <span className="inline-flex items-center justify-center gap-2">
+                                        <span className="h-3.5 w-3.5 rounded-full border-2 border-current border-t-transparent animate-spin" />
+                                        Working...
+                                    </span>
+                                ) : (
+                                    confirmLabel
+                                )}
+                            </button>
+                            <button
+                                type="button"
+                                onClick={onClose}
+                                disabled={loading}
+                                className="w-full rounded-full bg-white py-3.5 text-[13px] font-bold text-feldgrau ring-1 ring-licorice/8 transition-colors hover:text-licorice disabled:opacity-40"
+                            >
+                                {cancelLabel}
+                            </button>
+                        </>
+                    )}
                 </div>
             </div>
         </div>

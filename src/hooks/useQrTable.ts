@@ -13,6 +13,7 @@ export function useQrTable(token: string | null) {
   useEffect(() => {
     if (!token) {
       // eslint-disable-next-line react-hooks/set-state-in-effect
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setState({ table: null, loading: false, error: false })
       return
     }

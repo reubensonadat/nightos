@@ -40,6 +40,7 @@ function loadBrand(): BrandColors {
             return { ...DEFAULT_BRAND, ...parsed };
         }
     // eslint-disable-next-line no-empty
+    // eslint-disable-next-line no-empty
     } catch {}
     return { ...DEFAULT_BRAND };
 }

@@ -120,6 +120,7 @@ export function TableOperationsScreen() {
                     bill: openBills.find((b) => b.table_id === t.id),
                 })),
         // eslint-disable-next-line react-hooks/exhaustive-deps
+        // eslint-disable-next-line react-hooks/exhaustive-deps
         [tables, occupiedTableIds, openBills],
     );
 

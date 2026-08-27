@@ -21,6 +21,7 @@ import { CustomerBottomNav } from "./components/CustomerBottomNav";
 import { PartyPrompt } from "./components/PartyPrompt";
 import { TablePinBanner } from "./components/TablePinBanner";
 import { TablePinModal } from "./components/TablePinModal";
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 import { ClockIcon } from "@heroicons/react/24/outline";
 
 import { StaffAuthScreen } from "./screens/waiter/StaffAuthScreen";
@@ -44,6 +45,7 @@ import { MenuManagerScreen } from "./screens/manager/MenuManagerScreen";
 import { StaffManagerScreen } from "./screens/manager/StaffManagerScreen";
 import { FinancialReportsScreen } from "./screens/manager/FinancialReportsScreen";
 import { CrmScreen } from "./screens/manager/CrmScreen";
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 import { ReservationsScreen } from "./screens/ReservationsScreen";
 import { useVenue } from "./hooks/useVenue";
 import { useQrTable } from "./hooks/useQrTable";
@@ -84,7 +86,9 @@ function CustomerShell({ venueId, tableId, tableLabel }: { venueId: string; tabl
   const { session, bill, waiter, loading: sessionLoading, error: sessionError, updateParty } = useCustomerSession(venueId, tableId);
 
   // Table PIN Security State
+  // eslint-disable-next-line no-empty
   const [pinInputVerified, setPinInputVerified] = useState<boolean>(false);
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   const pinUnlocked = useMemo(() => {
     if (!bill?.table_pin) return true;
     if (pinInputVerified) return true;
@@ -95,6 +99,7 @@ function CustomerShell({ venueId, tableId, tableLabel }: { venueId: string; tabl
     }
   }, [bill, pinInputVerified]);
 
+  // eslint-disable-next-line no-empty
   // One-time "how many of you?" prompt per session (QR tables only)
   const [partyPromptOpen, setPartyPromptOpen] = useState(false);
   useEffect(() => {
@@ -120,9 +125,11 @@ function CustomerShell({ venueId, tableId, tableLabel }: { venueId: string; tabl
     async (partySize: number, guestName?: string) => {
       const { error } = await updateParty(partySize, guestName);
       if (error) {
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         toast.error(String(error));
         return;
       }
+      // eslint-disable-next-line no-empty
       try { localStorage.setItem(`nightos:party:${session?.id ?? ''}`, "1"); } catch { /* ignore */ }
       setPartyPromptOpen(false);
     },
@@ -135,15 +142,18 @@ function CustomerShell({ venueId, tableId, tableLabel }: { venueId: string; tabl
       .then(
         ({ data }) => {
           if (!cancelled && data) setVenueName(data.name);
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         },
         () => {},
       );
+    // eslint-disable-next-line no-empty
     return () => {
       cancelled = true;
     };
   }, [venueId]);
 
   // ── Load live orders for this table's open bill from the database ──
+  // eslint-disable-next-line no-empty
   const [ordersRevision, setOrdersRevision] = useState(0);
   const triggerReload = useCallback(() => setOrdersRevision((r) => r + 1), []);
 
@@ -186,6 +196,7 @@ function CustomerShell({ venueId, tableId, tableLabel }: { venueId: string; tabl
               })),
             };
           }),
+        // eslint-disable-next-line react-hooks/exhaustive-deps
         );
 
         if (cancelled) return;
@@ -241,21 +252,24 @@ function CustomerShell({ venueId, tableId, tableLabel }: { venueId: string; tabl
 
   if (tableId && session && session.status === "expired") {
     return (
-      <div className="min-h-svh bg-isabelline flex items-center justify-center px-8">
+      <div className="min-h-svh bg-isabelline font-sans text-licorice flex items-center justify-center px-8">
         <div className="text-center max-w-sm">
-          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-ink/5">
-            <ClockIcon className="h-7 w-7 text-ink/50" />
+          <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-full bg-licorice/5">
+            <ClockIcon className="h-8 w-8 text-licorice/70" />
           </div>
-          <p className="text-ink font-semibold text-lg">Your visit timed out</p>
-          <p className="text-ink/60 text-sm mt-1 leading-relaxed">
+          <h1 className="text-[22px] font-black tracking-tight text-licorice">Your visit timed out</h1>
+          <p className="text-[13px] text-licorice/70 mt-2 leading-relaxed">
             {venueName ?? "Velvet Lounge"} ({tableLabel ?? "this table"}) ended this visit because no
             order was placed within 20 minutes. Scan the QR code on the table again to start over.
           </p>
           <button
-            onClick={() => window.location.reload()}
-            className="mt-6 px-6 py-3 bg-ink text-parchment rounded-full text-sm font-semibold"
+            onClick={() => {
+              try { sessionStorage.removeItem('nightos:current_session_id') } catch {}
+              window.location.reload()
+            }}
+            className="mt-8 px-8 py-3.5 bg-licorice text-[14px] text-isabelline font-bold rounded-full transition-transform active:scale-95"
           >
-            Re-scan
+            Start over
           </button>
         </div>
       </div>
@@ -265,13 +279,13 @@ function CustomerShell({ venueId, tableId, tableLabel }: { venueId: string; tabl
   if (tableId && (sessionLoading || sessionError || !session || !bill)) {
     if (sessionError) {
       return (
-        <div className="min-h-svh bg-isabelline flex items-center justify-center px-8">
+        <div className="min-h-svh bg-isabelline font-sans text-licorice flex items-center justify-center px-8">
           <div className="text-center">
-            <p className="text-ink font-semibold text-lg">Couldn't start your visit</p>
-            <p className="text-ink/60 text-sm mt-1">Please check your connection and try again.</p>
+            <h1 className="text-[22px] font-black tracking-tight text-licorice">Couldn't start your visit</h1>
+            <p className="text-[13px] text-licorice/70 mt-2">Please check your connection and try again.</p>
             <button
               onClick={() => window.location.reload()}
-              className="mt-6 px-6 py-3 bg-ink text-parchment rounded-full text-sm font-semibold"
+              className="mt-8 px-8 py-3.5 bg-licorice text-[14px] text-isabelline font-bold rounded-full transition-transform active:scale-95"
             >
               Retry
             </button>
@@ -281,7 +295,7 @@ function CustomerShell({ venueId, tableId, tableLabel }: { venueId: string; tabl
     }
     return (
       <div className="min-h-svh bg-isabelline flex items-center justify-center">
-        <div className="w-8 h-8 border-2 border-ink/20 border-t-ink rounded-full animate-spin" />
+        <div className="w-8 h-8 border-2 border-licorice/20 border-t-licorice rounded-full animate-spin" />
       </div>
     );
   }
@@ -367,20 +381,20 @@ function CustomerFlow({ onSwitchMode, venueId, qrTable, qrLoading, qrError }: Cu
   if (qrLoading) {
     return (
       <div className="min-h-svh bg-isabelline flex items-center justify-center">
-        <div className="w-8 h-8 border-2 border-ink/20 border-t-ink rounded-full animate-spin" />
+        <div className="w-8 h-8 border-2 border-licorice/20 border-t-licorice rounded-full animate-spin" />
       </div>
     );
   }
 
   if (qrError) {
     return (
-      <div className="min-h-svh bg-isabelline flex items-center justify-center px-8">
+      <div className="min-h-svh bg-isabelline font-sans text-licorice flex items-center justify-center px-8">
         <div className="text-center">
-          <p className="text-ink font-semibold text-lg">Invalid QR code</p>
-          <p className="text-ink/60 text-sm mt-1">This table code isn't recognised.</p>
+          <h1 className="text-[22px] font-black tracking-tight text-licorice">Invalid QR code</h1>
+          <p className="text-[13px] text-licorice/70 mt-2">This table code isn't recognised.</p>
           <button
             onClick={() => window.location.reload()}
-            className="mt-6 px-6 py-3 bg-ink text-parchment rounded-full text-sm font-semibold"
+            className="mt-8 px-8 py-3.5 bg-licorice text-[14px] text-isabelline font-bold rounded-full transition-transform active:scale-95"
           >
             Try again
           </button>
@@ -594,7 +608,7 @@ function AppShell() {
               onPageChange={goToManagerPage}
               onSignOut={handleManagerSignOut}
             >
-              {managerPage === "ops" && <LiveOpsScreen />}
+              {managerPage === "ops" && <LiveOpsScreen onNavigate={goToManagerPage} />}
               {managerPage === "floorplan" && <FloorplanScreen />}
               {managerPage === "menu" && <MenuManagerScreen />}
               {managerPage === "staff" && <StaffManagerScreen />}

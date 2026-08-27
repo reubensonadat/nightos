@@ -302,6 +302,7 @@ function HistoryCard({
           <p className="text-[10px] text-feldgrau">{order.itemCount} {order.itemCount === 1 ? "item" : "items"} · {formatDate(order.sentAt)}</p>
         </div>
         <span className="font-mono text-[13px] font-bold tabular-nums text-khaki">{formatGHS(order.total)}</span>
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
         <ChevronDownIcon className="ml-2 h-4 w-4 -rotate-90 text-feldgrau/50" strokeWidth={2.25} />
       </button>
       {open && (

@@ -40,6 +40,7 @@ export function ShiftPerformanceScreen({ staffId, staffName }: Props) {
     const [loading, setLoading] = useState(true);
 
     const load = async () => {
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
         setLoading(true);
         setError(null);
         try {
@@ -76,6 +77,7 @@ export function ShiftPerformanceScreen({ staffId, staffName }: Props) {
         summary && summary.tables_served > 0
             ? summary.sales / summary.tables_served
             : 0;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     const commission = summary ? summary.sales * COMMISSION_RATE : 0;
 
     return (

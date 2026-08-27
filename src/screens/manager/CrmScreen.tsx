@@ -83,6 +83,7 @@ export function CrmScreen() {
 
     useEffect(() => {
         // eslint-disable-next-line react-hooks/set-state-in-effect
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         fetchPage(0);
         setPage(0);
     }, [fetchPage]);

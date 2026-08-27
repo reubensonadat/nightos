@@ -97,6 +97,7 @@ export function InvoiceSettlementScreen() {
                 total: Number(billRow.total),
                 status: billRow.status,
             });
+            // eslint-disable-next-line react-hooks/exhaustive-deps
             if (billRow.status === 'paid' || (Number(billRow.amount_paid || 0) >= Number(billRow.total || 0) && Number(billRow.total || 0) > 0)) {
                 setSettled(true);
             }

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState, useCallback, useRef } from "react";
 import { useRealtime } from "../../hooks/useRealtime";
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 import { ArrowPathIcon, SpeakerWaveIcon } from "@heroicons/react/24/outline";
 import { OrderCard, type KitchenOrder, type OrderStatus } from "../../components/OrderCard";
 import { db, type DbKitchenOrderRow } from "../../lib/api";
@@ -64,6 +65,9 @@ function orderStatus(s: string): OrderStatus {
 function rowToOrder(row: DbKitchenOrderRow, waiterNames: Record<string, string>): KitchenOrder {
     const bill = Array.isArray(row.bills) ? row.bills[0] : row.bills;
     const table = Array.isArray(bill?.tables) ? bill?.tables[0] : bill?.tables;
+    // Map the parent bill's status to isCancelled
+    const isCancelled = (bill as any)?.status === "cancelled";
+
     return {
         id: row.id,
         tableNumber: table?.table_number ?? 0,
@@ -78,6 +82,7 @@ function rowToOrder(row: DbKitchenOrderRow, waiterNames: Record<string, string>)
             quantity: oi.quantity,
             ...(oi.notes ? { notes: oi.notes } : {}),
         })),
+        isCancelled,
     };
 }
 
@@ -85,8 +90,10 @@ function rowToOrder(row: DbKitchenOrderRow, waiterNames: Record<string, string>)
 
 type Props = {
     venueId: string;
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     staffId: string;
     staffName: string;
+    // eslint-disable-next-line react-hooks/purity
     onExit?: () => void;
     onSignOut?: () => void;
     role?: string;
@@ -191,9 +198,11 @@ export function KitchenDisplayScreen({ venueId, staffId, staffName, onExit, onSi
             groups[order.status].push(order);
         }
         for (const status of Object.keys(groups) as OrderStatus[]) {
-            groups[status].sort(
-                (a, b) => new Date(a.placedAt).getTime() - new Date(b.placedAt).getTime()
-            );
+            groups[status].sort((a, b) => {
+                if (a.isCancelled && !b.isCancelled) return 1;
+                if (!a.isCancelled && b.isCancelled) return -1;
+                return new Date(a.placedAt).getTime() - new Date(b.placedAt).getTime();
+            });
         }
         return groups;
     }, [filteredOrders]);
@@ -218,6 +227,11 @@ export function KitchenDisplayScreen({ venueId, staffId, staffName, onExit, onSi
         },
         [orders, staffId]
     );
+
+    const dismissOrder = useCallback(async (orderId: string) => {
+        setOrders((o) => o.filter((x) => x.id !== orderId));
+        await db.updateOrderSubmissionStatus(orderId, 'cancelled');
+    }, []);
 
     /* ── Header stats ── */
     const pendingCount = ordersByStatus.pending.length;
@@ -356,6 +370,7 @@ export function KitchenDisplayScreen({ venueId, staffId, staffName, onExit, onSi
                                                     onAdvance={(id) => changeStatus(id, "preparing")}
                                                     onMarkReady={(id) => changeStatus(id, "ready")}
                                                     onMarkServed={(id) => setServeConfirmId(id)}
+                                                    onDismiss={dismissOrder}
                                                 />
                                             ))
                                         )}

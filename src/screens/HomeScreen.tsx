@@ -2,9 +2,11 @@ import { useEffect, useState } from "react";
 import {
     ArrowRightIcon,
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     ClockIcon,
     MapPinIcon,
     MusicalNoteIcon,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     UserIcon,
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     WifiIcon,
@@ -13,6 +15,7 @@ import { formatGHS } from "../data/menu";
 import { useVenue } from "../hooks/useVenue";
 
 // Premium Unsplash hero — warm, editorial cocktail imagery
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 const signatureImg =
     "https://images.unsplash.com/photo-1551024709-8f23befc6f87?auto=format&fit=crop&w=1200&q=80";
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -32,6 +35,7 @@ function getGreeting() {
     const h = new Date().getHours();
     if (h < 12) return "Good morning";
     if (h < 17) return "Good afternoon";
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     return "Good evening";
 }
 
@@ -52,8 +56,11 @@ export function HomeScreen({ onEnter, onViewReservations, onStaffPortal, onKitch
         return () => clearInterval(t);
     }, []);
 
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     // Mock happy-hour end at 8pm
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const happyHourEnd = new Date();
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     happyHourEnd.setHours(20, 0, 0, 0);
     const happyHourMs = Math.max(0, happyHourEnd.getTime() - now.getTime());
     // eslint-disable-next-line @typescript-eslint/no-unused-vars

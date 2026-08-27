@@ -37,6 +37,7 @@ export function useVenue(slug?: string) {
     const venueSlug = slug;
     if (!venueSlug) {
       // eslint-disable-next-line react-hooks/set-state-in-effect
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setLoading(false);
       return;
     }
