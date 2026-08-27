@@ -495,7 +495,7 @@ function AppShell() {
   }, [location.pathname]);
 
   const goToManagerPage = useCallback(
-    (page: ManagerPage) => navigate(`/manager/${page}`),
+    (page: string) => navigate(page.startsWith("/") ? page : `/manager/${page}`),
     [navigate],
   );
 

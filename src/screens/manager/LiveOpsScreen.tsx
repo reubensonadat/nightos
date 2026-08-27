@@ -405,7 +405,7 @@ export function LiveOpsScreen({ onNavigate }: { onNavigate?: (page: string) => v
 
                 {/* ── Top Sellers (real order items, selected window) ── */}
                 <div 
-                    onClick={() => onNavigate?.("menu")}
+                    onClick={() => onNavigate?.("menu?tab=top-sellers")}
                     className="rounded-[1.5rem] bg-white p-5 md:p-6 shadow-sm ring-1 ring-licorice/5 flex flex-col h-full cursor-pointer hover:bg-isabelline/50 transition-all group"
                 >
                     <div className="group-active:scale-[0.98] transition-transform duration-200 h-full flex flex-col">
@@ -441,7 +441,7 @@ export function LiveOpsScreen({ onNavigate }: { onNavigate?: (page: string) => v
                         type="button"
                         onClick={(e) => {
                             e.stopPropagation();
-                            onNavigate?.("menu");
+                            onNavigate?.("menu?tab=top-sellers");
                         }}
                         className="mt-auto w-full rounded-full bg-isabelline py-2 text-xs font-bold tracking-tight text-feldgrau hover:text-licorice transition-colors"
                     >
