@@ -19,6 +19,7 @@ import {
     UserIcon,
     UsersIcon,
     XMarkIcon,
+    ClipboardDocumentListIcon,
 } from "@heroicons/react/24/outline";
 import { ShieldCheckIcon } from "@heroicons/react/24/solid";
 import signoutBlackIcon from "../../assets/sign-out-black.svg";
@@ -168,6 +169,7 @@ export function AdminLoginScreen({ onSignIn }: LoginProps) {
 export type ManagerPage =
     | "ops"
     | "floorplan"
+    | "orders"
     | "menu"
     | "staff"
     | "finance"
@@ -182,6 +184,7 @@ type NavItem = {
 const NAV_ITEMS: NavItem[] = [
     { id: "ops", label: "Dashboard", icon: Squares2X2Icon },
     { id: "floorplan", label: "Tables", icon: MapIcon },
+    { id: "orders", label: "All Orders", icon: ClipboardDocumentListIcon },
     { id: "menu", label: "Menu & Inventory", icon: ClipboardDocumentCheckIcon },
     { id: "staff", label: "Staff & Roles", icon: UsersIcon },
     { id: "finance", label: "Financial Reports", icon: BanknotesIcon },

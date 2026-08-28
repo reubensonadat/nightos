@@ -612,9 +612,9 @@ export function FloorplanScreen() {
                 swapButtons
                 loading={closingLoading && !!closingItems}
                 onConfirm={async () => {
-                    if (!closingTable?.billId) return;
+                    if (!closingTable?.id) return;
                     setClosingLoading(true);
-                    await db.updateBill(closingTable.billId, { status: "cancelled" });
+                    await db.cancelTableSession(closingTable.id);
                     setClosingTable(null);
                     setClosingItems(null);
                     setSelectedId(null);

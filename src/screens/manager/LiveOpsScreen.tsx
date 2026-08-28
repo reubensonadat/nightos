@@ -611,6 +611,14 @@ export function LiveOpsScreen({ onNavigate }: { onNavigate?: (page: string) => v
             <div className="rounded-[1.5rem] bg-white p-5 md:p-6 shadow-sm ring-1 ring-licorice/5">
                 <div className="flex items-center justify-between mb-5">
                     <h2 className="text-lg font-bold text-slate-900 tracking-tight">Recent Orders</h2>
+                    {onNavigate && (
+                        <button
+                            onClick={() => onNavigate("orders")}
+                            className="text-xs font-bold uppercase tracking-wider text-feldgrau hover:text-licorice transition-colors flex items-center gap-1"
+                        >
+                            View All <ChevronRightIcon className="w-3.5 h-3.5" strokeWidth={2.5} />
+                        </button>
+                    )}
                 </div>
 
                 <div className="overflow-x-auto no-scrollbar">

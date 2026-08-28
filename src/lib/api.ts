@@ -541,6 +541,35 @@ export const db = {
       .single();
   },
 
+  cancelTableSession: async (tableId: string) => {
+    cacheInvalidate('bills:');
+    
+    // 1. Find all active bills for this table
+    const { data: bills, error: billsError } = await supabase
+      .from('bills')
+      .select('id')
+      .eq('table_id', tableId)
+      .in('status', ['open', 'settling']);
+      
+    if (billsError || !bills || bills.length === 0) return { error: billsError };
+
+    const billIds = bills.map(b => b.id);
+    
+    // 2. Update bills to cancelled
+    const { error: updateError } = await supabase
+      .from('bills')
+      .update({ status: 'cancelled', closed_at: new Date().toISOString() })
+      .in('id', billIds);
+      
+    if (updateError) return { error: updateError };
+    
+    // 3. Cascade to order_submissions and order_items
+    await supabase.from('order_submissions').update({ status: 'cancelled' }).in('bill_id', billIds);
+    await supabase.from('order_items').update({ status: 'cancelled' }).in('bill_id', billIds);
+    
+    return { error: null };
+  },
+
   /* ── Order Submissions ── */
   createOrderSubmission: (
     billId: string,
@@ -635,6 +664,21 @@ export const db = {
     ]);
     if (countErr) return { data, error: countErr, total: 0 };
     return { data, error, total: count ?? 0 };
+  },
+
+  managerAllOrders: async (venueId: string, daysAgo: number) => {
+    const fromDate = new Date();
+    fromDate.setDate(fromDate.getDate() - daysAgo);
+    return supabase
+      .from('order_submissions')
+      .select(`
+        id, status, guest_name, created_at, notes,
+        bills ( tables ( table_label, table_number ) ),
+        order_items ( quantity, line_total, product_name, notes )
+      `)
+      .eq('venue_id', venueId)
+      .gte('created_at', fromDate.toISOString())
+      .order('created_at', { ascending: false });
   },
 
   orderItemsBySubmission: (submissionId: string) =>

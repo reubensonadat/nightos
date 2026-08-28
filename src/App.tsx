@@ -35,12 +35,10 @@ import { TableLayout } from "./screens/waiter/TableLayout";
 
 import { KitchenDisplayScreen } from "./screens/kitchen/KitchenDisplayScreen";
 
-import {
-  ManagerShell,
-  type ManagerPage,
-} from "./screens/manager/ManagerShell";
+import { ManagerShell, type ManagerPage } from "./screens/manager/ManagerShell";
 import { LiveOpsScreen } from "./screens/manager/LiveOpsScreen";
 import { FloorplanScreen } from "./screens/manager/FloorplanScreen";
+import { ManagerOrdersScreen } from "./screens/manager/ManagerOrdersScreen";
 import { MenuManagerScreen } from "./screens/manager/MenuManagerScreen";
 import { StaffManagerScreen } from "./screens/manager/StaffManagerScreen";
 import { FinancialReportsScreen } from "./screens/manager/FinancialReportsScreen";
@@ -486,7 +484,7 @@ function AppShell() {
     const seg = location.pathname.split("/")[2];
     if (
       seg &&
-      (seg === "ops" || seg === "floorplan" || seg === "menu" || seg === "staff" ||
+      (seg === "ops" || seg === "floorplan" || seg === "orders" || seg === "menu" || seg === "staff" ||
         seg === "finance" || seg === "crm" || seg === "brand")
     ) {
       return seg as ManagerPage;
@@ -610,6 +608,7 @@ function AppShell() {
             >
               {managerPage === "ops" && <LiveOpsScreen onNavigate={goToManagerPage} />}
               {managerPage === "floorplan" && <FloorplanScreen />}
+              {managerPage === "orders" && <ManagerOrdersScreen venueId={venueId} />}
               {managerPage === "menu" && <MenuManagerScreen />}
               {managerPage === "staff" && <StaffManagerScreen />}
               {managerPage === "finance" && <FinancialReportsScreen />}

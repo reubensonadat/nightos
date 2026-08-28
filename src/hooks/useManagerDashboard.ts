@@ -199,7 +199,10 @@ export function useManagerDashboard(venueId: string | null, days: 7 | 30 = 7) {
         orders: 0,
       });
     }
-    for (const p of payments) dayBuckets.find((b) => b.key === dayKey(new Date(p.created_at)))!.revenue += p.amount;
+    for (const p of payments) {
+      const b = dayBuckets.find((b) => b.key === dayKey(new Date(p.created_at)));
+      if (b) b.revenue += p.amount;
+    }
     for (const s of submissions) {
       const b = dayBuckets.find((x) => x.key === dayKey(new Date(s.created_at)));
       if (b) b.orders += 1;

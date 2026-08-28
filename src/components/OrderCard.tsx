@@ -131,10 +131,14 @@ export function OrderCard({ order, now, onAdvance, onMarkReady, onMarkServed, on
                 </div>
 
                 {/* Elapsed timer */}
-                <div className={`flex items-center gap-1 ${styles.text}`}>
-                    <span className="text-lg tabular-nums tracking-tight">
-                        {formatDuration(elapsedSeconds)}
-                    </span>
+                <div className={`flex items-center gap-1 ${isCancelled ? "text-slate-500 font-bold uppercase text-[10px] tracking-wider" : styles.text}`}>
+                    {isCancelled ? (
+                        <span>Cancelled</span>
+                    ) : (
+                        <span className="text-lg tabular-nums tracking-tight">
+                            {formatDuration(elapsedSeconds)}
+                        </span>
+                    )}
                 </div>
             </header>
 
@@ -167,6 +171,7 @@ export function OrderCard({ order, now, onAdvance, onMarkReady, onMarkServed, on
             </div>
 
             {/* ── Status action button ── */}
+            {/* ── Status action button ── */}
             <div className="border-t border-isabelline p-2">
                 {isCancelled ? (
                     <button
@@ -178,76 +183,77 @@ export function OrderCard({ order, now, onAdvance, onMarkReady, onMarkServed, on
                             rounded-lg bg-slate-200 px-4 py-2.5
                             text-base font-bold tracking-tight text-slate-500
                             transition-all duration-150
-                            hover:bg-slate-300
-                            active:scale-[0.98]
+                            hover:bg-slate-300 active:scale-[0.98]
                         "
                     >
                         Dismiss
                     </button>
-                ) : order.status === "pending" && (
-                    <button
-                        type="button"
-                        onClick={() => onAdvance(order.id)}
-                        aria-label="Start preparing"
-                        className="
-                            flex w-full items-center justify-center gap-1.5
-                            rounded-lg bg-licorice px-4 py-2.5
-                            text-base font-bold tracking-tight text-isabelline
-                            shadow-[0_4px_12px_rgba(35,20,12,0.18)]
-                            transition-all duration-150
-                            hover:bg-licorice/95
-                            active:scale-[0.98]
-                        "
-                    >
-                        Start Preparing
-                    </button>
-                )}
+                ) : (
+                    <>
+                        {order.status === "pending" && (
+                            <button
+                                type="button"
+                                onClick={() => onAdvance(order.id)}
+                                aria-label="Start preparing"
+                                className="
+                                    flex w-full items-center justify-center gap-1.5
+                                    rounded-lg bg-licorice px-4 py-2.5
+                                    text-base font-bold tracking-tight text-isabelline
+                                    shadow-[0_4px_12px_rgba(35,20,12,0.18)]
+                                    transition-all duration-150
+                                    hover:bg-licorice/95
+                                    active:scale-[0.98]
+                                "
+                            >
+                                Start Preparing
+                            </button>
+                        )}
 
-                {order.status === "preparing" && (
-                    <button
-                        type="button"
-                        onClick={() => onMarkReady(order.id)}
-                        aria-label="Mark as ready"
-                        className="
-                            flex w-full items-center justify-center gap-1.5
-                            rounded-lg bg-khaki px-4 py-2.5
-                            text-base font-bold tracking-tight text-licorice
-                            shadow-[0_4px_12px_rgba(143,106,55,0.25)]
-                            transition-all duration-150
-                            hover:brightness-105
-                            active:scale-[0.98]
-                        "
-                    >
-                        Mark Ready
-                    </button>
-                )}
+                        {order.status === "preparing" && (
+                            <button
+                                type="button"
+                                onClick={() => onMarkReady(order.id)}
+                                aria-label="Mark as ready"
+                                className="
+                                    flex w-full items-center justify-center gap-1.5
+                                    rounded-lg bg-khaki px-4 py-2.5
+                                    text-base font-bold tracking-tight text-licorice
+                                    shadow-[0_4px_12px_rgba(143,106,55,0.25)]
+                                    transition-all duration-150
+                                    hover:brightness-105
+                                    active:scale-[0.98]
+                                "
+                            >
+                                Mark Ready
+                            </button>
+                        )}
 
-                {order.status === "ready" &&
-                    (onMarkServed ? (
-                        <button
-                            type="button"
-                            onClick={() => onMarkServed(order.id)}
-                            aria-label="Mark as served"
-                            className="
-                                flex w-full items-center justify-center gap-1.5
-                                rounded-lg bg-feldgrau px-4 py-2.5
-                                text-base font-bold tracking-tight text-isabelline
-                                shadow-[0_4px_12px_rgba(58,66,63,0.25)]
-                                transition-all duration-150
-                                hover:brightness-110
-                                active:scale-[0.98]
-                            "
-                        >
-                            Mark Served
-                        </button>
-                    ) : (
-                        <div className="flex items-center justify-center gap-1.5 rounded-lg bg-khaki/15 px-4 py-2.5 text-base font-bold tracking-tight text-khaki">
-                            Ready for pickup
-                        </div>
-                    ))}
+                        {order.status === "ready" &&
+                            (onMarkServed ? (
+                                <button
+                                    type="button"
+                                    onClick={() => onMarkServed(order.id)}
+                                    aria-label="Mark as served"
+                                    className="
+                                        flex w-full items-center justify-center gap-1.5
+                                        rounded-lg bg-feldgrau px-4 py-2.5
+                                        text-base font-bold tracking-tight text-isabelline
+                                        shadow-[0_4px_12px_rgba(58,66,63,0.25)]
+                                        transition-all duration-150
+                                        hover:brightness-110
+                                        active:scale-[0.98]
+                                    "
+                                >
+                                    Mark Served
+                                </button>
+                            ) : (
+                                <div className="flex items-center justify-center gap-1.5 rounded-lg bg-khaki/15 px-4 py-2.5 text-base font-bold tracking-tight text-khaki">
+                                    Ready for pickup
+                                </div>
+                            ))}
+                    </>
+                )}
             </div>
         </article>
     );
 }
-
-export { STATUS_LABEL };
