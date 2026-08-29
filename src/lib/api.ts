@@ -1152,6 +1152,78 @@ export const db = {
   shiftCoverage: (venueId: string) =>
     supabase.rpc('shift_coverage', { p_venue_id: venueId }),
 
+  /** All staff shifts for a venue within a date/time range. */
+  staffShiftsSince: async (venueId: string, sinceIso: string, untilIso?: string) => {
+    let query = supabase
+      .from('staff_shifts')
+      .select('id, staff_id, venue_id, clock_in, clock_out, cash_balance_start, cash_balance_end, status, created_at')
+      .eq('venue_id', venueId)
+      .gte('clock_in', sinceIso)
+      .order('clock_in', { ascending: false });
+    if (untilIso) {
+      query = query.lte('clock_in', untilIso);
+    }
+    return query;
+  },
+
+  /** Shift Report Data: comprehensive query for End-of-Shift calculations */
+  shiftReportData: async (venueId: string, sinceIso: string, untilIso?: string) => {
+    let paymentsQ = supabase
+      .from('payments')
+      .select('id, bill_id, venue_id, amount, method, reference, payer_name, collected_by, status, paystack_data, platform_fee, fee_settled, created_at')
+      .eq('venue_id', venueId)
+      .gte('created_at', sinceIso)
+      .order('created_at', { ascending: false });
+    if (untilIso) paymentsQ = paymentsQ.lte('created_at', untilIso);
+
+    let billsQ = supabase
+      .from('bills')
+      .select('id, venue_id, table_id, waiter_id, guest_count, status, payment_model, subtotal, convenience_fee, service_charge, vat, total, amount_paid, is_merged, merged_into_bill_id, created_at, updated_at, closed_at, tables(table_number, table_label)')
+      .eq('venue_id', venueId)
+      .gte('created_at', sinceIso)
+      .order('created_at', { ascending: false });
+    if (untilIso) billsQ = billsQ.lte('created_at', untilIso);
+
+    let subsQ = supabase
+      .from('order_submissions')
+      .select(`
+        id, bill_id, venue_id, guest_name, status, station, priority, notes, customer_session_id, created_at, updated_at,
+        order_items(id, product_name, quantity, unit_price, line_total, status, notes),
+        bills(id, table_id, waiter_id, tables(table_number, table_label))
+      `)
+      .eq('venue_id', venueId)
+      .gte('created_at', sinceIso)
+      .order('created_at', { ascending: false });
+    if (untilIso) subsQ = subsQ.lte('created_at', untilIso);
+
+    let logsQ = supabase
+      .from('activity_logs')
+      .select('id, venue_id, actor_id, actor_name, action, entity_type, entity_id, details, created_at')
+      .eq('venue_id', venueId)
+      .gte('created_at', sinceIso)
+      .order('created_at', { ascending: false });
+    if (untilIso) logsQ = logsQ.lte('created_at', untilIso);
+
+    const [paymentsRes, billsRes, subsRes, staffRes, shiftsRes, logsRes] = await Promise.all([
+      paymentsQ,
+      billsQ,
+      subsQ,
+      supabase.from('staff').select('id, venue_id, name, phone, email, role, is_active').eq('venue_id', venueId),
+      supabase.from('staff_shifts').select('id, staff_id, venue_id, clock_in, clock_out, cash_balance_start, cash_balance_end, status, created_at').eq('venue_id', venueId).gte('clock_in', sinceIso).order('clock_in', { ascending: false }),
+      logsQ,
+    ]);
+
+    return {
+      payments: paymentsRes.data ?? [],
+      bills: billsRes.data ?? [],
+      submissions: subsRes.data ?? [],
+      staff: staffRes.data ?? [],
+      shifts: shiftsRes.data ?? [],
+      activityLogs: logsRes.data ?? [],
+      error: paymentsRes.error || billsRes.error || subsRes.error ? (paymentsRes.error?.message || billsRes.error?.message || subsRes.error?.message) : null,
+    };
+  },
+
   /* ── Reservations ── */
   createReservation: (
     venueId: string,

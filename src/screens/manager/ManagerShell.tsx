@@ -1,15 +1,13 @@
 import { useState, type FormEvent, type ReactNode } from "react";
 import {
     ArrowRightIcon,
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     ArrowRightStartOnRectangleIcon,
     BanknotesIcon,
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     Bars3Icon,
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     ChartBarIcon,
     ClipboardDocumentCheckIcon,
+    ClipboardDocumentListIcon,
+    DocumentChartBarIcon,
     EyeIcon,
     LockClosedIcon,
     MapIcon,
@@ -19,7 +17,6 @@ import {
     UserIcon,
     UsersIcon,
     XMarkIcon,
-    ClipboardDocumentListIcon,
 } from "@heroicons/react/24/outline";
 import { ShieldCheckIcon } from "@heroicons/react/24/solid";
 import signoutBlackIcon from "../../assets/sign-out-black.svg";
@@ -168,6 +165,7 @@ export function AdminLoginScreen({ onSignIn }: LoginProps) {
 
 export type ManagerPage =
     | "ops"
+    | "shift-report"
     | "floorplan"
     | "orders"
     | "menu"
@@ -183,6 +181,7 @@ type NavItem = {
 
 const NAV_ITEMS: NavItem[] = [
     { id: "ops", label: "Dashboard", icon: Squares2X2Icon },
+    { id: "shift-report", label: "Shift Report", icon: DocumentChartBarIcon },
     { id: "floorplan", label: "Tables", icon: MapIcon },
     { id: "orders", label: "All Orders", icon: ClipboardDocumentListIcon },
     { id: "menu", label: "Menu & Inventory", icon: ClipboardDocumentCheckIcon },

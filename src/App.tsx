@@ -41,6 +41,7 @@ import { FloorplanScreen } from "./screens/manager/FloorplanScreen";
 import { ManagerOrdersScreen } from "./screens/manager/ManagerOrdersScreen";
 import { MenuManagerScreen } from "./screens/manager/MenuManagerScreen";
 import { StaffManagerScreen } from "./screens/manager/StaffManagerScreen";
+import { ShiftReportScreen } from "./screens/manager/ShiftReportScreen";
 import { FinancialReportsScreen } from "./screens/manager/FinancialReportsScreen";
 import { CrmScreen } from "./screens/manager/CrmScreen";
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -607,6 +608,7 @@ function AppShell() {
               onSignOut={handleManagerSignOut}
             >
               {managerPage === "ops" && <LiveOpsScreen onNavigate={goToManagerPage} />}
+              {managerPage === "shift-report" && <ShiftReportScreen />}
               {managerPage === "floorplan" && <FloorplanScreen />}
               {managerPage === "orders" && <ManagerOrdersScreen venueId={venueId} />}
               {managerPage === "menu" && <MenuManagerScreen />}

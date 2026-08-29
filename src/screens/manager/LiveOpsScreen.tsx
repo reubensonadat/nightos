@@ -5,10 +5,8 @@ import {
     BanknotesIcon,
     CheckBadgeIcon,
     ChevronRightIcon,
+    DocumentChartBarIcon,
     ExclamationTriangleIcon,
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    LinkIcon,
     PlusIcon,
     ShoppingCartIcon,
     TableCellsIcon,
@@ -19,6 +17,7 @@ import { formatGHS, formatGHSString } from "../../data/menu";
 import { useVenue } from "../../hooks/useVenue";
 import { useManagerDashboard, type DashboardRecentOrder } from "../../hooks/useManagerDashboard";
 import { db } from "../../lib/api";
+import { ShiftReportScreen } from "./ShiftReportScreen";
 
 /* ═══════════════════════════════════════════════════════════════════════════
    MANAGER DASHBOARD — every number here is computed in the frontend from
@@ -44,27 +43,6 @@ function OrderStatusBadge({ status }: { status: DashboardRecentOrder["status"] }
         </span>
     );
 }
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-function formatCompact(n: number): string {
-    if (n >= 1000) return `${(n / 1000).toFixed(1)}k`;
-    return n.toString();
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-}
-
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-function formatGHSCompact(n: number): React.ReactNode {
-    if (n >= 1000) {
-        return (
-            <span className="whitespace-nowrap inline-flex items-baseline">
-                <span className="text-[0.8em] opacity-70 font-semibold mr-[2px]">GH₵</span>
-                <span>{(n / 1000).toFixed(1)}k</span>
-            </span>
-        );
-    }
-    return formatGHS(n);
-}
 
 /** "45m", "2h", "2h 05m" — for idle/dwell times. */
 function formatDwell(mins: number): string {
@@ -81,15 +59,14 @@ function formatDwell(mins: number): string {
 export function LiveOpsScreen({ onNavigate }: { onNavigate?: (page: string) => void }) {
     const { venue } = useVenue('velvet-lounge');
     const [range, setRange] = useState<7 | 30>(7);
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const s = useManagerDashboard(venue.id, range);
 
     const [outstanding, setOutstanding] = useState(0);
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const [landed, setLanded] = useState<Awaited<ReturnType<typeof db.landedWithoutOrders>>["data"]>([]);
     const [openBills, setOpenBills] = useState<Awaited<ReturnType<typeof db.openBillOverview>>["data"]>([]);
     const [dwellThreshold, setDwellThreshold] = useState(120);
     const [recentFees, setRecentFees] = useState<Awaited<ReturnType<typeof db.recentCashFees>>["data"]>([]);
+    const [showShiftModal, setShowShiftModal] = useState(false);
 
     // Group per-table bills by their merged target so linked tables (ABC + CBD)
     // show as one line with both table labels.
@@ -129,10 +106,9 @@ export function LiveOpsScreen({ onNavigate }: { onNavigate?: (page: string) => v
             await loadLive();
         };
         init();
-        }, [loadLive]);
+    }, [loadLive]);
 
-    // Live refresh — customer sessions, bills and payments drive this
-    // screen; no polling.
+    // Live refresh — customer sessions, bills and payments drive this screen; no polling.
     const liveTimer = useRef<number | null>(null);
     const scheduleLive = useCallback(() => {
         if (liveTimer.current !== null) window.clearTimeout(liveTimer.current);
@@ -195,7 +171,6 @@ export function LiveOpsScreen({ onNavigate }: { onNavigate?: (page: string) => v
                     <h1 className="font-display text-[26px] font-black tracking-[-0.03em] text-licorice">
                         {greeting}, Manager
                     </h1>
-
                 </div>
 
                 {/* Quick action buttons */}
@@ -209,10 +184,18 @@ export function LiveOpsScreen({ onNavigate }: { onNavigate?: (page: string) => v
                     </button>
                     <button
                         type="button"
+                        onClick={() => setShowShiftModal(true)}
+                        className="inline-flex items-center gap-1.5 rounded-full bg-khaki/20 text-licorice px-4 py-2 text-sm font-semibold ring-1 ring-khaki/40 hover:bg-khaki/30 active:scale-[0.97] transition-all shadow-sm"
+                    >
+                        <DocumentChartBarIcon className="h-4 w-4 text-khaki" strokeWidth={2} />
+                        Shift Report
+                    </button>
+                    <button
+                        type="button"
                         onClick={() => onNavigate?.("finance")}
                         className="inline-flex items-center gap-1.5 rounded-full bg-white text-licorice px-4 py-2 text-sm font-semibold ring-1 ring-licorice/8 hover:bg-isabelline active:scale-[0.97] transition-all"
                     >
-                        View Report
+                        Finance
                     </button>
                 </div>
             </div>
@@ -323,7 +306,6 @@ export function LiveOpsScreen({ onNavigate }: { onNavigate?: (page: string) => v
                         />
                     </div>
                 </div>
-
 
             </div>
 
@@ -452,7 +434,7 @@ export function LiveOpsScreen({ onNavigate }: { onNavigate?: (page: string) => v
             </div>
 
             {/* ═══════════════════════════════════════════════════════════
-               ALERTS + STAFF SNAPSHOT ROW
+               ALERTS + STAFF SNAPSHOT + SHIFT METRICS ROW
                ═══════════════════════════════════════════════════════════ */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-stretch">
 
@@ -568,40 +550,61 @@ export function LiveOpsScreen({ onNavigate }: { onNavigate?: (page: string) => v
                     </div>
                 </div>
 
-                {/* ── Quick Stats (real today's numbers) ── */}
-                <div className="rounded-[1.5rem] bg-white p-5 md:p-6 shadow-sm ring-1 ring-licorice/5 flex flex-col h-full">
-                    <h2 className="text-lg font-bold text-slate-900 tracking-tight mb-5">Shift Metrics</h2>
+                {/* ── Shift Metrics Card (interactive link to End of Shift Summary) ── */}
+                <div 
+                    onClick={() => setShowShiftModal(true)}
+                    className="rounded-[1.5rem] bg-white p-5 md:p-6 shadow-sm ring-1 ring-licorice/5 flex flex-col justify-between h-full cursor-pointer hover:bg-isabelline/50 transition-all group"
+                >
+                    <div className="group-active:scale-[0.98] transition-transform duration-200">
+                        <div className="flex items-center justify-between mb-5">
+                            <h2 className="text-lg font-bold text-slate-900 tracking-tight">Shift Metrics</h2>
+                            <span className="inline-flex items-center gap-1 rounded-full bg-khaki/20 px-2.5 py-0.5 text-[11px] font-bold text-khaki group-hover:bg-khaki/30 transition-colors">
+                                End of Shift &rarr;
+                            </span>
+                        </div>
 
-                    <div className="space-y-4">
-                        <div className="flex items-center justify-between border-b border-isabelline pb-2">
-                            <div className="flex items-center gap-2">
-                                <ShoppingCartIcon className="w-4 h-4 text-slate-400 stroke-[1.5px] fill-none" />
-                                <span className="text-xs font-medium tracking-tight text-feldgrau">Orders taken</span>
+                        <div className="space-y-4">
+                            <div className="flex items-center justify-between border-b border-isabelline pb-2">
+                                <div className="flex items-center gap-2">
+                                    <ShoppingCartIcon className="w-4 h-4 text-slate-400 stroke-[1.5px] fill-none" />
+                                    <span className="text-xs font-medium tracking-tight text-feldgrau">Orders taken</span>
+                                </div>
+                                <span className="text-sm font-bold tabular-nums text-licorice">{s.ordersTakenToday}</span>
                             </div>
-                            <span className="text-sm font-bold tabular-nums text-licorice">{s.ordersTakenToday}</span>
-                        </div>
-                        <div className="flex items-center justify-between border-b border-isabelline pb-2">
-                            <div className="flex items-center gap-2">
-                                <CheckBadgeIcon className="w-4 h-4 text-slate-400 stroke-[1.5px] fill-none" />
-                                <span className="text-xs font-medium tracking-tight text-feldgrau">Payments today</span>
+                            <div className="flex items-center justify-between border-b border-isabelline pb-2">
+                                <div className="flex items-center gap-2">
+                                    <CheckBadgeIcon className="w-4 h-4 text-slate-400 stroke-[1.5px] fill-none" />
+                                    <span className="text-xs font-medium tracking-tight text-feldgrau">Payments today</span>
+                                </div>
+                                <span className="text-sm font-bold tabular-nums text-licorice">{s.paymentsToday}</span>
                             </div>
-                            <span className="text-sm font-bold tabular-nums text-licorice">{s.paymentsToday}</span>
-                        </div>
-                        <div className="flex items-center justify-between border-b border-isabelline pb-2">
-                            <div className="flex items-center gap-2">
-                                <ArrowUpRightIcon className="w-4 h-4 text-slate-400 stroke-[1.5px] fill-none" />
-                                <span className="text-xs font-medium tracking-tight text-feldgrau">Avg order value</span>
+                            <div className="flex items-center justify-between border-b border-isabelline pb-2">
+                                <div className="flex items-center gap-2">
+                                    <ArrowUpRightIcon className="w-4 h-4 text-slate-400 stroke-[1.5px] fill-none" />
+                                    <span className="text-xs font-medium tracking-tight text-feldgrau">Avg order value</span>
+                                </div>
+                                <span className="text-sm font-bold tabular-nums text-licorice">{formatGHS(s.avgOrderValue)}</span>
                             </div>
-                            <span className="text-sm font-bold tabular-nums text-licorice">{formatGHS(s.avgOrderValue)}</span>
-                        </div>
-                        <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-2">
-                                <UserGroupIcon className="w-4 h-4 text-slate-400 stroke-[1.5px] fill-none" />
-                                <span className="text-xs font-medium tracking-tight text-feldgrau">Guests served</span>
+                            <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-2">
+                                    <UserGroupIcon className="w-4 h-4 text-slate-400 stroke-[1.5px] fill-none" />
+                                    <span className="text-xs font-medium tracking-tight text-feldgrau">Guests served</span>
+                                </div>
+                                <span className="text-sm font-bold tabular-nums text-licorice">{s.guestsServed}</span>
                             </div>
-                            <span className="text-sm font-bold tabular-nums text-licorice">{s.guestsServed}</span>
                         </div>
                     </div>
+
+                    <button
+                        type="button"
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            setShowShiftModal(true);
+                        }}
+                        className="mt-5 w-full rounded-full bg-isabelline py-2 text-xs font-bold tracking-tight text-feldgrau group-hover:text-licorice group-hover:bg-licorice/5 transition-colors text-center"
+                    >
+                        View Full Shift Report &rarr;
+                    </button>
                 </div>
             </div>
 
@@ -759,7 +762,20 @@ export function LiveOpsScreen({ onNavigate }: { onNavigate?: (page: string) => v
                 </div>
             </div>
 
-
+            {/* ═══════════════════════════════════════════════════════════
+               SHIFT REPORT MODAL OVERLAY
+               ═══════════════════════════════════════════════════════════ */}
+            {showShiftModal && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-3 md:p-6">
+                    <div
+                        className="fixed inset-0 bg-licorice/50 backdrop-blur-sm transition-opacity"
+                        onClick={() => setShowShiftModal(false)}
+                    />
+                    <div className="relative z-10 w-full max-w-5xl max-h-[90vh] overflow-y-auto rounded-[2rem] bg-isabelline shadow-2xl ring-1 ring-white/60">
+                        <ShiftReportScreen isModal onClose={() => setShowShiftModal(false)} />
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

@@ -1,7 +1,6 @@
-import { useState, useEffect, useMemo, Fragment, useCallback } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { db } from "../../lib/api";
 import { useRealtime } from "../../hooks/useRealtime";
-import { Dialog, Transition } from "@headlessui/react";
 import { 
   MagnifyingGlassIcon, 
   XMarkIcon,
@@ -238,110 +237,84 @@ export function ManagerOrdersScreen({ venueId }: { venueId: string }) {
       </div>
 
       {/* Order Details Modal */}
-      <Transition appear show={!!selectedOrder} as={Fragment}>
-        <Dialog as="div" className="relative z-[100]" onClose={() => setSelectedOrder(null)}>
-          <Transition.Child
-            as={Fragment}
-            enter="ease-out duration-300"
-            enterFrom="opacity-0"
-            enterTo="opacity-100"
-            leave="ease-in duration-200"
-            leaveFrom="opacity-100"
-            leaveTo="opacity-0"
-          >
-            <div className="fixed inset-0 bg-licorice/40 backdrop-blur-sm" />
-          </Transition.Child>
+      {selectedOrder && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+          <div 
+            className="fixed inset-0 bg-licorice/40 backdrop-blur-sm transition-opacity" 
+            onClick={() => setSelectedOrder(null)} 
+          />
+          <div className="relative z-10 w-full max-w-lg overflow-hidden rounded-[2rem] bg-isabelline shadow-2xl ring-1 ring-licorice/5 flex flex-col max-h-[85vh]">
+            {/* Modal Header */}
+            <div className="flex-none px-6 py-5 border-b border-licorice/5 flex items-start justify-between bg-white">
+              <div>
+                <h3 className="text-lg font-black tracking-tight text-licorice">
+                  Order #{selectedOrder.id.slice(0, 8).toUpperCase()}
+                </h3>
+                <div className="mt-1 flex items-center gap-2 text-[13px] font-semibold text-feldgrau">
+                  <span>{selectedOrder.tableLabel}</span>
+                  <span className="text-licorice/20">•</span>
+                  <span>{selectedOrder.guestName}</span>
+                </div>
+              </div>
+              <div className="flex items-center gap-3">
+                <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-[11px] font-bold uppercase tracking-wider ${getStatusColor(selectedOrder.status)}`}>
+                  {selectedOrder.status}
+                </span>
+                <button
+                  type="button"
+                  className="rounded-full bg-isabelline p-2 text-feldgrau hover:bg-licorice/5 hover:text-licorice transition-colors"
+                  onClick={() => setSelectedOrder(null)}
+                >
+                  <XMarkIcon className="h-5 w-5" />
+                </button>
+              </div>
+            </div>
 
-          <div className="fixed inset-0 overflow-y-auto">
-            <div className="flex min-h-full items-center justify-center p-4 text-center sm:p-0">
-              <Transition.Child
-                as={Fragment}
-                enter="ease-out duration-300"
-                enterFrom="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95"
-                enterTo="opacity-100 translate-y-0 sm:scale-100"
-                leave="ease-in duration-200"
-                leaveFrom="opacity-100 translate-y-0 sm:scale-100"
-                leaveTo="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95"
-              >
-                <Dialog.Panel className="relative transform overflow-hidden rounded-[2rem] bg-isabelline text-left shadow-2xl transition-all sm:my-8 sm:w-full sm:max-w-lg ring-1 ring-licorice/5 flex flex-col max-h-[85vh]">
-                  {selectedOrder && (
-                    <>
-                      {/* Modal Header */}
-                      <div className="flex-none px-6 py-5 border-b border-licorice/5 flex items-start justify-between bg-white">
-                        <div>
-                          <Dialog.Title as="h3" className="text-lg font-black tracking-tight text-licorice">
-                            Order #{selectedOrder.id.slice(0, 8).toUpperCase()}
-                          </Dialog.Title>
-                          <div className="mt-1 flex items-center gap-2 text-[13px] font-semibold text-feldgrau">
-                            <span>{selectedOrder.tableLabel}</span>
-                            <span className="text-licorice/20">•</span>
-                            <span>{selectedOrder.guestName}</span>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-3">
-                          <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-[11px] font-bold uppercase tracking-wider ${getStatusColor(selectedOrder.status)}`}>
-                            {selectedOrder.status}
-                          </span>
-                          <button
-                            type="button"
-                            className="rounded-full bg-isabelline p-2 text-feldgrau hover:bg-licorice/5 hover:text-licorice transition-colors"
-                            onClick={() => setSelectedOrder(null)}
-                          >
-                            <XMarkIcon className="h-5 w-5" />
-                          </button>
-                        </div>
+            {/* Modal Body (Scrollable items list) */}
+            <div className="flex-1 overflow-y-auto p-6 space-y-4">
+              {selectedOrder.notes && (
+                <div className="bg-khaki/10 text-khaki-900 p-4 rounded-xl text-[13px] font-medium border border-khaki/20">
+                  <strong>Note:</strong> {selectedOrder.notes}
+                </div>
+              )}
+
+              <div className="space-y-3">
+                <h4 className="text-[11px] font-bold uppercase tracking-wider text-feldgrau mb-2">Order Items</h4>
+                {selectedOrder.items.map((item, idx) => (
+                  <div key={idx} className="flex justify-between items-start gap-4 p-4 rounded-xl bg-white shadow-sm ring-1 ring-licorice/5">
+                    <div className="flex items-start gap-3">
+                      <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-isabelline text-[13px] font-bold text-licorice">
+                        {item.quantity}x
                       </div>
-
-                      {/* Modal Body (Scrollable items list) */}
-                      <div className="flex-1 overflow-y-auto p-6 space-y-4">
-                        {selectedOrder.notes && (
-                          <div className="bg-khaki/10 text-khaki-900 p-4 rounded-xl text-[13px] font-medium border border-khaki/20">
-                            <strong>Note:</strong> {selectedOrder.notes}
-                          </div>
+                      <div className="flex flex-col">
+                        <span className="text-[14px] font-bold text-licorice">{item.product_name}</span>
+                        {item.notes && (
+                          <span className="text-[12px] font-medium text-feldgrau italic mt-0.5">
+                            "{item.notes}"
+                          </span>
                         )}
-
-                        <div className="space-y-3">
-                          <h4 className="text-[11px] font-bold uppercase tracking-wider text-feldgrau mb-2">Order Items</h4>
-                          {selectedOrder.items.map((item, idx) => (
-                            <div key={idx} className="flex justify-between items-start gap-4 p-4 rounded-xl bg-white shadow-sm ring-1 ring-licorice/5">
-                              <div className="flex items-start gap-3">
-                                <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-isabelline text-[13px] font-bold text-licorice">
-                                  {item.quantity}x
-                                </div>
-                                <div className="flex flex-col">
-                                  <span className="text-[14px] font-bold text-licorice">{item.product_name}</span>
-                                  {item.notes && (
-                                    <span className="text-[12px] font-medium text-feldgrau italic mt-0.5">
-                                      "{item.notes}"
-                                    </span>
-                                  )}
-                                </div>
-                              </div>
-                              <span className="text-[14px] font-bold text-licorice">
-                                GH₵{item.line_total.toFixed(2)}
-                              </span>
-                            </div>
-                          ))}
-                        </div>
                       </div>
+                    </div>
+                    <span className="text-[14px] font-bold text-licorice">
+                      GH₵{item.line_total.toFixed(2)}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
 
-                      {/* Modal Footer */}
-                      <div className="flex-none p-6 border-t border-licorice/5 bg-white">
-                        <div className="flex justify-between items-center">
-                          <span className="text-[14px] font-bold text-feldgrau">Total Amount</span>
-                          <span className="text-[20px] font-black text-licorice tracking-tight">
-                            GH₵{selectedOrder.totalAmount.toFixed(2)}
-                          </span>
-                        </div>
-                      </div>
-                    </>
-                  )}
-                </Dialog.Panel>
-              </Transition.Child>
+            {/* Modal Footer */}
+            <div className="flex-none p-6 border-t border-licorice/5 bg-white">
+              <div className="flex justify-between items-center">
+                <span className="text-[14px] font-bold text-feldgrau">Total Amount</span>
+                <span className="text-[20px] font-black text-licorice tracking-tight">
+                  GH₵{selectedOrder.totalAmount.toFixed(2)}
+                </span>
+              </div>
             </div>
           </div>
-        </Dialog>
-      </Transition>
+        </div>
+      )}
     </div>
   );
 }
