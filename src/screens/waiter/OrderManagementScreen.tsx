@@ -83,6 +83,7 @@ export function OrderManagementScreen() {
     const [showPartyModal, setShowPartyModal] = useState(false);
     const [partySizeInput, setPartySizeInput] = useState<number>(1);
     const [savingParty, setSavingParty] = useState(false);
+    const [freeingTable, setFreeingTable] = useState(false);
 
     useEffect(() => {
         if (currentBill?.guest_count) {
@@ -107,7 +108,6 @@ export function OrderManagementScreen() {
                 setCurrentBill(data);
             }
             setShowPartyModal(false);
-            sounds.tap();
             toast.success(`Table ${table.number} updated to ${validatedSize} ${validatedSize === 1 ? 'guest' : 'guests'}`);
         } catch {
             toast.error("Could not update party size");
@@ -116,10 +116,29 @@ export function OrderManagementScreen() {
         }
     };
 
+    const handleFreeTable = async () => {
+        if (!currentBill) return;
+        setFreeingTable(true);
+        try {
+            await db.closeBillAndFreeTable(currentBill.id, table.id, staffId);
+            toast.success(`Table ${String(table.number).padStart(2, "0")} is now free for new guests!`);
+            setCurrentBill(null);
+            setBillId(null);
+            setSubmissions([]);
+            setItemsBySubmission({});
+            setOrder([]);
+            await load();
+        } catch {
+            toast.error("Failed to free table.");
+        } finally {
+            setFreeingTable(false);
+        }
+    };
+
     const load = useCallback(async () => {
         setLoading(true);
         try {
-            const { data: bill } = await db.openBillForTable(table.id);
+            const { data: bill } = await db.activeBillForTable(table.id);
             if (bill) {
                 setCurrentBill(bill);
                 const billId =
@@ -356,15 +375,46 @@ export function OrderManagementScreen() {
                         <span className="text-[13px] font-bold tracking-tight text-licorice">
                             Table {String(table.number).padStart(2, "0")}
                         </span>
-
+                        {currentBill && (
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    setPartySizeInput(currentBill.guest_count || 1);
+                                    setShowPartyModal(true);
+                                }}
+                                className="mt-0.5 inline-flex items-center gap-1 rounded-full bg-licorice/6 hover:bg-licorice/12 px-2.5 py-0.5 text-[11px] font-bold text-licorice transition-all active:scale-95 shadow-2xs"
+                                title="Click to adjust party size"
+                            >
+                                <UserGroupIcon className="h-3 w-3 text-khaki" strokeWidth={2.5} />
+                                <span>{currentBill.guest_count || 1} {(currentBill.guest_count || 1) === 1 ? "guest" : "guests"}</span>
+                                <span className="text-[10px] text-feldgrau font-semibold underline ml-0.5">edit</span>
+                            </button>
+                        )}
                     </div>
 
                     <div className="flex items-center gap-1.5">
+                        {currentBill && (
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    setPartySizeInput(currentBill.guest_count || 1);
+                                    setShowPartyModal(true);
+                                }}
+                                aria-label="Adjust party size"
+                                className="w-10 h-10 rounded-full bg-white border border-slate-200 flex items-center justify-center text-slate-600 active:bg-slate-50 transition-colors shadow-sm relative hover:border-licorice/20"
+                                title="Adjust Party Size"
+                            >
+                                <UserGroupIcon className="h-4 w-4 text-licorice" strokeWidth={2} />
+                                <span className="absolute -top-1 -right-1 flex h-4 min-w-[16px] px-1 items-center justify-center rounded-full bg-licorice text-[9px] font-bold text-isabelline shadow-sm">
+                                    {currentBill.guest_count || 1}
+                                </span>
+                            </button>
+                        )}
                         <button
                             type="button"
                             onClick={() => navigate(`/waiter/table/${table.id}/ops`)}
                             aria-label="Table operations"
-                            className="w-10 h-10 rounded-full bg-white border border-slate-200 flex items-center justify-center text-slate-600 active:bg-slate-50 transition-colors"
+                            className="w-10 h-10 rounded-full bg-white border border-slate-200 flex items-center justify-center text-slate-600 active:bg-slate-50 transition-colors shadow-sm hover:border-licorice/20"
                         >
                             <Cog8ToothIcon className="h-5 w-5" strokeWidth={2} />
                         </button>
@@ -373,10 +423,10 @@ export function OrderManagementScreen() {
 
                 {/* Paid Bill Alert Banner */}
                 {currentBill && (currentBill.status === 'paid' || (Number(currentBill.amount_paid || 0) >= Number(currentBill.total || 0) && Number(currentBill.total || 0) > 0)) && (
-                    <div className="mx-auto w-full max-w-7xl px-5 md:px-8 pb-3">
-                        <div className="flex items-center justify-between rounded-2xl bg-emerald-50 border border-emerald-500/30 p-3.5 shadow-sm">
+                    <div className="mx-auto w-full max-w-7xl px-5 md:px-8 pb-3 animate-velvet-fade">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-2xl bg-emerald-50 border border-emerald-500/30 p-3.5 shadow-sm">
                             <div className="flex items-center gap-3">
-                                <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-600 text-white shadow-sm">
+                                <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-600 text-white shadow-sm shrink-0">
                                     <CheckCircleIcon className="h-5 w-5" />
                                 </div>
                                 <div>
@@ -386,13 +436,33 @@ export function OrderManagementScreen() {
                                     </p>
                                 </div>
                             </div>
-                            <button
-                                type="button"
-                                onClick={() => navigate(`/waiter/table/${table.id}/settle`)}
-                                className="rounded-xl bg-emerald-700 px-3.5 py-2 text-[11px] font-bold text-white shadow-sm transition-all hover:bg-emerald-800 active:scale-95"
-                            >
-                                Settle / Close Tab →
-                            </button>
+                            <div className="flex items-center gap-2 self-end sm:self-auto">
+                                <button
+                                    type="button"
+                                    onClick={() => navigate(`/waiter/table/${table.id}/settle`)}
+                                    className="rounded-xl bg-white border border-emerald-600/30 px-3 py-2 text-[11px] font-bold text-emerald-900 shadow-2xs transition-all hover:bg-emerald-100 active:scale-95"
+                                >
+                                    Receipt Details
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={handleFreeTable}
+                                    disabled={freeingTable}
+                                    className="rounded-xl bg-emerald-700 px-3.5 py-2 text-[11px] font-bold text-white shadow-sm transition-all hover:bg-emerald-800 active:scale-95 disabled:opacity-50 flex items-center gap-1.5"
+                                >
+                                    {freeingTable ? (
+                                        <>
+                                            <span className="h-3 w-3 animate-spin rounded-full border-2 border-white/30 border-t-white" />
+                                            Freeing…
+                                        </>
+                                    ) : (
+                                        <>
+                                            <CheckIcon className="h-3.5 w-3.5" strokeWidth={2.5} />
+                                            Free Table for Next Guests
+                                        </>
+                                    )}
+                                </button>
+                            </div>
                         </div>
                     </div>
                 )}
@@ -671,6 +741,134 @@ export function OrderManagementScreen() {
                 }}
                 onClose={() => setCancelConfirmId(null)}
             />
+
+            {/* ── Dynamic Party Size Adjuster Modal ── */}
+            {showPartyModal && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+                    <div
+                        className="fixed inset-0 bg-licorice/60 backdrop-blur-sm transition-opacity"
+                        onClick={() => !savingParty && setShowPartyModal(false)}
+                    />
+                    <div className="relative z-10 w-full max-w-sm overflow-hidden rounded-[2rem] bg-isabelline p-6 shadow-2xl ring-1 ring-licorice/10 animate-velvet-fade">
+                        <div className="flex items-center justify-between border-b border-licorice/8 pb-4">
+                            <div className="flex items-center gap-2.5">
+                                <div className="flex h-9 w-9 items-center justify-center rounded-full bg-licorice text-isabelline shadow-sm">
+                                    <UserGroupIcon className="h-4 w-4" strokeWidth={2.2} />
+                                </div>
+                                <div>
+                                    <p className="text-[10px] font-bold uppercase tracking-wider text-khaki">
+                                        Table {String(table.number).padStart(2, "0")} · Capacity
+                                    </p>
+                                    <h2 className="text-[16px] font-black text-licorice leading-tight">
+                                        Adjust Party Size
+                                    </h2>
+                                </div>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={() => setShowPartyModal(false)}
+                                className="flex h-8 w-8 items-center justify-center rounded-full bg-white text-licorice ring-1 ring-licorice/8 hover:bg-isabelline active:scale-95"
+                            >
+                                <XMarkIcon className="h-4 w-4" />
+                            </button>
+                        </div>
+
+                        {/* Headcount Stepper */}
+                        <div className="my-6 flex flex-col items-center justify-center">
+                            <p className="text-[11px] font-medium text-feldgrau mb-3">
+                                Live seated guests at this table:
+                            </p>
+                            <div className="flex items-center justify-center gap-5">
+                                <button
+                                    type="button"
+                                    onClick={() => setPartySizeInput((p) => Math.max(1, p - 1))}
+                                    disabled={partySizeInput <= 1 || savingParty}
+                                    className="flex h-12 w-12 items-center justify-center rounded-full bg-white text-licorice shadow-sm ring-1 ring-licorice/10 transition-all hover:bg-isabelline active:scale-90 disabled:opacity-30"
+                                >
+                                    <MinusIcon className="h-5 w-5" strokeWidth={2.5} />
+                                </button>
+                                <div className="min-w-[100px] text-center flex flex-col items-center">
+                                    <input
+                                        type="number"
+                                        min="1"
+                                        max="999"
+                                        value={partySizeInput}
+                                        onChange={(e) => {
+                                            const val = parseInt(e.target.value, 10);
+                                            if (!isNaN(val)) setPartySizeInput(Math.max(1, Math.min(999, val)));
+                                        }}
+                                        className="w-28 text-center font-mono text-[38px] font-black tabular-nums leading-none text-licorice bg-transparent focus:outline-none focus:ring-1 focus:ring-khaki rounded-xl"
+                                    />
+                                    <p className="text-[10px] font-bold uppercase tracking-wider text-feldgrau mt-0.5">
+                                        {partySizeInput === 1 ? "Guest" : "Guests"}
+                                    </p>
+                                </div>
+                                <button
+                                    type="button"
+                                    onClick={() => setPartySizeInput((p) => Math.min(999, p + 1))}
+                                    disabled={partySizeInput >= 999 || savingParty}
+                                    className="flex h-12 w-12 items-center justify-center rounded-full bg-white text-licorice shadow-sm ring-1 ring-licorice/10 transition-all hover:bg-isabelline active:scale-90"
+                                >
+                                    <PlusIcon className="h-5 w-5" strokeWidth={2.5} />
+                                </button>
+                            </div>
+
+                            {/* Quick Presets */}
+                            <div className="mt-5 flex flex-wrap items-center justify-center gap-1.5 max-w-[320px]">
+                                {[1, 2, 4, 6, 8, 10, 15, 20, 50, 100, 200].map((num) => (
+                                    <button
+                                        key={num}
+                                        type="button"
+                                        onClick={() => setPartySizeInput(num)}
+                                        className={`px-2.5 py-1 text-xs font-bold rounded-lg transition-all ${
+                                            partySizeInput === num
+                                                ? "bg-licorice text-isabelline shadow-sm scale-105"
+                                                : "bg-white text-licorice ring-1 ring-licorice/8 hover:bg-isabelline"
+                                        }`}
+                                    >
+                                        {num}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+
+                        {/* Matching algorithm note */}
+                        <div className="rounded-xl bg-amber-50 border border-amber-200/80 p-3 text-[11px] text-amber-900 leading-relaxed">
+                            <span className="font-bold">Workload matching:</span> Updating party headcount dynamically adjusts active floor load and keeps waiter assignment balanced.
+                        </div>
+
+                        {/* Action buttons */}
+                        <div className="mt-5 flex items-center gap-2">
+                            <button
+                                type="button"
+                                onClick={() => setShowPartyModal(false)}
+                                disabled={savingParty}
+                                className="flex-1 rounded-full bg-white py-3 text-xs font-bold text-licorice ring-1 ring-licorice/8 hover:bg-isabelline active:scale-95"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => handleUpdatePartySize(partySizeInput)}
+                                disabled={savingParty}
+                                className="flex-1 rounded-full bg-licorice py-3 text-xs font-bold text-isabelline shadow-md hover:bg-licorice/90 active:scale-95 disabled:opacity-60 flex items-center justify-center gap-1.5"
+                            >
+                                {savingParty ? (
+                                    <>
+                                        <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-isabelline/30 border-t-isabelline" />
+                                        Saving…
+                                    </>
+                                ) : (
+                                    <>
+                                        <CheckIcon className="h-4 w-4" strokeWidth={2.5} />
+                                        Save {partySizeInput} {partySizeInput === 1 ? 'Guest' : 'Guests'}
+                                    </>
+                                )}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </main>
     );
 }

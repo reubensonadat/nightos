@@ -26,6 +26,7 @@ type SessionState = {
   waiter: AssignedWaiter | null
   loading: boolean
   error: string | null
+  isNewTab: boolean
 }
 
 export function useCustomerSession(venueId: string | null, tableId: string | null) {
@@ -35,6 +36,7 @@ export function useCustomerSession(venueId: string | null, tableId: string | nul
     waiter: null,
     loading: false,
     error: null,
+    isNewTab: false,
   })
 
   const assignWaiter = useCallback(async (billId: string, token: string) => {
@@ -216,11 +218,13 @@ export function useCustomerSession(venueId: string | null, tableId: string | nul
       }
     }
 
+    let createdFreshBill = false
+
     if (!bill) {
       // 3b. Open or create bill for this table
       const { data: existingBill, error: billErr } = await db.openBillForTable(tableId)
       if (billErr) {
-        setState((s) => ({ ...s, session, bill: null, loading: false, error: 'Failed to load bill' }))
+        setState((s) => ({ ...s, session, bill: null, isNewTab: false, loading: false, error: 'Failed to load bill' }))
         return
       }
 
@@ -244,10 +248,11 @@ export function useCustomerSession(venueId: string | null, tableId: string | nul
           autoPin,
         )
         if (createBillErr || !newBill) {
-          setState((s) => ({ ...s, session, bill: null, loading: false, error: 'Failed to create bill' }))
+          setState((s) => ({ ...s, session, bill: null, isNewTab: false, loading: false, error: 'Failed to create bill' }))
           return
         }
         bill = newBill
+        createdFreshBill = true
         try { localStorage.setItem(`nightos:table_pin:${newBill.id}`, autoPin); } catch { /* noop */ }
         await supabase
           .from('customer_sessions')
@@ -267,7 +272,7 @@ export function useCustomerSession(venueId: string | null, tableId: string | nul
       } catch { /* noop */ }
     }
 
-    setState((s) => ({ ...s, session, bill, loading: false, error: null }))
+    setState((s) => ({ ...s, session, bill, isNewTab: createdFreshBill, loading: false, error: null }))
 
     // 4. Make sure the bill has a waiter (idempotent, people-weighted)
     if (bill) assignWaiter(bill.id, token)

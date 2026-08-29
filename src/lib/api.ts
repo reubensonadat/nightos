@@ -450,7 +450,6 @@ export const db = {
     ),
 
   /* ── Bills ── */
-  /* ── Bills ── */
   openBillForTable: (tableId: string) =>
     supabase
       .from('bills')
@@ -459,6 +458,21 @@ export const db = {
       )
       .eq('table_id', tableId)
       .in('status', ['open', 'settling'])
+      .is('closed_at', null)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+
+  /** Finds any active unclosed bill on the table (including open, settling, or paid-pending-clear). */
+  activeBillForTable: (tableId: string) =>
+    supabase
+      .from('bills')
+      .select(
+        'id, venue_id, table_id, waiter_id, guest_count, status, payment_model, subtotal, convenience_fee, service_charge, vat, total, amount_paid, is_merged, merged_into_bill_id, table_pin, created_at, updated_at, closed_at, last_activity_at',
+      )
+      .eq('table_id', tableId)
+      .in('status', ['open', 'settling', 'paid'])
+      .is('closed_at', null)
       .order('created_at', { ascending: false })
       .limit(1)
       .maybeSingle(),
@@ -510,7 +524,7 @@ export const db = {
 
   /**
    * Bills for a venue with pagination: returns one page of up to `pageSize`
-   * rows plus the total count (for page buttons).
+   * active unclosed floor rows plus the total count.
    */
   billsByVenue: async (venueId: string, page = 0, pageSize = 20) => {
     const from = page * pageSize;
@@ -519,7 +533,8 @@ export const db = {
       .from('bills')
       .select('id', { count: 'exact', head: true })
       .eq('venue_id', venueId)
-      .in('status', ['open', 'settling', 'paid']);
+      .in('status', ['open', 'settling', 'paid'])
+      .is('closed_at', null);
     if (countErr) return { data: null, error: countErr, total: 0 };
     const { data, error } = await supabase
       .from('bills')
@@ -528,6 +543,7 @@ export const db = {
       )
       .eq('venue_id', venueId)
       .in('status', ['open', 'settling', 'paid'])
+      .is('closed_at', null)
       .order('created_at', { ascending: false })
       .range(from, to);
     return { data, error, total: count ?? 0 };
@@ -570,6 +586,51 @@ export const db = {
     }
 
     return { data: updatedBill as unknown as DbBill, error: null };
+  },
+
+  /** Closes a settled or finished bill, archives it, closes customer sessions, and frees the table. */
+  closeBillAndFreeTable: async (billId: string, tableId: string, _staffId?: string | null) => {
+    cacheInvalidate('bills:');
+    cacheInvalidate('customer_sessions:');
+    cacheInvalidate('orders:');
+
+    // 1. Mark bill closed
+    const { error: billErr } = await supabase
+      .from('bills')
+      .update({
+        closed_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', billId);
+
+    // 2. Close any active customer sessions for this table
+    await supabase
+      .from('customer_sessions')
+      .update({
+        status: 'closed',
+        last_active_at: new Date().toISOString(),
+      })
+      .eq('table_id', tableId)
+      .eq('status', 'active');
+
+    // 3. Clean up client local storage for this table/bill
+    try {
+      localStorage.removeItem(`nightos:table_pin:${billId}`);
+      localStorage.removeItem('nightos:cart');
+      sessionStorage.removeItem('nightos:current_session_id');
+      const toRemove: string[] = [];
+      for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i);
+        if (k && (k.startsWith('nightos:party:') || k.startsWith('nightos:table_pin:'))) {
+          toRemove.push(k);
+        }
+      }
+      toRemove.forEach((k) => localStorage.removeItem(k));
+    } catch {
+      // ignore
+    }
+
+    return { ok: !billErr, error: billErr };
   },
 
   cancelTableSession: async (tableId: string) => {

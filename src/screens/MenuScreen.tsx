@@ -29,6 +29,8 @@ type Props = {
     tableLabel?: string | null;
     waiterName?: string | null;
     tablePin?: string | null;
+    partySize?: number;
+    onEditParty?: () => void;
     onBack?: () => void;
     onViewCart?: () => void;
 };
@@ -113,7 +115,7 @@ async function fetchProducts(venueId: string): Promise<MenuItem[]> {
 
 }
 
-export function MenuScreen({ venueId, venueName, tableLabel, waiterName, tablePin, onBack, onViewCart }: Props) {
+export function MenuScreen({ venueId, venueName, tableLabel, waiterName, tablePin, partySize, onEditParty, onBack, onViewCart }: Props) {
     const [active, setActive] = useState<MenuCategory>("Signatures");
     const [query, setQuery] = useState("");
     const [activeItemId, setActiveItemId] = useState<string | null>(null);
@@ -204,7 +206,7 @@ export function MenuScreen({ venueId, venueName, tableLabel, waiterName, tablePi
                     </div>
 
                     {/* Right: single consolidated pill */}
-                    {(tableLabel || waiterName) && (() => {
+                    {(tableLabel || waiterName || partySize) && (() => {
                         const shortTable = tableLabel
                             ? `T-${tableLabel.replace(/^table\s*/i, "").trim()}`
                             : null;
@@ -219,21 +221,35 @@ export function MenuScreen({ venueId, venueName, tableLabel, waiterName, tablePi
                             : null;
 
                         return (
-                            <div className="flex items-center gap-1.5 rounded-full bg-white px-3 py-1.5 shadow-sm ring-1 ring-licorice/8 whitespace-nowrap shrink-0">
+                            <button
+                                type="button"
+                                onClick={() => onEditParty?.()}
+                                disabled={!onEditParty}
+                                className="flex items-center gap-1.5 rounded-full bg-white px-3 py-1.5 shadow-sm ring-1 ring-licorice/8 whitespace-nowrap shrink-0 hover:bg-isabelline active:scale-95 transition-all"
+                                title={onEditParty ? "Click to adjust party size" : undefined}
+                            >
                                 {shortTable && (
                                     <span className="text-[12px] font-black tracking-tight text-licorice">
                                         {shortTable}
                                     </span>
                                 )}
-                                {shortTable && formattedServer && (
-                                    <span className="mx-1 h-3.5 w-px bg-licorice/20" />
+                                {partySize && (
+                                    <>
+                                        {shortTable && <span className="mx-0.5 h-3 w-px bg-licorice/15" />}
+                                        <span className="text-[11px] font-bold text-licorice inline-flex items-center gap-0.5">
+                                            👥 {partySize}
+                                        </span>
+                                    </>
                                 )}
                                 {formattedServer && (
-                                    <span className="text-[10px] font-semibold tracking-tight text-feldgrau">
-                                        Server: {formattedServer}
-                                    </span>
+                                    <>
+                                        {(shortTable || partySize) && <span className="mx-0.5 h-3 w-px bg-licorice/15" />}
+                                        <span className="text-[10px] font-semibold tracking-tight text-feldgrau">
+                                            {formattedServer}
+                                        </span>
+                                    </>
                                 )}
-                            </div>
+                            </button>
                         );
                     })()}
                 </div>

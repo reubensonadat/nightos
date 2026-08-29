@@ -82,7 +82,7 @@ function CustomerShell({ venueId, tableId, tableLabel }: { venueId: string; tabl
   const [venueName, setVenueName] = useState<string | null>(null);
   const { itemCount } = useCart();
 
-  const { session, bill, waiter, loading: sessionLoading, error: sessionError, updateParty } = useCustomerSession(venueId, tableId);
+  const { session, bill, waiter, isNewTab, loading: sessionLoading, error: sessionError, updateParty } = useCustomerSession(venueId, tableId);
 
   // Table PIN Security State
   // eslint-disable-next-line no-empty
@@ -99,14 +99,17 @@ function CustomerShell({ venueId, tableId, tableLabel }: { venueId: string; tabl
   }, [bill, pinInputVerified]);
 
   // eslint-disable-next-line no-empty
-  // One-time "how many of you?" prompt per session (QR tables only)
+  // "How many of you?" prompt ONLY when initializing a fresh new tab
+  // (no existing open bill or PIN already present on the table before this scan).
+  // If an open bill already existed on the table, joining guests skip the prompt.
   const [partyPromptOpen, setPartyPromptOpen] = useState(false);
   useEffect(() => {
     let cancelled = false;
     const init = async () => {
-      if (!tableId || !session || partyPromptOpen) return;
+      if (!tableId || !session || !bill || partyPromptOpen) return;
       try {
         if (localStorage.getItem(`nightos:party:${session.id}`) === "1") return;
+        if (!isNewTab) return;
       } catch {
         // ignore
       }
@@ -116,7 +119,7 @@ function CustomerShell({ venueId, tableId, tableLabel }: { venueId: string; tabl
     return () => {
       cancelled = true;
     };
-  }, [tableId, session, partyPromptOpen]);
+  }, [tableId, session, bill, isNewTab, partyPromptOpen]);
 
   const handlePartyConfirm = useCallback(
     async (partySize: number, guestName?: string) => {
@@ -306,6 +309,8 @@ function CustomerShell({ venueId, tableId, tableLabel }: { venueId: string; tabl
           tableLabel={tableLabel}
           waiterName={waiter?.name ?? null}
           tablePin={pinUnlocked && bill?.table_pin ? bill.table_pin : null}
+          partySize={bill?.guest_count || session?.party_size}
+          onEditParty={tableId ? () => setPartyPromptOpen(true) : undefined}
           onViewCart={() => setTab("tab")}
         />
       )}

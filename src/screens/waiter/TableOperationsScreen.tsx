@@ -17,7 +17,7 @@ import type { Table } from "./TablesDashboard";
 
 /* ────────────────────────── Types ────────────────────────── */
 
-type Op = "transfer" | "merge" | "split" | "close";
+type Op = "party" | "transfer" | "merge" | "split" | "close";
 
 type OpenBill = {
     id: string;
@@ -30,16 +30,15 @@ type OpenBill = {
 
 /* ────────────────────────── Component ────────────────────────── */
 
-
-
 export function TableOperationsScreen() {
     const { table, staffId, venueId } = useOutletContext<{ table: Table; venueId: string; staffId: string }>();
     const navigate = useNavigate();
     const onBack = () => navigate(`/waiter/table/${table.id}`);
-    const [op, setOp] = useState<Op>("transfer");
+    const [op, setOp] = useState<Op>("party");
     const [tables, setTables] = useState<Table[]>([]);
     const [openBills, setOpenBills] = useState<OpenBill[]>([]);
     const [bill, setBill] = useState<OpenBill | null>(null);
+    const [partyCount, setPartyCount] = useState<number>(1);
     const [loading, setLoading] = useState(true);
     const [working, setWorking] = useState<Op | null>(null);
     const [selectedDest, setSelectedDest] = useState<string | null>(null);
@@ -54,7 +53,7 @@ export function TableOperationsScreen() {
             const [tablesResult, billsResult, currentBill] = await Promise.all([
                 db.tablesByVenue(effectiveVenueId),
                 db.billsByVenue(effectiveVenueId),
-                db.openBillForTable(table.id),
+                db.activeBillForTable(table.id),
             ]);
             if (tablesResult.error) throw tablesResult.error;
             setTables(
@@ -67,6 +66,9 @@ export function TableOperationsScreen() {
             );
             setOpenBills(billsResult.data ?? []);
             setBill(currentBill.data ?? null);
+            if (currentBill.data?.guest_count) {
+                setPartyCount(currentBill.data.guest_count);
+            }
         } catch {
             toast.error("Could not load table data.");
         } finally {
@@ -132,7 +134,17 @@ export function TableOperationsScreen() {
             toast.error("This table has no open bill.");
             return;
         }
-        if (op === "transfer" && selectedDest) {
+        if (op === "party") {
+            setWorking("party");
+            const { error } = await db.updateTablePartySize(table.id, bill.id, partyCount);
+            setWorking(null);
+            if (error) {
+                toast.error("Failed to update party size.");
+                return;
+            }
+            toast.success(`Table ${table.number} party size set to ${partyCount} guests.`);
+            onBack();
+        } else if (op === "transfer" && selectedDest) {
             setWorking("transfer");
             const { data, error } = await db.transferBill(bill.id, selectedDest, staffId);
             setWorking(null);
@@ -178,19 +190,21 @@ export function TableOperationsScreen() {
     const handleCloseTable = async () => {
         if (!bill) return;
         setWorking("close");
-        const { ok, error } = await db.closeBill(bill.id, staffId);
+        const { ok, error } = await db.closeBillAndFreeTable(bill.id, table.id, staffId);
         setWorking(null);
         setConfirmClose(false);
         if (!ok) {
             toast.error(error ? String((error as { message?: string }).message ?? error) : "Couldn't close this table");
             return;
         }
-        onBack();
+        toast.success(`Table ${table.number} closed and freed.`);
+        navigate('/waiter');
     };
 
     const canConfirm =
         !working &&
-        ((op === "transfer" && selectedDest !== null) ||
+        ((op === "party" && partyCount > 0) ||
+            (op === "transfer" && selectedDest !== null) ||
             (op === "merge" && selectedMerge !== null) ||
             op === "split");
 
@@ -222,6 +236,16 @@ export function TableOperationsScreen() {
                 {/* Op tabs */}
                 <nav className="mx-auto w-full max-w-3xl px-5 md:px-8 pb-3">
                     <div className="flex items-center gap-1 rounded-full bg-white p-1 shadow-sm ring-1 ring-licorice/8">
+                        <button
+                            type="button"
+                            onClick={() => setOp("party")}
+                            className={`flex-1 rounded-full py-2 text-[11px] font-bold tracking-tight transition-all duration-200 ${op === "party"
+                                ? "bg-licorice text-isabelline shadow-[0_4px_12px_rgba(35,20,12,0.18)]"
+                                : "text-feldgrau hover:text-licorice"
+                                }`}
+                        >
+                            Party Size
+                        </button>
                         <button
                             type="button"
                             onClick={() => setOp("transfer")}
@@ -278,6 +302,83 @@ export function TableOperationsScreen() {
                     </div>
                 ) : (
                     <>
+                        {/* ── PARTY SIZE ── */}
+                        {op === "party" && (
+                            <div className="animate-velvet-fade">
+                                <div className="mb-4 rounded-lg bg-white p-4 shadow-sm ring-1 ring-isabelline">
+                                    <div className="flex items-center gap-2">
+                                        <UserGroupIcon className="h-4 w-4 text-khaki" strokeWidth={2} />
+                                        <span className="text-[12px] font-bold tracking-tight text-licorice">
+                                            Party Headcount
+                                        </span>
+                                    </div>
+                                    <p className="mt-1.5 text-[11px] leading-[1.5] tracking-tight text-feldgrau">
+                                        Update the total number of guests currently seated at Table {String(table.number).padStart(2, "0")}.
+                                        This dynamically recalibrates floor workload balancing and matching.
+                                    </p>
+                                </div>
+
+                                <div className="rounded-lg bg-white p-6 shadow-sm ring-1 ring-isabelline flex flex-col items-center">
+                                    <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-feldgrau mb-4">
+                                        Live Guest Count
+                                    </span>
+
+                                    <div className="flex items-center justify-center gap-6">
+                                        <button
+                                            type="button"
+                                            onClick={() => setPartyCount((p) => Math.max(1, p - 1))}
+                                            disabled={partyCount <= 1}
+                                            className="flex h-12 w-12 items-center justify-center rounded-full bg-isabelline text-licorice shadow-sm ring-1 ring-licorice/10 transition-all hover:bg-white active:scale-90 disabled:opacity-30"
+                                        >
+                                            <MinusIcon className="h-5 w-5" strokeWidth={2.5} />
+                                        </button>
+                                        <div className="min-w-[100px] text-center flex flex-col items-center">
+                                            <input
+                                                type="number"
+                                                min="1"
+                                                max="999"
+                                                value={partyCount}
+                                                onChange={(e) => {
+                                                    const val = parseInt(e.target.value, 10);
+                                                    if (!isNaN(val)) setPartyCount(Math.max(1, Math.min(999, val)));
+                                                }}
+                                                className="w-28 text-center font-mono text-[42px] font-black tabular-nums leading-none text-licorice bg-transparent focus:outline-none focus:ring-1 focus:ring-khaki rounded-xl"
+                                            />
+                                            <p className="text-[10px] font-bold uppercase tracking-wider text-feldgrau mt-1">
+                                                {partyCount === 1 ? "Guest" : "Guests"}
+                                            </p>
+                                        </div>
+                                        <button
+                                            type="button"
+                                            onClick={() => setPartyCount((p) => Math.min(999, p + 1))}
+                                            disabled={partyCount >= 999}
+                                            className="flex h-12 w-12 items-center justify-center rounded-full bg-isabelline text-licorice shadow-sm ring-1 ring-licorice/10 transition-all hover:bg-white active:scale-90"
+                                        >
+                                            <PlusIcon className="h-5 w-5" strokeWidth={2.5} />
+                                        </button>
+                                    </div>
+
+                                    {/* Preset buttons */}
+                                    <div className="mt-6 flex flex-wrap items-center justify-center gap-2 max-w-[340px]">
+                                        {[1, 2, 4, 6, 8, 10, 15, 20, 50, 100, 200].map((num) => (
+                                            <button
+                                                key={num}
+                                                type="button"
+                                                onClick={() => setPartyCount(num)}
+                                                className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all ${
+                                                    partyCount === num
+                                                        ? "bg-licorice text-isabelline shadow-sm scale-105"
+                                                        : "bg-isabelline text-licorice ring-1 ring-licorice/8 hover:bg-white"
+                                                }`}
+                                            >
+                                                {num}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
                         {/* ── TRANSFER ── */}
                         {op === "transfer" && (
                             <div className="animate-velvet-fade">

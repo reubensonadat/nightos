@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
     ArrowDownTrayIcon,
     ArrowPathIcon,
@@ -120,22 +120,16 @@ export function ShiftReportScreen({ isModal = false, onClose }: Props) {
     const [startingFloat, setStartingFloat] = useState<number>(200);
     const [countedCash, setCountedCash] = useState<string>("");
 
-    // Calculate time window boundaries
+    // Calculate time window boundaries with stable date boundaries (prevents millisecond re-render loops)
     const { sinceIso, untilIso, rangeLabel } = useMemo(() => {
         const now = new Date();
         const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0);
 
         if (range === "CURRENT") {
-            // Find earliest active shift clock-in or default to today's start
-            const activeClockIns = shifts
-                .filter((s) => s.status === "active" || s.status === "on_break")
-                .map((s) => new Date(s.clock_in).getTime());
-            const earliestClockIn = activeClockIns.length > 0 ? Math.min(...activeClockIns) : startOfToday.getTime();
-            const start = new Date(Math.min(earliestClockIn, startOfToday.getTime()));
             return {
-                sinceIso: start.toISOString(),
+                sinceIso: startOfToday.toISOString(),
                 untilIso: undefined,
-                rangeLabel: `Current Shift (since ${start.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })})`,
+                rangeLabel: "Current Shift (Today)",
             };
         }
 
@@ -158,9 +152,9 @@ export function ShiftReportScreen({ isModal = false, onClose }: Props) {
         }
 
         if (range === "LAST_7D") {
-            const start = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+            const start7d = new Date(startOfToday.getTime() - 7 * 24 * 60 * 60 * 1000);
             return {
-                sinceIso: start.toISOString(),
+                sinceIso: start7d.toISOString(),
                 untilIso: undefined,
                 rangeLabel: "Last 7 Days",
             };
@@ -181,52 +175,59 @@ export function ShiftReportScreen({ isModal = false, onClose }: Props) {
             untilIso: undefined,
             rangeLabel: "Today",
         };
-    }, [range, shifts, customStart, customEnd]);
+    }, [range, customStart, customEnd]);
 
-    // Data fetcher
-    const loadShiftData = useCallback(async () => {
-        if (!venue.id || venue.id === "00000000-0000-0000-0000-000000000000") return;
-        setLoading(true);
+    // Data fetcher with guard against overlapping / looping fetches
+    const isFetchingRef = useRef(false);
+    const loadShiftData = useCallback(async (showSpinner = true) => {
+        if (!venue.id || venue.id === "00000000-0000-0000-0000-000000000000" || isFetchingRef.current) return;
+        isFetchingRef.current = true;
+        if (showSpinner) setLoading(true);
         setError(null);
         try {
             const res = await db.shiftReportData(venue.id, sinceIso, untilIso);
             if (res.error) throw new Error(res.error);
-            setPayments(res.payments);
-            setBills(res.bills);
-            setSubmissions(res.submissions);
-            setStaffList(res.staff);
-            setShifts(res.shifts);
+            setPayments(res.payments || []);
+            setBills(res.bills || []);
+            setSubmissions(res.submissions || []);
+            setStaffList(res.staff || []);
+            setShifts(res.shifts || []);
             setLastRefreshed(new Date());
         } catch (err) {
             console.error("[ShiftReportScreen] Error fetching shift data:", err);
             setError(err instanceof Error ? err.message : "Failed to load shift report data.");
         } finally {
-            setLoading(false);
+            isFetchingRef.current = false;
+            if (showSpinner) setLoading(false);
         }
     }, [venue.id, sinceIso, untilIso]);
 
     useEffect(() => {
-        loadShiftData();
+        loadShiftData(true);
+    }, [loadShiftData]);
+
+    const handleRealtimeUpdate = useCallback(() => {
+        loadShiftData(false);
     }, [loadShiftData]);
 
     // Realtime subscriptions
     useRealtime({
         table: "payments",
         filter: venue.id ? `venue_id=eq.${venue.id}` : undefined,
-        onInsert: loadShiftData,
-        onUpdate: loadShiftData,
+        onInsert: handleRealtimeUpdate,
+        onUpdate: handleRealtimeUpdate,
     });
     useRealtime({
         table: "bills",
         filter: venue.id ? `venue_id=eq.${venue.id}` : undefined,
-        onInsert: loadShiftData,
-        onUpdate: loadShiftData,
+        onInsert: handleRealtimeUpdate,
+        onUpdate: handleRealtimeUpdate,
     });
     useRealtime({
         table: "order_submissions",
         filter: venue.id ? `venue_id=eq.${venue.id}` : undefined,
-        onInsert: loadShiftData,
-        onUpdate: loadShiftData,
+        onInsert: handleRealtimeUpdate,
+        onUpdate: handleRealtimeUpdate,
     });
 
     /* ═══════════════════════════════════════════════════════════════════════
@@ -542,7 +543,7 @@ export function ShiftReportScreen({ isModal = false, onClose }: Props) {
 
                     <button
                         type="button"
-                        onClick={loadShiftData}
+                        onClick={() => void loadShiftData(true)}
                         title="Refresh numbers"
                         className="rounded-full bg-white p-2 text-feldgrau ring-1 ring-licorice/8 hover:bg-isabelline hover:text-licorice transition-all shadow-sm active:scale-95"
                     >
@@ -612,7 +613,7 @@ export function ShiftReportScreen({ isModal = false, onClose }: Props) {
                     <p className="mt-2 text-sm font-bold text-dark-red">{error}</p>
                     <button
                         type="button"
-                        onClick={loadShiftData}
+                        onClick={() => void loadShiftData(true)}
                         className="mt-4 rounded-full bg-licorice px-4 py-2 text-xs font-bold text-isabelline hover:bg-licorice/90"
                     >
                         Try Again
@@ -808,36 +809,27 @@ export function ShiftReportScreen({ isModal = false, onClose }: Props) {
                                 </div>
                             </div>
 
-                            {/* Tax & Financial Reconciliation Breakdown Table */}
-                            <div className="rounded-[1.5rem] bg-white p-5 md:p-6 shadow-sm ring-1 ring-licorice/5">
-                                <h3 className="font-bold text-base text-licorice mb-3">Shift Financial Breakdown</h3>
-                                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-xs">
-                                    <div className="rounded-xl bg-isabelline p-3.5">
-                                        <p className="text-feldgrau font-semibold uppercase text-[10px]">Net Sales</p>
-                                        <p className="mt-1 text-base font-bold tabular-nums text-licorice">{formatGHS(totalSubtotal)}</p>
-                                    </div>
-                                    <div className="rounded-xl bg-isabelline p-3.5">
-                                        <p className="text-feldgrau font-semibold uppercase text-[10px]">Service Charge (8%)</p>
-                                        <p className="mt-1 text-base font-bold tabular-nums text-licorice">{formatGHS(totalServiceCharge)}</p>
-                                    </div>
-                                    <div className="rounded-xl bg-isabelline p-3.5">
-                                        <p className="text-feldgrau font-semibold uppercase text-[10px]">VAT / Taxes</p>
-                                        <p className="mt-1 text-base font-bold tabular-nums text-licorice">{formatGHS(totalVat)}</p>
-                                    </div>
-                                    <div className="rounded-xl bg-isabelline p-3.5">
-                                        <p className="text-feldgrau font-semibold uppercase text-[10px]">Bysen Fees Owed</p>
-                                        <p className="mt-1 text-base font-bold tabular-nums text-dark-red">{formatGHS(totalPlatformFees)}</p>
-                                    </div>
+                            {/* Secondary Metrics Row */}
+                            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
+                                <div className="rounded-2xl bg-white/70 p-3.5 ring-1 ring-licorice/5">
+                                    <p className="text-[10px] font-bold uppercase tracking-wider text-feldgrau">Net Subtotal</p>
+                                    <p className="text-sm font-bold text-licorice mt-0.5">{formatGHS(totalSubtotal)}</p>
+                                </div>
+                                <div className="rounded-2xl bg-white/70 p-3.5 ring-1 ring-licorice/5">
+                                    <p className="text-[10px] font-bold uppercase tracking-wider text-feldgrau">Service Charge Collected</p>
+                                    <p className="text-sm font-bold text-licorice mt-0.5">{formatGHS(totalServiceCharge)}</p>
+                                </div>
+                                <div className="rounded-2xl bg-white/70 p-3.5 ring-1 ring-licorice/5">
+                                    <p className="text-[10px] font-bold uppercase tracking-wider text-feldgrau">VAT Collected (15%)</p>
+                                    <p className="text-sm font-bold text-licorice mt-0.5">{formatGHS(totalVat)}</p>
+                                </div>
+                                <div className="rounded-2xl bg-white/70 p-3.5 ring-1 ring-licorice/5">
+                                    <p className="text-[10px] font-bold uppercase tracking-wider text-feldgrau">Platform Fee (NightOS)</p>
+                                    <p className="text-sm font-bold text-khaki mt-0.5">{formatGHS(totalPlatformFees)}</p>
                                 </div>
                             </div>
-                        </div>
-                    )}
 
-                    {/* ──────────────────────────────────────────────────
-                       TAB 2: PAYMENT METHODS BREAKDOWN
-                       ────────────────────────────────────────────────── */}
-                    {activeTab === "payments" && (
-                        <div className="space-y-6">
+                            {/* Payment Breakdown Chart + Tables Breakdown */}
                             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                                 {/* Pie Chart Visualization */}
                                 <div className="rounded-[1.5rem] bg-white p-5 md:p-6 shadow-sm ring-1 ring-licorice/5 flex flex-col items-center justify-center">
@@ -860,7 +852,7 @@ export function ShiftReportScreen({ isModal = false, onClose }: Props) {
                                                     ))}
                                                 </Pie>
                                                 <Tooltip
-                                                    formatter={(val) => [formatGHS(Number(val)), "Revenue"]}
+                                                    formatter={(val: unknown) => [formatGHS(Number(val)), "Revenue"]}
                                                     contentStyle={{
                                                         borderRadius: "12px",
                                                         border: "none",

@@ -64,15 +64,30 @@ export function InvoiceSettlementScreen() {
     const [showInvoice, setShowInvoice] = useState(false);
     const [venueName, setVenueName] = useState<string | null>(null);
     const [settleConfirmOpen, setSettleConfirmOpen] = useState(false);
+    const [freeingTable, setFreeingTable] = useState(false);
 
     /* ── Load the real open/paid bill for this table ── */
     const [revision, setRevision] = useState(0);
     const triggerReload = () => setRevision((r) => r + 1);
 
+    const handleFreeTableAndLeave = async () => {
+        if (!bill) return;
+        setFreeingTable(true);
+        try {
+            await db.closeBillAndFreeTable(bill.id, table.id, staffId);
+            toast.success(`Table ${String(table.number).padStart(2, "0")} is now free and ready for new guests!`);
+            navigate('/waiter');
+        } catch {
+            toast.error("Failed to free table.");
+        } finally {
+            setFreeingTable(false);
+        }
+    };
+
     useEffect(() => {
         let cancelled = false;
         const init = async () => {
-            const { data: billRow } = await db.openBillForTable(table.id);
+            const { data: billRow } = await db.activeBillForTable(table.id);
             if (cancelled) return;
             db.venueById(venueId).then(
                 ({ data }) => { if (!cancelled && data) setVenueName(data.name); },
@@ -272,13 +287,33 @@ export function InvoiceSettlementScreen() {
                         </div>
                     </div>
 
-                    <button
-                        type="button"
-                        onClick={onSettled}
-                        className="mt-5 w-full rounded-full bg-licorice py-3.5 text-[13px] font-bold tracking-tight text-isabelline shadow-[0_12px_28px_rgba(35,20,12,0.20)] transition-all hover:bg-licorice/95 active:scale-[0.985]"
-                    >
-                        Back to Tables
-                    </button>
+                    <div className="mt-6 flex flex-col gap-2.5">
+                        <button
+                            type="button"
+                            onClick={handleFreeTableAndLeave}
+                            disabled={freeingTable}
+                            className="w-full rounded-full bg-emerald-700 py-3.5 text-[13px] font-bold tracking-tight text-white shadow-[0_12px_28px_rgba(4,120,87,0.25)] transition-all hover:bg-emerald-800 active:scale-[0.985] disabled:opacity-50 flex items-center justify-center gap-2"
+                        >
+                            {freeingTable ? (
+                                <>
+                                    <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white" />
+                                    Freeing Table…
+                                </>
+                            ) : (
+                                <>
+                                    <CheckCircleIcon className="h-4 w-4" />
+                                    Free Table & Finish Tab
+                                </>
+                            )}
+                        </button>
+                        <button
+                            type="button"
+                            onClick={onSettled}
+                            className="w-full rounded-full bg-white border border-licorice/10 py-3 text-[12px] font-bold tracking-tight text-licorice hover:bg-isabelline active:scale-[0.985]"
+                        >
+                            Keep Table Open & Return to Floor
+                        </button>
+                    </div>
                 </section>
             </main>
         );
