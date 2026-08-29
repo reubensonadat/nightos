@@ -4,7 +4,9 @@ import { useRealtime } from "../../hooks/useRealtime";
 import {
     ArrowLeftIcon,
     CheckIcon,
+    MinusIcon,
     PlusIcon,
+    UserGroupIcon,
     XMarkIcon,
     Cog8ToothIcon,
 } from "@heroicons/react/24/outline";
@@ -76,6 +78,43 @@ export function OrderManagementScreen() {
     const [loading, setLoading] = useState(true);
     const [cancellingId, setCancellingId] = useState<string | null>(null);
     const [cancelConfirmId, setCancelConfirmId] = useState<string | null>(null);
+
+    // ── Waiter Dynamic Party Size Adjustment ──
+    const [showPartyModal, setShowPartyModal] = useState(false);
+    const [partySizeInput, setPartySizeInput] = useState<number>(1);
+    const [savingParty, setSavingParty] = useState(false);
+
+    useEffect(() => {
+        if (currentBill?.guest_count) {
+            setPartySizeInput(currentBill.guest_count);
+        }
+    }, [currentBill?.guest_count]);
+
+    const handleUpdatePartySize = async (newSize: number) => {
+        if (!currentBill) {
+            toast.error("No active bill for this table");
+            return;
+        }
+        const validatedSize = Math.max(1, Math.min(99, newSize));
+        setSavingParty(true);
+        try {
+            const { data, error } = await db.updateTablePartySize(table.id, currentBill.id, validatedSize);
+            if (error) {
+                toast.error("Failed to update party size");
+                return;
+            }
+            if (data) {
+                setCurrentBill(data);
+            }
+            setShowPartyModal(false);
+            sounds.tap();
+            toast.success(`Table ${table.number} updated to ${validatedSize} ${validatedSize === 1 ? 'guest' : 'guests'}`);
+        } catch {
+            toast.error("Could not update party size");
+        } finally {
+            setSavingParty(false);
+        }
+    };
 
     const load = useCallback(async () => {
         setLoading(true);

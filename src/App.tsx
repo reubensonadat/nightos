@@ -107,8 +107,6 @@ function CustomerShell({ venueId, tableId, tableLabel }: { venueId: string; tabl
       if (!tableId || !session || partyPromptOpen) return;
       try {
         if (localStorage.getItem(`nightos:party:${session.id}`) === "1") return;
-        // If an open bill already exists on the table or session already configured, do NOT prompt again
-        if (bill || (session.party_size && session.party_size > 1)) return;
       } catch {
         // ignore
       }
@@ -118,7 +116,7 @@ function CustomerShell({ venueId, tableId, tableLabel }: { venueId: string; tabl
     return () => {
       cancelled = true;
     };
-  }, [tableId, session, bill, partyPromptOpen]);
+  }, [tableId, session, partyPromptOpen]);
 
   const handlePartyConfirm = useCallback(
     async (partySize: number, guestName?: string) => {
@@ -355,7 +353,7 @@ function CustomerShell({ venueId, tableId, tableLabel }: { venueId: string; tabl
         <PartyPrompt
           venueName={venueName ?? "Velvet Lounge"}
           tableLabel={tableLabel}
-          initialSize={session?.party_size ?? 1}
+          initialSize={bill?.guest_count || session?.party_size || 1}
           onConfirm={handlePartyConfirm}
         />
       )}
@@ -480,12 +478,12 @@ function AppShell() {
     return () => window.removeEventListener("popstate", onPopState);
   }, []);
 
-  // Manager page is URL-driven: /manager/ops, /manager/floorplan, ...
+  // Manager page is URL-driven: /manager/ops, /manager/shift-report, /manager/floorplan, ...
   const managerPage = useMemo<ManagerPage>(() => {
     const seg = location.pathname.split("/")[2];
     if (
       seg &&
-      (seg === "ops" || seg === "floorplan" || seg === "orders" || seg === "menu" || seg === "staff" ||
+      (seg === "ops" || seg === "shift-report" || seg === "floorplan" || seg === "orders" || seg === "menu" || seg === "staff" ||
         seg === "finance" || seg === "crm" || seg === "brand")
     ) {
       return seg as ManagerPage;

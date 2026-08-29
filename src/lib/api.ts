@@ -541,6 +541,37 @@ export const db = {
       .single();
   },
 
+  updateTablePartySize: async (tableId: string, billId: string, guestCount: number) => {
+    cacheInvalidate('bills:');
+    cacheInvalidate('customer_sessions:');
+
+    // 1. Update bill guest_count
+    const { data: updatedBill, error: billErr } = await supabase
+      .from('bills')
+      .update({ guest_count: Math.max(1, guestCount), last_activity_at: new Date().toISOString() })
+      .eq('id', billId)
+      .select()
+      .single();
+
+    if (billErr) return { data: null, error: billErr };
+
+    // 2. Also update any active customer session on this table
+    await supabase
+      .from('customer_sessions')
+      .update({ party_size: Math.max(1, guestCount), last_active_at: new Date().toISOString() })
+      .eq('table_id', tableId)
+      .eq('status', 'active');
+
+    // 3. Re-balance waiter assignment matching
+    try {
+      await supabase.rpc('assign_waiter_to_bill', { p_bill_id: billId });
+    } catch {
+      // ignore
+    }
+
+    return { data: updatedBill as unknown as DbBill, error: null };
+  },
+
   cancelTableSession: async (tableId: string) => {
     cacheInvalidate('bills:');
     
