@@ -828,6 +828,76 @@ export function ShiftReportScreen({ isModal = false, onClose }: Props) {
                                     <p className="text-sm font-bold text-khaki mt-0.5">{formatGHS(totalPlatformFees)}</p>
                                 </div>
                             </div>
+                        </div>
+                    )}
+
+                    {/* ──────────────────────────────────────────────────
+                       TAB 2: PAYMENT METHODS BREAKDOWN
+                       ────────────────────────────────────────────────── */}
+                    {activeTab === "payments" && (
+                        <div className="space-y-6">
+                            {/* Executive Payment Cards */}
+                            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
+                                <div className="rounded-[1.5rem] bg-white p-4 md:p-5 shadow-sm ring-1 ring-licorice/5">
+                                    <div className="flex items-center justify-between">
+                                        <p className="text-[10px] md:text-xs font-bold uppercase tracking-wider text-feldgrau">Total Gross Sales</p>
+                                        <div className="flex h-7 w-7 items-center justify-center rounded-full bg-khaki/20 text-khaki">
+                                            <BanknotesIcon className="h-4 w-4" />
+                                        </div>
+                                    </div>
+                                    <p className="mt-2 text-xl md:text-2xl font-black text-licorice">
+                                        {formatGHS(totalGrossRevenue)}
+                                    </p>
+                                    <p className="mt-1 text-[11px] font-medium text-feldgrau">
+                                        {successfulPayments.length} transactions processed
+                                    </p>
+                                </div>
+
+                                <div className="rounded-[1.5rem] bg-white p-4 md:p-5 shadow-sm ring-1 ring-licorice/5">
+                                    <div className="flex items-center justify-between">
+                                        <p className="text-[10px] md:text-xs font-bold uppercase tracking-wider text-feldgrau">Cash in Drawer</p>
+                                        <div className="flex h-7 w-7 items-center justify-center rounded-full bg-emerald-100 text-emerald-800">
+                                            <BanknotesIcon className="h-4 w-4" />
+                                        </div>
+                                    </div>
+                                    <p className="mt-2 text-xl md:text-2xl font-black text-emerald-900">
+                                        {formatGHS(cashCollected)}
+                                    </p>
+                                    <p className="mt-1 text-[11px] font-medium text-feldgrau">
+                                        {totalGrossRevenue > 0 ? Math.round((cashCollected / totalGrossRevenue) * 100) : 0}% of revenue
+                                    </p>
+                                </div>
+
+                                <div className="rounded-[1.5rem] bg-white p-4 md:p-5 shadow-sm ring-1 ring-licorice/5">
+                                    <div className="flex items-center justify-between">
+                                        <p className="text-[10px] md:text-xs font-bold uppercase tracking-wider text-feldgrau">Digital / Card / MoMo</p>
+                                        <div className="flex h-7 w-7 items-center justify-center rounded-full bg-blue-100 text-blue-800">
+                                            <CreditCardIcon className="h-4 w-4" />
+                                        </div>
+                                    </div>
+                                    <p className="mt-2 text-xl md:text-2xl font-black text-blue-950">
+                                        {formatGHS(digitalCollected)}
+                                    </p>
+                                    <p className="mt-1 text-[11px] font-medium text-feldgrau">
+                                        {totalGrossRevenue > 0 ? Math.round((digitalCollected / totalGrossRevenue) * 100) : 0}% of revenue
+                                    </p>
+                                </div>
+
+                                <div className="rounded-[1.5rem] bg-white p-4 md:p-5 shadow-sm ring-1 ring-licorice/5">
+                                    <div className="flex items-center justify-between">
+                                        <p className="text-[10px] md:text-xs font-bold uppercase tracking-wider text-feldgrau">NightOS Platform Fee</p>
+                                        <div className="flex h-7 w-7 items-center justify-center rounded-full bg-purple-100 text-purple-800">
+                                            <ShoppingCartIcon className="h-4 w-4" />
+                                        </div>
+                                    </div>
+                                    <p className="mt-2 text-xl md:text-2xl font-black text-khaki">
+                                        {formatGHS(totalPlatformFees)}
+                                    </p>
+                                    <p className="mt-1 text-[11px] font-medium text-feldgrau">
+                                        Owed platform fees
+                                    </p>
+                                </div>
+                            </div>
 
                             {/* Payment Breakdown Chart + Tables Breakdown */}
                             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
