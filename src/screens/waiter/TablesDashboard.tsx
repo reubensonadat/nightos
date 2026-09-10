@@ -27,8 +27,29 @@ export type Table = {
     lastActivityAt?: string; // ISO time string — dwell clock
     reservationTime?: string;
     reservationGuests?: number;
+    waiterId?: string;
     server?: string;
 };
+
+/* ────────────────────────── Soft Star SVG ────────────────────────── */
+
+function SoftStarIcon({ className = "h-4 w-4 text-amber-500 fill-amber-400" }: { className?: string }) {
+    return (
+        <svg
+            viewBox="0 0 24 24"
+            className={className}
+            strokeWidth="1.5"
+            stroke="currentColor"
+            aria-label="Assigned to you"
+        >
+            <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M11.48 3.499a.562.562 0 011.04 0l2.125 5.111a.563.563 0 00.475.345l5.518.442c.499.04.701.663.321.988l-4.204 3.602a.563.563 0 00-.182.557l1.285 5.385c.116.488-.415.872-.835.617L12 17.75l-4.723 2.796c-.42.255-.951-.129-.835-.617l1.285-5.385a.563.563 0 00-.182-.557l-4.204-3.602c-.38-.325-.178-.948.32-.988l5.518-.442a.563.563 0 00.475-.345L11.48 3.5z"
+            />
+        </svg>
+    );
+}
 
 /* ────────────────────────── Helpers ────────────────────────── */
 
@@ -93,7 +114,12 @@ type Props = {
     role?: string;
 };
 
-function transformToTables(dbTables: Record<string, unknown>[], openBills: Record<string, unknown>[], waiterNames: Record<string, string>): Table[] {
+function transformToTables(
+    dbTables: Record<string, unknown>[],
+    openBills: Record<string, unknown>[],
+    waiterNames: Record<string, string>,
+    activeStaffIds?: Set<string>
+): Table[] {
     const billMap = new Map<string, Record<string, unknown>>();
     for (const b of openBills) {
         billMap.set(b.table_id as string, b);
@@ -104,6 +130,7 @@ function transformToTables(dbTables: Record<string, unknown>[], openBills: Recor
             const guestCount = (bill.guest_count as number) ?? 1;
             const seatedAt = bill.created_at as string;
             const waiterId = bill.waiter_id as string | null;
+            const isWaiteronDuty = waiterId && activeStaffIds ? activeStaffIds.has(waiterId) : true;
             const isPaid = bill.status === 'paid' || (Number(bill.amount_paid || 0) >= Number(bill.total || 0) && Number(bill.total || 0) > 0);
             return {
                 id: t.id as string,
@@ -114,7 +141,8 @@ function transformToTables(dbTables: Record<string, unknown>[], openBills: Recor
                 tabTotal: bill.total as number,
                 seatedAt,
                 lastActivityAt: (bill.last_activity_at as string) ?? (bill.created_at as string),
-                server: waiterId ? (waiterNames[waiterId] ?? undefined) : undefined,
+                waiterId: isWaiteronDuty && waiterId ? waiterId : undefined,
+                server: isWaiteronDuty && waiterId ? (waiterNames[waiterId] ?? undefined) : undefined,
             };
         }
         return {
@@ -151,24 +179,27 @@ export function TablesDashboard({ venueId, staffName, staffId, onSignOut }: Prop
         try {
             await db.getVenueSetting(venueId, 'max_dwell_minutes', 120);
 
-            const [tablesResult, billsResult] = await Promise.all([
+            const [tablesResult, billsResult, shiftsResult] = await Promise.all([
                 db.tablesByVenue(venueId),
                 db.billsByVenue(venueId),
+                db.activeShiftsByVenue(venueId),
             ]);
             if (tablesResult.error) throw tablesResult.error;
             const billRows = billsResult.data ?? [];
-            setTables(transformToTables(tablesResult.data ?? [], billRows, waiterNamesRef.current));
+            const activeStaffIds = new Set((shiftsResult.data ?? []).map((s) => s.staff_id));
+
+            setTables(transformToTables(tablesResult.data ?? [], billRows, waiterNamesRef.current, activeStaffIds));
 
             const waiterIds = [
                 ...new Set(
-                    billRows.map((b: Record<string, unknown>) => b.waiter_id).filter((id: unknown): id is string => typeof id === "string" && id.length > 0)
+                    billRows.map((b: Record<string, unknown>) => b.waiter_id).filter((id: unknown): id is string => typeof id === "string" && id.length > 0 && activeStaffIds.has(id))
                 ),
             ];
             if (waiterIds.length > 0) {
                 const { data: staffRows } = await db.staffNamesByIds(waiterIds);
                 const names = Object.fromEntries((staffRows ?? []).map((s) => [s.id, s.name]));
                 waiterNamesRef.current = names;
-                setTables(transformToTables(tablesResult.data ?? [], billRows, names));
+                setTables(transformToTables(tablesResult.data ?? [], billRows, names, activeStaffIds));
             }
         } catch {
             // No mock fallback — the grid shows the empty state instead.
@@ -369,12 +400,17 @@ export function TablesDashboard({ venueId, staffName, staffId, onSignOut }: Prop
                     </div>
                 ) : (
                     <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 md:gap-5">
-                        {filteredTables.map((table, idx) => (
-                            <button
-                                key={table.id}
-                                type="button"
-                                onClick={() => navigate(`/waiter/table/${table.id}`)}
-                                className={`
+                        {filteredTables.map((table, idx) => {
+                            const isMyTable = Boolean(
+                                (table.waiterId && staffId && table.waiterId === staffId) ||
+                                (table.server && staffName && table.server.toLowerCase().trim() === staffName.toLowerCase().trim())
+                            );
+                            return (
+                                <button
+                                    key={table.id}
+                                    type="button"
+                                    onClick={() => navigate(`/waiter/table/${table.id}`)}
+                                    className={`
                                 animate-velvet-rise
                                 group flex flex-col rounded-lg
                                 shadow-[0_4px_16px_rgba(35,20,12,0.06)]
@@ -384,74 +420,88 @@ export function TablesDashboard({ venueId, staffName, staffId, onSignOut }: Prop
                                 active:scale-[0.98]
                                 text-left
                                 ${table.status === "paid"
-                                    ? "bg-emerald-50/90 border-2 border-emerald-500/60 ring-2 ring-emerald-500/20 shadow-emerald-500/10"
-                                    : table.status === "occupied"
-                                        ? "bg-khaki/20 border border-[#D4C4B7]"
-                                        : "bg-white ring-1 ring-isabelline"}
+                                        ? "bg-emerald-50/90 border-2 border-emerald-500/60 ring-2 ring-emerald-500/20 shadow-emerald-500/10"
+                                        : table.status === "occupied"
+                                            ? "bg-khaki/20 border border-[#D4C4B7]"
+                                            : "bg-white ring-1 ring-isabelline"}
                             `}
-                                style={{ animationDelay: `${Math.min(idx * 40, 240)}ms` }}
-                            >
-                                {/* Top row: number + status */}
-                                <div className="flex items-start justify-between px-3.5 pt-3.5">
-                                    <div>
-                                        <p className="text-[9px] font-bold uppercase tracking-[0.18em] text-feldgrau">
-                                            Table
-                                        </p>
-                                        <p className="mt-0.5 text-3xl font-bold font-sans tracking-tight text-licorice">
-                                            {String(table.number).padStart(2, "0")}
-                                        </p>
-                                    </div>
-                                    {(table.status === "reserved" || table.status === "paid") && (
-                                        <span
-                                            className={`inline-flex items-center gap-1 rounded-lg px-2 py-0.5 text-[8px] font-bold uppercase tracking-[0.14em] ${statusBg(table.status)}`}
-                                        >
-                                            <span className={`h-1.5 w-1.5 rounded-lg ${statusDot(table.status)}`} />
-                                            {statusLabel(table.status)}
-                                        </span>
-                                    )}
-                                </div>
-
-                                {/* Details */}
-                                <div className="flex-1 px-3.5 pb-3.5 pt-3">
-                                    {table.status === "paid" && (
+                                    style={{ animationDelay: `${Math.min(idx * 40, 240)}ms` }}
+                                >
+                                    {/* Top row: number + status / star */}
+                                    <div className="flex items-start justify-between px-3.5 pt-3.5">
                                         <div>
-                                            <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-emerald-700">
-                                                <span className="h-2 w-2 rounded-full bg-emerald-500 animate-ping" />
-                                                Bill Paid in Full
-                                            </div>
-                                            {table.tabTotal !== undefined && (
-                                                <p className="mt-1.5 text-xl font-black tabular-nums tracking-tight text-emerald-950">
-                                                    {formatGHS(table.tabTotal)}
-                                                </p>
-                                            )}
-                                            <p className="mt-1 text-[10px] font-semibold text-emerald-800/80">
-                                                {table.server ? `Served by ${table.server}` : "Guest paid via mobile"}
+                                            <p className="text-[9px] font-bold uppercase tracking-[0.18em] text-feldgrau">
+                                                Table
+                                            </p>
+                                            <p className="mt-0.5 text-3xl font-bold font-sans tracking-tight text-licorice">
+                                                {String(table.number).padStart(2, "0")}
                                             </p>
                                         </div>
-                                    )}
+                                        <div className="flex flex-col items-end gap-1">
+                                            {isMyTable && (
+                                                <div
+                                                    className="flex h-7 w-7 items-center justify-center rounded-full bg-amber-400/20 ring-1 ring-amber-500/40 shadow-xs"
+                                                    title="Assigned to you"
+                                                >
+                                                    <SoftStarIcon className="h-4.5 w-4.5 text-amber-600 fill-amber-400" />
+                                                </div>
+                                            )}
+                                            {(table.status === "reserved" || table.status === "paid") && (
+                                                <span
+                                                    className={`inline-flex items-center gap-1 rounded-lg px-2 py-0.5 text-[8px] font-bold uppercase tracking-[0.14em] ${statusBg(table.status)}`}
+                                                >
+                                                    <span className={`h-1.5 w-1.5 rounded-lg ${statusDot(table.status)}`} />
+                                                    {statusLabel(table.status)}
+                                                </span>
+                                            )}
+                                        </div>
+                                    </div>
 
-                                    {table.status === "occupied" && (() => {
-                                        return (
-                                            <>
-                                                <div className="flex items-center gap-3 text-[10px] font-semibold tracking-tight text-feldgrau">
-                                                    <span className="inline-flex items-center gap-1">
-                                                        <UserGroupIcon className="h-3 w-3" strokeWidth={2.25} />
-                                                        {table.guests}
-                                                    </span>
+                                    {/* Details */}
+                                    <div className="flex-1 px-3.5 pb-3.5 pt-3">
+                                        {table.status === "paid" && (
+                                            <div>
+                                                <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-emerald-700">
+                                                    <span className="h-2 w-2 rounded-full bg-emerald-500 animate-ping" />
+                                                    Bill Paid in Full
                                                 </div>
                                                 {table.tabTotal !== undefined && (
-                                                    <p className="mt-2 text-lg font-bold tabular-nums tracking-tight text-slate-900">
+                                                    <p className="mt-1.5 text-xl font-black tabular-nums tracking-tight text-emerald-950">
                                                         {formatGHS(table.tabTotal)}
                                                     </p>
                                                 )}
-                                                {table.server && (
-                                                    <p className="mt-1 text-[10px] font-semibold tracking-tight text-feldgrau/80">
-                                                        Served by {table.server}
-                                                    </p>
-                                                )}
-                                            </>
-                                        );
-                                    })()}
+                                                <p className="mt-1 text-[10px] font-semibold text-emerald-800/80">
+                                                    {table.server ? `Served by ${table.server}` : "Guest paid via mobile"}
+                                                </p>
+                                            </div>
+                                        )}
+
+                                        {table.status === "occupied" && (() => {
+                                            return (
+                                                <>
+                                                    <div className="flex items-center gap-3 text-[10px] font-semibold tracking-tight text-feldgrau">
+                                                        <span className="inline-flex items-center gap-1">
+                                                            <UserGroupIcon className="h-3 w-3" strokeWidth={2.25} />
+                                                            {table.guests}
+                                                        </span>
+                                                    </div>
+                                                    {table.tabTotal !== undefined && (
+                                                        <p className="mt-2 text-lg font-bold tabular-nums tracking-tight text-slate-900">
+                                                            {formatGHS(table.tabTotal)}
+                                                        </p>
+                                                    )}
+                                                    {table.server ? (
+                                                        <p className="mt-1 text-[10px] font-semibold tracking-tight text-feldgrau/80">
+                                                            Served by {table.server}
+                                                        </p>
+                                                    ) : (
+                                                        <p className="mt-1 text-[10px] font-medium italic tracking-tight text-feldgrau/60">
+                                                            Unassigned
+                                                        </p>
+                                                    )}
+                                                </>
+                                            );
+                                        })()}
 
                                     {table.status === "reserved" && (
                                         <>
@@ -493,7 +543,8 @@ export function TablesDashboard({ venueId, staffName, staffId, onSignOut }: Prop
                                     />
                                 </div>
                             </button>
-                        ))}
+                        );
+                    })}
                     </div>
                 )}
             </section>

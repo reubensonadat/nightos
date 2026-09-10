@@ -47,6 +47,20 @@ export function useCustomerSession(venueId: string | null, tableId: string | nul
       setState((s) => ({ ...s, waiter: null }))
       return
     }
+
+    // Verify waiter is currently ON DUTY (active shift)
+    const { data: activeShift } = await supabase
+      .from('staff_shifts')
+      .select('id')
+      .eq('staff_id', waiterId as string)
+      .eq('status', 'active')
+      .maybeSingle()
+
+    if (!activeShift) {
+      setState((s) => ({ ...s, waiter: null }))
+      return
+    }
+
     const { data: staff } = await supabase
       .from('staff')
       .select('id, name')

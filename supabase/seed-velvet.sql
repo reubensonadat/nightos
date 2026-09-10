@@ -333,7 +333,6 @@ BEGIN
         AND EXISTS (
             SELECT 1 FROM public.staff_shifts ss
             WHERE ss.staff_id = s.id AND ss.status = 'active'
-              AND ss.supervisor_approved = true
         )
         AND (s.area_assignment IS NULL OR s.area_assignment = v_table_area)
         AND (

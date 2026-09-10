@@ -203,13 +203,15 @@ export function FloorplanScreen() {
     const fetchData = useCallback(async () => {
         if (!venue.id || venue.id === "00000000-0000-0000-0000-000000000000") return;
         try {
-            const [tablesResult, billsResult] = await Promise.all([
+            const [tablesResult, billsResult, shiftsResult] = await Promise.all([
                 db.tablesByVenue(venue.id),
                 db.billsByVenue(venue.id, 0, 500),
+                db.activeShiftsByVenue(venue.id),
             ]);
             if (tablesResult.error) throw tablesResult.error;
             const allBills = billsResult.data ?? [];
             const activeBills = allBills.filter((b) => b.status === 'open' || b.status === 'settling');
+            const activeStaffIds = new Set((shiftsResult.data ?? []).map((s) => s.staff_id));
             
             // activeBills is sorted newest first. Map keeps the oldest if we map directly, so we use a loop to keep the first (newest)
             const billMap = new Map<string, typeof activeBills[0]>();
@@ -222,6 +224,7 @@ export function FloorplanScreen() {
             const rows: FloorTable[] = (tablesResult.data ?? []).map((t) => {
                 const bill = billMap.get(t.id);
                 if (bill) {
+                    const isWaiteronDuty = bill.waiter_id ? activeStaffIds.has(bill.waiter_id) : false;
                     return {
                         ...t,
                         status: "occupied" as const,
@@ -233,7 +236,7 @@ export function FloorplanScreen() {
                             0,
                             Math.floor((Date.now() - new Date(bill.created_at).getTime()) / 60_000),
                         ),
-                        waiterName: bill.waiter_id ? waiterNamesRef.current[bill.waiter_id] ?? null : null,
+                        waiterName: isWaiteronDuty && bill.waiter_id ? waiterNamesRef.current[bill.waiter_id] ?? null : null,
                     };
                 }
                 return { ...t, status: "available" as const };
@@ -244,7 +247,7 @@ export function FloorplanScreen() {
                 ...new Set(
                     activeBills
                         .map((b) => b.waiter_id)
-                        .filter((id): id is string => typeof id === "string" && id.length > 0),
+                        .filter((id): id is string => typeof id === "string" && id.length > 0 && activeStaffIds.has(id)),
                 ),
             ];
             if (waiterIds.length > 0) {
@@ -254,9 +257,10 @@ export function FloorplanScreen() {
                 setTables((prev) =>
                     prev.map((t) => {
                         const bill = billMap.get(t.id);
-                        return bill?.waiter_id
+                        const isWaiteronDuty = bill?.waiter_id ? activeStaffIds.has(bill.waiter_id) : false;
+                        return isWaiteronDuty && bill?.waiter_id
                             ? { ...t, waiterName: names[bill.waiter_id] ?? null }
-                            : t;
+                            : { ...t, waiterName: null };
                     }),
                 );
             }
@@ -471,12 +475,12 @@ export function FloorplanScreen() {
                                         <span className="font-bold tabular-nums text-licorice">{selected.ageMinutes}m</span>
                                     </div>
                                 )}
-                                {selected.waiterName && (
-                                    <div className="flex justify-between border-b border-isabelline pb-1.5">
-                                        <span className="font-medium tracking-tight text-feldgrau">Server</span>
-                                        <span className="font-bold text-licorice">{selected.waiterName}</span>
-                                    </div>
-                                )}
+                                <div className="flex justify-between border-b border-isabelline pb-1.5">
+                                    <span className="font-medium tracking-tight text-feldgrau">Server</span>
+                                    <span className={`font-bold ${selected.waiterName ? "text-licorice" : "text-feldgrau/70 italic"}`}>
+                                        {selected.waiterName || "Unassigned"}
+                                    </span>
+                                </div>
                             </div>
 
                             <button

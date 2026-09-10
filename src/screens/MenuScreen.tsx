@@ -218,7 +218,7 @@ export function MenuScreen({ venueId, venueName, tableLabel, waiterName, tablePi
                             ? parts.length > 1
                                 ? `${parts[0]} ${parts[parts.length - 1][0].toUpperCase()}.`
                                 : cleanServer
-                            : null;
+                            : "Unassigned";
 
                         return (
                             <button
@@ -241,14 +241,12 @@ export function MenuScreen({ venueId, venueName, tableLabel, waiterName, tablePi
                                         </span>
                                     </>
                                 )}
-                                {formattedServer && (
-                                    <>
-                                        {(shortTable || partySize) && <span className="mx-0.5 h-3 w-px bg-licorice/15" />}
-                                        <span className="text-[10px] font-semibold tracking-tight text-feldgrau">
-                                            {formattedServer}
-                                        </span>
-                                    </>
-                                )}
+                                <>
+                                    {(shortTable || partySize) && <span className="mx-0.5 h-3 w-px bg-licorice/15" />}
+                                    <span className={`text-[10px] tracking-tight ${cleanServer ? "font-semibold text-feldgrau" : "font-medium italic text-feldgrau/70"}`}>
+                                        {formattedServer}
+                                    </span>
+                                </>
                             </button>
                         );
                     })()}
