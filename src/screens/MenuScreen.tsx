@@ -317,46 +317,46 @@ export function MenuScreen({ venueId, venueName, tableLabel, waiterName, tablePi
                         </p>
                     </div>
                 ) : (
-                <>
-                {visibleItems.length === 0 && (
-                    <div className="mt-4 flex flex-col items-center justify-center rounded-2xl bg-white px-6 py-12 text-center shadow-[0_4px_16px_rgba(35,20,12,0.04)] ring-1 ring-isabelline">
-                        <span className="h-1.5 w-1.5 rounded-full bg-khaki" />
-                        <h3 className="mt-4 text-[15px] font-bold tracking-tight text-licorice">
-                            Nothing on this list yet
-                        </h3>
-                        <p className="mt-1.5 text-[12px] leading-[1.5] tracking-tight text-feldgrau">
-                            Try a different category or clear your search.
-                        </p>
-                    </div>
-                )}
+                    <>
+                        {visibleItems.length === 0 && (
+                            <div className="mt-4 flex flex-col items-center justify-center rounded-2xl bg-white px-6 py-12 text-center shadow-[0_4px_16px_rgba(35,20,12,0.04)] ring-1 ring-isabelline">
+                                <span className="h-1.5 w-1.5 rounded-full bg-khaki" />
+                                <h3 className="mt-4 text-[15px] font-bold tracking-tight text-licorice">
+                                    Nothing on this list yet
+                                </h3>
+                                <p className="mt-1.5 text-[12px] leading-[1.5] tracking-tight text-feldgrau">
+                                    Try a different category or clear your search.
+                                </p>
+                            </div>
+                        )}
 
-                {/* ═══════════════════════════════════════════════════════════
+                        {/* ═══════════════════════════════════════════════════════════
                     GRID — square image cards
                   ═══════════════════════════════════════════════════════════ */}
-                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 md:gap-5">
-                    {gridItems.map((item, idx) => {
-                        const fav = isFavorite(item.id);
-                        return (
-                            <MenuItemCard
-                                key={item.id}
-                                id={item.id}
-                                name={item.name}
-                                price={item.price}
-                                image={item.image}
-                                description={item.description}
-                                category={item.category}
-                                abv={item.abv}
-                                isFavorite={fav}
-                                onToggleFavorite={() => toggleFavorite(item.id)}
-                                onClick={() => setActiveItemId(item.id)}
-                                onAdd={() => addQuick(item)}
-                                animationDelayMs={Math.min(idx * 40, 240)}
-                            />
-                        );
-                    })}
-                </div>
-                </>
-            )}
+                        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 md:gap-5">
+                            {gridItems.map((item, idx) => {
+                                const fav = isFavorite(item.id);
+                                return (
+                                    <MenuItemCard
+                                        key={item.id}
+                                        id={item.id}
+                                        name={item.name}
+                                        price={item.price}
+                                        image={item.image}
+                                        description={item.description}
+                                        category={item.category}
+                                        abv={item.abv}
+                                        isFavorite={fav}
+                                        onToggleFavorite={() => toggleFavorite(item.id)}
+                                        onClick={() => setActiveItemId(item.id)}
+                                        onAdd={() => addQuick(item)}
+                                        animationDelayMs={Math.min(idx * 40, 240)}
+                                    />
+                                );
+                            })}
+                        </div>
+                    </>
+                )}
             </section>
 
             {/* ═══════════════════════════════════════════════════════════

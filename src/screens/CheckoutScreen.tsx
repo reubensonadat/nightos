@@ -8,7 +8,7 @@ import {
 } from "@heroicons/react/24/outline";
 import { CheckCircleIcon } from "@heroicons/react/24/solid";
 import toast from "react-hot-toast";
-import { formatGHS } from "../data/menu";
+import { formatGHS, formatGHSString } from "../data/menu";
 import { PaystackButton } from "../components/PaystackButton";
 import { ReceiptDownloader } from "../components/ReceiptDownloader";
 import { db, type DbBill, type DbVenue } from "../lib/api";
@@ -312,7 +312,7 @@ export function CheckoutScreen({ total, billId, venueId, onBack, onPaid }: Props
                 </div>
 
                 {/* ── Bill Summary Card ── */}
-                <div className="mb-5 overflow-hidden rounded-2xl bg-white shadow-[0_4px_16px_rgba(35,20,12,0.04)] ring-1 ring-isabelline">
+                <div className="mb-5 overflow-hidden rounded-xl bg-white shadow-[0_4px_16px_rgba(35,20,12,0.04)] ring-1 ring-isabelline">
                     {/* Header */}
                     <div className="flex items-center justify-between border-b border-isabelline px-4 py-3">
                         <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-khaki">
@@ -559,7 +559,7 @@ export function CheckoutScreen({ total, billId, venueId, onBack, onPaid }: Props
                             <span className="text-[15px] font-bold tracking-tight text-isabelline">
                                 {cashRequested
                                     ? "Your waiter will confirm the payment"
-                                    : `Confirm ${formatGHS(payAmount)} with your waiter`}
+                                    : `Confirm ${formatGHSString(payAmount)} with your waiter`}
                             </span>
                         </span>
                         <span className="flex h-9 w-9 items-center justify-center rounded-full bg-isabelline text-licorice">

@@ -4,7 +4,7 @@ import {
     ArrowRightIcon,
     UserGroupIcon,
 } from "@heroicons/react/24/outline";
-import { formatGHS } from "../../data/menu";
+import { formatGHS, formatGHSString } from "../../data/menu";
 import { db } from "../../lib/api";
 import { useRealtime } from "../../hooks/useRealtime";
 import signoutBlackIcon from "../../assets/sign-out-black.svg";
@@ -238,7 +238,7 @@ export function TablesDashboard({ venueId, staffName, staffId, onSignOut }: Prop
                 sounds.playPaymentSuccess();
                 const matchedTable = tables.find((t) => t.id === updated.table_id);
                 const tableText = matchedTable?.label ? matchedTable.label : (matchedTable?.number ? `Table ${matchedTable.number}` : 'Table');
-                toast.success(`💳 ${tableText}: Bill of ${formatGHS(Number(updated.total || 0))} has been PAID by guest!`, {
+                toast.success(`💳 ${tableText}: Bill of ${formatGHSString(Number(updated.total || 0))} has been PAID by guest!`, {
                     duration: 8000,
                     icon: '🛎️',
                 });

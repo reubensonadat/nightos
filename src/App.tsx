@@ -25,7 +25,7 @@ import { TablePinModal } from "./components/TablePinModal";
 import { ClockIcon } from "@heroicons/react/24/outline";
 
 import { StaffAuthScreen } from "./screens/waiter/StaffAuthScreen";
- 
+
 import { TablesDashboard } from "./screens/waiter/TablesDashboard";
 import { OrderManagementScreen } from "./screens/waiter/OrderManagementScreen";
 import { TableOperationsScreen } from "./screens/waiter/TableOperationsScreen";
@@ -49,7 +49,7 @@ import { ReservationsScreen } from "./screens/ReservationsScreen";
 import { useVenue } from "./hooks/useVenue";
 import { useQrTable } from "./hooks/useQrTable";
 import { useCustomerSession } from "./hooks/useCustomerSession";
- 
+
 import { db, type DbTable } from "./lib/api";
 
 type NavTab = "menu" | "tab" | "orders";
@@ -142,9 +142,9 @@ function CustomerShell({ venueId, tableId, tableLabel }: { venueId: string; tabl
       .then(
         ({ data }) => {
           if (!cancelled && data) setVenueName(data.name);
-        // eslint-disable-next-line react-hooks/set-state-in-effect
+          // eslint-disable-next-line react-hooks/set-state-in-effect
         },
-        () => {},
+        () => { },
       );
     // eslint-disable-next-line no-empty
     return () => {
@@ -196,7 +196,7 @@ function CustomerShell({ venueId, tableId, tableLabel }: { venueId: string; tabl
               })),
             };
           }),
-        // eslint-disable-next-line react-hooks/exhaustive-deps
+          // eslint-disable-next-line react-hooks/exhaustive-deps
         );
 
         if (cancelled) return;
@@ -264,7 +264,7 @@ function CustomerShell({ venueId, tableId, tableLabel }: { venueId: string; tabl
           </p>
           <button
             onClick={() => {
-              try { sessionStorage.removeItem('nightos:current_session_id') } catch {}
+              try { sessionStorage.removeItem('nightos:current_session_id') } catch { }
               window.location.reload()
             }}
             className="mt-8 px-8 py-3.5 bg-licorice text-[14px] text-isabelline font-bold rounded-full transition-transform active:scale-95"
@@ -514,7 +514,7 @@ function AppShell() {
 
   const handleStaffSignOut = () => {
     const staffId = staffSession?.id;
-    if (staffId) db.clockOutStaff(staffId).catch(() => {});
+    if (staffId) db.clockOutStaff(staffId).catch(() => { });
     signOut();
   };
 
