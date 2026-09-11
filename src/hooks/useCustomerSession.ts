@@ -288,8 +288,8 @@ export function useCustomerSession(venueId: string | null, tableId: string | nul
 
     setState((s) => ({ ...s, session, bill, isNewTab: createdFreshBill, loading: false, error: null }))
 
-    // 4. Make sure the bill has a waiter (idempotent, people-weighted)
-    if (bill) assignWaiter(bill.id, token)
+    // 4. Make sure the bill has a waiter (idempotent, people-weighted once headcount confirmed)
+    if (bill && !createdFreshBill) assignWaiter(bill.id, token)
   }, [venueId, tableId, assignWaiter, reviveSession, reviveIfBillOpen])
 
   useEffect(() => {

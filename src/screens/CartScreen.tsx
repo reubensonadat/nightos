@@ -31,6 +31,9 @@ type Props = {
     onBack?: () => void;
     onContinueShopping?: () => void;
     onOrderSent?: (order: OrderSummary) => void;
+    onCallWaiter?: () => void;
+    callingWaiter?: boolean;
+    waiterCalled?: boolean;
 };
 
 /** Estimated prep time based on item count — gives the page a "living" feel. */
@@ -42,7 +45,7 @@ function estimatePrepMinutes(itemCount: number): string {
     return `${min}–${min + 4} min`;
 }
 
-export function CartScreen({ venueId, tableLabel, tablePin, billId, customerSessionId, sessionToken, onBack, onContinueShopping, onOrderSent }: Props) {
+export function CartScreen({ venueId, tableLabel, tablePin, billId, customerSessionId, sessionToken, onBack, onContinueShopping, onOrderSent, onCallWaiter, callingWaiter, waiterCalled }: Props) {
     const { lines, itemCount, subtotal, setQty, remove, clear } = useCart();
     const [orderNotes, setOrderNotes] = useState("");
     const [sending, setSending] = useState(false);
@@ -235,6 +238,14 @@ export function CartScreen({ venueId, tableLabel, tablePin, billId, customerSess
     const hasDraft = lines.length > 0;
     const hasPlaced = placedItems.length > 0;
 
+    if (loadingPlaced && !hasDraft) {
+        return (
+            <main className="relative min-h-svh w-full bg-isabelline font-sans text-licorice antialiased flex items-center justify-center">
+                <div className="h-8 w-8 animate-spin rounded-full border-2 border-licorice/20 border-t-licorice" />
+            </main>
+        );
+    }
+
     // ── Empty state ── (only show if NO draft items AND NO placed session items exist)
     if (!hasDraft && !hasPlaced && !loadingPlaced) {
         return (
@@ -242,7 +253,7 @@ export function CartScreen({ venueId, tableLabel, tablePin, billId, customerSess
                 <header className="sticky top-0 z-50 bg-licorice">
                     {tablePin && (
                         <div className="pt-[max(env(safe-area-inset-top),0px)] pb-2">
-                            <TablePinBanner pin={tablePin} tableLabel={tableLabel} />
+                            <TablePinBanner pin={tablePin} tableLabel={tableLabel} onCallWaiter={onCallWaiter} callingWaiter={callingWaiter} waiterCalled={waiterCalled} />
                         </div>
                     )}
                     <div className={`relative z-10 mx-auto flex w-full max-w-7xl items-center justify-between px-5 md:px-8 ${!tablePin ? 'pt-[max(env(safe-area-inset-top),14px)]' : 'pt-0'} pb-3`}>
@@ -289,7 +300,7 @@ export function CartScreen({ venueId, tableLabel, tablePin, billId, customerSess
                 <div className="fixed inset-x-0 bottom-[88px] z-40 flex justify-center px-5 md:px-8">
                     <button
                         type="button"
-                        onClick={onContinueShopping}
+                        onClick={onContinueShopping || onBack}
                         className="
                             group flex w-full max-w-md md:max-w-2xl mx-auto items-center justify-between
                             gap-3 rounded-full bg-licorice px-6 py-4
@@ -323,7 +334,7 @@ export function CartScreen({ venueId, tableLabel, tablePin, billId, customerSess
             <header className="sticky top-0 z-50 bg-licorice">
                 {tablePin && (
                     <div className="pt-[max(env(safe-area-inset-top),0px)] pb-2">
-                        <TablePinBanner pin={tablePin} tableLabel={tableLabel} />
+                        <TablePinBanner pin={tablePin} tableLabel={tableLabel} onCallWaiter={onCallWaiter} callingWaiter={callingWaiter} waiterCalled={waiterCalled} />
                     </div>
                 )}
                 <div className={`relative z-10 mx-auto flex w-full max-w-7xl items-center justify-between px-5 md:px-8 ${!tablePin ? 'pt-[max(env(safe-area-inset-top),14px)]' : 'pt-0'} pb-3`}>

@@ -68,7 +68,7 @@ type Props = {
     onPaid: () => void;
 };
 
-export function CheckoutScreen({ total, billId, venueId, onBack, onPaid }: Props) {
+export function CheckoutScreen({ total, billId, venueId, sessionToken, onBack, onPaid }: Props) {
     const [bill, setBill] = useState<DbBill | null>(null);
     const [venue, setVenue] = useState<DbVenue | null>(null);
     const [tableLabel, setTableLabel] = useState<string | null>(null);
@@ -146,9 +146,18 @@ export function CheckoutScreen({ total, billId, venueId, onBack, onPaid }: Props
             return;
         }
         setPaying(true);
-        setCashRequested(true);
-        setPaying(false);
-        toast.success("Your waiter will come over to confirm your cash payment.");
+        try {
+            const token = sessionToken || (typeof sessionStorage !== 'undefined' ? sessionStorage.getItem('nightos:current_session_token') : null);
+            const { error } = await db.requestWaiterAssistance(billId, 'cash_settlement', token);
+            if (error) throw error;
+            setCashRequested(true);
+            toast.success("Your waiter will come over to confirm your cash payment.");
+        } catch (err) {
+            console.error('[CheckoutScreen] requestWaiterAssistance error:', err);
+            toast.error("Could not notify waiter. Please try again.");
+        } finally {
+            setPaying(false);
+        }
     };
 
     const handlePaystackSuccess = async (reference: string) => {

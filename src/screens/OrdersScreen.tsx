@@ -36,6 +36,9 @@ type Props = {
   sessionToken?: string | null;
   onPayBill: (order: OrderSummary) => void;
   onReorder?: (order: OrderSummary) => void;
+  onCallWaiter?: () => void;
+  callingWaiter?: boolean;
+  waiterCalled?: boolean;
 };
 
 /* ────────────────────────── Active Order Card ────────────────────────── */
@@ -337,7 +340,7 @@ function HistoryCard({
 
 /* ────────────────────────── Main Screen ────────────────────────── */
 
-export function OrdersScreen({ activeOrders, history, tableLabel, tablePin, billId: _billId, sessionToken, venueName, onPayBill, onReorder: _onReorder, onBack }: Props & { venueName?: string | null; onBack?: () => void }) {
+export function OrdersScreen({ activeOrders, history, tableLabel, tablePin, billId: _billId, sessionToken, venueName, onPayBill, onReorder: _onReorder, onBack, onCallWaiter, callingWaiter, waiterCalled }: Props & { venueName?: string | null; onBack?: () => void }) {
   const navigate = useNavigate();
   const hasActive = activeOrders.length > 0;
   const hasHistory = history.length > 0;
@@ -362,7 +365,7 @@ export function OrdersScreen({ activeOrders, history, tableLabel, tablePin, bill
       <header className="sticky top-0 z-30 bg-isabelline/95 backdrop-blur-xl border-b border-licorice/8">
         {tablePin && (
           <div className="pt-[max(env(safe-area-inset-top),0px)]">
-            <TablePinBanner pin={tablePin} tableLabel={tableLabel} />
+            <TablePinBanner pin={tablePin} tableLabel={tableLabel} onCallWaiter={onCallWaiter} callingWaiter={callingWaiter} waiterCalled={waiterCalled} />
           </div>
         )}
         <div className={`mx-auto flex w-full max-w-7xl items-center justify-between px-5 md:px-8 ${!tablePin ? 'pt-[max(env(safe-area-inset-top),16px)]' : 'pt-3'} pb-3 relative`}>

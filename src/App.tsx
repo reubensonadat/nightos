@@ -84,6 +84,24 @@ function CustomerShell({ venueId, tableId, tableLabel }: { venueId: string; tabl
 
   const { session, bill, waiter, isNewTab, loading: sessionLoading, error: sessionError, updateParty } = useCustomerSession(venueId, tableId);
 
+  const [callingWaiter, setCallingWaiter] = useState(false);
+  const [waiterCalled, setWaiterCalled] = useState(false);
+
+  const handleCallWaiter = useCallback(async () => {
+    if (!bill?.id || callingWaiter) return;
+    setCallingWaiter(true);
+    try {
+      const { error } = await db.requestWaiterAssistance(bill.id, 'call_waiter', session?.session_token);
+      if (error) throw error;
+      setWaiterCalled(true);
+      toast.success("🛎️ Your waiter has been notified and will be right over!");
+    } catch {
+      toast.error("Could not notify waiter. Please try again.");
+    } finally {
+      setCallingWaiter(false);
+    }
+  }, [bill?.id, callingWaiter, session?.session_token]);
+
   // Table PIN Security State
   // eslint-disable-next-line no-empty
   const [pinInputVerified, setPinInputVerified] = useState<boolean>(false);
@@ -132,8 +150,9 @@ function CustomerShell({ venueId, tableId, tableLabel }: { venueId: string; tabl
       // eslint-disable-next-line no-empty
       try { localStorage.setItem(`nightos:party:${session?.id ?? ''}`, "1"); } catch { /* ignore */ }
       setPartyPromptOpen(false);
+      setTab("menu");
     },
-    [updateParty, session],
+    [updateParty, session, setTab],
   );
 
   useEffect(() => {
@@ -310,6 +329,8 @@ function CustomerShell({ venueId, tableId, tableLabel }: { venueId: string; tabl
           waiterName={waiter?.name ?? null}
           tablePin={pinUnlocked && bill?.table_pin ? bill.table_pin : null}
           partySize={bill?.guest_count || session?.party_size}
+          billId={bill?.id}
+          sessionToken={session?.session_token}
           onEditParty={tableId ? () => setPartyPromptOpen(true) : undefined}
           onViewCart={() => setTab("tab")}
         />
@@ -324,7 +345,11 @@ function CustomerShell({ venueId, tableId, tableLabel }: { venueId: string; tabl
           customerSessionId={session?.id}
           sessionToken={session?.session_token}
           onBack={() => setTab("menu")}
+          onContinueShopping={() => setTab("menu")}
           onOrderSent={handleOrderSent}
+          onCallWaiter={bill?.id ? handleCallWaiter : undefined}
+          callingWaiter={callingWaiter}
+          waiterCalled={waiterCalled}
         />
       )}
       {tab === "orders" && (
@@ -338,6 +363,9 @@ function CustomerShell({ venueId, tableId, tableLabel }: { venueId: string; tabl
           sessionToken={session?.session_token}
           onPayBill={setPayingOrder}
           onBack={() => setTab("tab")}
+          onCallWaiter={bill?.id ? handleCallWaiter : undefined}
+          callingWaiter={callingWaiter}
+          waiterCalled={waiterCalled}
         />
       )}
       <CustomerBottomNav activeTab={tab} onTabChange={setTab} cartCount={itemCount} />
@@ -360,6 +388,7 @@ function CustomerShell({ venueId, tableId, tableLabel }: { venueId: string; tabl
           tableLabel={tableLabel}
           initialSize={bill?.guest_count || session?.party_size || 1}
           onConfirm={handlePartyConfirm}
+          onClose={() => setPartyPromptOpen(false)}
         />
       )}
     </div>

@@ -71,6 +71,30 @@ class SoundEffects {
       // Audio playback might be restricted if user hasn't interacted yet
     }
   }
+
+  /**
+   * Attention-grabbing service bell chime for waiter calls.
+   */
+  playBell(): void {
+    try {
+      const ctx = this.getContext();
+      if (!ctx) return;
+      const now = ctx.currentTime;
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(880, now);
+      osc.frequency.exponentialRampToValueAtTime(1760, now + 0.15);
+      gain.gain.setValueAtTime(0.3, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.5);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(now);
+      osc.stop(now + 0.5);
+    } catch {
+      // ignore
+    }
+  }
 }
 
 export const sounds = new SoundEffects();

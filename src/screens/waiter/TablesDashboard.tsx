@@ -8,6 +8,7 @@ import { formatGHS, formatGHSString } from "../../data/menu";
 import { db } from "../../lib/api";
 import { useRealtime } from "../../hooks/useRealtime";
 import signoutBlackIcon from "../../assets/sign-out-black.svg";
+import bellRingingIcon from "../../assets/bell-ringing.svg";
 import { SignOutModal } from "../../components/SignOutModal";
 import toast from "react-hot-toast";
 import { sounds } from "../../lib/sound";
@@ -29,6 +30,7 @@ export type Table = {
     reservationGuests?: number;
     waiterId?: string;
     server?: string;
+    assistanceType?: 'call_waiter' | 'cash_settlement';
 };
 
 /* ────────────────────────── Soft Star SVG ────────────────────────── */
@@ -143,6 +145,7 @@ function transformToTables(
                 lastActivityAt: (bill.last_activity_at as string) ?? (bill.created_at as string),
                 waiterId: isWaiteronDuty && waiterId ? waiterId : undefined,
                 server: isWaiteronDuty && waiterId ? (waiterNames[waiterId] ?? undefined) : undefined,
+                assistanceType: (bill.assistance_type as 'call_waiter' | 'cash_settlement') || undefined,
             };
         }
         return {
@@ -230,6 +233,15 @@ export function TablesDashboard({ venueId, staffName, staffId, onSignOut }: Prop
         onUpdate: (payload: { new?: Record<string, unknown>; old?: Record<string, unknown> }) => {
             const updated = payload?.new;
             const previous = payload?.old;
+            if (updated?.assistance_type && updated.assistance_type !== previous?.assistance_type) {
+                sounds.playBell();
+                const matchedTable = tables.find((t) => t.id === updated.table_id);
+                const tableText = matchedTable?.label ? matchedTable.label : (matchedTable?.number ? `Table ${matchedTable.number}` : 'Table');
+                const msg = updated.assistance_type === 'cash_settlement'
+                    ? `💵 ${tableText}: Guest requested cash payment confirmation!`
+                    : `🛎️ ${tableText}: Guest called for waiter assistance!`;
+                toast.success(msg, { duration: 8000, icon: '🛎️' });
+            }
             if (
                 updated &&
                 (updated.status === 'paid' || (Number(updated.amount_paid || 0) >= Number(updated.total || 0) && Number(updated.total || 0) > 0)) &&
@@ -427,8 +439,8 @@ export function TablesDashboard({ venueId, staffName, staffId, onSignOut }: Prop
                             `}
                                     style={{ animationDelay: `${Math.min(idx * 40, 240)}ms` }}
                                 >
-                                    {/* Top row: number + status / star */}
-                                    <div className="flex items-start justify-between px-3.5 pt-3.5">
+                                    {/* Top row: number + status / star / assistance */}
+                                    <div className="flex items-center justify-between px-3.5 pt-3.5">
                                         <div>
                                             <p className="text-[9px] font-bold uppercase tracking-[0.18em] text-feldgrau">
                                                 Table
@@ -437,7 +449,15 @@ export function TablesDashboard({ venueId, staffName, staffId, onSignOut }: Prop
                                                 {String(table.number).padStart(2, "0")}
                                             </p>
                                         </div>
-                                        <div className="flex flex-col items-end gap-1">
+                                        <div className="flex items-center gap-2">
+                                            {table.assistanceType && (
+                                                <div
+                                                    className="flex h-[33px] w-[33px] items-center justify-center rounded-full bg-white shadow-sm ring-1 ring-licorice/10 overflow-hidden p-1 shrink-0"
+                                                    title={table.assistanceType === 'cash_settlement' ? "Cash Settlement Requested" : "Waiter Assistance Requested"}
+                                                >
+                                                    <img src={bellRingingIcon} className="h-[25px] w-[25px] object-contain" alt="Assistance" />
+                                                </div>
+                                            )}
                                             {isMyTable && (
                                                 <div
                                                     className="flex h-7 w-7 items-center justify-center rounded-full bg-amber-400/20 ring-1 ring-amber-500/40 shadow-xs"

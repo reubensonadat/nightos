@@ -122,6 +122,8 @@ export type DbBill = {
   is_merged: boolean;
   merged_into_bill_id: string | null;
   table_pin?: string | null;
+  assistance_type?: 'call_waiter' | 'cash_settlement' | null;
+  assistance_requested_at?: string | null;
   created_at: string;
   updated_at: string;
   closed_at: string | null;
@@ -454,7 +456,7 @@ export const db = {
     supabase
       .from('bills')
       .select(
-        'id, venue_id, table_id, waiter_id, guest_count, status, payment_model, subtotal, convenience_fee, service_charge, vat, total, amount_paid, is_merged, merged_into_bill_id, table_pin, created_at, updated_at, closed_at, last_activity_at',
+        'id, venue_id, table_id, waiter_id, guest_count, status, payment_model, subtotal, convenience_fee, service_charge, vat, total, amount_paid, is_merged, merged_into_bill_id, table_pin, created_at, updated_at, closed_at, last_activity_at, assistance_type, assistance_requested_at',
       )
       .eq('table_id', tableId)
       .in('status', ['open', 'settling'])
@@ -468,7 +470,7 @@ export const db = {
     supabase
       .from('bills')
       .select(
-        'id, venue_id, table_id, waiter_id, guest_count, status, payment_model, subtotal, convenience_fee, service_charge, vat, total, amount_paid, is_merged, merged_into_bill_id, table_pin, created_at, updated_at, closed_at, last_activity_at',
+        'id, venue_id, table_id, waiter_id, guest_count, status, payment_model, subtotal, convenience_fee, service_charge, vat, total, amount_paid, is_merged, merged_into_bill_id, table_pin, created_at, updated_at, closed_at, last_activity_at, assistance_type, assistance_requested_at',
       )
       .eq('table_id', tableId)
       .in('status', ['open', 'settling', 'paid'])
@@ -490,7 +492,7 @@ export const db = {
     return supabase
       .from('bills')
       .select(
-        'id, venue_id, table_id, waiter_id, guest_count, status, payment_model, subtotal, convenience_fee, service_charge, vat, total, amount_paid, is_merged, merged_into_bill_id, table_pin, created_at, updated_at, closed_at, last_activity_at',
+        'id, venue_id, table_id, waiter_id, guest_count, status, payment_model, subtotal, convenience_fee, service_charge, vat, total, amount_paid, is_merged, merged_into_bill_id, table_pin, created_at, updated_at, closed_at, last_activity_at, assistance_type, assistance_requested_at',
       )
       .eq('id', billId)
       .maybeSingle();
@@ -500,7 +502,7 @@ export const db = {
     supabase
       .from('bills')
       .select(
-        'id, venue_id, table_id, waiter_id, guest_count, status, payment_model, subtotal, convenience_fee, service_charge, vat, total, amount_paid, is_merged, merged_into_bill_id, table_pin, created_at, updated_at, closed_at, last_activity_at',
+        'id, venue_id, table_id, waiter_id, guest_count, status, payment_model, subtotal, convenience_fee, service_charge, vat, total, amount_paid, is_merged, merged_into_bill_id, table_pin, created_at, updated_at, closed_at, last_activity_at, assistance_type, assistance_requested_at',
       )
       .eq('id', id)
       .maybeSingle(),
@@ -539,7 +541,7 @@ export const db = {
     const { data, error } = await supabase
       .from('bills')
       .select(
-        'id, venue_id, table_id, waiter_id, guest_count, status, payment_model, subtotal, convenience_fee, service_charge, vat, total, amount_paid, is_merged, merged_into_bill_id, table_pin, created_at, updated_at, closed_at, last_activity_at',
+        'id, venue_id, table_id, waiter_id, guest_count, status, payment_model, subtotal, convenience_fee, service_charge, vat, total, amount_paid, is_merged, merged_into_bill_id, table_pin, created_at, updated_at, closed_at, last_activity_at, assistance_type, assistance_requested_at',
       )
       .eq('venue_id', venueId)
       .in('status', ['open', 'settling', 'paid'])
@@ -1471,6 +1473,31 @@ export const db = {
     supabase.functions.invoke('assign-waiter', {
       body: { bill_id: billId },
     }),
+
+  /* ── Realtime Waiter Assistance ── */
+  requestWaiterAssistance: (billId: string, type: 'call_waiter' | 'cash_settlement', sessionToken?: string | null) =>
+    withSession(
+      supabase
+        .from('bills')
+        .update({
+          assistance_type: type,
+          assistance_requested_at: new Date().toISOString(),
+          last_activity_at: new Date().toISOString(),
+        })
+        .eq('id', billId),
+      sessionToken,
+    ).then(({ data, error }) => ({ data, error })),
+
+  clearWaiterAssistance: (billId: string) =>
+    supabase
+      .from('bills')
+      .update({
+        assistance_type: null,
+        assistance_requested_at: null,
+        last_activity_at: new Date().toISOString(),
+      })
+      .eq('id', billId)
+      .then(({ data, error }) => ({ data, error })),
 };
 
 export type Db = typeof db;

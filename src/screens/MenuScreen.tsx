@@ -22,6 +22,8 @@ import { db, type DbProduct, type DbModifierOption } from "../lib/api";
 import { supabase } from "../lib/supabase";
 
 import { TablePinBanner } from "../components/TablePinBanner";
+import bellRingingIcon from "../assets/bell-ringing.svg";
+import toast from "react-hot-toast";
 
 type Props = {
     venueId?: string;
@@ -30,6 +32,8 @@ type Props = {
     waiterName?: string | null;
     tablePin?: string | null;
     partySize?: number;
+    billId?: string | null;
+    sessionToken?: string | null;
     onEditParty?: () => void;
     onBack?: () => void;
     onViewCart?: () => void;
@@ -115,14 +119,31 @@ async function fetchProducts(venueId: string): Promise<MenuItem[]> {
 
 }
 
-export function MenuScreen({ venueId, venueName, tableLabel, waiterName, tablePin, partySize, onEditParty, onBack, onViewCart }: Props) {
+export function MenuScreen({ venueId, venueName, tableLabel, waiterName, tablePin, partySize, billId, sessionToken, onEditParty, onBack, onViewCart }: Props) {
     const [active, setActive] = useState<MenuCategory>("Signatures");
     const [query, setQuery] = useState("");
     const [activeItemId, setActiveItemId] = useState<string | null>(null);
     const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
     const [loading, setLoading] = useState(true);
+    const [callingWaiter, setCallingWaiter] = useState(false);
+    const [waiterCalled, setWaiterCalled] = useState(false);
     const { addQuick, subtotal, itemCount, toggleFavorite, isFavorite } =
         useCart();
+
+    const handleCallWaiter = async () => {
+        if (!billId || callingWaiter) return;
+        setCallingWaiter(true);
+        try {
+            const { error } = await db.requestWaiterAssistance(billId, 'call_waiter', sessionToken);
+            if (error) throw error;
+            setWaiterCalled(true);
+            toast.success("🛎️ Your waiter has been notified and will be right over!");
+        } catch {
+            toast.error("Could not notify waiter. Please try again.");
+        } finally {
+            setCallingWaiter(false);
+        }
+    };
 
     useEffect(() => {
         if (!venueId) {
@@ -177,7 +198,13 @@ export function MenuScreen({ venueId, venueName, tableLabel, waiterName, tablePi
                 {/* ── Table PIN Banner ── */}
                 {tablePin && (
                     <div className="pt-[max(env(safe-area-inset-top),0px)]">
-                        <TablePinBanner pin={tablePin} tableLabel={tableLabel} />
+                        <TablePinBanner
+                            pin={tablePin}
+                            tableLabel={tableLabel}
+                            onCallWaiter={billId ? handleCallWaiter : undefined}
+                            callingWaiter={callingWaiter}
+                            waiterCalled={waiterCalled}
+                        />
                     </div>
                 )}
 
@@ -205,8 +232,28 @@ export function MenuScreen({ venueId, venueName, tableLabel, waiterName, tablePi
                         </div>
                     </div>
 
-                    {/* Right: single consolidated pill */}
-                    {(tableLabel || waiterName || partySize) && (() => {
+                    {/* Right: Call Waiter button (if no PIN banner) + single consolidated pill */}
+                    <div className="flex items-center gap-2">
+                        {!tablePin && billId && (
+                            <button
+                                type="button"
+                                onClick={handleCallWaiter}
+                                disabled={callingWaiter}
+                                className={`flex h-8 w-8 items-center justify-center rounded-full text-[13px] font-bold shadow-xs transition-all active:scale-95 border ${
+                                    waiterCalled
+                                        ? "bg-amber-100 text-amber-950 border-amber-400 ring-2 ring-amber-400/30"
+                                        : "bg-white text-licorice border-licorice/10 hover:bg-isabelline"
+                                }`}
+                                title={waiterCalled ? "Waiter Notified ✓" : "Call Waiter"}
+                            >
+                                {callingWaiter ? (
+                                    <span className="text-[13px]">⏳</span>
+                                ) : (
+                                    <img src={bellRingingIcon} alt="Call Waiter" className="h-4.5 w-4.5 object-contain" />
+                                )}
+                            </button>
+                        )}
+                        {(tableLabel || waiterName || partySize) && (() => {
                         const shortTable = tableLabel
                             ? `T-${tableLabel.replace(/^table\s*/i, "").trim()}`
                             : null;
@@ -251,6 +298,7 @@ export function MenuScreen({ venueId, venueName, tableLabel, waiterName, tablePi
                         );
                     })()}
                 </div>
+            </div>
 
                 {/* ── Row 2: Always-visible search ── */}
                 <div className="mx-auto w-full max-w-7xl px-5 md:px-8 pb-2.5">

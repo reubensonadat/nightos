@@ -17,6 +17,7 @@ import { db, type DbBill, type DbOrderSubmission, type DbOrderItem, type DbProdu
 import type { Table } from "./TablesDashboard";
 import { MenuItemCard } from "../../components/MenuItemCard";
 import { ConfirmModal } from "../../components/ConfirmModal";
+import bellRingingIcon from "../../assets/bell-ringing.svg";
 import { sounds } from "../../lib/sound";
 
 /* ────────────────────────── Types ────────────────────────── */
@@ -238,6 +239,13 @@ export function OrderManagementScreen() {
         onUpdate: (payload: { new?: Record<string, unknown>; old?: Record<string, unknown> }) => {
             const updated = payload?.new;
             const previous = payload?.old;
+            if (updated?.assistance_type && updated.assistance_type !== previous?.assistance_type) {
+                sounds.playBell();
+                const msg = updated.assistance_type === 'cash_settlement'
+                    ? `💵 Table ${table.number}: Guest requested cash payment confirmation!`
+                    : `🛎️ Table ${table.number}: Guest called for waiter assistance!`;
+                toast.success(msg, { duration: 8000, icon: '🛎️' });
+            }
             if (
                 updated &&
                 (updated.status === 'paid' || (Number(updated.amount_paid || 0) >= Number(updated.total || 0) && Number(updated.total || 0) > 0)) &&
@@ -422,6 +430,34 @@ export function OrderManagementScreen() {
                         </button>
                     </div>
                 </div>
+
+                {/* Assistance Request Alert Banner */}
+                {currentBill?.assistance_type && (
+                    <div className="mx-auto w-full max-w-7xl px-5 md:px-8 pb-3">
+                        <div className="flex items-center justify-between gap-3 rounded-xl bg-white border border-licorice/12 px-4 py-2.5 shadow-sm ring-1 ring-licorice/5">
+                            <div className="flex items-center gap-3">
+                                <div className="flex h-7 w-7 items-center justify-center rounded-full bg-white shadow-sm ring-1 ring-licorice/10 overflow-hidden p-1 shrink-0">
+                                    {currentBill.assistance_type === 'cash_settlement' ? <span className="text-xs">💵</span> : <img src={bellRingingIcon} className="h-5 w-5 object-contain" alt="Assistance" />}
+                                </div>
+                                <p className="text-xs font-bold text-licorice tracking-tight">
+                                    {currentBill.assistance_type === 'cash_settlement' ? "Cash settlement requested" : "Assistance requested"}
+                                </p>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={async () => {
+                                    await db.clearWaiterAssistance(currentBill.id);
+                                    setCurrentBill((prev) => (prev ? { ...prev, assistance_type: null } : null));
+                                    toast.success("Request acknowledged");
+                                }}
+                                className="rounded-lg bg-licorice px-3.5 py-1.5 text-xs font-bold text-isabelline shadow-sm transition-all hover:bg-licorice/90 active:scale-95 flex items-center gap-1.5 shrink-0"
+                            >
+                                <CheckIcon className="h-3.5 w-3.5 text-khaki" strokeWidth={2.5} />
+                                OK
+                            </button>
+                        </div>
+                    </div>
+                )}
 
                 {/* Paid Bill Alert Banner */}
                 {currentBill && (currentBill.status === 'paid' || (Number(currentBill.amount_paid || 0) >= Number(currentBill.total || 0) && Number(currentBill.total || 0) > 0)) && (
