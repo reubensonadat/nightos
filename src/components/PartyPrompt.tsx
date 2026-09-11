@@ -16,6 +16,7 @@ type Props = {
  * then drops the guest straight into the menu.
  */
 export function PartyPrompt({ venueName, tableLabel, initialSize = 1, saving = false, onConfirm, onClose }: Props) {
+    void onClose;
     const [size, setSize] = useState(initialSize);
     const [name, setName] = useState("");
     const [busy, setBusy] = useState(false);

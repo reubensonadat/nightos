@@ -1,14 +1,4 @@
-import {
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    CheckIcon,
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    ClockIcon,
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    PlayIcon,
-} from "@heroicons/react/24/outline";
+
 
 /* ────────────────────────── Types ────────────────────────── */
 
@@ -86,17 +76,13 @@ const URGENCY_STYLES = {
     },
 } as const;
 
-const STATUS_LABEL: Record<OrderStatus, string> = {
-    pending: "Pending",
-    preparing: "Preparing",
-    ready: "Ready",
-};
+
 
 /* ────────────────────────── Component ────────────────────────── */
 
 export function OrderCard({ order, now, onAdvance, onMarkReady, onMarkServed, onDismiss }: Props) {
     const elapsedSeconds = secondsSince(order.placedAt, now);
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+     
     const elapsedMinutes = Math.floor(elapsedSeconds / 60);
     const urgency = getUrgency(elapsedMinutes);
     const styles = URGENCY_STYLES[urgency];

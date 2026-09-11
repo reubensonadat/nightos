@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, useCallback, useRef } from "react";
 import { useRealtime } from "../../hooks/useRealtime";
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
+ 
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 import { ArrowPathIcon, SpeakerWaveIcon } from "@heroicons/react/24/outline";
 import { OrderCard, type KitchenOrder, type OrderStatus } from "../../components/OrderCard";
@@ -66,7 +66,7 @@ function rowToOrder(row: DbKitchenOrderRow, waiterNames: Record<string, string>)
     const bill = Array.isArray(row.bills) ? row.bills[0] : row.bills;
     const table = Array.isArray(bill?.tables) ? bill?.tables[0] : bill?.tables;
     // Map the parent bill's status to isCancelled
-    const isCancelled = (bill as any)?.status === "cancelled";
+    const isCancelled = (bill as { status?: string } | null)?.status === "cancelled";
 
     return {
         id: row.id,
@@ -90,10 +90,10 @@ function rowToOrder(row: DbKitchenOrderRow, waiterNames: Record<string, string>)
 
 type Props = {
     venueId: string;
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+     
     staffId: string;
     staffName: string;
-    // eslint-disable-next-line react-hooks/purity
+     
     onExit?: () => void;
     onSignOut?: () => void;
     role?: string;

@@ -67,6 +67,7 @@ export function LiveOpsScreen({ onNavigate }: { onNavigate?: (page: string) => v
     const [dwellThreshold, setDwellThreshold] = useState(120);
     const [recentFees, setRecentFees] = useState<Awaited<ReturnType<typeof db.recentCashFees>>["data"]>([]);
     const [showShiftModal, setShowShiftModal] = useState(false);
+    void landed;
 
     // Group per-table bills by their merged target so linked tables (ABC + CBD)
     // show as one line with both table labels.

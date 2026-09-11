@@ -19,9 +19,8 @@ import { type OrderSummary } from "./screens/OrderTrackingScreen";
 import { OrdersScreen } from "./screens/OrdersScreen";
 import { CustomerBottomNav } from "./components/CustomerBottomNav";
 import { PartyPrompt } from "./components/PartyPrompt";
-import { TablePinBanner } from "./components/TablePinBanner";
 import { TablePinModal } from "./components/TablePinModal";
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
+ 
 import { ClockIcon } from "@heroicons/react/24/outline";
 
 import { StaffAuthScreen } from "./screens/waiter/StaffAuthScreen";
@@ -44,7 +43,7 @@ import { StaffManagerScreen } from "./screens/manager/StaffManagerScreen";
 import { ShiftReportScreen } from "./screens/manager/ShiftReportScreen";
 import { FinancialReportsScreen } from "./screens/manager/FinancialReportsScreen";
 import { CrmScreen } from "./screens/manager/CrmScreen";
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
+ 
 import { ReservationsScreen } from "./screens/ReservationsScreen";
 import { useVenue } from "./hooks/useVenue";
 import { useQrTable } from "./hooks/useQrTable";
@@ -100,12 +99,12 @@ function CustomerShell({ venueId, tableId, tableLabel }: { venueId: string; tabl
     } finally {
       setCallingWaiter(false);
     }
-  }, [bill?.id, callingWaiter, session?.session_token]);
+  }, [bill, callingWaiter, session]);
 
   // Table PIN Security State
-  // eslint-disable-next-line no-empty
+   
   const [pinInputVerified, setPinInputVerified] = useState<boolean>(false);
-  // eslint-disable-next-line react-hooks/set-state-in-effect
+   
   const pinUnlocked = useMemo(() => {
     if (!bill?.table_pin) return true;
     if (pinInputVerified) return true;
@@ -116,7 +115,7 @@ function CustomerShell({ venueId, tableId, tableLabel }: { venueId: string; tabl
     }
   }, [bill, pinInputVerified]);
 
-  // eslint-disable-next-line no-empty
+   
   // "How many of you?" prompt ONLY when initializing a fresh new tab
   // (no existing open bill or PIN already present on the table before this scan).
   // If an open bill already existed on the table, joining guests skip the prompt.
@@ -143,11 +142,11 @@ function CustomerShell({ venueId, tableId, tableLabel }: { venueId: string; tabl
     async (partySize: number, guestName?: string) => {
       const { error } = await updateParty(partySize, guestName);
       if (error) {
-        // eslint-disable-next-line react-hooks/set-state-in-effect
+         
         toast.error(String(error));
         return;
       }
-      // eslint-disable-next-line no-empty
+       
       try { localStorage.setItem(`nightos:party:${session?.id ?? ''}`, "1"); } catch { /* ignore */ }
       setPartyPromptOpen(false);
       setTab("menu");
@@ -161,18 +160,18 @@ function CustomerShell({ venueId, tableId, tableLabel }: { venueId: string; tabl
       .then(
         ({ data }) => {
           if (!cancelled && data) setVenueName(data.name);
-          // eslint-disable-next-line react-hooks/set-state-in-effect
+           
         },
         () => { },
       );
-    // eslint-disable-next-line no-empty
+     
     return () => {
       cancelled = true;
     };
   }, [venueId]);
 
   // ── Load live orders for this table's open bill from the database ──
-  // eslint-disable-next-line no-empty
+   
   const [ordersRevision, setOrdersRevision] = useState(0);
   const triggerReload = useCallback(() => setOrdersRevision((r) => r + 1), []);
 
@@ -215,7 +214,7 @@ function CustomerShell({ venueId, tableId, tableLabel }: { venueId: string; tabl
               })),
             };
           }),
-          // eslint-disable-next-line react-hooks/exhaustive-deps
+           
         );
 
         if (cancelled) return;
@@ -283,7 +282,7 @@ function CustomerShell({ venueId, tableId, tableLabel }: { venueId: string; tabl
           </p>
           <button
             onClick={() => {
-              try { sessionStorage.removeItem('nightos:current_session_id') } catch { }
+              try { sessionStorage.removeItem('nightos:current_session_id') } catch (e) { console.error(e) }
               window.location.reload()
             }}
             className="mt-8 px-8 py-3.5 bg-licorice text-[14px] text-isabelline font-bold rounded-full transition-transform active:scale-95"

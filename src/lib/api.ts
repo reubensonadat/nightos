@@ -352,6 +352,65 @@ export const db = {
       TTL.MENU,
     ),
 
+  createTable: async (args: {
+    venueId: string;
+    tableNumber: number;
+    capacity: number;
+    area: string;
+    tableLabel?: string;
+  }) => {
+    cacheInvalidate(`tables:${args.venueId}`);
+    const token = `VL-TABLE-${String(args.tableNumber).padStart(2, '0')}`;
+    const label = args.tableLabel || `Table ${String(args.tableNumber).padStart(2, '0')}`;
+    const { data, error } = await supabase
+      .from('tables')
+      .insert({
+        venue_id: args.venueId,
+        table_number: args.tableNumber,
+        table_label: label,
+        capacity: args.capacity,
+        area: args.area,
+        qr_code_token: token,
+        is_active: true,
+      })
+      .select()
+      .single();
+
+    return { data, error };
+  },
+
+  updateTable: async (id: string, venueId: string, updates: { tableNumber?: number; capacity?: number; area?: string }) => {
+    cacheInvalidate(`tables:${venueId}`);
+    cacheInvalidate(`table:id:${id}`);
+    const patch: Record<string, unknown> = {};
+    if (updates.tableNumber !== undefined) {
+      patch.table_number = updates.tableNumber;
+      patch.table_label = `Table ${String(updates.tableNumber).padStart(2, '0')}`;
+    }
+    if (updates.capacity !== undefined) patch.capacity = updates.capacity;
+    if (updates.area !== undefined) patch.area = updates.area;
+
+    const { data, error } = await supabase
+      .from('tables')
+      .update(patch)
+      .eq('id', id)
+      .select()
+      .single();
+
+    return { data, error };
+  },
+
+  deleteTable: async (id: string, venueId: string) => {
+    cacheInvalidate(`tables:${venueId}`);
+    cacheInvalidate(`table:id:${id}`);
+    const { error } = await supabase
+      .from('tables')
+      .update({ is_active: false })
+      .eq('id', id);
+
+    return { data: !error, error };
+  },
+
   tableById: (id: string) =>
     cached<DbTable | null>(
       () =>
@@ -592,6 +651,7 @@ export const db = {
 
   /** Closes a settled or finished bill, archives it, closes customer sessions, and frees the table. */
   closeBillAndFreeTable: async (billId: string, tableId: string, _staffId?: string | null) => {
+    void _staffId;
     cacheInvalidate('bills:');
     cacheInvalidate('customer_sessions:');
     cacheInvalidate('orders:');

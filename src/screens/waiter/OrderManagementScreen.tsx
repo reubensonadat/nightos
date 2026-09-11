@@ -88,11 +88,13 @@ export function OrderManagementScreen() {
     const [savingParty, setSavingParty] = useState(false);
     const [freeingTable, setFreeingTable] = useState(false);
 
-    useEffect(() => {
+    const [prevGuestCount, setPrevGuestCount] = useState(currentBill?.guest_count);
+    if (currentBill?.guest_count !== prevGuestCount) {
+        setPrevGuestCount(currentBill?.guest_count);
         if (currentBill?.guest_count) {
             setPartySizeInput(currentBill.guest_count);
         }
-    }, [currentBill?.guest_count]);
+    }
 
     const handleUpdatePartySize = async (newSize: number) => {
         if (!currentBill) {

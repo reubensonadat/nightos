@@ -1,12 +1,18 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
     ArrowDownTrayIcon,
+    CheckIcon,
     ClockIcon,
     LinkIcon,
+    PencilSquareIcon,
+    PlusIcon,
+    TrashIcon,
     UserGroupIcon,
     XMarkIcon,
 } from "@heroicons/react/24/outline";
 import QRCode from "qrcode";
+import clsx from "clsx";
+import toast from "react-hot-toast";
 import { formatGHS } from "../../data/menu";
 import { db, type DbTable } from "../../lib/api";
 import { useVenue } from "../../hooks/useVenue";
@@ -123,7 +129,7 @@ function TableActiveOrders({ billId, waiterName }: { billId: string; waiterName?
                         <span className="h-1.5 w-1.5 rounded-full bg-slate-400" />
                         Self-Service
                     </span>
-                // eslint-disable-next-line react-hooks/refs
+                 
                 )}
             </div>
             <div className="overflow-x-auto no-scrollbar">
@@ -189,6 +195,9 @@ export function FloorplanScreen() {
     const [selectedId, setSelectedId] = useState<string | null>(null);
     const selected = useMemo(() => tables.find(t => t.id === selectedId) ?? null, [tables, selectedId]);
 
+    const [addModalOpen, setAddModalOpen] = useState(false);
+    const [editingTable, setEditingTable] = useState<FloorTable | null>(null);
+    const [deletingTable, setDeletingTable] = useState<FloorTable | null>(null);
     const [showQrFor, setShowQrFor] = useState<FloorTable | null>(null);
     const [copied, setCopied] = useState(false);
     
@@ -366,8 +375,16 @@ export function FloorplanScreen() {
             <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
                 {/* Floorplan grid */}
                 <div className="lg:col-span-2 rounded-[1.5rem] bg-white p-5 shadow-sm ring-1 ring-isabelline">
-                    <div>
+                    <div className="flex items-center justify-between">
                         <h2 className="text-lg font-bold text-slate-900 tracking-tight">Tables</h2>
+                        <button
+                            type="button"
+                            onClick={() => setAddModalOpen(true)}
+                            className="inline-flex items-center gap-1 rounded-full bg-licorice px-3.5 py-1.5 text-xs font-bold tracking-tight text-isabelline shadow-sm transition-all hover:bg-licorice/90 active:scale-95"
+                        >
+                            <PlusIcon className="h-3.5 w-3.5" strokeWidth={2.5} />
+                            Add Table
+                        </button>
                     </div>
 
                     {loading ? (
@@ -437,7 +454,19 @@ export function FloorplanScreen() {
 
                 {/* Details panel */}
                 <div className="rounded-[1.5rem] bg-white p-5 shadow-sm ring-1 ring-isabelline">
-                    <p className="text-xs font-bold uppercase text-feldgrau">Table Details</p>
+                    <div className="flex items-center justify-between">
+                        <p className="text-xs font-bold uppercase text-feldgrau">Table Details</p>
+                        {selected && (
+                            <button
+                                type="button"
+                                onClick={() => setEditingTable(selected)}
+                                className="inline-flex items-center gap-1.5 rounded-full bg-isabelline px-3 py-1 text-xs font-bold tracking-tight text-licorice ring-1 ring-licorice/8 transition-all hover:bg-isabelline/80 active:scale-95"
+                            >
+                                <PencilSquareIcon className="h-3.5 w-3.5 text-licorice" strokeWidth={2.25} />
+                                Edit Table
+                            </button>
+                        )}
+                    </div>
                     {selected ? (
                         <div className="mt-4">
                             <div className="flex items-baseline gap-3">
@@ -630,6 +659,411 @@ export function FloorplanScreen() {
                     setClosingItems(null);
                 }}
             />
+
+            {/* ── Add Table / Area Modal ── */}
+            {addModalOpen && (
+                <AddTableModal
+                    venueId={venue.id}
+                    existingAreas={areas}
+                    maxTableNum={tables.length > 0 ? Math.max(...tables.map((t) => t.table_number)) : 0}
+                    onCreated={(newId) => {
+                        setSelectedId(newId);
+                        fetchData();
+                    }}
+                    onClose={() => setAddModalOpen(false)}
+                />
+            )}
+
+            {/* ── Edit Table Modal ── */}
+            {editingTable && (
+                <EditTableModal
+                    table={editingTable}
+                    venueId={venue.id}
+                    existingAreas={areas}
+                    onSaved={() => {
+                        fetchData();
+                    }}
+                    onDeleteRequest={() => {
+                        setDeletingTable(editingTable);
+                        setEditingTable(null);
+                    }}
+                    onClose={() => setEditingTable(null)}
+                />
+            )}
+
+            {/* ── Delete Table Confirm Modal ── */}
+            <ConfirmModal
+                isOpen={!!deletingTable}
+                title={`Delete Table ${deletingTable ? String(deletingTable.table_number).padStart(2, "0") : ""}?`}
+                body={`Are you sure you want to remove Table ${deletingTable ? String(deletingTable.table_number).padStart(2, "0") : ""} from ${deletingTable?.area}? Customers will no longer be able to scan or open tabs on this table.`}
+                confirmLabel="Delete Table"
+                cancelLabel="Cancel"
+                isDanger
+                swapButtons
+                onConfirm={async () => {
+                    if (!deletingTable?.id) return;
+                    const { data: ok } = await db.deleteTable(deletingTable.id, venue.id);
+                    if (ok) {
+                        toast.success(`Table ${String(deletingTable.table_number).padStart(2, "0")} deleted.`);
+                        setSelectedId(null);
+                        setDeletingTable(null);
+                        fetchData();
+                    } else {
+                        toast.error("Could not delete table.");
+                        setDeletingTable(null);
+                    }
+                }}
+                onClose={() => setDeletingTable(null)}
+            />
+        </div>
+    );
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   EDIT TABLE MODAL
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+function EditTableModal({
+    table,
+    venueId,
+    existingAreas,
+    onSaved,
+    onDeleteRequest,
+    onClose,
+}: {
+    table: FloorTable;
+    venueId: string;
+    existingAreas: string[];
+    onSaved: () => void;
+    onDeleteRequest?: () => void;
+    onClose: () => void;
+}) {
+    const defaultAreas = Array.from(new Set(["Main Hall", "VIP Lounge", "Bar", "Outdoor", "Private", ...existingAreas]));
+    const [tableNumber, setTableNumber] = useState<number>(table.table_number);
+    const [selectedArea, setSelectedArea] = useState<string>(
+        defaultAreas.includes(table.area) ? table.area : "__custom__"
+    );
+    const [customArea, setCustomArea] = useState<string>(
+        defaultAreas.includes(table.area) ? "" : table.area
+    );
+    const [capacity, setCapacity] = useState<number>(table.capacity);
+    const [saving, setSaving] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+
+    const handleSave = async () => {
+        const areaToUse = selectedArea === "__custom__" ? customArea.trim() : selectedArea;
+        if (!areaToUse) {
+            setError("Please select or enter a seating area.");
+            return;
+        }
+        if (!tableNumber || tableNumber <= 0) {
+            setError("Please enter a valid table number.");
+            return;
+        }
+        if (!capacity || capacity <= 0) {
+            setError("Please enter a valid capacity.");
+            return;
+        }
+
+        setError(null);
+        setSaving(true);
+        const { data, error: err } = await db.updateTable(table.id, venueId, {
+            tableNumber,
+            capacity,
+            area: areaToUse,
+        });
+        setSaving(false);
+
+        if (err || !data) {
+            setError(err?.message || "Could not update table.");
+            return;
+        }
+
+        toast.success(`Table ${String(tableNumber).padStart(2, "0")} updated!`);
+        onSaved();
+        onClose();
+    };
+
+    return (
+        <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center px-4">
+            <div className="absolute inset-0 bg-licorice/50 backdrop-blur-sm" onClick={onClose} />
+            <div className="relative w-full max-w-md rounded-t-[1.5rem] md:rounded-[1.5rem] bg-white shadow-2xl overflow-hidden">
+                <div className="flex items-center justify-between border-b border-isabelline px-5 py-3">
+                    <div>
+                        <h3 className="text-[14px] font-bold tracking-tight text-licorice">Edit Table {String(table.table_number).padStart(2, "0")}</h3>
+                    </div>
+                    <button type="button" onClick={onClose} aria-label="Close" className="flex h-8 w-8 items-center justify-center rounded-full bg-isabelline text-licorice">
+                        <XMarkIcon className="h-4 w-4" strokeWidth={2.25} />
+                    </button>
+                </div>
+
+                <div className="space-y-4 px-5 py-4">
+                    <div className="grid grid-cols-2 gap-3">
+                        <div>
+                            <label className="text-xs font-bold uppercase text-feldgrau">Table Number</label>
+                            <input
+                                type="number"
+                                min={1}
+                                value={tableNumber === 0 ? "" : tableNumber}
+                                onChange={(e) => setTableNumber(e.target.value === "" ? 0 : Math.max(1, parseInt(e.target.value, 10) || 1))}
+                                className="mt-1 w-full rounded-lg bg-isabelline px-3 py-2 font-mono text-[13px] font-bold tabular-nums text-licorice ring-1 ring-licorice/8 focus:outline-none focus:ring-2 focus:ring-licorice/20"
+                            />
+                        </div>
+                        <div>
+                            <label className="text-xs font-bold uppercase text-feldgrau">Capacity (Seats)</label>
+                            <input
+                                type="number"
+                                min={1}
+                                value={capacity === 0 ? "" : capacity}
+                                onChange={(e) => setCapacity(e.target.value === "" ? 0 : Math.max(1, parseInt(e.target.value, 10) || 1))}
+                                className="mt-1 w-full rounded-lg bg-isabelline px-3 py-2 font-mono text-[13px] font-bold tabular-nums text-licorice ring-1 ring-licorice/8 focus:outline-none focus:ring-2 focus:ring-licorice/20"
+                            />
+                        </div>
+                    </div>
+
+                    <div>
+                        <label className="text-xs font-bold uppercase text-feldgrau">Seating Area</label>
+                        <div className="mt-1.5 grid grid-cols-2 gap-2">
+                            {defaultAreas.map((areaName) => (
+                                <button
+                                    key={areaName}
+                                    type="button"
+                                    onClick={() => setSelectedArea(areaName)}
+                                    className={clsx(
+                                        "rounded-lg py-2 px-3 text-left text-xs font-bold tracking-tight transition-all active:scale-95",
+                                        selectedArea === areaName ? "bg-licorice text-isabelline shadow-sm" : "bg-isabelline text-feldgrau ring-1 ring-licorice/8",
+                                    )}
+                                >
+                                    {areaName}
+                                </button>
+                            ))}
+                            <button
+                                type="button"
+                                onClick={() => setSelectedArea("__custom__")}
+                                className={clsx(
+                                    "rounded-lg py-2 px-3 text-left text-xs font-bold tracking-tight transition-all active:scale-95 border-dashed border border-licorice/20",
+                                    selectedArea === "__custom__" ? "bg-licorice text-isabelline shadow-sm border-solid" : "bg-isabelline text-feldgrau ring-1 ring-licorice/8",
+                                )}
+                            >
+                                + New Area…
+                            </button>
+                        </div>
+
+                        {selectedArea === "__custom__" && (
+                            <div className="mt-2.5">
+                                <label className="text-[11px] font-bold uppercase text-feldgrau/70">Custom Area Name</label>
+                                <input
+                                    type="text"
+                                    autoFocus
+                                    value={customArea}
+                                    onChange={(e) => setCustomArea(e.target.value)}
+                                    placeholder="e.g. Rooftop, Terrace, Patio…"
+                                    className="mt-1 w-full rounded-lg bg-isabelline px-3 py-2 text-[12px] text-licorice placeholder:text-feldgrau/50 ring-1 ring-licorice/8 focus:outline-none focus:ring-2 focus:ring-licorice/20"
+                                />
+                            </div>
+                        )}
+                    </div>
+
+                    {error && (
+                        <p className="rounded-lg bg-red-50 px-3 py-2 text-xs font-semibold tracking-tight text-red-700">{error}</p>
+                    )}
+                </div>
+
+                <div className="flex items-center justify-between border-t border-isabelline px-5 py-3">
+                    {onDeleteRequest ? (
+                        <button
+                            type="button"
+                            onClick={onDeleteRequest}
+                            disabled={table.status === "occupied"}
+                            className="inline-flex items-center gap-1 rounded-full bg-red-50 px-3 py-1.5 text-xs font-bold tracking-tight text-dark-red ring-1 ring-dark-red/20 transition-all hover:bg-red-100 active:scale-95 disabled:opacity-40"
+                            title={table.status === "occupied" ? "Cannot delete occupied table" : "Delete table"}
+                        >
+                            <TrashIcon className="h-3.5 w-3.5" strokeWidth={2.25} />
+                            Delete Table
+                        </button>
+                    ) : <div />}
+
+                    <button
+                        type="button"
+                        onClick={handleSave}
+                        disabled={saving || (selectedArea === "__custom__" && !customArea.trim())}
+                        className="inline-flex items-center gap-1 rounded-full bg-licorice px-4 py-2 text-xs font-bold tracking-tight text-isabelline shadow-sm disabled:opacity-40"
+                    >
+                        {saving ? "Saving…" : (
+                            <>
+                                <CheckIcon className="h-3.5 w-3.5" strokeWidth={2.5} />
+                                Save Changes
+                            </>
+                        )}
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   ADD TABLE / AREA MODAL
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+function AddTableModal({
+    venueId,
+    existingAreas,
+    maxTableNum,
+    onCreated,
+    onClose,
+}: {
+    venueId: string;
+    existingAreas: string[];
+    maxTableNum: number;
+    onCreated: (newTableId: string) => void;
+    onClose: () => void;
+}) {
+    const defaultAreas = Array.from(new Set(["Main Hall", "VIP Lounge", "Bar", "Outdoor", "Private", ...existingAreas]));
+    const [tableNumber, setTableNumber] = useState<number>(maxTableNum + 1);
+    const [selectedArea, setSelectedArea] = useState<string>(defaultAreas[0]);
+    const [customArea, setCustomArea] = useState<string>("");
+    const [capacity, setCapacity] = useState<number>(4);
+    const [saving, setSaving] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+
+    const handleCreate = async () => {
+        const areaToUse = selectedArea === "__custom__" ? customArea.trim() : selectedArea;
+        if (!areaToUse) {
+            setError("Please select or enter a seating area.");
+            return;
+        }
+        if (!tableNumber || tableNumber <= 0) {
+            setError("Please enter a valid table number.");
+            return;
+        }
+        if (!capacity || capacity <= 0) {
+            setError("Please enter a valid capacity.");
+            return;
+        }
+
+        setError(null);
+        setSaving(true);
+        const { data, error: err } = await db.createTable({
+            venueId,
+            tableNumber,
+            capacity,
+            area: areaToUse,
+            tableLabel: `Table ${String(tableNumber).padStart(2, "0")}`,
+        });
+        setSaving(false);
+
+        if (err || !data) {
+            setError(err?.message || "Could not create table. Table number may already exist.");
+            return;
+        }
+
+        toast.success(`Table ${String(tableNumber).padStart(2, "0")} added to ${areaToUse}!`);
+        onCreated(data.id);
+        onClose();
+    };
+
+    return (
+        <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center px-4">
+            <div className="absolute inset-0 bg-licorice/50 backdrop-blur-sm" onClick={onClose} />
+            <div className="relative w-full max-w-md rounded-t-[1.5rem] md:rounded-[1.5rem] bg-white shadow-2xl overflow-hidden">
+                <div className="flex items-center justify-between border-b border-isabelline px-5 py-3">
+                    <div>
+                        <h3 className="text-[14px] font-bold tracking-tight text-licorice">Add New Table / Area</h3>
+                    </div>
+                    <button type="button" onClick={onClose} aria-label="Close" className="flex h-8 w-8 items-center justify-center rounded-full bg-isabelline text-licorice">
+                        <XMarkIcon className="h-4 w-4" strokeWidth={2.25} />
+                    </button>
+                </div>
+
+                <div className="space-y-4 px-5 py-4">
+                    <div className="grid grid-cols-2 gap-3">
+                        <div>
+                            <label className="text-xs font-bold uppercase text-feldgrau">Table Number</label>
+                            <input
+                                type="number"
+                                min={1}
+                                value={tableNumber === 0 ? "" : tableNumber}
+                                onChange={(e) => setTableNumber(e.target.value === "" ? 0 : Math.max(1, parseInt(e.target.value, 10) || 1))}
+                                className="mt-1 w-full rounded-lg bg-isabelline px-3 py-2 font-mono text-[13px] font-bold tabular-nums text-licorice ring-1 ring-licorice/8 focus:outline-none focus:ring-2 focus:ring-licorice/20"
+                            />
+                        </div>
+                        <div>
+                            <label className="text-xs font-bold uppercase text-feldgrau">Capacity (Seats)</label>
+                            <input
+                                type="number"
+                                min={1}
+                                value={capacity === 0 ? "" : capacity}
+                                onChange={(e) => setCapacity(e.target.value === "" ? 0 : Math.max(1, parseInt(e.target.value, 10) || 1))}
+                                className="mt-1 w-full rounded-lg bg-isabelline px-3 py-2 font-mono text-[13px] font-bold tabular-nums text-licorice ring-1 ring-licorice/8 focus:outline-none focus:ring-2 focus:ring-licorice/20"
+                            />
+                        </div>
+                    </div>
+
+                    <div>
+                        <label className="text-xs font-bold uppercase text-feldgrau">Seating Area</label>
+                        <div className="mt-1.5 grid grid-cols-2 gap-2">
+                            {defaultAreas.map((areaName) => (
+                                <button
+                                    key={areaName}
+                                    type="button"
+                                    onClick={() => setSelectedArea(areaName)}
+                                    className={clsx(
+                                        "rounded-lg py-2 px-3 text-left text-xs font-bold tracking-tight transition-all active:scale-95",
+                                        selectedArea === areaName ? "bg-licorice text-isabelline shadow-sm" : "bg-isabelline text-feldgrau ring-1 ring-licorice/8",
+                                    )}
+                                >
+                                    {areaName}
+                                </button>
+                            ))}
+                            <button
+                                type="button"
+                                onClick={() => setSelectedArea("__custom__")}
+                                className={clsx(
+                                    "rounded-lg py-2 px-3 text-left text-xs font-bold tracking-tight transition-all active:scale-95 border-dashed border border-licorice/20",
+                                    selectedArea === "__custom__" ? "bg-licorice text-isabelline shadow-sm border-solid" : "bg-isabelline text-feldgrau ring-1 ring-licorice/8",
+                                )}
+                            >
+                                + New Area…
+                            </button>
+                        </div>
+
+                        {selectedArea === "__custom__" && (
+                            <div className="mt-2.5">
+                                <label className="text-[11px] font-bold uppercase text-feldgrau/70">Custom Area Name</label>
+                                <input
+                                    type="text"
+                                    autoFocus
+                                    value={customArea}
+                                    onChange={(e) => setCustomArea(e.target.value)}
+                                    placeholder="e.g. Rooftop, Terrace, Patio…"
+                                    className="mt-1 w-full rounded-lg bg-isabelline px-3 py-2 text-[12px] text-licorice placeholder:text-feldgrau/50 ring-1 ring-licorice/8 focus:outline-none focus:ring-2 focus:ring-licorice/20"
+                                />
+                            </div>
+                        )}
+                    </div>
+
+                    {error && (
+                        <p className="rounded-lg bg-red-50 px-3 py-2 text-xs font-semibold tracking-tight text-red-700">{error}</p>
+                    )}
+                </div>
+
+                <div className="flex items-center justify-end border-t border-isabelline px-5 py-3">
+                    <button
+                        type="button"
+                        onClick={handleCreate}
+                        disabled={saving || (selectedArea === "__custom__" && !customArea.trim())}
+                        className="inline-flex items-center gap-1 rounded-full bg-licorice px-4 py-2 text-xs font-bold tracking-tight text-isabelline shadow-sm disabled:opacity-40"
+                    >
+                        {saving ? "Creating…" : (
+                            <>
+                                <CheckIcon className="h-3.5 w-3.5" strokeWidth={2.5} />
+                                Create Table
+                            </>
+                        )}
+                    </button>
+                </div>
+            </div>
         </div>
     );
 }

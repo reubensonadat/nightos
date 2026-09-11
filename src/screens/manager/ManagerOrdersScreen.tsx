@@ -22,6 +22,16 @@ type FlatOrder = {
   items: { product_name: string; quantity: number; line_total: number; notes: string | null }[];
 };
 
+type ManagerOrderRow = {
+  id: string;
+  status: OrderStatus;
+  guest_name?: string | null;
+  created_at: string;
+  notes?: string | null;
+  bills?: { tables?: { table_label?: string | null; table_number?: number } | { table_label?: string | null; table_number?: number }[] | null } | { tables?: { table_label?: string | null; table_number?: number } | { table_label?: string | null; table_number?: number }[] | null }[] | null;
+  order_items?: { quantity: number; line_total: number; product_name: string; notes?: string | null }[];
+};
+
 export function ManagerOrdersScreen({ venueId }: { venueId: string }) {
   const [orders, setOrders] = useState<FlatOrder[]>([]);
   const [loading, setLoading] = useState(true);
@@ -38,9 +48,10 @@ export function ManagerOrdersScreen({ venueId }: { venueId: string }) {
     setLoading(true);
     const { data, error } = await db.managerAllOrders(venueId, timeFilter);
     if (!error && data) {
-      const flattened: FlatOrder[] = data.map((d: any) => {
-        const table = Array.isArray(d.bills) ? d.bills[0]?.tables : d.bills?.tables;
-        const tableActual = Array.isArray(table) ? table[0] : table;
+      const rows = data as unknown as ManagerOrderRow[];
+      const flattened: FlatOrder[] = rows.map((d) => {
+        const bills = Array.isArray(d.bills) ? d.bills[0] : d.bills;
+        const tables = Array.isArray(bills?.tables) ? bills?.tables[0] : bills?.tables;
         const items = d.order_items || [];
         
         return {
@@ -48,15 +59,15 @@ export function ManagerOrdersScreen({ venueId }: { venueId: string }) {
           status: d.status,
           guestName: d.guest_name || "Walk-in",
           createdAt: d.created_at,
-          notes: d.notes,
-          tableLabel: tableActual?.table_label || `Table ${tableActual?.table_number || "—"}`,
-          itemCount: items.reduce((acc: number, item: any) => acc + item.quantity, 0),
-          totalAmount: items.reduce((acc: number, item: any) => acc + item.line_total, 0),
-          items: items.map((i: any) => ({
+          notes: d.notes || null,
+          tableLabel: tables?.table_label ? String(tables.table_label) : `Table ${tables?.table_number || "—"}`,
+          itemCount: items.reduce((acc, item) => acc + Number(item.quantity || 0), 0),
+          totalAmount: items.reduce((acc, item) => acc + Number(item.line_total || 0), 0),
+          items: items.map((i) => ({
             product_name: i.product_name,
             quantity: i.quantity,
-            line_total: i.line_total,
-            notes: i.notes
+            line_total: Number(i.line_total),
+            notes: i.notes || null
           }))
         };
       });
@@ -66,7 +77,13 @@ export function ManagerOrdersScreen({ venueId }: { venueId: string }) {
   }, [venueId, timeFilter]);
 
   useEffect(() => {
-    loadOrders();
+    let active = true;
+    Promise.resolve().then(() => {
+      if (active) void loadOrders();
+    });
+    return () => {
+      active = false;
+    };
   }, [loadOrders]);
 
   useRealtime({
@@ -129,7 +146,7 @@ export function ManagerOrdersScreen({ venueId }: { venueId: string }) {
             ].map(tf => (
               <button
                 key={tf.val}
-                onClick={() => setTimeFilter(tf.val as any)}
+                onClick={() => setTimeFilter(tf.val as typeof timeFilter)}
                 className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all ${
                   timeFilter === tf.val ? 'bg-white text-licorice shadow-sm ring-1 ring-licorice/5' : 'text-feldgrau hover:text-licorice'
                 }`}
@@ -143,7 +160,7 @@ export function ManagerOrdersScreen({ venueId }: { venueId: string }) {
             {['all', 'pending', 'confirmed', 'preparing', 'ready', 'served', 'cancelled'].map((s) => (
               <button
                 key={s}
-                onClick={() => setStatusFilter(s as any)}
+                onClick={() => setStatusFilter(s as typeof statusFilter)}
                 className={`whitespace-nowrap px-3.5 py-2 rounded-xl text-[13px] font-bold capitalize transition-all border ${
                   statusFilter === s 
                   ? 'bg-khaki text-licorice border-khaki shadow-sm' 

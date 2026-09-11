@@ -341,6 +341,8 @@ function HistoryCard({
 /* ────────────────────────── Main Screen ────────────────────────── */
 
 export function OrdersScreen({ activeOrders, history, tableLabel, tablePin, billId: _billId, sessionToken, venueName, onPayBill, onReorder: _onReorder, onBack, onCallWaiter, callingWaiter, waiterCalled }: Props & { venueName?: string | null; onBack?: () => void }) {
+  void _billId;
+  void _onReorder;
   const navigate = useNavigate();
   const hasActive = activeOrders.length > 0;
   const hasHistory = history.length > 0;

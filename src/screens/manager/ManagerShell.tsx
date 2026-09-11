@@ -1,10 +1,8 @@
 import { useState, type FormEvent, type ReactNode } from "react";
 import {
     ArrowRightIcon,
-    ArrowRightStartOnRectangleIcon,
     BanknotesIcon,
     Bars3Icon,
-    ChartBarIcon,
     ClipboardDocumentCheckIcon,
     ClipboardDocumentListIcon,
     DocumentChartBarIcon,
@@ -360,14 +358,6 @@ export function ManagerShell({ managerName, activePage, onPageChange, onSignOut,
                 <header className="hidden md:flex h-[60px] sticky top-0 z-20 items-center justify-between border-b border-licorice/8 bg-isabelline/95 backdrop-blur-xl px-8">
                     <div className="flex items-center gap-2">
                         <h1 className="text-[15px] font-bold tracking-tight text-licorice">{activeItem.label}</h1>
-                    </div>
-                    <div className="flex items-center gap-3">
-                        <span className="font-mono text-xs font-bold tabular-nums text-feldgrau">
-                            {new Date().toLocaleDateString("en-GH", { weekday: "short", month: "short", day: "numeric" })}
-                        </span>
-                        <span className="font-mono text-[12px] font-bold tabular-nums text-licorice">
-                            {new Date().toLocaleTimeString("en-GH", { hour: "2-digit", minute: "2-digit", hour12: false })}
-                        </span>
                     </div>
                 </header>
 

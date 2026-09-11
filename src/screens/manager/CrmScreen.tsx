@@ -82,7 +82,7 @@ export function CrmScreen() {
     }, [venue.id]);
 
     useEffect(() => {
-        // eslint-disable-next-line react-hooks/set-state-in-effect
+         
         // eslint-disable-next-line react-hooks/set-state-in-effect
         fetchPage(0);
         setPage(0);

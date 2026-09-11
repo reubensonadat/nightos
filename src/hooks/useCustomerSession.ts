@@ -195,7 +195,7 @@ export function useCustomerSession(venueId: string | null, tableId: string | nul
     if (!session) {
       const { data: newSession, error: createErr } = await supabase
         .from('customer_sessions')
-        // eslint-disable-next-line react-hooks/set-state-in-effect
+         
         .insert({
           venue_id: venueId,
           table_id: tableId,

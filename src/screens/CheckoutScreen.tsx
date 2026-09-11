@@ -126,7 +126,7 @@ export function CheckoutScreen({ total, billId, venueId, sessionToken, onBack, o
             };
         }
         // Fallback while the bill loads (legacy prop math, never used for charging)
-        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+         
         const sub = total / 1.225;
         return {
             subtotal: Math.round(sub * 100) / 100,

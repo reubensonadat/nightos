@@ -39,7 +39,7 @@ function loadBrand(): BrandColors {
             const parsed = JSON.parse(saved);
             return { ...DEFAULT_BRAND, ...parsed };
         }
-    // eslint-disable-next-line no-empty
+     
     // eslint-disable-next-line no-empty
     } catch {}
     return { ...DEFAULT_BRAND };
