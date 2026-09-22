@@ -665,6 +665,7 @@ export function FloorplanScreen() {
                 <AddTableModal
                     venueId={venue.id}
                     existingAreas={areas}
+                    existingTables={tables}
                     maxTableNum={tables.length > 0 ? Math.max(...tables.map((t) => t.table_number)) : 0}
                     onCreated={(newId) => {
                         setSelectedId(newId);
@@ -680,6 +681,7 @@ export function FloorplanScreen() {
                     table={editingTable}
                     venueId={venue.id}
                     existingAreas={areas}
+                    existingTables={tables}
                     onSaved={() => {
                         fetchData();
                     }}
@@ -727,6 +729,7 @@ function EditTableModal({
     table,
     venueId,
     existingAreas,
+    existingTables = [],
     onSaved,
     onDeleteRequest,
     onClose,
@@ -734,6 +737,7 @@ function EditTableModal({
     table: FloorTable;
     venueId: string;
     existingAreas: string[];
+    existingTables?: FloorTable[];
     onSaved: () => void;
     onDeleteRequest?: () => void;
     onClose: () => void;
@@ -758,6 +762,10 @@ function EditTableModal({
         }
         if (!tableNumber || tableNumber <= 0) {
             setError("Please enter a valid table number.");
+            return;
+        }
+        if (existingTables.some((t) => t.id !== table.id && t.table_number === tableNumber)) {
+            setError(`Table number ${tableNumber} already exists. Please choose a different number.`);
             return;
         }
         if (!capacity || capacity <= 0) {
@@ -909,12 +917,14 @@ function EditTableModal({
 function AddTableModal({
     venueId,
     existingAreas,
+    existingTables = [],
     maxTableNum,
     onCreated,
     onClose,
 }: {
     venueId: string;
     existingAreas: string[];
+    existingTables?: FloorTable[];
     maxTableNum: number;
     onCreated: (newTableId: string) => void;
     onClose: () => void;
@@ -935,6 +945,10 @@ function AddTableModal({
         }
         if (!tableNumber || tableNumber <= 0) {
             setError("Please enter a valid table number.");
+            return;
+        }
+        if (existingTables.some((t) => t.table_number === tableNumber)) {
+            setError(`Table number ${tableNumber} already exists in this venue. Please choose a different number.`);
             return;
         }
         if (!capacity || capacity <= 0) {

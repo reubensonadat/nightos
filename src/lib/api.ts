@@ -360,7 +360,19 @@ export const db = {
     tableLabel?: string;
   }) => {
     cacheInvalidate(`tables:${args.venueId}`);
-    const token = `VL-TABLE-${String(args.tableNumber).padStart(2, '0')}`;
+    const { data: existing } = await supabase
+      .from('tables')
+      .select('id')
+      .eq('venue_id', args.venueId)
+      .eq('table_number', args.tableNumber)
+      .maybeSingle();
+
+    if (existing) {
+      return { data: null, error: { message: `Table number ${args.tableNumber} already exists in this venue.` } };
+    }
+
+    const randomSuffix = Math.random().toString(36).substring(2, 8);
+    const token = `VL-TABLE-${String(args.tableNumber).padStart(2, '0')}-${randomSuffix}`;
     const label = args.tableLabel || `Table ${String(args.tableNumber).padStart(2, '0')}`;
     const { data, error } = await supabase
       .from('tables')
@@ -376,12 +388,31 @@ export const db = {
       .select()
       .single();
 
+    if (error && (error.code === '23505' || error.message?.includes('tables_venue_id_table_number_key'))) {
+      return { data: null, error: { message: `Table number ${args.tableNumber} already exists in this venue.` } };
+    }
+
     return { data, error };
   },
 
   updateTable: async (id: string, venueId: string, updates: { tableNumber?: number; capacity?: number; area?: string }) => {
     cacheInvalidate(`tables:${venueId}`);
     cacheInvalidate(`table:id:${id}`);
+
+    if (updates.tableNumber !== undefined) {
+      const { data: existing } = await supabase
+        .from('tables')
+        .select('id')
+        .eq('venue_id', venueId)
+        .eq('table_number', updates.tableNumber)
+        .neq('id', id)
+        .maybeSingle();
+
+      if (existing) {
+        return { data: null, error: { message: `Table number ${updates.tableNumber} already exists in this venue.` } };
+      }
+    }
+
     const patch: Record<string, unknown> = {};
     if (updates.tableNumber !== undefined) {
       patch.table_number = updates.tableNumber;
@@ -396,6 +427,10 @@ export const db = {
       .eq('id', id)
       .select()
       .single();
+
+    if (error && (error.code === '23505' || error.message?.includes('tables_venue_id_table_number_key'))) {
+      return { data: null, error: { message: `Table number ${updates.tableNumber} already exists in this venue.` } };
+    }
 
     return { data, error };
   },
