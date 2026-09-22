@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import {
     ArrowRightIcon,
     UserGroupIcon,
+    QrCodeIcon,
 } from "@heroicons/react/24/outline";
 import { formatGHS, formatGHSString } from "../../data/menu";
 import { db } from "../../lib/api";
@@ -10,6 +11,7 @@ import { useRealtime } from "../../hooks/useRealtime";
 import signoutBlackIcon from "../../assets/sign-out-black.svg";
 import bellRingingIcon from "../../assets/bell-ringing.svg";
 import { SignOutModal } from "../../components/SignOutModal";
+import { PrintableQrModal } from "../../components/PrintableQrModal";
 import toast from "react-hot-toast";
 import { sounds } from "../../lib/sound";
 
@@ -31,6 +33,8 @@ export type Table = {
     waiterId?: string;
     server?: string;
     assistanceType?: 'call_waiter' | 'cash_settlement';
+    qrCodeToken?: string;
+    area?: string;
 };
 
 /* ────────────────────────── Soft Star SVG ────────────────────────── */
@@ -146,6 +150,8 @@ function transformToTables(
                 waiterId: isWaiteronDuty && waiterId ? waiterId : undefined,
                 server: isWaiteronDuty && waiterId ? (waiterNames[waiterId] ?? undefined) : undefined,
                 assistanceType: (bill.assistance_type as 'call_waiter' | 'cash_settlement') || undefined,
+                qrCodeToken: (t.qr_code_token as string) || undefined,
+                area: (t.area as string) || undefined,
             };
         }
         return {
@@ -153,6 +159,8 @@ function transformToTables(
             number: t.table_number as number,
             label: t.table_label as string,
             status: 'available' as const,
+            qrCodeToken: (t.qr_code_token as string) || undefined,
+            area: (t.area as string) || undefined,
         };
     });
 }
@@ -163,6 +171,7 @@ export function TablesDashboard({ venueId, staffName, staffId, onSignOut }: Prop
     const [filter, setFilter] = useState<Filter>("all");
     const [loading, setLoading] = useState(true);
     const [isSignOutModalOpen, setIsSignOutModalOpen] = useState(false);
+    const [selectedQrTable, setSelectedQrTable] = useState<Table | null>(null);
     const [tablesManaged, setTablesManaged] = useState(0);
     const [, setNowTick] = useState(0);
     const reloadTimer = useRef<number | null>(null);
@@ -450,6 +459,19 @@ export function TablesDashboard({ venueId, staffName, staffId, onSignOut }: Prop
                                             </p>
                                         </div>
                                         <div className="flex items-center gap-2">
+                                            {table.qrCodeToken && (
+                                                <button
+                                                    type="button"
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        setSelectedQrTable(table);
+                                                    }}
+                                                    className="flex h-7 w-7 items-center justify-center rounded-full bg-licorice/5 text-licorice/70 hover:bg-licorice hover:text-white transition-colors shrink-0"
+                                                    title="View / Download Printable QR Card"
+                                                >
+                                                    <QrCodeIcon className="h-3.5 w-3.5" strokeWidth={2.25} />
+                                                </button>
+                                            )}
                                             {table.assistanceType && (
                                                 <div
                                                     className="flex h-[33px] w-[33px] items-center justify-center rounded-full bg-white shadow-sm ring-1 ring-licorice/10 overflow-hidden p-1 shrink-0"
@@ -579,6 +601,18 @@ export function TablesDashboard({ venueId, staffName, staffId, onSignOut }: Prop
                 }}
                 tablesManaged={tablesManaged}
             />
+
+            {selectedQrTable && selectedQrTable.qrCodeToken && (
+                <PrintableQrModal
+                    isOpen={Boolean(selectedQrTable)}
+                    onClose={() => setSelectedQrTable(null)}
+                    tableNumber={selectedQrTable.number}
+                    tableLabel={selectedQrTable.label}
+                    area={selectedQrTable.area}
+                    venueName="VELVET LOUNGE"
+                    qrCodeToken={selectedQrTable.qrCodeToken}
+                />
+            )}
         </main>
     );
 }

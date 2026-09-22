@@ -355,7 +355,7 @@ export function ManagerShell({ managerName, activePage, onPageChange, onSignOut,
               ═══════════════════════════════════════════════════════════ */}
             <div className="md:pl-64">
                 {/* Desktop top bar */}
-                <header className="hidden md:flex h-[60px] sticky top-0 z-20 items-center justify-between border-b border-licorice/8 bg-isabelline/95 backdrop-blur-xl px-8">
+                <header className="hidden md:flex h-[60px] sticky top-0 z-30 items-center justify-between border-b border-licorice/8 bg-isabelline/95 backdrop-blur-xl px-8">
                     <div className="flex items-center gap-2">
                         <h1 className="text-[15px] font-bold tracking-tight text-licorice">{activeItem.label}</h1>
                     </div>
