@@ -64,9 +64,6 @@ export async function uploadToR2(
   venueId: string,
   folder: 'products' | 'logos' | 'venue' = 'products'
 ): Promise<{ url: string; key: string }> {
-  const { data: { user }, error: userError } = await supabase.auth.getUser()
-  if (userError || !user) throw new Error('You must be logged in to upload files.')
-
   const uploadFile = await compressImage(file)
 
   const { data, error } = await supabase.functions.invoke('generate-upload-url', {
