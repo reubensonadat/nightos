@@ -104,10 +104,11 @@ export function ShiftReportScreen({ isModal = false, onClose }: Props) {
     const [error, setError] = useState<string | null>(null);
 
     // Raw datasets from Supabase
-    const [payments, setPayments] = useState<Record<string, unknown>[]>([]);
-    const [bills, setBills] = useState<Record<string, unknown>[]>([]);
-    const [submissions, setSubmissions] = useState<Record<string, unknown>[]>([]);
-    const [staffList, setStaffList] = useState<Record<string, unknown>[]>([]);
+    const [payments, setPayments] = useState<any[]>([]);
+    const [bills, setBills] = useState<any[]>([]);
+    const [submissions, setSubmissions] = useState<any[]>([]);
+    const [staffList, setStaffList] = useState<any[]>([]);
+    const [shifts, setShifts] = useState<any[]>([]);
     const [lastRefreshed, setLastRefreshed] = useState<Date>(new Date());
 
     // Cash drawer reconciliation inputs
