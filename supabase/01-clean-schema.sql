@@ -618,17 +618,7 @@ BEGIN
     ORDER BY COUNT(b.id) ASC
     LIMIT 1;
 
-    -- Tier 2 Fallback: Any active waiter in the venue
-    IF v_best_waiter_id IS NULL THEN
-        SELECT s.id INTO v_best_waiter_id
-        FROM public.staff s
-        WHERE s.venue_id = v_bill.venue_id
-          AND s.role = 'waiter'
-          AND s.is_active = true
-        ORDER BY s.created_at ASC
-        LIMIT 1;
-    END IF;
-
+    -- If an active clocked-in waiter is found, assign them; otherwise leave unassigned (NULL)
     IF v_best_waiter_id IS NOT NULL THEN
         UPDATE public.bills SET waiter_id = v_best_waiter_id WHERE id = p_bill_id;
     END IF;

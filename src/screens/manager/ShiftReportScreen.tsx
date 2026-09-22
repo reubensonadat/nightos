@@ -1,19 +1,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-    ArrowDownTrayIcon,
-    ArrowPathIcon,
     BanknotesIcon,
     CalendarIcon,
     CheckBadgeIcon,
-    ClockIcon,
     CreditCardIcon,
     DevicePhoneMobileIcon,
     ExclamationTriangleIcon,
-    NoSymbolIcon,
     PrinterIcon,
     ShoppingCartIcon,
     UserGroupIcon,
-    UserIcon,
     XMarkIcon,
 } from "@heroicons/react/24/outline";
 import {
@@ -23,7 +18,7 @@ import {
     ResponsiveContainer,
     Tooltip,
 } from "recharts";
-import { formatGHS, formatGHSString } from "../../data/menu";
+import { formatGHS } from "../../data/menu";
 import { db } from "../../lib/api";
 import { useVenue } from "../../hooks/useVenue";
 import { useRealtime } from "../../hooks/useRealtime";
@@ -203,7 +198,13 @@ export function ShiftReportScreen({ isModal = false, onClose }: Props) {
     }, [venue.id, sinceIso, untilIso]);
 
     useEffect(() => {
-        loadShiftData(true);
+        let active = true;
+        Promise.resolve().then(() => {
+            if (active) void loadShiftData(true);
+        });
+        return () => {
+            active = false;
+        };
     }, [loadShiftData]);
 
     const handleRealtimeUpdate = useCallback(() => {
@@ -389,8 +390,8 @@ export function ShiftReportScreen({ isModal = false, onClose }: Props) {
             }
 
             const items = s.order_items ?? [];
-            const subTotal = items.reduce((sum: number, it: any) => sum + Number(it.line_total || 0), 0);
-            const itemCount = items.reduce((sum: number, it: any) => sum + Number(it.quantity || 1), 0);
+            const subTotal = items.reduce((sum: number, it: { line_total?: number }) => sum + Number(it.line_total || 0), 0);
+            const itemCount = items.reduce((sum: number, it: { quantity?: number }) => sum + Number(it.quantity || 1), 0);
 
             if (s.status === "cancelled") {
                 cur.cancelledCount += 1;
@@ -489,10 +490,6 @@ export function ShiftReportScreen({ isModal = false, onClose }: Props) {
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-licorice/8 pb-5">
                 <div>
                     <div className="flex items-center gap-2">
-                        <span className="inline-flex items-center gap-1.5 rounded-full bg-khaki/20 px-2.5 py-0.5 text-xs font-bold uppercase tracking-wider text-khaki">
-                            <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                            Shift Report
-                        </span>
                         <span className="text-xs font-bold text-feldgrau">
                             Updated {lastRefreshed.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })}
                         </span>
@@ -543,15 +540,6 @@ export function ShiftReportScreen({ isModal = false, onClose }: Props) {
 
                     <button
                         type="button"
-                        onClick={() => void loadShiftData(true)}
-                        title="Refresh numbers"
-                        className="rounded-full bg-white p-2 text-feldgrau ring-1 ring-licorice/8 hover:bg-isabelline hover:text-licorice transition-all shadow-sm active:scale-95"
-                    >
-                        <ArrowPathIcon className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
-                    </button>
-
-                    <button
-                        type="button"
                         onClick={handlePrint}
                         className="inline-flex items-center gap-1.5 rounded-full bg-white text-licorice px-3.5 py-2 text-xs font-bold ring-1 ring-licorice/8 hover:bg-isabelline active:scale-95 transition-all shadow-sm"
                     >
@@ -577,15 +565,15 @@ export function ShiftReportScreen({ isModal = false, onClose }: Props) {
             <div className="flex items-center gap-2 overflow-x-auto no-scrollbar py-4 border-b border-licorice/5">
                 {[
                     { id: "overview", label: "Overview & KPIs" },
-                    { id: "payments", label: `Payment Methods (${paymentMethodsSummary.length})` },
-                    { id: "staff", label: `Staff Performance (${staffPerformance.length})` },
-                    { id: "voids", label: `Voids & Discounts (${voidDetails.length + cancelledBillsCount})` },
+                    { id: "payments", label: "Payment Methods" },
+                    { id: "staff", label: "Staff Performance" },
+                    { id: "voids", label: "Voids & Discounts" },
                     { id: "reconciliation", label: "Cash Reconciliation" },
                 ].map((tab) => (
                     <button
                         key={tab.id}
                         type="button"
-                        onClick={() => setActiveTab(tab.id as any)}
+                        onClick={() => setActiveTab(tab.id as typeof activeTab)}
                         className={`rounded-full px-4 py-1.5 text-xs font-bold transition-all whitespace-nowrap ${
                             activeTab === tab.id
                                 ? "bg-licorice text-isabelline shadow-sm"

@@ -19,13 +19,12 @@ import { type OrderSummary } from "./screens/OrderTrackingScreen";
 import { OrdersScreen } from "./screens/OrdersScreen";
 import { CustomerBottomNav } from "./components/CustomerBottomNav";
 import { PartyPrompt } from "./components/PartyPrompt";
-import { TablePinBanner } from "./components/TablePinBanner";
 import { TablePinModal } from "./components/TablePinModal";
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
+ 
 import { ClockIcon } from "@heroicons/react/24/outline";
 
 import { StaffAuthScreen } from "./screens/waiter/StaffAuthScreen";
- 
+
 import { TablesDashboard } from "./screens/waiter/TablesDashboard";
 import { OrderManagementScreen } from "./screens/waiter/OrderManagementScreen";
 import { TableOperationsScreen } from "./screens/waiter/TableOperationsScreen";
@@ -44,12 +43,12 @@ import { StaffManagerScreen } from "./screens/manager/StaffManagerScreen";
 import { ShiftReportScreen } from "./screens/manager/ShiftReportScreen";
 import { FinancialReportsScreen } from "./screens/manager/FinancialReportsScreen";
 import { CrmScreen } from "./screens/manager/CrmScreen";
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
+ 
 import { ReservationsScreen } from "./screens/ReservationsScreen";
 import { useVenue } from "./hooks/useVenue";
 import { useQrTable } from "./hooks/useQrTable";
 import { useCustomerSession } from "./hooks/useCustomerSession";
- 
+
 import { db, type DbTable } from "./lib/api";
 
 type NavTab = "menu" | "tab" | "orders";
@@ -84,10 +83,28 @@ function CustomerShell({ venueId, tableId, tableLabel }: { venueId: string; tabl
 
   const { session, bill, waiter, isNewTab, loading: sessionLoading, error: sessionError, updateParty } = useCustomerSession(venueId, tableId);
 
+  const [callingWaiter, setCallingWaiter] = useState(false);
+  const [waiterCalled, setWaiterCalled] = useState(false);
+
+  const handleCallWaiter = useCallback(async () => {
+    if (!bill?.id || callingWaiter) return;
+    setCallingWaiter(true);
+    try {
+      const { error } = await db.requestWaiterAssistance(bill.id, 'call_waiter', session?.session_token);
+      if (error) throw error;
+      setWaiterCalled(true);
+      toast.success("🛎️ Your waiter has been notified and will be right over!");
+    } catch {
+      toast.error("Could not notify waiter. Please try again.");
+    } finally {
+      setCallingWaiter(false);
+    }
+  }, [bill, callingWaiter, session]);
+
   // Table PIN Security State
-  // eslint-disable-next-line no-empty
+   
   const [pinInputVerified, setPinInputVerified] = useState<boolean>(false);
-  // eslint-disable-next-line react-hooks/set-state-in-effect
+   
   const pinUnlocked = useMemo(() => {
     if (!bill?.table_pin) return true;
     if (pinInputVerified) return true;
@@ -98,7 +115,7 @@ function CustomerShell({ venueId, tableId, tableLabel }: { venueId: string; tabl
     }
   }, [bill, pinInputVerified]);
 
-  // eslint-disable-next-line no-empty
+   
   // "How many of you?" prompt ONLY when initializing a fresh new tab
   // (no existing open bill or PIN already present on the table before this scan).
   // If an open bill already existed on the table, joining guests skip the prompt.
@@ -125,15 +142,16 @@ function CustomerShell({ venueId, tableId, tableLabel }: { venueId: string; tabl
     async (partySize: number, guestName?: string) => {
       const { error } = await updateParty(partySize, guestName);
       if (error) {
-        // eslint-disable-next-line react-hooks/set-state-in-effect
+         
         toast.error(String(error));
         return;
       }
-      // eslint-disable-next-line no-empty
+       
       try { localStorage.setItem(`nightos:party:${session?.id ?? ''}`, "1"); } catch { /* ignore */ }
       setPartyPromptOpen(false);
+      setTab("menu");
     },
-    [updateParty, session],
+    [updateParty, session, setTab],
   );
 
   useEffect(() => {
@@ -142,18 +160,18 @@ function CustomerShell({ venueId, tableId, tableLabel }: { venueId: string; tabl
       .then(
         ({ data }) => {
           if (!cancelled && data) setVenueName(data.name);
-        // eslint-disable-next-line react-hooks/set-state-in-effect
+           
         },
-        () => {},
+        () => { },
       );
-    // eslint-disable-next-line no-empty
+     
     return () => {
       cancelled = true;
     };
   }, [venueId]);
 
   // ── Load live orders for this table's open bill from the database ──
-  // eslint-disable-next-line no-empty
+   
   const [ordersRevision, setOrdersRevision] = useState(0);
   const triggerReload = useCallback(() => setOrdersRevision((r) => r + 1), []);
 
@@ -196,7 +214,7 @@ function CustomerShell({ venueId, tableId, tableLabel }: { venueId: string; tabl
               })),
             };
           }),
-        // eslint-disable-next-line react-hooks/exhaustive-deps
+           
         );
 
         if (cancelled) return;
@@ -264,7 +282,7 @@ function CustomerShell({ venueId, tableId, tableLabel }: { venueId: string; tabl
           </p>
           <button
             onClick={() => {
-              try { sessionStorage.removeItem('nightos:current_session_id') } catch {}
+              try { sessionStorage.removeItem('nightos:current_session_id') } catch (e) { console.error(e) }
               window.location.reload()
             }}
             className="mt-8 px-8 py-3.5 bg-licorice text-[14px] text-isabelline font-bold rounded-full transition-transform active:scale-95"
@@ -310,6 +328,8 @@ function CustomerShell({ venueId, tableId, tableLabel }: { venueId: string; tabl
           waiterName={waiter?.name ?? null}
           tablePin={pinUnlocked && bill?.table_pin ? bill.table_pin : null}
           partySize={bill?.guest_count || session?.party_size}
+          billId={bill?.id}
+          sessionToken={session?.session_token}
           onEditParty={tableId ? () => setPartyPromptOpen(true) : undefined}
           onViewCart={() => setTab("tab")}
         />
@@ -324,7 +344,11 @@ function CustomerShell({ venueId, tableId, tableLabel }: { venueId: string; tabl
           customerSessionId={session?.id}
           sessionToken={session?.session_token}
           onBack={() => setTab("menu")}
+          onContinueShopping={() => setTab("menu")}
           onOrderSent={handleOrderSent}
+          onCallWaiter={bill?.id ? handleCallWaiter : undefined}
+          callingWaiter={callingWaiter}
+          waiterCalled={waiterCalled}
         />
       )}
       {tab === "orders" && (
@@ -338,6 +362,9 @@ function CustomerShell({ venueId, tableId, tableLabel }: { venueId: string; tabl
           sessionToken={session?.session_token}
           onPayBill={setPayingOrder}
           onBack={() => setTab("tab")}
+          onCallWaiter={bill?.id ? handleCallWaiter : undefined}
+          callingWaiter={callingWaiter}
+          waiterCalled={waiterCalled}
         />
       )}
       <CustomerBottomNav activeTab={tab} onTabChange={setTab} cartCount={itemCount} />
@@ -360,6 +387,7 @@ function CustomerShell({ venueId, tableId, tableLabel }: { venueId: string; tabl
           tableLabel={tableLabel}
           initialSize={bill?.guest_count || session?.party_size || 1}
           onConfirm={handlePartyConfirm}
+          onClose={() => setPartyPromptOpen(false)}
         />
       )}
     </div>
@@ -514,7 +542,7 @@ function AppShell() {
 
   const handleStaffSignOut = () => {
     const staffId = staffSession?.id;
-    if (staffId) db.clockOutStaff(staffId).catch(() => {});
+    if (staffId) db.clockOutStaff(staffId).catch(() => { });
     signOut();
   };
 

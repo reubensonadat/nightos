@@ -7,6 +7,7 @@ type Props = {
     initialSize?: number;
     saving?: boolean;
     onConfirm: (partySize: number, guestName?: string) => Promise<void>;
+    onClose?: () => void;
 };
 
 /**
@@ -14,7 +15,8 @@ type Props = {
  * size (feeds waiter load balancing + guest counts) and an optional name,
  * then drops the guest straight into the menu.
  */
-export function PartyPrompt({ venueName, tableLabel, initialSize = 1, saving = false, onConfirm }: Props) {
+export function PartyPrompt({ venueName, tableLabel, initialSize = 1, saving = false, onConfirm, onClose }: Props) {
+    void onClose;
     const [size, setSize] = useState(initialSize);
     const [name, setName] = useState("");
     const [busy, setBusy] = useState(false);
@@ -33,8 +35,13 @@ export function PartyPrompt({ venueName, tableLabel, initialSize = 1, saving = f
     const increment = () => setSize((s) => Math.min(24, s + 1));
 
     return (
-        <div className="fixed inset-0 z-50 flex flex-col justify-end bg-licorice/60 backdrop-blur-sm">
-            <div className="mx-auto w-full max-w-md rounded-t-[2rem] bg-isabelline px-6 pt-8 pb-[max(env(safe-area-inset-bottom),24px)] shadow-[0_-24px_60px_rgba(35,20,12,0.35)]">
+        <div
+            className="fixed inset-0 z-50 flex flex-col justify-end bg-licorice/60 backdrop-blur-sm cursor-default"
+        >
+            <div
+                className="mx-auto w-full max-w-md rounded-t-[2rem] bg-isabelline px-6 pt-8 pb-[max(env(safe-area-inset-bottom),24px)] shadow-[0_-24px_60px_rgba(35,20,12,0.35)] cursor-default"
+                onClick={(e) => e.stopPropagation()}
+            >
                 <div className="mx-auto mb-5 h-1 w-10 rounded-full bg-licorice/15" />
 
                 <div className="flex items-start justify-between gap-3">

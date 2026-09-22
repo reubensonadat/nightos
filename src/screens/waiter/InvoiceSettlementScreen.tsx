@@ -8,7 +8,7 @@ import {
     DevicePhoneMobileIcon,
     ExclamationTriangleIcon,
 } from "@heroicons/react/24/outline";
-import { formatGHS } from "../../data/menu";
+import { formatGHS, formatGHSString } from "../../data/menu";
 import { db } from "../../lib/api";
 import { ReceiptDownloader } from "../../components/ReceiptDownloader";
 import { ProfessionalReceipt } from "../../components/ProfessionalReceipt";
@@ -58,6 +58,14 @@ export function InvoiceSettlementScreen() {
         total: number;
         status: string;
     } | null>(null);
+    const [completedBill, setCompletedBill] = useState<{
+        id: string;
+        subtotal: number;
+        service_charge: number;
+        vat: number;
+        total: number;
+        status: string;
+    } | null>(null);
     const [items, setItems] = useState<BillItem[]>([]);
     const [loading, setLoading] = useState(true);
     const [invoiceNo] = useState(() => `VL-${Date.now().toString(36).slice(-6).toUpperCase()}`);
@@ -71,10 +79,14 @@ export function InvoiceSettlementScreen() {
     const triggerReload = () => setRevision((r) => r + 1);
 
     const handleFreeTableAndLeave = async () => {
-        if (!bill) return;
+        const targetBill = bill || completedBill;
+        if (!targetBill) {
+            navigate('/waiter');
+            return;
+        }
         setFreeingTable(true);
         try {
-            await db.closeBillAndFreeTable(bill.id, table.id, staffId);
+            await db.closeBillAndFreeTable(targetBill.id, table.id, staffId);
             toast.success(`Table ${String(table.number).padStart(2, "0")} is now free and ready for new guests!`);
             navigate('/waiter');
         } catch {
@@ -104,15 +116,17 @@ export function InvoiceSettlementScreen() {
             );
             const { data: itemRows } = await db.billItems(billRow.id);
             if (cancelled) return;
-            setBill({
+            const loadedBill = {
                 id: billRow.id,
                 subtotal: Number(billRow.subtotal),
                 service_charge: Number(billRow.service_charge),
                 vat: Number(billRow.vat),
                 total: Number(billRow.total),
                 status: billRow.status,
-            });
-            // eslint-disable-next-line react-hooks/exhaustive-deps
+            };
+            setBill(loadedBill);
+            setCompletedBill(loadedBill);
+             
             if (billRow.status === 'paid' || (Number(billRow.amount_paid || 0) >= Number(billRow.total || 0) && Number(billRow.total || 0) > 0)) {
                 setSettled(true);
             }
@@ -167,8 +181,10 @@ export function InvoiceSettlementScreen() {
         setSettled(true);
     };
 
+    const activeBill = bill || completedBill;
+
     /* ── Settled success state ── */
-    if (settled && bill) {
+    if (settled && activeBill) {
         return (
             <main className="relative min-h-svh w-full overflow-x-hidden bg-isabelline font-sans text-licorice antialiased">
                 <header className="sticky top-0 z-30 bg-isabelline/95 backdrop-blur-xl border-b border-licorice/8">
@@ -209,7 +225,7 @@ export function InvoiceSettlementScreen() {
                     </div>
 
                     {/* Invoice card */}
-                    <div className="mt-8 overflow-hidden rounded-2xl bg-white shadow-[0_8px_24px_rgba(35,20,12,0.08)] ring-1 ring-isabelline">
+                    <div className="mt-8 overflow-hidden rounded-xl bg-white shadow-[0_8px_24px_rgba(35,20,12,0.08)] ring-1 ring-isabelline">
                         <div className="bg-licorice px-5 py-4 text-isabelline">
                             <div className="flex items-center justify-between">
                                 <div>
@@ -254,15 +270,15 @@ export function InvoiceSettlementScreen() {
                             <div className="mt-3 space-y-1 border-t border-isabelline pt-3 text-[11px]">
                                 <div className="flex justify-between text-feldgrau">
                                     <span>Subtotal</span>
-                                    <span className="font-mono tabular-nums">{formatGHS(bill.subtotal)}</span>
+                                    <span className="font-mono tabular-nums">{formatGHS(activeBill.subtotal)}</span>
                                 </div>
                                 <div className="flex justify-between text-feldgrau">
                                     <span>Service charge</span>
-                                    <span className="font-mono tabular-nums">{formatGHS(bill.service_charge)}</span>
+                                    <span className="font-mono tabular-nums">{formatGHS(activeBill.service_charge)}</span>
                                 </div>
                                 <div className="flex justify-between text-feldgrau">
                                     <span>VAT</span>
-                                    <span className="font-mono tabular-nums">{formatGHS(bill.vat)}</span>
+                                    <span className="font-mono tabular-nums">{formatGHS(activeBill.vat)}</span>
                                 </div>
                             </div>
 
@@ -271,7 +287,7 @@ export function InvoiceSettlementScreen() {
                                     Total
                                 </span>
                                 <span className="font-mono text-[18px] font-black tabular-nums text-licorice">
-                                    {formatGHS(bill.total)}
+                                    {formatGHS(activeBill.total)}
                                 </span>
                             </div>
 
@@ -292,26 +308,23 @@ export function InvoiceSettlementScreen() {
                             type="button"
                             onClick={handleFreeTableAndLeave}
                             disabled={freeingTable}
-                            className="w-full rounded-full bg-emerald-700 py-3.5 text-[13px] font-bold tracking-tight text-white shadow-[0_12px_28px_rgba(4,120,87,0.25)] transition-all hover:bg-emerald-800 active:scale-[0.985] disabled:opacity-50 flex items-center justify-center gap-2"
+                            className="w-full rounded-full bg-emerald-700 py-3.5 text-[13px] font-bold tracking-tight text-white shadow-[0_12px_28px_rgba(4,120,87,0.25)] transition-all hover:bg-emerald-800 active:scale-[0.985] disabled:opacity-50 flex items-center justify-center"
                         >
                             {freeingTable ? (
-                                <>
+                                <div className="flex items-center gap-2">
                                     <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white" />
                                     Freeing Table…
-                                </>
+                                </div>
                             ) : (
-                                <>
-                                    <CheckCircleIcon className="h-4 w-4" />
-                                    Free Table & Finish Tab
-                                </>
+                                "Free Table & Finish Tab"
                             )}
                         </button>
                         <button
                             type="button"
                             onClick={onSettled}
-                            className="w-full rounded-full bg-white border border-licorice/10 py-3 text-[12px] font-bold tracking-tight text-licorice hover:bg-isabelline active:scale-[0.985]"
+                            className="w-full rounded-full bg-white border border-licorice/10 py-3.5 text-[13px] font-bold tracking-tight text-licorice hover:bg-isabelline active:scale-[0.985] flex items-center justify-center"
                         >
-                            Keep Table Open & Return to Floor
+                            Keep Table Open
                         </button>
                     </div>
                 </section>
@@ -526,7 +539,7 @@ export function InvoiceSettlementScreen() {
                         <p className="mb-2 px-1 text-[10px] font-bold uppercase tracking-[0.18em] text-feldgrau">
                             Cash Received
                         </p>
-                        <div className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-isabelline">
+                        <div className="rounded-xl bg-white p-4 shadow-sm ring-1 ring-isabelline">
                             <div className="flex items-baseline gap-2 border-b border-isabelline pb-3">
                                 <span className="shrink-0 text-[14px] font-bold text-feldgrau">GHS</span>
                                 <input
@@ -552,14 +565,16 @@ export function InvoiceSettlementScreen() {
                                         {formatGHS(amt)}
                                     </button>
                                 ))}
-                                <button
-                                    type="button"
-                                    onClick={() => setCashReceived(total.toString())}
-                                    className="col-span-3 sm:col-auto rounded-full bg-licorice px-3 py-2 text-[11px] font-bold tracking-tight text-isabelline transition-all hover:bg-licorice/90 active:scale-95"
-                                >
-                                    Exact
-                                </button>
                             </div>
+
+                            {/* Exact CTA */}
+                            <button
+                                type="button"
+                                onClick={() => setCashReceived(total.toString())}
+                                className="mt-4 w-full rounded-xl bg-licorice px-4 py-3.5 text-[13px] font-bold tracking-tight text-isabelline shadow-sm transition-all hover:bg-licorice/90 active:scale-[0.985]"
+                            >
+                                Exact
+                            </button>
 
                             {/* Change calculation */}
                             {received > 0 && (
@@ -665,8 +680,8 @@ export function InvoiceSettlementScreen() {
             {/* W7 — Settle bill confirm */}
             <ConfirmModal
                 isOpen={settleConfirmOpen}
-                title={`Confirm ${formatGHS(total)} cash?`}
-                body={`Change due to guest: ${formatGHS(Math.max(0, change))}. This closes the bill and can't be reversed.`}
+                title={`Confirm ${formatGHSString(total)} cash?`}
+                body={`Change due to guest: ${formatGHSString(Math.max(0, change))}. This closes the bill and can't be reversed.`}
                 confirmLabel="Collect & Close Bill"
                 cancelLabel="Go Back"
                 isDanger={false}

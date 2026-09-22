@@ -2,8 +2,6 @@ import { useMemo, useState, useEffect } from "react";
 import {
     ArrowLeftIcon,
     ArrowRightIcon,
-    ClockIcon,
-    MapPinIcon,
     MinusIcon,
     PencilSquareIcon,
     PlusIcon,
@@ -31,25 +29,20 @@ type Props = {
     onBack?: () => void;
     onContinueShopping?: () => void;
     onOrderSent?: (order: OrderSummary) => void;
+    onCallWaiter?: () => void;
+    callingWaiter?: boolean;
+    waiterCalled?: boolean;
 };
 
-/** Estimated prep time based on item count — gives the page a "living" feel. */
-function estimatePrepMinutes(itemCount: number): string {
-    if (itemCount === 0) return "—";
-    const base = 8;
-    const perItem = 2;
-    const min = base + Math.floor(itemCount * perItem);
-    return `${min}–${min + 4} min`;
-}
 
-export function CartScreen({ venueId, tableLabel, tablePin, billId, customerSessionId, sessionToken, onBack, onContinueShopping, onOrderSent }: Props) {
-    const { lines, itemCount, subtotal, setQty, remove, clear } = useCart();
+
+export function CartScreen({ venueId, tableLabel, tablePin, billId, customerSessionId, sessionToken, onBack, onContinueShopping, onOrderSent, onCallWaiter, callingWaiter, waiterCalled }: Props) {
+    const { lines, subtotal, setQty, remove, clear } = useCart();
     const [orderNotes, setOrderNotes] = useState("");
     const [sending, setSending] = useState(false);
 
     // Placed orders on the table's open bill
     const [placedItems, setPlacedItems] = useState<DbOrderItem[]>([]);
-    const [placedBill, setPlacedBill] = useState<{ subtotal: number; vat: number; total: number } | null>(null);
     const [loadingPlaced, setLoadingPlaced] = useState(true);
 
     useEffect(() => {
@@ -65,20 +58,10 @@ export function CartScreen({ venueId, tableLabel, tablePin, billId, customerSess
         }
 
         const fetchPlaced = async () => {
-            const [itemsRes, billRes] = await Promise.all([
-                db.orderItemsByBill(billId, sessionToken),
-                db.customerBill(billId, sessionToken),
-            ]);
+            const itemsRes = await db.orderItemsByBill(billId, sessionToken);
             if (!active) return;
             const valid = (itemsRes.data ?? []).filter((i) => i.status !== 'cancelled');
             setPlacedItems(valid);
-            if (billRes.data) {
-                setPlacedBill({
-                    subtotal: Number(billRes.data.subtotal ?? 0),
-                    vat: Number(billRes.data.vat ?? 0),
-                    total: Number(billRes.data.total ?? 0),
-                });
-            }
             setLoadingPlaced(false);
         };
 
@@ -96,18 +79,12 @@ export function CartScreen({ venueId, tableLabel, tablePin, billId, customerSess
                 db.orderItemsByBill(billId, sessionToken).then(({ data }) => {
                     setPlacedItems((data ?? []).filter((i) => i.status !== 'cancelled'));
                 });
-                db.customerBill(billId, sessionToken).then(({ data }) => {
-                    if (data) setPlacedBill({ subtotal: Number(data.subtotal ?? 0), vat: Number(data.vat ?? 0), total: Number(data.total ?? 0) });
-                });
             }
         },
         onUpdate: () => {
             if (billId) {
                 db.orderItemsByBill(billId, sessionToken).then(({ data }) => {
                     setPlacedItems((data ?? []).filter((i) => i.status !== 'cancelled'));
-                });
-                db.customerBill(billId, sessionToken).then(({ data }) => {
-                    if (data) setPlacedBill({ subtotal: Number(data.subtotal ?? 0), vat: Number(data.vat ?? 0), total: Number(data.total ?? 0) });
                 });
             }
         },
@@ -133,20 +110,14 @@ export function CartScreen({ venueId, tableLabel, tablePin, billId, customerSess
         };
     }, [venueId]);
 
-    // Combined item count and bill math
-    const draftCount = itemCount;
-    const placedCount = placedItems.reduce((acc, i) => acc + i.quantity, 0);
-    const displayItemCount = draftCount + placedCount;
-
     const draftSubtotal = subtotal;
     const placedSubtotal = placedItems.reduce((acc, i) => acc + Number(i.line_total || 0), 0);
     const combinedSubtotal = draftSubtotal + placedSubtotal;
 
-    const { serviceCharge, vat, total } = useMemo(() => {
+    const { vat, total } = useMemo(() => {
         const service = Math.round(combinedSubtotal * (venueFees.serviceChargePct / 100) * 100) / 100;
         const tax = Math.round(combinedSubtotal * (venueFees.vatPct / 100) * 100) / 100;
         return {
-            serviceCharge: service,
             vat: tax,
             total: combinedSubtotal + service + tax,
         };
@@ -235,6 +206,14 @@ export function CartScreen({ venueId, tableLabel, tablePin, billId, customerSess
     const hasDraft = lines.length > 0;
     const hasPlaced = placedItems.length > 0;
 
+    if (loadingPlaced && !hasDraft) {
+        return (
+            <main className="relative min-h-svh w-full bg-isabelline font-sans text-licorice antialiased flex items-center justify-center">
+                <div className="h-8 w-8 animate-spin rounded-full border-2 border-licorice/20 border-t-licorice" />
+            </main>
+        );
+    }
+
     // ── Empty state ── (only show if NO draft items AND NO placed session items exist)
     if (!hasDraft && !hasPlaced && !loadingPlaced) {
         return (
@@ -242,7 +221,7 @@ export function CartScreen({ venueId, tableLabel, tablePin, billId, customerSess
                 <header className="sticky top-0 z-50 bg-licorice">
                     {tablePin && (
                         <div className="pt-[max(env(safe-area-inset-top),0px)] pb-2">
-                            <TablePinBanner pin={tablePin} tableLabel={tableLabel} />
+                            <TablePinBanner pin={tablePin} tableLabel={tableLabel} onCallWaiter={onCallWaiter} callingWaiter={callingWaiter} waiterCalled={waiterCalled} />
                         </div>
                     )}
                     <div className={`relative z-10 mx-auto flex w-full max-w-7xl items-center justify-between px-5 md:px-8 ${!tablePin ? 'pt-[max(env(safe-area-inset-top),14px)]' : 'pt-0'} pb-3`}>
@@ -289,7 +268,7 @@ export function CartScreen({ venueId, tableLabel, tablePin, billId, customerSess
                 <div className="fixed inset-x-0 bottom-[88px] z-40 flex justify-center px-5 md:px-8">
                     <button
                         type="button"
-                        onClick={onContinueShopping}
+                        onClick={onContinueShopping || onBack}
                         className="
                             group flex w-full max-w-md md:max-w-2xl mx-auto items-center justify-between
                             gap-3 rounded-full bg-licorice px-6 py-4
@@ -323,7 +302,7 @@ export function CartScreen({ venueId, tableLabel, tablePin, billId, customerSess
             <header className="sticky top-0 z-50 bg-licorice">
                 {tablePin && (
                     <div className="pt-[max(env(safe-area-inset-top),0px)] pb-2">
-                        <TablePinBanner pin={tablePin} tableLabel={tableLabel} />
+                        <TablePinBanner pin={tablePin} tableLabel={tableLabel} onCallWaiter={onCallWaiter} callingWaiter={callingWaiter} waiterCalled={waiterCalled} />
                     </div>
                 )}
                 <div className={`relative z-10 mx-auto flex w-full max-w-7xl items-center justify-between px-5 md:px-8 ${!tablePin ? 'pt-[max(env(safe-area-inset-top),14px)]' : 'pt-0'} pb-3`}>

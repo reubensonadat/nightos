@@ -2,15 +2,15 @@ import { useEffect, useMemo, useState } from "react";
 import {
     ArrowLeftIcon,
     ArrowRightIcon,
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+     
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     HeartIcon,
     MagnifyingGlassIcon,
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+     
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     PlusIcon,
 } from "@heroicons/react/24/outline";
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
+ 
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 import { HeartIcon as HeartIconSolid } from "@heroicons/react/24/solid";
 import { formatGHS, formatGHSString } from "../data/menu";
@@ -22,6 +22,8 @@ import { db, type DbProduct, type DbModifierOption } from "../lib/api";
 import { supabase } from "../lib/supabase";
 
 import { TablePinBanner } from "../components/TablePinBanner";
+import bellRingingIcon from "../assets/bell-ringing.svg";
+import toast from "react-hot-toast";
 
 type Props = {
     venueId?: string;
@@ -30,6 +32,8 @@ type Props = {
     waiterName?: string | null;
     tablePin?: string | null;
     partySize?: number;
+    billId?: string | null;
+    sessionToken?: string | null;
     onEditParty?: () => void;
     onBack?: () => void;
     onViewCart?: () => void;
@@ -68,7 +72,7 @@ async function fetchProducts(venueId: string): Promise<MenuItem[]> {
         : { data: [] };
     const allOptions = (optionsResult.data ?? []) as DbModifierOption[];
 
-    // eslint-disable-next-line react-hooks/set-state-in-effect
+     
     // Group → options map
     const groupOptions = new Map<string, DbModifierOption[]>();
     for (const opt of allOptions) {
@@ -80,13 +84,13 @@ async function fetchProducts(venueId: string): Promise<MenuItem[]> {
         const gids = productGroupIds.get(p.id) ?? [];
         return {
             id: p.id,
-            // eslint-disable-next-line react-hooks/exhaustive-deps
+             
             name: p.name,
             description: p.description || '',
             longDescription: p.long_description || undefined,
             price: p.price,
             category: p.category_id ? categoryMap.get(p.category_id) || "Other" : "Other",
-            // eslint-disable-next-line react-hooks/set-state-in-effect
+             
             station: p.station,
             image: p.images?.[0] || '',
             tags: ((p.tags ?? []) as string[]).filter((t) =>
@@ -115,14 +119,31 @@ async function fetchProducts(venueId: string): Promise<MenuItem[]> {
 
 }
 
-export function MenuScreen({ venueId, venueName, tableLabel, waiterName, tablePin, partySize, onEditParty, onBack, onViewCart }: Props) {
+export function MenuScreen({ venueId, venueName, tableLabel, waiterName, tablePin, partySize, billId, sessionToken, onEditParty, onBack, onViewCart }: Props) {
     const [active, setActive] = useState<MenuCategory>("Signatures");
     const [query, setQuery] = useState("");
     const [activeItemId, setActiveItemId] = useState<string | null>(null);
     const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
     const [loading, setLoading] = useState(true);
+    const [callingWaiter, setCallingWaiter] = useState(false);
+    const [waiterCalled, setWaiterCalled] = useState(false);
     const { addQuick, subtotal, itemCount, toggleFavorite, isFavorite } =
         useCart();
+
+    const handleCallWaiter = async () => {
+        if (!billId || callingWaiter) return;
+        setCallingWaiter(true);
+        try {
+            const { error } = await db.requestWaiterAssistance(billId, 'call_waiter', sessionToken);
+            if (error) throw error;
+            setWaiterCalled(true);
+            toast.success("🛎️ Your waiter has been notified and will be right over!");
+        } catch {
+            toast.error("Could not notify waiter. Please try again.");
+        } finally {
+            setCallingWaiter(false);
+        }
+    };
 
     useEffect(() => {
         if (!venueId) {
@@ -177,7 +198,13 @@ export function MenuScreen({ venueId, venueName, tableLabel, waiterName, tablePi
                 {/* ── Table PIN Banner ── */}
                 {tablePin && (
                     <div className="pt-[max(env(safe-area-inset-top),0px)]">
-                        <TablePinBanner pin={tablePin} tableLabel={tableLabel} />
+                        <TablePinBanner
+                            pin={tablePin}
+                            tableLabel={tableLabel}
+                            onCallWaiter={billId ? handleCallWaiter : undefined}
+                            callingWaiter={callingWaiter}
+                            waiterCalled={waiterCalled}
+                        />
                     </div>
                 )}
 
@@ -205,8 +232,28 @@ export function MenuScreen({ venueId, venueName, tableLabel, waiterName, tablePi
                         </div>
                     </div>
 
-                    {/* Right: single consolidated pill */}
-                    {(tableLabel || waiterName || partySize) && (() => {
+                    {/* Right: Call Waiter button (if no PIN banner) + single consolidated pill */}
+                    <div className="flex items-center gap-2">
+                        {!tablePin && billId && (
+                            <button
+                                type="button"
+                                onClick={handleCallWaiter}
+                                disabled={callingWaiter}
+                                className={`flex h-8 w-8 items-center justify-center rounded-full text-[13px] font-bold shadow-xs transition-all active:scale-95 border ${
+                                    waiterCalled
+                                        ? "bg-amber-100 text-amber-950 border-amber-400 ring-2 ring-amber-400/30"
+                                        : "bg-white text-licorice border-licorice/10 hover:bg-isabelline"
+                                }`}
+                                title={waiterCalled ? "Waiter Notified ✓" : "Call Waiter"}
+                            >
+                                {callingWaiter ? (
+                                    <span className="text-[13px]">⏳</span>
+                                ) : (
+                                    <img src={bellRingingIcon} alt="Call Waiter" className="h-4.5 w-4.5 object-contain" />
+                                )}
+                            </button>
+                        )}
+                        {(tableLabel || waiterName || partySize) && (() => {
                         const shortTable = tableLabel
                             ? `T-${tableLabel.replace(/^table\s*/i, "").trim()}`
                             : null;
@@ -218,7 +265,7 @@ export function MenuScreen({ venueId, venueName, tableLabel, waiterName, tablePi
                             ? parts.length > 1
                                 ? `${parts[0]} ${parts[parts.length - 1][0].toUpperCase()}.`
                                 : cleanServer
-                            : null;
+                            : "Unassigned";
 
                         return (
                             <button
@@ -241,18 +288,17 @@ export function MenuScreen({ venueId, venueName, tableLabel, waiterName, tablePi
                                         </span>
                                     </>
                                 )}
-                                {formattedServer && (
-                                    <>
-                                        {(shortTable || partySize) && <span className="mx-0.5 h-3 w-px bg-licorice/15" />}
-                                        <span className="text-[10px] font-semibold tracking-tight text-feldgrau">
-                                            {formattedServer}
-                                        </span>
-                                    </>
-                                )}
+                                <>
+                                    {(shortTable || partySize) && <span className="mx-0.5 h-3 w-px bg-licorice/15" />}
+                                    <span className={`text-[10px] tracking-tight ${cleanServer ? "font-semibold text-feldgrau" : "font-medium italic text-feldgrau/70"}`}>
+                                        {formattedServer}
+                                    </span>
+                                </>
                             </button>
                         );
                     })()}
                 </div>
+            </div>
 
                 {/* ── Row 2: Always-visible search ── */}
                 <div className="mx-auto w-full max-w-7xl px-5 md:px-8 pb-2.5">
@@ -319,46 +365,46 @@ export function MenuScreen({ venueId, venueName, tableLabel, waiterName, tablePi
                         </p>
                     </div>
                 ) : (
-                <>
-                {visibleItems.length === 0 && (
-                    <div className="mt-4 flex flex-col items-center justify-center rounded-2xl bg-white px-6 py-12 text-center shadow-[0_4px_16px_rgba(35,20,12,0.04)] ring-1 ring-isabelline">
-                        <span className="h-1.5 w-1.5 rounded-full bg-khaki" />
-                        <h3 className="mt-4 text-[15px] font-bold tracking-tight text-licorice">
-                            Nothing on this list yet
-                        </h3>
-                        <p className="mt-1.5 text-[12px] leading-[1.5] tracking-tight text-feldgrau">
-                            Try a different category or clear your search.
-                        </p>
-                    </div>
-                )}
+                    <>
+                        {visibleItems.length === 0 && (
+                            <div className="mt-4 flex flex-col items-center justify-center rounded-2xl bg-white px-6 py-12 text-center shadow-[0_4px_16px_rgba(35,20,12,0.04)] ring-1 ring-isabelline">
+                                <span className="h-1.5 w-1.5 rounded-full bg-khaki" />
+                                <h3 className="mt-4 text-[15px] font-bold tracking-tight text-licorice">
+                                    Nothing on this list yet
+                                </h3>
+                                <p className="mt-1.5 text-[12px] leading-[1.5] tracking-tight text-feldgrau">
+                                    Try a different category or clear your search.
+                                </p>
+                            </div>
+                        )}
 
-                {/* ═══════════════════════════════════════════════════════════
+                        {/* ═══════════════════════════════════════════════════════════
                     GRID — square image cards
                   ═══════════════════════════════════════════════════════════ */}
-                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 md:gap-5">
-                    {gridItems.map((item, idx) => {
-                        const fav = isFavorite(item.id);
-                        return (
-                            <MenuItemCard
-                                key={item.id}
-                                id={item.id}
-                                name={item.name}
-                                price={item.price}
-                                image={item.image}
-                                description={item.description}
-                                category={item.category}
-                                abv={item.abv}
-                                isFavorite={fav}
-                                onToggleFavorite={() => toggleFavorite(item.id)}
-                                onClick={() => setActiveItemId(item.id)}
-                                onAdd={() => addQuick(item)}
-                                animationDelayMs={Math.min(idx * 40, 240)}
-                            />
-                        );
-                    })}
-                </div>
-                </>
-            )}
+                        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 md:gap-5">
+                            {gridItems.map((item, idx) => {
+                                const fav = isFavorite(item.id);
+                                return (
+                                    <MenuItemCard
+                                        key={item.id}
+                                        id={item.id}
+                                        name={item.name}
+                                        price={item.price}
+                                        image={item.image}
+                                        description={item.description}
+                                        category={item.category}
+                                        abv={item.abv}
+                                        isFavorite={fav}
+                                        onToggleFavorite={() => toggleFavorite(item.id)}
+                                        onClick={() => setActiveItemId(item.id)}
+                                        onAdd={() => addQuick(item)}
+                                        animationDelayMs={Math.min(idx * 40, 240)}
+                                    />
+                                );
+                            })}
+                        </div>
+                    </>
+                )}
             </section>
 
             {/* ═══════════════════════════════════════════════════════════

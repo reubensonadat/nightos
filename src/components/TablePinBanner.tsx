@@ -1,22 +1,15 @@
-import { useState } from "react";
-import { KeyIcon, CheckIcon, DocumentDuplicateIcon } from "@heroicons/react/24/outline";
-import toast from "react-hot-toast";
+import { KeyIcon } from "@heroicons/react/24/outline";
+import bellRingingIcon from "../assets/bell-ringing.svg";
 
 type Props = {
   pin: string;
   tableLabel?: string | null;
+  onCallWaiter?: () => void;
+  callingWaiter?: boolean;
+  waiterCalled?: boolean;
 };
 
-export function TablePinBanner({ pin, tableLabel }: Props) {
-  const [copied, setCopied] = useState(false);
-
-  const handleCopy = () => {
-    navigator.clipboard.writeText(pin);
-    setCopied(true);
-    toast.success(`Table PIN ${pin} copied! Share with your friends.`);
-    setTimeout(() => setCopied(false), 2000);
-  };
-
+export function TablePinBanner({ pin, tableLabel, onCallWaiter, callingWaiter, waiterCalled }: Props) {
   return (
     <div className="mx-auto w-full max-w-7xl px-5 md:px-8 pt-2.5 pb-0.5">
       <div className="flex items-center justify-between rounded-xl bg-licorice px-3.5 py-2 text-isabelline shadow-sm ring-1 ring-white/10">
@@ -33,23 +26,25 @@ export function TablePinBanner({ pin, tableLabel }: Props) {
             </p>
           </div>
         </div>
-        <button
-          type="button"
-          onClick={handleCopy}
-          className="flex items-center gap-1 rounded-lg bg-white/10 px-2.5 py-1.5 text-[11px] font-bold text-white transition-all hover:bg-white/20 active:scale-95"
-        >
-          {copied ? (
-            <>
-              <CheckIcon className="h-3.5 w-3.5 text-khaki" strokeWidth={2.5} />
-              <span className="text-khaki">Copied</span>
-            </>
-          ) : (
-            <>
-              <DocumentDuplicateIcon className="h-3.5 w-3.5 opacity-80" strokeWidth={2} />
-              <span>Share</span>
-            </>
-          )}
-        </button>
+        {onCallWaiter && (
+          <button
+            type="button"
+            onClick={onCallWaiter}
+            disabled={callingWaiter}
+            className={`flex h-8.5 w-8.5 shrink-0 items-center justify-center rounded-lg shadow-sm transition-all active:scale-95 border ${
+              waiterCalled
+                ? "bg-amber-300 border-amber-400 ring-2 ring-amber-400/50"
+                : "bg-white border-white hover:bg-isabelline"
+            }`}
+            title={waiterCalled ? "Waiter Notified ✓" : "Call Waiter"}
+          >
+            {callingWaiter ? (
+              <span className="text-[14px]">⏳</span>
+            ) : (
+              <img src={bellRingingIcon} alt="Call Waiter" className="h-5 w-5 object-contain" />
+            )}
+          </button>
+        )}
       </div>
     </div>
   );

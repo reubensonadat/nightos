@@ -12,11 +12,12 @@ import {
 } from "@heroicons/react/24/outline";
 import { CheckCircleIcon } from "@heroicons/react/24/solid";
 import toast from "react-hot-toast";
-import { formatGHS } from "../../data/menu";
+import { formatGHS, formatGHSString } from "../../data/menu";
 import { db, type DbBill, type DbOrderSubmission, type DbOrderItem, type DbProduct, type DbMenuCategory } from "../../lib/api";
 import type { Table } from "./TablesDashboard";
 import { MenuItemCard } from "../../components/MenuItemCard";
 import { ConfirmModal } from "../../components/ConfirmModal";
+import bellRingingIcon from "../../assets/bell-ringing.svg";
 import { sounds } from "../../lib/sound";
 
 /* ────────────────────────── Types ────────────────────────── */
@@ -52,6 +53,8 @@ const STATUS_META: Record<string, { label: string; cls: string }> = {
     cancelled: { label: "Cancelled", cls: "bg-slate-50 text-slate-700 ring-slate-200" },
 };
 
+const menuCache = new Map<string, { categories: DbMenuCategory[]; products: DbProduct[] }>();
+
 function statusMeta(status: string) {
     return STATUS_META[status] ?? { label: status, cls: "bg-isabelline text-feldgrau ring-licorice/10" };
 }
@@ -85,11 +88,13 @@ export function OrderManagementScreen() {
     const [savingParty, setSavingParty] = useState(false);
     const [freeingTable, setFreeingTable] = useState(false);
 
-    useEffect(() => {
+    const [prevGuestCount, setPrevGuestCount] = useState(currentBill?.guest_count);
+    if (currentBill?.guest_count !== prevGuestCount) {
+        setPrevGuestCount(currentBill?.guest_count);
         if (currentBill?.guest_count) {
             setPartySizeInput(currentBill.guest_count);
         }
-    }, [currentBill?.guest_count]);
+    }
 
     const handleUpdatePartySize = async (newSize: number) => {
         if (!currentBill) {
@@ -97,18 +102,20 @@ export function OrderManagementScreen() {
             return;
         }
         const validatedSize = Math.max(1, Math.min(99, newSize));
+        // 0ms Optimistic Update
+        setCurrentBill((prev) => (prev ? { ...prev, guest_count: validatedSize } : null));
+        setShowPartyModal(false);
+        toast.success(`Table ${table.number} updated to ${validatedSize} ${validatedSize === 1 ? 'guest' : 'guests'}`);
         setSavingParty(true);
         try {
             const { data, error } = await db.updateTablePartySize(table.id, currentBill.id, validatedSize);
             if (error) {
-                toast.error("Failed to update party size");
+                toast.error("Failed to save party size update");
                 return;
             }
             if (data) {
                 setCurrentBill(data);
             }
-            setShowPartyModal(false);
-            toast.success(`Table ${table.number} updated to ${validatedSize} ${validatedSize === 1 ? 'guest' : 'guests'}`);
         } catch {
             toast.error("Could not update party size");
         } finally {
@@ -127,7 +134,7 @@ export function OrderManagementScreen() {
             setSubmissions([]);
             setItemsBySubmission({});
             setOrder([]);
-            await load();
+            await load(false);
         } catch {
             toast.error("Failed to free table.");
         } finally {
@@ -135,8 +142,10 @@ export function OrderManagementScreen() {
         }
     };
 
-    const load = useCallback(async () => {
-        setLoading(true);
+    const load = useCallback(async (showLoadingSpinner = false) => {
+        if (showLoadingSpinner && !currentBill) {
+            setLoading(true);
+        }
         try {
             const { data: bill } = await db.activeBillForTable(table.id);
             if (bill) {
@@ -166,13 +175,25 @@ export function OrderManagementScreen() {
             }
 
             const effectiveVenueId = venueId || "a0000000-0000-0000-0000-000000000001";
-            const [{ data: cats }, { data: prods }] = await Promise.all([
-                db.menuCategories(effectiveVenueId),
-                db.products(effectiveVenueId),
-            ]);
-            const catList = cats ?? [];
+            let catList: DbMenuCategory[] = [];
+            let prodList: DbProduct[] = [];
+
+            if (menuCache.has(effectiveVenueId)) {
+                const cached = menuCache.get(effectiveVenueId)!;
+                catList = cached.categories;
+                prodList = cached.products;
+            } else {
+                const [{ data: cats }, { data: prods }] = await Promise.all([
+                    db.menuCategories(effectiveVenueId),
+                    db.products(effectiveVenueId),
+                ]);
+                catList = cats ?? [];
+                prodList = prods ?? [];
+                menuCache.set(effectiveVenueId, { categories: catList, products: prodList });
+            }
+
             setCategories(catList);
-            setProducts(prods ?? []);
+            setProducts(prodList);
             if (catList.length > 0) {
                 setActiveCategory((prev) => {
                     const stillExists = prev && catList.some((c) => c.id === prev);
@@ -181,15 +202,14 @@ export function OrderManagementScreen() {
             }
         } catch (e) {
             console.error("Failed to load table orders:", e);
-            toast.error("Failed to load this table's orders");
         } finally {
             setLoading(false);
         }
-    }, [table.id, venueId, staffId]);
+    }, [table.id, venueId, staffId, currentBill]);
 
     useEffect(() => {
         const init = async () => {
-            await load();
+            await load(true);
         };
         init();
     }, [load]);
@@ -200,7 +220,7 @@ export function OrderManagementScreen() {
         if (reloadTimer.current !== null) window.clearTimeout(reloadTimer.current);
         reloadTimer.current = window.setTimeout(() => {
             reloadTimer.current = null;
-            load();
+            load(false);
         }, 500);
     }, [load]);
 
@@ -221,13 +241,20 @@ export function OrderManagementScreen() {
         onUpdate: (payload: { new?: Record<string, unknown>; old?: Record<string, unknown> }) => {
             const updated = payload?.new;
             const previous = payload?.old;
+            if (updated?.assistance_type && updated.assistance_type !== previous?.assistance_type) {
+                sounds.playBell();
+                const msg = updated.assistance_type === 'cash_settlement'
+                    ? `💵 Table ${table.number}: Guest requested cash payment confirmation!`
+                    : `🛎️ Table ${table.number}: Guest called for waiter assistance!`;
+                toast.success(msg, { duration: 8000, icon: '🛎️' });
+            }
             if (
                 updated &&
                 (updated.status === 'paid' || (Number(updated.amount_paid || 0) >= Number(updated.total || 0) && Number(updated.total || 0) > 0)) &&
                 previous?.status !== 'paid'
             ) {
                 sounds.playPaymentSuccess();
-                toast.success(`💳 Table ${table.number} Bill Paid: ${formatGHS(Number(updated.total || 0))} has been paid by guest!`, {
+                toast.success(`💳 Table ${table.number} Bill Paid: ${formatGHSString(Number(updated.total || 0))} has been paid by guest!`, {
                     duration: 8000,
                     icon: '🛎️',
                 });
@@ -375,21 +402,6 @@ export function OrderManagementScreen() {
                         <span className="text-[13px] font-bold tracking-tight text-licorice">
                             Table {String(table.number).padStart(2, "0")}
                         </span>
-                        {currentBill && (
-                            <button
-                                type="button"
-                                onClick={() => {
-                                    setPartySizeInput(currentBill.guest_count || 1);
-                                    setShowPartyModal(true);
-                                }}
-                                className="mt-0.5 inline-flex items-center gap-1 rounded-full bg-licorice/6 hover:bg-licorice/12 px-2.5 py-0.5 text-[11px] font-bold text-licorice transition-all active:scale-95 shadow-2xs"
-                                title="Click to adjust party size"
-                            >
-                                <UserGroupIcon className="h-3 w-3 text-khaki" strokeWidth={2.5} />
-                                <span>{currentBill.guest_count || 1} {(currentBill.guest_count || 1) === 1 ? "guest" : "guests"}</span>
-                                <span className="text-[10px] text-feldgrau font-semibold underline ml-0.5">edit</span>
-                            </button>
-                        )}
                     </div>
 
                     <div className="flex items-center gap-1.5">
@@ -420,6 +432,34 @@ export function OrderManagementScreen() {
                         </button>
                     </div>
                 </div>
+
+                {/* Assistance Request Alert Banner */}
+                {currentBill?.assistance_type && (
+                    <div className="mx-auto w-full max-w-7xl px-5 md:px-8 pb-3">
+                        <div className="flex items-center justify-between gap-3 rounded-xl bg-white border border-licorice/12 px-4 py-2.5 shadow-sm ring-1 ring-licorice/5">
+                            <div className="flex items-center gap-3">
+                                <div className="flex h-7 w-7 items-center justify-center rounded-full bg-white shadow-sm ring-1 ring-licorice/10 overflow-hidden p-1 shrink-0">
+                                    {currentBill.assistance_type === 'cash_settlement' ? <span className="text-xs">💵</span> : <img src={bellRingingIcon} className="h-5 w-5 object-contain" alt="Assistance" />}
+                                </div>
+                                <p className="text-xs font-bold text-licorice tracking-tight">
+                                    {currentBill.assistance_type === 'cash_settlement' ? "Cash settlement requested" : "Assistance requested"}
+                                </p>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={async () => {
+                                    await db.clearWaiterAssistance(currentBill.id);
+                                    setCurrentBill((prev) => (prev ? { ...prev, assistance_type: null } : null));
+                                    toast.success("Request acknowledged");
+                                }}
+                                className="rounded-lg bg-licorice px-3.5 py-1.5 text-xs font-bold text-isabelline shadow-sm transition-all hover:bg-licorice/90 active:scale-95 flex items-center gap-1.5 shrink-0"
+                            >
+                                <CheckIcon className="h-3.5 w-3.5 text-khaki" strokeWidth={2.5} />
+                                OK
+                            </button>
+                        </div>
+                    </div>
+                )}
 
                 {/* Paid Bill Alert Banner */}
                 {currentBill && (currentBill.status === 'paid' || (Number(currentBill.amount_paid || 0) >= Number(currentBill.total || 0) && Number(currentBill.total || 0) > 0)) && (

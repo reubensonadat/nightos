@@ -169,13 +169,25 @@ export function MenuManagerScreen() {
     }, [venue.id, timeWindow]);
 
     useEffect(() => {
-        void fetchData();
+        let active = true;
+        Promise.resolve().then(() => {
+            if (active) void fetchData();
+        });
+        return () => {
+            active = false;
+        };
     }, [fetchData]);
 
     useEffect(() => {
+        let active = true;
         if (venue.id) {
-            void fetchOrderData();
+            Promise.resolve().then(() => {
+                if (active) void fetchOrderData();
+            });
         }
+        return () => {
+            active = false;
+        };
     }, [fetchOrderData, venue.id, timeWindow]);
 
     const categories = useMemo(
@@ -1364,7 +1376,7 @@ function ItemModal({ item, onSave, onClose, onDelete }: {
     onDelete?: () => void;
 }) {
     const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
-    const [draft, setDraft] = useState<InventoryRow>(item ?? {
+    const [draft, setDraft] = useState<InventoryRow>(() => item ?? {
         id: `inv-${Date.now()}`,
         venue_id: "",
         product_id: null,

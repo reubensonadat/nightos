@@ -8,6 +8,8 @@ import {
     PencilSquareIcon,
     PhoneIcon,
     PlusIcon,
+     
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     ShieldCheckIcon,
     XMarkIcon,
 } from "@heroicons/react/24/outline";
@@ -101,18 +103,25 @@ export function StaffManagerScreen() {
 
     const filtered = useMemo(
         () =>
-            staff.filter((s) => {
-                if (roleFilter !== "all" && s.role !== roleFilter) return false;
-                if (search.trim()) {
-                    const q = search.toLowerCase();
-                    return (
-                        s.name.toLowerCase().includes(q) ||
-                        s.phone.toLowerCase().includes(q) ||
-                        (s.email ?? "").toLowerCase().includes(q)
-                    );
-                }
-                return true;
-            }),
+            staff
+                .filter((s) => {
+                    if (roleFilter !== "all" && s.role !== roleFilter) return false;
+                    if (search.trim()) {
+                        const q = search.toLowerCase();
+                        return (
+                            s.name.toLowerCase().includes(q) ||
+                            s.phone.toLowerCase().includes(q) ||
+                            (s.email ?? "").toLowerCase().includes(q)
+                        );
+                    }
+                    return true;
+                })
+                .sort((a, b) => {
+                    if (a.is_active !== b.is_active) {
+                        return a.is_active ? -1 : 1;
+                    }
+                    return a.name.localeCompare(b.name);
+                }),
         [staff, roleFilter, search],
     );
 
@@ -484,117 +493,121 @@ export function StaffManagerScreen() {
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-isabelline">
-                                {tableData.map((s) => {
-                                    const isOnShift = shiftStaffIds.has(s.id);
-                                    return (
-                                        <tr
-                                            key={s.id}
-                                            className="hover:bg-isabelline/30 transition-colors cursor-pointer"
-                                            onClick={() => setSelectedStaff(s)}
-                                        >
-                                            <td className="px-4 py-2.5">
-                                                <div className="flex items-center gap-2.5">
-                                                    <div className="w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold shrink-0 bg-khaki/20 text-khaki">
-                                                        {s.name.charAt(0)}
-                                                    </div>
-                                                    <div className="min-w-0">
-                                                        <p className="truncate text-sm font-bold text-slate-900 tracking-tight">{s.name}</p>
-                                                        <p className="truncate text-xs font-medium text-slate-500 mt-0.5">{s.phone}</p>
-                                                    </div>
+                                {tableData.map((s) => (
+                                    <tr
+                                        key={s.id}
+                                        className={clsx(
+                                            "transition-colors cursor-pointer",
+                                            s.is_active ? "hover:bg-isabelline/30" : "bg-slate-50/60 opacity-55 hover:bg-slate-100/50"
+                                        )}
+                                        onClick={() => setSelectedStaff(s)}
+                                    >
+                                        <td className="px-4 py-2.5">
+                                            <div className="flex items-center gap-2.5">
+                                                <div className={clsx(
+                                                    "w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold shrink-0",
+                                                    s.is_active ? "bg-khaki/20 text-khaki" : "bg-slate-200 text-slate-400"
+                                                )}>
+                                                    {s.name.charAt(0)}
                                                 </div>
-                                            </td>
-                                            <td className="px-4 py-2.5">
-                                                <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">
-                                                    {roleLabel(s.role)}
+                                                <div className="min-w-0">
+                                                    <p className={clsx(
+                                                        "truncate text-sm font-bold tracking-tight",
+                                                        s.is_active ? "text-slate-900" : "text-slate-400 line-through decoration-slate-300"
+                                                    )}>
+                                                        {s.name}
+                                                    </p>
+                                                    <p className="truncate text-xs font-medium text-slate-400 mt-0.5">{s.phone}</p>
+                                                </div>
+                                            </div>
+                                        </td>
+                                        <td className="px-4 py-2.5">
+                                            <span className={clsx(
+                                                "text-xs font-semibold uppercase tracking-wider",
+                                                s.is_active ? "text-slate-500" : "text-slate-400"
+                                            )}>
+                                                {roleLabel(s.role)}
+                                            </span>
+                                        </td>
+                                        <td className="px-4 py-2.5">
+                                            {!s.is_active ? (
+                                                <span className="inline-flex items-center gap-1 text-xs font-bold uppercase tracking-wider text-rose-500/75 bg-rose-50/80 px-2 py-0.5 rounded-full border border-rose-200/50">
+                                                    Deactivated
                                                 </span>
-                                            </td>
-                                            <td className="px-4 py-2.5">
-                                                <span
-                                                    className={clsx(
-                                                        "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold",
-                                                        isOnShift
-                                                            ? "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-600/20"
-                                                            : "bg-slate-100 text-slate-500",
-                                                    )}
-                                                >
-                                                    {isOnShift && <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />}
-                                                    {isOnShift ? "On Shift" : "Off Duty"}
-                                                </span>
-                                            </td>
-                                            <td className="px-4 py-2.5">
-                                                <span
-                                                    className={clsx(
-                                                        "inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold",
-                                                        s.is_active
-                                                            ? "text-slate-600 bg-slate-100"
-                                                            : "text-rose-700 bg-rose-50 ring-1 ring-rose-200",
-                                                    )}
-                                                >
-                                                    {s.is_active ? "Active" : "Deactivated"}
-                                                </span>
-                                            </td>
-                                            <td className="px-4 py-2.5 text-right">
-                                                {s.role === "waiter" && s.is_active && (
-                                                    <span className="text-xs font-semibold tracking-tight text-feldgrau">
-                                                        max {s.max_tables} tables
+                                            ) : (
+                                                <div className="flex items-center gap-2">
+                                                    <span className={clsx(
+                                                        "inline-flex items-center gap-1 text-xs font-bold uppercase tracking-wider",
+                                                        shiftStaffIds.has(s.id) ? "text-emerald-600" : "text-feldgrau",
+                                                    )}>
+                                                        {shiftStaffIds.has(s.id) ? "On Shift" : "Off Duty"}
                                                     </span>
-                                                )}
-                                            </td>
-                                        </tr>
-                                    );
-                                })}
+                                                </div>
+                                            )}
+                                        </td>
+                                        <td className="px-4 py-2.5 text-right">
+                                            {s.role === "waiter" && s.is_active && (
+                                                <span className="text-xs font-semibold tracking-tight text-feldgrau">
+                                                    max {s.max_tables} tables
+                                                </span>
+                                            )}
+                                        </td>
+                                    </tr>
+                                ))}
                             </tbody>
                         </table>
 
                         {/* Mobile cards */}
                         <div className="md:hidden divide-y divide-isabelline">
-                            {tableData.map((s) => {
-                                const isOnShift = shiftStaffIds.has(s.id);
-                                return (
-                                    <div
-                                        key={s.id}
-                                        className="px-4 py-3.5 cursor-pointer active:bg-isabelline/50 transition-colors"
-                                        onClick={() => setSelectedStaff(s)}
-                                    >
-                                        <div className="flex items-center justify-between gap-3">
-                                            <div className="flex items-center gap-3 min-w-0">
-                                                <div className="w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold shrink-0 bg-khaki/20 text-khaki">
-                                                    {s.name.charAt(0)}
-                                                </div>
-                                                <div className="min-w-0">
-                                                    <p className="truncate text-sm font-bold text-slate-900 tracking-tight">{s.name}</p>
-                                                    <div className="mt-0.5 flex items-center gap-1.5 flex-wrap">
-                                                        <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">
-                                                            {roleLabel(s.role)}
-                                                        </span>
-                                                        <span className="text-slate-300">·</span>
-                                                        <span className="text-[11px] text-slate-400">{s.phone}</span>
-                                                    </div>
-                                                </div>
-                                            </div>
-
-                                            <div className="flex flex-col items-end gap-1 shrink-0">
-                                                <span
-                                                    className={clsx(
-                                                        "inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold",
-                                                        isOnShift
-                                                            ? "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-600/20"
-                                                            : "bg-slate-100 text-slate-500",
-                                                    )}
-                                                >
-                                                    {isOnShift && <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />}
-                                                    {isOnShift ? "On Shift" : "Off Duty"}
+                            {tableData.map((s) => (
+                                <div
+                                    key={s.id}
+                                    className={clsx(
+                                        "px-4 py-3 cursor-pointer active:bg-isabelline/50 transition-colors",
+                                        s.is_active ? "" : "bg-slate-50/60 opacity-55"
+                                    )}
+                                    onClick={() => setSelectedStaff(s)}
+                                >
+                                    <div className="flex items-center gap-3">
+                                        <div className={clsx(
+                                            "w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold shrink-0",
+                                            s.is_active ? "bg-khaki/20 text-khaki" : "bg-slate-200 text-slate-400"
+                                        )}>
+                                            {s.name.charAt(0)}
+                                        </div>
+                                        <div className="min-w-0 flex-1">
+                                            <div className="flex flex-col">
+                                                <p className={clsx(
+                                                    "truncate text-sm font-bold tracking-tight",
+                                                    s.is_active ? "text-slate-900" : "text-slate-400 line-through decoration-slate-300"
+                                                )}>
+                                                    {s.name}
+                                                </p>
+                                                <span className={clsx(
+                                                    "text-xs font-semibold uppercase tracking-wider mt-0.5",
+                                                    s.is_active ? "text-slate-500" : "text-slate-400"
+                                                )}>
+                                                    {roleLabel(s.role)}
                                                 </span>
-                                                {!s.is_active && (
-                                                    <span className="text-[9px] font-bold uppercase text-rose-600 bg-rose-50 px-1.5 py-0.2 rounded ring-1 ring-rose-200">
+                                            </div>
+                                            <div className="mt-0.5 flex items-center gap-2 text-xs">
+                                                {!s.is_active ? (
+                                                    <span className="inline-flex items-center gap-1 text-xs font-bold uppercase tracking-wider text-rose-500/75 bg-rose-50/80 px-2 py-0.5 rounded-full border border-rose-200/50">
                                                         Deactivated
+                                                    </span>
+                                                ) : (
+                                                    <span className={clsx(
+                                                        "inline-flex items-center gap-1",
+                                                        shiftStaffIds.has(s.id) ? "text-emerald-600" : "text-feldgrau",
+                                                    )}>
+                                                        {shiftStaffIds.has(s.id) ? "On Shift" : "Off Duty"}
                                                     </span>
                                                 )}
                                             </div>
                                         </div>
                                     </div>
-                                );
-                            })}
+                                </div>
+                            ))}
                         </div>
                     </>
                 )}
@@ -910,7 +923,7 @@ function AddStaffModal({ onAdd, onClose }: {
     const [email, setEmail] = useState("");
     const [phone, setPhone] = useState("");
     const [role, setRole] = useState("waiter");
-    const [payModel, setPayModel] = useState<"hourly" | "salary">("hourly");
+    const [payModel, setPayModel] = useState<"hourly" | "salary">("salary");
     const [hourlyRate, setHourlyRate] = useState(25);
     const [salaryAmount, setSalaryAmount] = useState(0);
     const [maxTables, setMaxTables] = useState(6);
@@ -978,7 +991,7 @@ function AddStaffModal({ onAdd, onClose }: {
                     <div>
                         <label className="text-xs font-bold uppercase text-feldgrau">Pay</label>
                         <div className="mt-1 grid grid-cols-2 gap-2">
-                            {([["hourly", "Hourly"], ["salary", "Salary/mo"]] as const).map(([val, lbl]) => (
+                            {([["salary", "Salary/mo"], ["hourly", "Hourly"]] as const).map(([val, lbl]) => (
                                 <button
                                     key={val}
                                     type="button"
@@ -997,19 +1010,19 @@ function AddStaffModal({ onAdd, onClose }: {
                         {payModel === "hourly" ? (
                             <div>
                                 <label className="text-xs font-bold uppercase text-feldgrau">Hourly Rate (GHS)</label>
-                                <input type="number" min={0} value={hourlyRate} onChange={(e) => setHourlyRate(parseInt(e.target.value) || 0)}
+                                <input type="number" min={0} value={hourlyRate === 0 ? "" : hourlyRate} onChange={(e) => setHourlyRate(e.target.value === "" ? 0 : Math.max(0, parseInt(e.target.value, 10) || 0))} placeholder="0"
                                     className="mt-1 w-full rounded-lg bg-isabelline px-3 py-2 font-mono text-[12px] tabular-nums text-licorice ring-1 ring-licorice/8 focus:outline-none focus:ring-2 focus:ring-licorice/20" />
                             </div>
                         ) : (
                             <div>
                                 <label className="text-xs font-bold uppercase text-feldgrau">Salary (GHS/mo)</label>
-                                <input type="number" min={0} value={salaryAmount} onChange={(e) => setSalaryAmount(parseInt(e.target.value) || 0)}
+                                <input type="number" min={0} value={salaryAmount === 0 ? "" : salaryAmount} onChange={(e) => setSalaryAmount(e.target.value === "" ? 0 : Math.max(0, parseInt(e.target.value, 10) || 0))} placeholder="0"
                                     className="mt-1 w-full rounded-lg bg-isabelline px-3 py-2 font-mono text-[12px] tabular-nums text-licorice ring-1 ring-licorice/8 focus:outline-none focus:ring-2 focus:ring-licorice/20" />
                             </div>
                         )}
                         <div>
                             <label className="text-xs font-bold uppercase text-feldgrau">Max Tables</label>
-                            <input type="number" min={1} max={20} value={maxTables} onChange={(e) => setMaxTables(parseInt(e.target.value) || 1)}
+                            <input type="number" min={1} max={20} value={maxTables === 0 ? "" : maxTables} onChange={(e) => setMaxTables(e.target.value === "" ? 1 : Math.max(1, parseInt(e.target.value, 10) || 1))} placeholder="6"
                                 className="mt-1 w-full rounded-lg bg-isabelline px-3 py-2 font-mono text-[12px] tabular-nums text-licorice ring-1 ring-licorice/8 focus:outline-none focus:ring-2 focus:ring-licorice/20" />
                         </div>
                     </div>
@@ -1080,7 +1093,7 @@ function EditStaffModal({ staff, onSave, onClose }: {
 }) {
     const [role, setRole] = useState(staff.role);
     const [email, setEmail] = useState(staff.email ?? "");
-    const [payModel, setPayModel] = useState<"hourly" | "salary">(staff.pay_model ?? "hourly");
+    const [payModel, setPayModel] = useState<"hourly" | "salary">(staff.pay_model ?? "salary");
     const [hourlyRate, setHourlyRate] = useState(staff.hourly_rate || 0);
     const [salaryAmount, setSalaryAmount] = useState(staff.salary_amount ?? 0);
     const [maxTables, setMaxTables] = useState(staff.max_tables);
@@ -1141,7 +1154,7 @@ function EditStaffModal({ staff, onSave, onClose }: {
                     <div>
                         <label className="text-xs font-bold uppercase text-feldgrau">Pay</label>
                         <div className="mt-1 grid grid-cols-2 gap-2">
-                            {([["hourly", "Hourly"], ["salary", "Salary/mo"]] as const).map(([val, lbl]) => (
+                            {([["salary", "Salary/mo"], ["hourly", "Hourly"]] as const).map(([val, lbl]) => (
                                 <button
                                     key={val}
                                     type="button"
@@ -1161,19 +1174,19 @@ function EditStaffModal({ staff, onSave, onClose }: {
                         {payModel === "hourly" ? (
                             <div>
                                 <label className="text-xs font-bold uppercase text-feldgrau">Hourly Rate (GHS)</label>
-                                <input type="number" min={0} value={hourlyRate} onChange={(e) => setHourlyRate(parseInt(e.target.value) || 0)}
+                                <input type="number" min={0} value={hourlyRate === 0 ? "" : hourlyRate} onChange={(e) => setHourlyRate(e.target.value === "" ? 0 : Math.max(0, parseInt(e.target.value, 10) || 0))} placeholder="0"
                                     className="mt-1 w-full rounded-lg bg-isabelline px-3 py-2 font-mono text-[12px] tabular-nums text-licorice ring-1 ring-licorice/8 focus:outline-none focus:ring-2 focus:ring-licorice/20" />
                             </div>
                         ) : (
                             <div>
                                 <label className="text-xs font-bold uppercase text-feldgrau">Salary (GHS/mo)</label>
-                                <input type="number" min={0} value={salaryAmount} onChange={(e) => setSalaryAmount(parseInt(e.target.value) || 0)}
+                                <input type="number" min={0} value={salaryAmount === 0 ? "" : salaryAmount} onChange={(e) => setSalaryAmount(e.target.value === "" ? 0 : Math.max(0, parseInt(e.target.value, 10) || 0))} placeholder="0"
                                     className="mt-1 w-full rounded-lg bg-isabelline px-3 py-2 font-mono text-[12px] tabular-nums text-licorice ring-1 ring-licorice/8 focus:outline-none focus:ring-2 focus:ring-licorice/20" />
                             </div>
                         )}
                         <div>
                             <label className="text-xs font-bold uppercase text-feldgrau">Max Tables</label>
-                            <input type="number" min={1} max={20} value={maxTables} onChange={(e) => setMaxTables(parseInt(e.target.value) || 1)}
+                            <input type="number" min={1} max={20} value={maxTables === 0 ? "" : maxTables} onChange={(e) => setMaxTables(e.target.value === "" ? 1 : Math.max(1, parseInt(e.target.value, 10) || 1))} placeholder="6"
                                 className="mt-1 w-full rounded-lg bg-isabelline px-3 py-2 font-mono text-[12px] tabular-nums text-licorice ring-1 ring-licorice/8 focus:outline-none focus:ring-2 focus:ring-licorice/20" />
                         </div>
                     </div>
