@@ -2,9 +2,17 @@ export type ManagerSignOutModalProps = {
     isOpen: boolean;
     onClose: () => void;
     onSignOut: () => void;
+    onSwitchToKitchen?: () => void;
+    onSwitchToWaiter?: () => void;
 };
 
-export function ManagerSignOutModal({ isOpen, onClose, onSignOut }: ManagerSignOutModalProps) {
+export function ManagerSignOutModal({
+    isOpen,
+    onClose,
+    onSignOut,
+    onSwitchToKitchen,
+    onSwitchToWaiter,
+}: ManagerSignOutModalProps) {
     if (!isOpen) return null;
 
     return (
@@ -25,13 +33,37 @@ export function ManagerSignOutModal({ isOpen, onClose, onSignOut }: ManagerSignO
                 </div>
 
                 <div className="px-6 pt-5 pb-2 md:pt-6">
-                    <h2 className="text-[17px] font-bold tracking-tight text-licorice">Sign out?</h2>
+                    <h2 className="text-[17px] font-bold tracking-tight text-licorice">Switch View or Sign Out</h2>
                     <p className="mt-2 text-[13px] leading-relaxed text-feldgrau">
-                        You'll be taken back to the login screen.
+                        Choose another dashboard to open or sign out of your session.
                     </p>
                 </div>
 
                 <div className="flex flex-col gap-2 px-6 pt-4 pb-[max(env(safe-area-inset-bottom),24px)]">
+                    {onSwitchToKitchen && (
+                        <button
+                            type="button"
+                            onClick={() => {
+                                onSwitchToKitchen();
+                                onClose();
+                            }}
+                            className="w-full rounded-full bg-white py-3.5 text-[13px] font-bold tracking-tight text-licorice ring-1 ring-licorice/12 transition-all hover:bg-licorice/5 active:scale-[0.98]"
+                        >
+                            Kitchen Display
+                        </button>
+                    )}
+                    {onSwitchToWaiter && (
+                        <button
+                            type="button"
+                            onClick={() => {
+                                onSwitchToWaiter();
+                                onClose();
+                            }}
+                            className="w-full rounded-full bg-white py-3.5 text-[13px] font-bold tracking-tight text-licorice ring-1 ring-licorice/12 transition-all hover:bg-licorice/5 active:scale-[0.98]"
+                        >
+                            Waiter Dashboard
+                        </button>
+                    )}
                     <button
                         type="button"
                         onClick={onSignOut}
@@ -44,7 +76,7 @@ export function ManagerSignOutModal({ isOpen, onClose, onSignOut }: ManagerSignO
                         onClick={onClose}
                         className="w-full rounded-full bg-white py-3.5 text-[13px] font-bold text-feldgrau ring-1 ring-licorice/8 transition-colors hover:text-licorice active:scale-[0.98]"
                     >
-                        Stay
+                        Cancel
                     </button>
                 </div>
             </div>

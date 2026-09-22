@@ -1,4 +1,5 @@
 import { useState, type FormEvent, type ReactNode } from "react";
+import { useNavigate } from "react-router-dom";
 import {
     ArrowRightIcon,
     BanknotesIcon,
@@ -159,17 +160,9 @@ export function AdminLoginScreen({ onSignIn }: LoginProps) {
     );
 }
 
-/* ────────────────────────── Manager Shell ────────────────────────── */
+/* ────────────────────────── Navigation Configuration ────────────────────────── */
 
-export type ManagerPage =
-    | "ops"
-    | "shift-report"
-    | "floorplan"
-    | "orders"
-    | "menu"
-    | "staff"
-    | "finance"
-    | "crm";
+export type ManagerPage = "ops" | "shift-report" | "floorplan" | "orders" | "menu" | "staff" | "finance" | "crm" | "brand";
 
 type NavItem = {
     id: ManagerPage;
@@ -178,15 +171,18 @@ type NavItem = {
 };
 
 const NAV_ITEMS: NavItem[] = [
-    { id: "ops", label: "Dashboard", icon: Squares2X2Icon },
-    { id: "shift-report", label: "Shift Report", icon: DocumentChartBarIcon },
-    { id: "floorplan", label: "Tables", icon: MapIcon },
-    { id: "orders", label: "All Orders", icon: ClipboardDocumentListIcon },
-    { id: "menu", label: "Menu & Inventory", icon: ClipboardDocumentCheckIcon },
-    { id: "staff", label: "Staff & Roles", icon: UsersIcon },
-    { id: "finance", label: "Financial Reports", icon: BanknotesIcon },
-    { id: "crm", label: "CRM & Marketing", icon: MegaphoneIcon },
+    { id: "ops", label: "Live Ops", icon: Squares2X2Icon },
+    { id: "shift-report", label: "Shift Reports", icon: DocumentChartBarIcon },
+    { id: "floorplan", label: "Floor Plan", icon: MapIcon },
+    { id: "orders", label: "Order History", icon: ClipboardDocumentListIcon },
+    { id: "menu", label: "Menu Management", icon: ClipboardDocumentCheckIcon },
+    { id: "staff", label: "Staff Directory", icon: UsersIcon },
+    { id: "finance", label: "Finance & Payroll", icon: BanknotesIcon },
+    { id: "crm", label: "Customer CRM", icon: UserCircleIcon },
+    { id: "brand", label: "Brand Settings", icon: MegaphoneIcon },
 ];
+
+/* ────────────────────────── Manager Shell Component ────────────────────────── */
 
 type ShellProps = {
     managerName: string;
@@ -197,6 +193,7 @@ type ShellProps = {
 };
 
 export function ManagerShell({ managerName, activePage, onPageChange, onSignOut, children }: ShellProps) {
+    const navigate = useNavigate();
     const [mobileNavOpen, setMobileNavOpen] = useState(false);
     const [showSignOutModal, setShowSignOutModal] = useState(false);
 
@@ -371,6 +368,8 @@ export function ManagerShell({ managerName, activePage, onPageChange, onSignOut,
                 isOpen={showSignOutModal}
                 onClose={() => setShowSignOutModal(false)}
                 onSignOut={onSignOut}
+                onSwitchToKitchen={() => navigate("/kitchen")}
+                onSwitchToWaiter={() => navigate("/waiter")}
             />
         </div>
     );
