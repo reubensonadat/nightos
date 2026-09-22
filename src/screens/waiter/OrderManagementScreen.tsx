@@ -55,6 +55,10 @@ const STATUS_META: Record<string, { label: string; cls: string }> = {
 
 const menuCache = new Map<string, { categories: DbMenuCategory[]; products: DbProduct[] }>();
 
+export function clearMenuCache(): void {
+    menuCache.clear();
+}
+
 function statusMeta(status: string) {
     return STATUS_META[status] ?? { label: status, cls: "bg-isabelline text-feldgrau ring-licorice/10" };
 }

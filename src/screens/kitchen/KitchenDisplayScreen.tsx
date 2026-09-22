@@ -386,7 +386,7 @@ export function KitchenDisplayScreen({ venueId, staffId, staffName, onExit, onSi
                 isOpen={showSignOutModal}
                 pendingTicketsCount={pendingCount + preparingCount}
                 onClose={() => setShowSignOutModal(false)}
-                onSignOut={onExit || (() => {})}
+                onSignOut={onSignOut || onExit || (() => {})}
             />
 
             {/* K4 — Mark Served confirm */}

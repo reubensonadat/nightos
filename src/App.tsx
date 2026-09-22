@@ -540,16 +540,13 @@ function AppShell() {
     setMode("customer");
   };
 
-  const handleStaffSignOut = () => {
-    const staffId = staffSession?.id;
-    if (staffId) db.clockOutStaff(staffId).catch(() => { });
-    signOut();
-  };
-
-  const handleManagerSignOut = async () => {
-    await signOut();
-    setMode("customer");
-    navigate("/", { replace: true });
+  const handleSignOut = async () => {
+    try {
+      await signOut();
+    } finally {
+      setMode("customer");
+      navigate("/login", { replace: true });
+    }
   };
 
   if (!authVenue && !venueLoading && venueError) {
@@ -586,26 +583,28 @@ function AppShell() {
       {mode === "waiter" && (
         <Routes>
           <Route path="/waiter" element={
-            (staffSession || role === "owner") ? (
+            (staffSession || role === "owner" || role === "manager" || role === "waiter") ? (
               <TablesDashboard
                 venueId={staffSession?.venue_id || authVenue?.id || venueId || ""}
                 staffName={staffSession?.name || profile?.name || "Manager"}
                 staffId={staffSession?.id || user?.id || ""}
                 role={staffSession?.role || "manager"}
-                onSignOut={handleStaffSignOut}
+                onSignOut={handleSignOut}
               />
             ) : (
-              <Navigate to="/waiter/login" replace />
+              <Navigate to="/login" replace />
             )
           } />
-          <Route path="/waiter/login" element={
-            !(staffSession || role === "owner") ? <StaffAuthScreen /> : <Navigate to="/waiter" replace />
-          } />
+          <Route path="/waiter/login" element={<Navigate to="/login" replace />} />
           <Route path="/waiter/shift" element={
-            <ShiftPerformanceScreen
-              staffId={staffSession?.id || user?.id || ""}
-              staffName={staffSession?.name || profile?.name || "Manager"}
-            />
+            (staffSession || role === "owner" || role === "manager" || role === "waiter") ? (
+              <ShiftPerformanceScreen
+                staffId={staffSession?.id || user?.id || ""}
+                staffName={staffSession?.name || profile?.name || "Manager"}
+              />
+            ) : (
+              <Navigate to="/login" replace />
+            )
           } />
           <Route path="/waiter/table/:tableId" element={<TableLayout />}>
             <Route index element={<OrderManagementScreen />} />
@@ -616,16 +615,16 @@ function AppShell() {
       )}
 
       {mode === "kitchen" && (
-        (staffSession || role === "owner") ? (
+        (staffSession || role === "owner" || role === "manager" || role === "kitchen") ? (
           <KitchenDisplayScreen
             venueId={staffSession?.venue_id || authVenue?.id || venueId || ""}
             staffId={staffSession?.id || user?.id || ""}
             staffName={staffSession?.name || profile?.name || "Manager"}
             onExit={switchToCustomer}
-            onSignOut={handleStaffSignOut}
+            onSignOut={handleSignOut}
           />
         ) : (
-          <StaffAuthScreen />
+          <Navigate to="/login" replace />
         )
       )}
 
@@ -633,10 +632,10 @@ function AppShell() {
         <ProtectedRoute>
           <VenueRequired>
             <ManagerShell
-              managerName={user?.email?.split("@")[0] || "Manager"}
+              managerName={user?.email?.split("@")[0] || profile?.name || staffSession?.name || "Manager"}
               activePage={managerPage}
               onPageChange={goToManagerPage}
-              onSignOut={handleManagerSignOut}
+              onSignOut={handleSignOut}
             >
               {managerPage === "ops" && <LiveOpsScreen onNavigate={goToManagerPage} />}
               {managerPage === "shift-report" && <ShiftReportScreen />}

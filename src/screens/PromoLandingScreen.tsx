@@ -1,4 +1,5 @@
 import { useState, useRef } from "react";
+import { useNavigate } from "react-router-dom";
 import { ArrowRightIcon, Bars3Icon, XMarkIcon } from "@heroicons/react/24/outline";
 import { GuestExperienceSection } from "./GuestExperienceSection";
 import { FAQSection } from "./FAQSection";
@@ -9,6 +10,7 @@ import { KitchenDisplayPromoSection } from "./KitchenDisplayPromoSection";
 import { ManagerDashboardPromoSection } from "./ManagerDashboardPromoSection";
 
 export function PromoLandingScreen() {
+  const navigate = useNavigate();
   const [isScrolled, setIsScrolled] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -57,6 +59,12 @@ export function PromoLandingScreen() {
             <a href="#" className="text-[14px] font-medium hover:text-white transition-colors">Pricing</a>
             <a href="#" className="text-[14px] font-medium hover:text-white transition-colors">Integrations</a>
             <a href="#" className="text-[14px] font-medium hover:text-white transition-colors">About</a>
+            <button
+              onClick={() => navigate('/login')}
+              className="text-[14px] font-semibold text-[#c9935a] hover:text-white transition-colors"
+            >
+              Sign In
+            </button>
             <button className="bg-[#c9935a] text-[#1a110b] px-6 py-2.5 rounded text-[14px] font-semibold hover:bg-[#d8a46b] transition-colors">
               Book a Demo
             </button>
@@ -73,7 +81,16 @@ export function PromoLandingScreen() {
           <a href="#" className="text-[16px] font-medium hover:text-white transition-colors">Pricing</a>
           <a href="#" className="text-[16px] font-medium hover:text-white transition-colors">Integrations</a>
           <a href="#" className="text-[16px] font-medium hover:text-white transition-colors">About</a>
-          <button className="bg-[#c9935a] text-[#1a110b] w-full py-3 mt-2 rounded text-[15px] font-semibold hover:bg-[#d8a46b] transition-colors">
+          <button
+            onClick={() => {
+              setIsMobileMenuOpen(false);
+              navigate('/login');
+            }}
+            className="w-full py-3 text-center rounded text-[15px] font-semibold border border-[#c9935a]/30 text-[#c9935a] hover:bg-[#c9935a]/10 transition-colors"
+          >
+            Sign In
+          </button>
+          <button className="bg-[#c9935a] text-[#1a110b] w-full py-3 rounded text-[15px] font-semibold hover:bg-[#d8a46b] transition-colors">
             Book a Demo
           </button>
         </div>

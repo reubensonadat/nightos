@@ -50,9 +50,17 @@ export function cacheClear(): void {
     const keys: string[] = [];
     for (let i = 0; i < localStorage.length; i++) {
       const k = localStorage.key(i);
-      if (k && k.startsWith(CACHE_PREFIX)) keys.push(k);
+      if (k && (k.startsWith(CACHE_PREFIX) || k.startsWith('bysen:cache:'))) {
+        keys.push(k);
+      }
     }
-    keys.forEach((k) => localStorage.removeItem(k));
+    keys.forEach((k) => {
+      try {
+        localStorage.removeItem(k);
+      } catch {
+        /** ignore */
+      }
+    });
   } catch {
     /** silently fail */
   }

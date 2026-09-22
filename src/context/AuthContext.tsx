@@ -1,6 +1,8 @@
 import { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { authDb } from '../lib/db/auth'
+import { cacheClear } from '../lib/cache'
+import { clearMenuCache } from '../screens/waiter/OrderManagementScreen'
 import type { DbVenue, DbStaffSession } from '../lib/api'
 
 type AuthUser = import('@supabase/supabase-js').User
@@ -59,7 +61,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const currentUserIdRef = useRef<string | null>(null)
   const lastPhoneRef = useRef<string | null>(null)
 
-  const loadUserData = async (userId: string, userPhone: string | null = null): Promise<string | null> => {
+  const loadUserData = async (
+    userId: string,
+    userPhone: string | null = null,
+    userEmail: string | null = null,
+  ): Promise<string | null> => {
     if (!userId) {
       setProfile(null)
       setVenue(null)
@@ -68,64 +74,151 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return null
     }
 
+    // 1. Check if user owns a venue
     const { data: v } = await authDb.venueByOwner(userId)
     if (v) {
-      setVenue(v as DbVenue)
+      const venueObj = v as DbVenue
+      setVenue(venueObj)
       setRole('owner')
       setStaffSession(null)
+      setProfile({
+        id: userId,
+        email: userEmail ?? (venueObj.email || null),
+        phone_number: userPhone ?? (venueObj.phone || null),
+        name: venueObj.name || null,
+      })
       return 'owner'
-    } else {
-      const phoneToCheck = userPhone ?? lastPhoneRef.current
-      if (phoneToCheck) {
-        // Find staff
-        const { data: staffData } = await authDb.venueByStaffPhone(phoneToCheck)
-        if (staffData) {          const sd = staffData as Record<string, unknown>
-          setVenue(sd.venue as DbVenue)
-          setRole(sd.role as string)
-
-          // Also populate staffSession for App.tsx backward compatibility
-          const { data, error } = await supabase.rpc('get_staff_profile_by_phone', { p_phone: phoneToCheck }).single();
-          if (error) {
-            console.warn('[AuthContext] get_staff_profile_by_phone failed:', error)
-          }
-          const fullStaffData = data as Record<string, unknown>;
-            
-          if (fullStaffData && fullStaffData.venue_id) {
-             setStaffSession({
-                id: fullStaffData.id as string,
-                name: fullStaffData.name as string,
-                role: fullStaffData.role as DbStaffSession['role'],
-                venue_id: fullStaffData.venue_id as string,
-                venue_name: fullStaffData.venue_name as string,
-                venue_slug: fullStaffData.venue_slug as string,
-                area_assignment: fullStaffData.area_assignment as string | null,
-                max_tables: fullStaffData.max_tables as number,
-             })
-
-             // Auto clock-in — idempotent, so session reloads and token
-             // refreshes reuse the existing active shift instead of stacking.
-             ;(async () => {
-               try { await supabase.rpc('clock_in_staff', { p_staff_id: fullStaffData.id }) } catch { /* non-fatal */ }
-             })()
-          }
-          return sd.role as string
-        }
-        // No staff match — maybe the venue owner signed in with the
-        // venue's own phone number (or their number listed on it).
-        const { data: ownerByPhone } = await authDb.venueByPhone(phoneToCheck)
-        if (ownerByPhone) {
-          const od = ownerByPhone as Record<string, unknown>
-          setVenue(od.venue as DbVenue)
-          setRole('owner')
-          setStaffSession(null)
-          return 'owner'
-        }
-      }
-      setVenue(null)
-      setRole(null)
-      setStaffSession(null)
-      return null
     }
+
+    // 2. Check if phone is linked to staff or venue
+    const rawPhone = userPhone?.trim() || null
+    if (rawPhone) {
+      const { data: staffData } = await authDb.venueByStaffPhone(rawPhone)
+      if (staffData) {
+        const sd = staffData as Record<string, unknown>
+        setVenue(sd.venue as DbVenue)
+        setRole(sd.role as string)
+
+        const { data, error } = await supabase
+          .rpc('get_staff_profile_by_phone', { p_phone: rawPhone })
+          .single()
+        if (error) {
+          console.warn('[AuthContext] get_staff_profile_by_phone failed:', error)
+        }
+        const fullStaffData = data as Record<string, unknown>
+
+        if (fullStaffData && fullStaffData.venue_id) {
+          setStaffSession({
+            id: fullStaffData.id as string,
+            name: fullStaffData.name as string,
+            role: fullStaffData.role as DbStaffSession['role'],
+            venue_id: fullStaffData.venue_id as string,
+            venue_name: fullStaffData.venue_name as string,
+            venue_slug: fullStaffData.venue_slug as string,
+            area_assignment: fullStaffData.area_assignment as string | null,
+            max_tables: fullStaffData.max_tables as number,
+          })
+          setProfile({
+            id: userId,
+            email: (fullStaffData.email as string) || userEmail,
+            phone_number: (fullStaffData.phone as string) || rawPhone,
+            name: fullStaffData.name as string,
+          })
+
+          try {
+            await supabase.rpc('clock_in_staff', { p_staff_id: fullStaffData.id })
+          } catch {
+            /* non-fatal */
+          }
+        }
+        return sd.role as string
+      }
+
+      // Check if owner by phone
+      const { data: ownerByPhone } = await authDb.venueByPhone(rawPhone)
+      if (ownerByPhone) {
+        const od = ownerByPhone as Record<string, unknown>
+        const venueObj = od.venue as DbVenue
+        setVenue(venueObj)
+        setRole('owner')
+        setStaffSession(null)
+        setProfile({
+          id: userId,
+          email: userEmail ?? (venueObj.email || null),
+          phone_number: rawPhone,
+          name: venueObj.name || null,
+        })
+        return 'owner'
+      }
+    }
+
+    // 3. Check if user matches a staff row by email
+    const rawEmail = userEmail?.trim() || null
+    if (rawEmail) {
+      const { data: staffByEmail } = await supabase
+        .from('staff')
+        .select('id, name, phone, email, role, venue_id, is_active, area_assignment, max_tables, venues!inner(*)')
+        .ilike('email', rawEmail)
+        .eq('is_active', true)
+        .maybeSingle()
+
+      if (staffByEmail && staffByEmail.venue_id) {
+        const venueObj = staffByEmail.venues as unknown as DbVenue
+        setVenue(venueObj)
+        setRole(staffByEmail.role)
+        setStaffSession({
+          id: staffByEmail.id,
+          name: staffByEmail.name,
+          role: staffByEmail.role as DbStaffSession['role'],
+          venue_id: staffByEmail.venue_id,
+          venue_name: venueObj.name,
+          venue_slug: venueObj.slug,
+          area_assignment: staffByEmail.area_assignment,
+          max_tables: staffByEmail.max_tables,
+        })
+        setProfile({
+          id: userId,
+          email: rawEmail,
+          phone_number: staffByEmail.phone,
+          name: staffByEmail.name,
+        })
+
+        try {
+          await supabase.rpc('clock_in_staff', { p_staff_id: staffByEmail.id })
+        } catch {
+          /* non-fatal */
+        }
+
+        return staffByEmail.role
+      }
+
+      // Check if venue matches email
+      const { data: venueByEmail } = await supabase
+        .from('venues')
+        .select('*')
+        .ilike('email', rawEmail)
+        .eq('is_active', true)
+        .maybeSingle()
+
+      if (venueByEmail) {
+        const venueObj = venueByEmail as DbVenue
+        setVenue(venueObj)
+        setRole('owner')
+        setStaffSession(null)
+        setProfile({
+          id: userId,
+          email: rawEmail,
+          phone_number: venueObj.phone || null,
+          name: venueObj.name || null,
+        })
+        return 'owner'
+      }
+    }
+
+    setVenue(null)
+    setRole(null)
+    setStaffSession(null)
+    return null
   }
 
   useEffect(() => {
@@ -138,7 +231,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setUser(sess.user)
         setSession(sess)
         try {
-          await loadUserData(sess.user.id, sess.user.phone)
+          await loadUserData(sess.user.id, sess.user.phone, sess.user.email)
         } catch (e) {
           console.error('[AuthContext] loadUserData failed on boot:', e)
         } finally {
@@ -160,12 +253,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setSession(sess ?? null)
 
       if (event === 'SIGNED_OUT' || !sess?.user) {
+        currentUserIdRef.current = null
+        lastPhoneRef.current = null
         setProfile(null)
         setVenue(null)
         setRole(null)
         setStaffSession(null)
       } else if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
-        await loadUserData(sess.user.id, sess.user.phone ?? lastPhoneRef.current)
+        await loadUserData(sess.user.id, sess.user.phone, sess.user.email)
       }
     })
 
@@ -176,10 +271,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [])
 
   const signIn = async (email: string, password: string) => {
+    cacheClear()
+    clearMenuCache()
     const { data, error } = await supabase.auth.signInWithPassword({ email, password })
     if (error) return { error, role: null }
     if (data.user) {
-      const resolved = await loadUserData(data.user.id, data.user.phone)
+      currentUserIdRef.current = data.user.id
+      setUser(data.user)
+      setSession(data.session)
+      const resolved = await loadUserData(data.user.id, data.user.phone, email)
       return { error: null, role: resolved }
     }
     return { error: null, role: null }
@@ -213,17 +313,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   const verifyPhoneOtp = async (phone: string, token: string) => {
+    cacheClear()
+    clearMenuCache()
     const { data, error } = await supabase.auth.verifyOtp({ phone, token, type: 'sms' })
     if (error) return { error, role: null }
     if (data.user) {
+      currentUserIdRef.current = data.user.id
       lastPhoneRef.current = phone
-      const resolved = await loadUserData(data.user.id, phone)
+      setUser(data.user)
+      setSession(data.session)
+      const resolved = await loadUserData(data.user.id, phone, data.user.email)
       return { error: null, role: resolved }
     }
     return { error: null, role: null }
   }
 
   const signUp = async (email: string, password: string) => {
+    cacheClear()
+    clearMenuCache()
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
@@ -239,7 +346,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setRole(null)
       setStaffSession(null)
       try {
-        await loadUserData(data.user.id, data.user.phone)
+        await loadUserData(data.user.id, data.user.phone, email)
       } catch (e) {
         console.warn('[AuthContext] loadUserData after signUp failed:', e)
       }
@@ -248,14 +355,113 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   const signOut = async () => {
-    await supabase.auth.signOut()
-    Object.keys(localStorage)
-      .filter((k) => k.startsWith('nightos:') || k.startsWith('bysen:'))
-      .forEach((k) => localStorage.removeItem(k))
-    Object.keys(sessionStorage)
-      .filter((k) => k.startsWith('nightos:') || k.startsWith('bysen:'))
-      .forEach((k) => sessionStorage.removeItem(k))
+    // 1. Clock out active staff member if present
+    try {
+      if (staffSession?.id) {
+        await supabase.rpc('clock_out_staff', { p_staff_id: staffSession.id })
+      }
+    } catch (e) {
+      console.warn('[AuthContext] clock_out_staff error on sign out:', e)
+    }
+
+    // 2. Invalidate Supabase session safely (global first, fallback to local)
+    try {
+      await supabase.auth.signOut({ scope: 'global' })
+    } catch {
+      try {
+        await supabase.auth.signOut({ scope: 'local' })
+      } catch (e) {
+        console.warn('[AuthContext] Supabase signOut error:', e)
+      }
+    }
+
+    // 3. Clear cache and in-memory caches
+    try {
+      cacheClear()
+    } catch {
+      /* ignore */
+    }
+    try {
+      clearMenuCache()
+    } catch {
+      /* ignore */
+    }
+
+    // 4. Purge localStorage completely for any app / auth tokens
+    try {
+      const keysToRemove: string[] = []
+      for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i)
+        if (
+          k &&
+          (k.startsWith('nightos:') ||
+            k.startsWith('bysen:') ||
+            k.startsWith('sb-') ||
+            k.includes('auth-token'))
+        ) {
+          keysToRemove.push(k)
+        }
+      }
+      keysToRemove.forEach((k) => {
+        try {
+          localStorage.removeItem(k)
+        } catch {
+          /* ignore */
+        }
+      })
+    } catch (e) {
+      console.warn('[AuthContext] Error purging localStorage:', e)
+    }
+
+    // 5. Purge sessionStorage completely
+    try {
+      const sessionKeysToRemove: string[] = []
+      for (let i = 0; i < sessionStorage.length; i++) {
+        const k = sessionStorage.key(i)
+        if (
+          k &&
+          (k.startsWith('nightos:') ||
+            k.startsWith('bysen:') ||
+            k.startsWith('sb-') ||
+            k.includes('auth-token') ||
+            k.includes('otp_pending'))
+        ) {
+          sessionKeysToRemove.push(k)
+        }
+      }
+      sessionKeysToRemove.forEach((k) => {
+        try {
+          sessionStorage.removeItem(k)
+        } catch {
+          /* ignore */
+        }
+      })
+    } catch (e) {
+      console.warn('[AuthContext] Error purging sessionStorage:', e)
+    }
+
+    // 6. Purge IndexedDB databases if accessible
+    if (typeof window !== 'undefined' && window.indexedDB && window.indexedDB.databases) {
+      try {
+        const dbs = await window.indexedDB.databases()
+        for (const dbInfo of dbs) {
+          if (
+            dbInfo.name &&
+            (dbInfo.name.includes('supabase') ||
+              dbInfo.name.includes('nightos') ||
+              dbInfo.name.includes('bysen'))
+          ) {
+            window.indexedDB.deleteDatabase(dbInfo.name)
+          }
+        }
+      } catch {
+        /* ignore */
+      }
+    }
+
+    // 7. Reset all React state & refs
     currentUserIdRef.current = null
+    lastPhoneRef.current = null
     setUser(null)
     setSession(null)
     setProfile(null)
@@ -272,7 +478,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const refreshStaffSession = async () => {
     if (!user?.id) return
-    await loadUserData(user.id, user.phone)
+    await loadUserData(user.id, user.phone, user.email)
   }
 
   const value = useMemo(
