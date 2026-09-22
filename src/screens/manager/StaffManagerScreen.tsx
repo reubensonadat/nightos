@@ -1,6 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
+    ArrowRightOnRectangleIcon,
     CheckIcon,
+    ClockIcon,
+    ExclamationTriangleIcon,
     MagnifyingGlassIcon,
     PencilSquareIcon,
     PhoneIcon,
@@ -69,6 +72,7 @@ export function StaffManagerScreen() {
     const [editingStaff, setEditingStaff] = useState<StaffRow | null>(null);
     const [coverage, setCoverage] = useState<ShiftCoverageRow[] | null>(null);
     const [deactivateConfirmStaff, setDeactivateConfirmStaff] = useState<StaffRow | null>(null);
+    const [endShiftConfirmStaff, setEndShiftConfirmStaff] = useState<ShiftCoverageRow | null>(null);
 
     const load = useCallback(async () => {
         // Wait until we have a real venue UUID (not the default placeholder).
@@ -79,8 +83,13 @@ export function StaffManagerScreen() {
             db.activeShiftsByVenue(venue.id),
             db.shiftCoverage(venue.id),
         ]);
+        const activeCoverageList = (coverageRows as ShiftCoverageRow[] | null)?.filter((c) => c.shift_id) ?? [];
+        const activeIds = new Set<string>([
+            ...(shifts ?? []).map((sh) => sh.staff_id),
+            ...activeCoverageList.map((c) => c.staff_id),
+        ]);
         setStaff(rows ?? []);
-        setShiftStaffIds(new Set((shifts ?? []).map((sh) => sh.staff_id)));
+        setShiftStaffIds(activeIds);
         setCoverage((coverageRows as ShiftCoverageRow[] | null) ?? null);
         setLoading(false);
     }, [venue.id]);
@@ -90,7 +99,7 @@ export function StaffManagerScreen() {
             await load();
         };
         init();
-        }, [load]);
+    }, [load]);
 
     const filtered = useMemo(
         () =>
@@ -159,17 +168,18 @@ export function StaffManagerScreen() {
             toast.error("You don't have permission, or the shift is gone.");
             return;
         }
-        toast.success("Staff member confirmed on duty.");
+        toast.success("Staff member approved on duty.");
         await load();
     };
 
-    const takeOffDuty = async (shiftId: string) => {
+    const confirmEndShift = async (shiftId: string) => {
         const { data: ok, error } = await db.approveShift(shiftId, false);
         if (error || !ok) {
             toast.error("Could not close the shift.");
             return;
         }
-        toast.success("Taken off duty.");
+        toast.success("Shift ended successfully.");
+        setEndShiftConfirmStaff(null);
         await load();
     };
 
@@ -232,101 +242,180 @@ export function StaffManagerScreen() {
         return true;
     };
 
+    const [endAllShiftsConfirm, setEndAllShiftsConfirm] = useState(false);
+
+    const endAllShifts = async () => {
+        const activeShifts = coverage?.filter((c) => c.shift_id) ?? [];
+        if (activeShifts.length === 0) return;
+        
+        let closedCount = 0;
+        for (const c of activeShifts) {
+            if (c.shift_id) {
+                const { data: ok } = await db.approveShift(c.shift_id, false);
+                if (ok) closedCount++;
+            }
+        }
+        toast.success(`Ended ${closedCount} shift${closedCount !== 1 ? "s" : ""}.`);
+        setEndAllShiftsConfirm(false);
+        await load();
+    };
+
     const totalCount = staff.length;
-    const onShift = shiftStaffIds.size;
+    const onShift = coverage
+        ? coverage.filter((c) => c.shift_id).length
+        : shiftStaffIds.size;
     const activeCount = staff.filter((s) => s.is_active).length;
 
+    const activeCoverageForSelected = selectedStaff
+        ? coverage?.find((c) => c.staff_id === selectedStaff.id && c.shift_id) ?? null
+        : null;
+
     return (
-        <div className="mx-auto w-full max-w-7xl space-y-6">
-            {/* ── Stats row (real) ── */}
-            <div className="grid grid-cols-2 gap-3 md:grid-cols-3 md:gap-4">
-                <div className="rounded-[1.5rem] bg-white p-4 shadow-sm ring-1 ring-isabelline flex flex-col gap-1">
-                    <p className="text-xs font-bold uppercase tracking-wider text-feldgrau">Total Staff</p>
-                    <p className="text-4xl font-bold tabular-nums text-licorice">{loading ? "…" : totalCount}</p>
+        <div className="mx-auto w-full max-w-7xl space-y-5 sm:space-y-6">
+            {/* ── Stats row (responsive) ── */}
+            <div className="grid grid-cols-3 gap-2.5 sm:gap-4">
+                <div className="rounded-2xl sm:rounded-[1.5rem] bg-white p-3.5 sm:p-4 shadow-sm ring-1 ring-isabelline flex flex-col justify-between">
+                    <p className="text-[10px] sm:text-xs font-bold uppercase tracking-wider text-feldgrau">Total Staff</p>
+                    <p className="text-2xl sm:text-4xl font-bold tabular-nums text-licorice mt-1">{loading ? "…" : totalCount}</p>
                 </div>
-                <div className="rounded-[1.5rem] bg-licorice p-4 text-isabelline shadow-[0_8px_24px_rgba(35,20,12,0.15)] flex flex-col gap-1">
-                    <p className="text-xs font-bold uppercase tracking-wider text-isabelline/60">On Shift Now</p>
-                    <p className="text-4xl font-bold tabular-nums text-khaki">{loading ? "…" : onShift}</p>
+                <div className="rounded-2xl sm:rounded-[1.5rem] bg-licorice p-3.5 sm:p-4 text-isabelline shadow-[0_8px_24px_rgba(35,20,12,0.15)] flex flex-col justify-between">
+                    <div className="flex items-center justify-between">
+                        <p className="text-[10px] sm:text-xs font-bold uppercase tracking-wider text-isabelline/70">On Shift</p>
+                        <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
+                    </div>
+                    <p className="text-2xl sm:text-4xl font-bold tabular-nums text-khaki mt-1">{loading ? "…" : onShift}</p>
                 </div>
-                <div className="rounded-[1.5rem] bg-white p-4 shadow-sm ring-1 ring-isabelline flex flex-col gap-1">
-                    <p className="text-xs font-bold uppercase tracking-wider text-feldgrau">Active</p>
-                    <p className="text-4xl font-bold tabular-nums text-licorice">{loading ? "…" : activeCount}</p>
+                <div className="rounded-2xl sm:rounded-[1.5rem] bg-white p-3.5 sm:p-4 shadow-sm ring-1 ring-isabelline flex flex-col justify-between">
+                    <p className="text-[10px] sm:text-xs font-bold uppercase tracking-wider text-feldgrau">Active</p>
+                    <p className="text-2xl sm:text-4xl font-bold tabular-nums text-licorice mt-1">{loading ? "…" : activeCount}</p>
                 </div>
             </div>
 
-            {coverage && coverage.filter(c => c.shift_id).length > 0 && (
-                <div className="rounded-[1.5rem] bg-white p-4 shadow-sm ring-1 ring-isabelline">
-                    <div className="mb-3 flex items-center justify-between">
-                        <p className="text-xs font-bold uppercase text-feldgrau">
-                            Team on duty
-                        </p>
-                        <span className="text-xs font-semibold tracking-tight text-feldgrau/60">
-                            {coverage.filter((c) => c.supervisor_approved).length} confirmed ·{" "}
-                            {coverage.filter((c) => c.shift_id && !c.supervisor_approved).length} waiting
-                        </span>
+            {/* ── Active Shift Roster (Performance & Output-driven) ── */}
+            {coverage && coverage.filter((c) => c.shift_id).length > 0 && (
+                <div className="rounded-2xl sm:rounded-[1.5rem] bg-white p-4 sm:p-5 shadow-sm ring-1 ring-isabelline">
+                    <div className="mb-3.5 flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-3">
+                        <div className="flex items-center gap-2">
+                            <ClockIcon className="h-4 w-4 text-licorice" strokeWidth={2.2} />
+                            <h2 className="text-xs sm:text-sm font-bold uppercase tracking-wide text-licorice">
+                                Active Shift Roster
+                            </h2>
+                        </div>
+                        <div className="flex items-center gap-2 flex-wrap text-xs font-semibold">
+                            <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-0.5 text-[11px] font-bold text-emerald-700 ring-1 ring-emerald-600/20">
+                                <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                                {coverage.filter((c) => c.supervisor_approved).length} active on shift
+                            </span>
+                            {coverage.filter((c) => c.shift_id && !c.supervisor_approved).length > 0 && (
+                                <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2.5 py-0.5 text-[11px] font-bold text-amber-700 ring-1 ring-amber-600/20 animate-pulse">
+                                    {coverage.filter((c) => c.shift_id && !c.supervisor_approved).length} awaiting approval
+                                </span>
+                            )}
+                            <button
+                                type="button"
+                                onClick={() => setEndAllShiftsConfirm(true)}
+                                className="ml-1 text-[11px] font-bold text-rose-600 hover:text-rose-700 hover:underline px-2 py-1"
+                            >
+                                End All Shifts
+                            </button>
+                        </div>
                     </div>
-                    <div className="flex flex-col">
-                        {coverage.filter(c => c.shift_id).map((c) => {
-                            const onShift = !!c.shift_id;
-                            const approved = c.supervisor_approved === true;
 
-                            const getInitials = (name: string) => {
-                                const parts = name.trim().split(" ");
-                                if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase();
-                                return name.substring(0, 2).toUpperCase();
-                            };
+                    <div className="grid grid-cols-1 gap-3">
+                        {coverage
+                            .filter((c) => c.shift_id)
+                            .map((c) => {
+                                const approved = c.supervisor_approved === true;
 
-                            return (
-                                <div key={c.staff_id} className="flex items-center justify-between py-3 border-b border-slate-100 last:border-0">
-                                    {/* Left Side: Identity & Role */}
-                                    <div className="flex items-center gap-3">
-                                        {/* Avatar / Initials */}
-                                        <div className="w-10 h-10 rounded-full bg-slate-100 border border-slate-200 text-slate-600 flex items-center justify-center text-sm font-bold shrink-0">
-                                            {getInitials(c.name)}
+                                const getInitials = (name: string) => {
+                                    const parts = name.trim().split(" ");
+                                    if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase();
+                                    return name.substring(0, 2).toUpperCase();
+                                };
+
+                                return (
+                                    <div
+                                        key={c.staff_id}
+                                        className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3 sm:p-3.5 rounded-xl bg-slate-50/70 border border-slate-200/70 hover:bg-slate-50 transition-all"
+                                    >
+                                        {/* Left Side: Staff Identity, Output & Workload */}
+                                        <div className="flex items-center gap-3 min-w-0">
+                                            <div className="w-10 h-10 rounded-full bg-white border border-slate-200 text-licorice flex items-center justify-center text-sm font-bold shrink-0 shadow-xs">
+                                                {getInitials(c.name)}
+                                            </div>
+
+                                            <div className="min-w-0 flex-1">
+                                                <div className="flex items-center gap-2 flex-wrap">
+                                                    <span className="text-sm font-bold text-slate-900 tracking-tight truncate">
+                                                        {c.name}
+                                                    </span>
+                                                    <span className="rounded-md bg-slate-200/80 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-slate-700">
+                                                        {roleLabel(c.role)}
+                                                    </span>
+                                                    {approved ? (
+                                                        <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-600">
+                                                            <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                                                            On Duty
+                                                        </span>
+                                                    ) : (
+                                                        <span className="inline-flex items-center gap-1 text-[11px] font-bold text-amber-600">
+                                                            ⏳ Needs Approval
+                                                        </span>
+                                                    )}
+                                                </div>
+
+                                                {/* Output & Tables Performance Priority */}
+                                                <div className="mt-1 flex items-center gap-3 text-xs flex-wrap">
+                                                    {c.open_bills > 0 ? (
+                                                        <span className="inline-flex items-center gap-1 font-bold text-amber-800 bg-amber-100/80 px-2 py-0.5 rounded text-[11px] ring-1 ring-amber-300/50">
+                                                            🍽️ Serving {c.open_bills} active table{c.open_bills !== 1 ? "s" : ""}
+                                                        </span>
+                                                    ) : (
+                                                        <span className="inline-flex items-center gap-1 font-medium text-slate-500 bg-slate-100 px-2 py-0.5 rounded text-[11px]">
+                                                            0 active tables (Idle)
+                                                        </span>
+                                                    )}
+                                                    <span className="text-slate-400 text-[11px] tabular-nums">
+                                                        {c.clock_in
+                                                            ? `Clock-in: ${new Date(c.clock_in).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`
+                                                            : "Not clocked in"}
+                                                    </span>
+                                                </div>
+                                            </div>
                                         </div>
-                                        
-                                        {/* Name and Role Stack */}
-                                        <div className="flex flex-col">
-                                            <span className="text-sm font-bold text-slate-900 tracking-tight">{c.name}</span>
-                                            <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">{roleLabel(c.role)}</span>
+
+                                        {/* Right Side: Shift Action Buttons */}
+                                        <div className="flex items-center gap-2 self-end sm:self-auto shrink-0 w-full sm:w-auto justify-end">
+                                            {!approved ? (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => c.shift_id && approveShift(c.shift_id)}
+                                                    className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-emerald-600 px-4 py-2 text-xs font-bold text-white shadow-xs transition-all hover:bg-emerald-700 active:scale-95 w-full sm:w-auto"
+                                                >
+                                                    <CheckIcon className="h-4 w-4" strokeWidth={2.5} />
+                                                    Approve Shift
+                                                </button>
+                                            ) : (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setEndShiftConfirmStaff(c)}
+                                                    className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-rose-50 hover:bg-rose-100 px-3.5 py-2 text-xs font-bold text-rose-700 ring-1 ring-rose-200 transition-all active:scale-95 w-full sm:w-auto"
+                                                    title="End shift and clock out staff member"
+                                                >
+                                                    <ArrowRightOnRectangleIcon className="h-4 w-4" strokeWidth={2} />
+                                                    End Shift
+                                                </button>
+                                            )}
                                         </div>
                                     </div>
-
-                                    {/* Right Side: Shift Time & Actions */}
-                                    <div className="flex items-center gap-4">
-                                        <div className="text-sm text-slate-500 font-medium tabular-nums">
-                                            {onShift && c.clock_in
-                                                ? `Since ${new Date(c.clock_in).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`
-                                                : "Not clocked in"}
-                                        </div>
-                                        {onShift && !approved && (
-                                            <button
-                                                type="button"
-                                                onClick={() => c.shift_id && approveShift(c.shift_id)}
-                                                className="rounded-full bg-licorice px-3 py-1.5 text-xs font-bold uppercase tracking-wider text-isabelline transition-all hover:bg-licorice/90 active:scale-95"
-                                            >
-                                                Approve
-                                            </button>
-                                        )}
-                                        {onShift && approved && (
-                                            <button
-                                                type="button"
-                                                onClick={() => c.shift_id && takeOffDuty(c.shift_id)}
-                                                className="rounded-full bg-rose-500/10 px-3 py-1.5 text-xs font-bold uppercase tracking-wider text-rose-600 ring-1 ring-rose-500/20 transition-all hover:bg-rose-500/20 active:scale-95"
-                                            >
-                                                Off duty
-                                            </button>
-                                        )}
-                                    </div>
-                                </div>
-                            );
-                        })}
+                                );
+                            })}
                     </div>
                 </div>
             )}
 
             {/* ── Toolbar ── */}
-            <div className="flex flex-wrap items-center justify-between gap-3 rounded-[1.5rem] bg-white p-4 shadow-sm ring-1 ring-isabelline">
+            <div className="flex flex-col sm:flex-row flex-wrap items-stretch sm:items-center justify-between gap-3 rounded-2xl sm:rounded-[1.5rem] bg-white p-3.5 sm:p-4 shadow-sm ring-1 ring-isabelline">
                 <div className="flex min-w-0 flex-1 items-center gap-2 rounded-xl bg-isabelline px-3.5 py-2 ring-1 ring-licorice/8 focus-within:ring-2 focus-within:ring-licorice/20">
                     <MagnifyingGlassIcon className="h-4 w-4 shrink-0 text-feldgrau" strokeWidth={2} />
                     <input
@@ -338,44 +427,47 @@ export function StaffManagerScreen() {
                     />
                 </div>
 
-                <div className="no-scrollbar flex items-center gap-1 overflow-x-auto rounded-full bg-isabelline p-1">
-                    <button
-                        type="button"
-                        onClick={() => setRoleFilter("all")}
-                        className={clsx(
-                            "shrink-0 rounded-full px-3 py-1.5 text-xs font-bold tracking-tight transition-all",
-                            roleFilter === "all" ? "bg-licorice text-isabelline shadow-sm" : "text-feldgrau hover:text-licorice",
-                        )}
-                    >
-                        All
-                    </button>
-                    {ROLE_OPTIONS.map((r) => (
+                <div className="flex items-center justify-between sm:justify-start gap-2">
+                    <div className="no-scrollbar flex items-center gap-1 overflow-x-auto rounded-full bg-isabelline p-1 max-w-[calc(100vw-120px)] sm:max-w-none">
                         <button
-                            key={r.value}
                             type="button"
-                            onClick={() => setRoleFilter(r.value)}
+                            onClick={() => setRoleFilter("all")}
                             className={clsx(
                                 "shrink-0 rounded-full px-3 py-1.5 text-xs font-bold tracking-tight transition-all",
-                                roleFilter === r.value ? "bg-licorice text-isabelline shadow-sm" : "text-feldgrau hover:text-licorice",
+                                roleFilter === "all" ? "bg-licorice text-isabelline shadow-sm" : "text-feldgrau hover:text-licorice",
                             )}
                         >
-                            {r.label}
+                            All
                         </button>
-                    ))}
-                </div>
+                        {ROLE_OPTIONS.map((r) => (
+                            <button
+                                key={r.value}
+                                type="button"
+                                onClick={() => setRoleFilter(r.value)}
+                                className={clsx(
+                                    "shrink-0 rounded-full px-3 py-1.5 text-xs font-bold tracking-tight transition-all",
+                                    roleFilter === r.value ? "bg-licorice text-isabelline shadow-sm" : "text-feldgrau hover:text-licorice",
+                                )}
+                            >
+                                {r.label}
+                            </button>
+                        ))}
+                    </div>
 
-                <button
-                    type="button"
-                    onClick={() => setCreating(true)}
-                    className="inline-flex items-center gap-1 rounded-full bg-licorice px-3.5 py-2 text-xs font-bold tracking-tight text-isabelline shadow-sm transition-all hover:bg-licorice/95 active:scale-95"
-                >
-                    <PlusIcon className="h-3.5 w-3.5" strokeWidth={2.5} />
-                    Add Staff
-                </button>
+                    <button
+                        type="button"
+                        onClick={() => setCreating(true)}
+                        className="inline-flex items-center justify-center gap-1 rounded-full bg-licorice px-3.5 py-2 text-xs font-bold tracking-tight text-isabelline shadow-sm transition-all hover:bg-licorice/95 active:scale-95 shrink-0"
+                    >
+                        <PlusIcon className="h-3.5 w-3.5" strokeWidth={2.5} />
+                        <span className="hidden xs:inline">Add Staff</span>
+                        <span className="xs:hidden">Add</span>
+                    </button>
+                </div>
             </div>
 
-            {/* ── Staff table ── */}
-            <div className="overflow-hidden rounded-[1.5rem] bg-white shadow-sm ring-1 ring-isabelline">
+            {/* ── Staff table / Mobile list ── */}
+            <div className="overflow-hidden rounded-2xl sm:rounded-[1.5rem] bg-white shadow-sm ring-1 ring-isabelline">
                 {loading ? (
                     <div className="flex items-center justify-center py-16">
                         <div className="h-6 w-6 animate-spin rounded-full border-2 border-licorice/20 border-t-licorice" />
@@ -395,8 +487,9 @@ export function StaffManagerScreen() {
                                 <tr className="text-left">
                                     <th className="px-4 py-2.5 text-xs font-bold uppercase text-feldgrau">Name</th>
                                     <th className="px-4 py-2.5 text-xs font-bold uppercase text-feldgrau">Role</th>
-                                    <th className="px-4 py-2.5 text-xs font-bold uppercase text-feldgrau">Status</th>
-                                    <th className="px-4 py-2.5 text-xs font-bold uppercase text-feldgrau text-right">Actions</th>
+                                    <th className="px-4 py-2.5 text-xs font-bold uppercase text-feldgrau">Shift Status</th>
+                                    <th className="px-4 py-2.5 text-xs font-bold uppercase text-feldgrau">Account</th>
+                                    <th className="px-4 py-2.5 text-xs font-bold uppercase text-feldgrau text-right">Details</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-isabelline">
@@ -525,7 +618,10 @@ export function StaffManagerScreen() {
                 <StaffDetailDrawer
                     staff={selectedStaff}
                     onShift={shiftStaffIds.has(selectedStaff.id)}
+                    activeCoverage={activeCoverageForSelected}
                     onClose={() => setSelectedStaff(null)}
+                    onApproveShift={(shiftId) => approveShift(shiftId)}
+                    onEndShift={(cov) => setEndShiftConfirmStaff(cov)}
                     onToggleActive={(id, active) => {
                         const s = staff.find((x) => x.id === id);
                         if (s) requestDeactivate(s);
@@ -555,12 +651,12 @@ export function StaffManagerScreen() {
                 />
             )}
 
-            {/* M4 — Deactivate staff confirm */}
+            {/* ── Deactivate Staff Confirmation Modal ── */}
             <ConfirmModal
                 isOpen={deactivateConfirmStaff !== null}
                 title={`Deactivate ${deactivateConfirmStaff?.name}?`}
                 body="They won't be able to log in or serve tables until you reactivate them. Any tables they currently hold will remain open."
-                confirmLabel="Deactivate"
+                confirmLabel="Deactivate Account"
                 cancelLabel="Cancel"
                 isDanger
                 onConfirm={() => {
@@ -572,58 +668,160 @@ export function StaffManagerScreen() {
                 }}
                 onClose={() => setDeactivateConfirmStaff(null)}
             />
+
+            {/* ── End Shift Confirmation Modal (with open table warnings) ── */}
+            <ConfirmModal
+                isOpen={endShiftConfirmStaff !== null}
+                title={`End shift for ${endShiftConfirmStaff?.name}?`}
+                body={
+                    endShiftConfirmStaff && endShiftConfirmStaff.open_bills > 0 ? (
+                        <div className="space-y-2">
+                            <p className="font-semibold text-amber-700 bg-amber-50 p-2.5 rounded-lg border border-amber-200 text-xs flex items-start gap-1.5">
+                                <ExclamationTriangleIcon className="h-4 w-4 shrink-0 mt-0.5 text-amber-600" />
+                                <span>
+                                    {endShiftConfirmStaff.name} currently has <strong>{endShiftConfirmStaff.open_bills} open table(s)</strong> assigned.
+                                </span>
+                            </p>
+                            <p className="text-slate-600 text-xs">
+                                Ending their shift will take them off duty and clock them out. Please ensure their open tables are reassigned or settled.
+                            </p>
+                        </div>
+                    ) : (
+                        `This will take ${endShiftConfirmStaff?.name} off duty and record their shift clock-out time.`
+                    )
+                }
+                confirmLabel="End Shift & Clock Out"
+                cancelLabel="Keep on Shift"
+                isDanger
+                onConfirm={() => {
+                    if (endShiftConfirmStaff && endShiftConfirmStaff.shift_id) {
+                        void confirmEndShift(endShiftConfirmStaff.shift_id);
+                    }
+                }}
+                onClose={() => setEndShiftConfirmStaff(null)}
+            />
+
+            {/* ── End All Shifts Confirmation Modal ── */}
+            <ConfirmModal
+                isOpen={endAllShiftsConfirm}
+                title="End all active shifts?"
+                body="This will clock out all staff members currently on duty and clear the active shift roster. Active table assignments will remain open."
+                confirmLabel="End All Shifts"
+                cancelLabel="Cancel"
+                isDanger
+                onConfirm={() => void endAllShifts()}
+                onClose={() => setEndAllShiftsConfirm(false)}
+            />
         </div>
     );
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
-   STAFF DETAIL DRAWER (real fields only)
+   STAFF DETAIL DRAWER (real fields + direct shift & account controls)
    ═══════════════════════════════════════════════════════════════════════════ */
 
 function StaffDetailDrawer({
     staff,
     onShift,
+    activeCoverage,
     onClose,
+    onApproveShift,
+    onEndShift,
     onToggleActive,
     onEdit,
 }: {
     staff: StaffRow;
     onShift: boolean;
+    activeCoverage?: ShiftCoverageRow | null;
     onClose: () => void;
+    onApproveShift: (shiftId: string) => void;
+    onEndShift: (coverage: ShiftCoverageRow) => void;
     onToggleActive: (id: string, active: boolean) => void;
     onEdit: () => void;
 }) {
+    const isApproved = activeCoverage?.supervisor_approved === true;
+
     return (
         <div className="fixed inset-0 z-50 flex items-end md:items-center justify-end md:justify-center">
             <div className="absolute inset-0 bg-licorice/50 backdrop-blur-sm" onClick={onClose} />
             <div className="relative w-full md:max-w-md max-h-[90vh] overflow-y-auto rounded-t-[1.5rem] md:rounded-[1.5rem] bg-white shadow-2xl">
                 <div className="flex items-center justify-between border-b border-isabelline px-5 py-3">
                     <p className="text-xs font-bold uppercase text-feldgrau">Staff Profile</p>
-                    <button type="button" onClick={onClose} aria-label="Close" className="flex h-8 w-8 items-center justify-center rounded-full bg-isabelline text-licorice">
+                    <button
+                        type="button"
+                        onClick={onClose}
+                        aria-label="Close"
+                        className="flex h-8 w-8 items-center justify-center rounded-full bg-isabelline text-licorice"
+                    >
                         <XMarkIcon className="h-4 w-4" strokeWidth={2.25} />
                     </button>
                 </div>
 
-                <div className="px-5 py-4">
+                <div className="px-5 py-4 space-y-4">
+                    {/* Identity header */}
                     <div className="flex items-center gap-3">
                         <div className="flex h-14 w-14 items-center justify-center rounded-full bg-khaki/20 text-khaki">
                             <span className="font-serif text-[20px] font-bold">{staff.name.charAt(0)}</span>
                         </div>
                         <div className="min-w-0 flex-1">
                             <h3 className="truncate text-[16px] font-bold tracking-tight text-licorice">{staff.name}</h3>
-                            <div className="mt-0.5 flex items-center gap-2">
-                                <span className={clsx("inline-flex items-center rounded-full px-2 py-0.5 text-xs font-bold uppercase tracking-wider", ROLE_COLORS[staff.role] ?? "bg-isabelline text-feldgrau")}>
+                            <div className="mt-1 flex items-center gap-2 flex-wrap">
+                                <span
+                                    className={clsx(
+                                        "inline-flex items-center rounded-full px-2 py-0.5 text-xs font-bold uppercase tracking-wider",
+                                        ROLE_COLORS[staff.role] ?? "bg-isabelline text-feldgrau",
+                                    )}
+                                >
                                     {roleLabel(staff.role)}
                                 </span>
-                                <span className={clsx("inline-flex items-center gap-1 text-xs", onShift ? "text-emerald-600" : "text-feldgrau")}>
-                                    <span className={clsx("h-1.5 w-1.5 rounded-full", onShift ? "bg-emerald-400" : "bg-feldgrau/30")} />
-                                    {onShift ? "On Shift" : "Off Duty"}
+                                <span
+                                    className={clsx(
+                                        "inline-flex items-center gap-1 text-xs font-semibold",
+                                        onShift ? "text-emerald-600" : "text-feldgrau",
+                                    )}
+                                >
+                                    <span className={clsx("h-1.5 w-1.5 rounded-full", onShift ? "bg-emerald-400 animate-pulse" : "bg-feldgrau/30")} />
+                                    {onShift ? (isApproved ? "On Shift" : "Shift Awaiting Approval") : "Off Duty"}
                                 </span>
                             </div>
                         </div>
                     </div>
 
-                    <div className="mt-4 grid grid-cols-2 gap-2 rounded-xl bg-isabelline p-3">
+                    {/* Shift Action Banner (if active shift) */}
+                    {activeCoverage && activeCoverage.shift_id && (
+                        <div className="rounded-xl bg-slate-50 p-3 border border-slate-200">
+                            <div className="flex items-center justify-between text-xs mb-2">
+                                <span className="font-bold text-slate-700">Current Shift</span>
+                                <span className="text-slate-500 tabular-nums">
+                                    {activeCoverage.clock_in
+                                        ? `Since ${new Date(activeCoverage.clock_in).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`
+                                        : "Clocked in"}
+                                </span>
+                            </div>
+                            {!isApproved ? (
+                                <button
+                                    type="button"
+                                    onClick={() => activeCoverage.shift_id && onApproveShift(activeCoverage.shift_id)}
+                                    className="w-full flex items-center justify-center gap-1.5 rounded-lg bg-emerald-600 py-2 text-xs font-bold text-white shadow-xs hover:bg-emerald-700 active:scale-95"
+                                >
+                                    <CheckIcon className="h-4 w-4" strokeWidth={2.5} />
+                                    Approve Shift
+                                </button>
+                            ) : (
+                                <button
+                                    type="button"
+                                    onClick={() => onEndShift(activeCoverage)}
+                                    className="w-full flex items-center justify-center gap-1.5 rounded-lg bg-rose-50 hover:bg-rose-100 py-2 text-xs font-bold text-rose-700 ring-1 ring-rose-200 active:scale-95"
+                                >
+                                    <ArrowRightOnRectangleIcon className="h-4 w-4" strokeWidth={2} />
+                                    End Shift (Clock Out)
+                                </button>
+                            )}
+                        </div>
+                    )}
+
+                    {/* Key metrics */}
+                    <div className="grid grid-cols-2 gap-2 rounded-xl bg-isabelline p-3">
                         <div className="border-r border-licorice/8 text-center">
                             <p className="font-mono text-[16px] font-black tabular-nums text-licorice">{staff.max_tables}</p>
                             <p className="text-xs font-bold uppercase tracking-wider text-feldgrau">Max Tables</p>
@@ -631,8 +829,12 @@ function StaffDetailDrawer({
                         <div className="text-center">
                             <p className="font-mono text-[16px] font-black tabular-nums text-khaki">
                                 {staff.pay_model === "salary"
-                                    ? (staff.salary_amount != null ? `GH₵${staff.salary_amount}` : "—")
-                                    : (staff.hourly_rate > 0 ? `GH₵${staff.hourly_rate}` : "—")}
+                                    ? staff.salary_amount != null
+                                        ? `GH₵${staff.salary_amount}`
+                                        : "—"
+                                    : staff.hourly_rate > 0
+                                      ? `GH₵${staff.hourly_rate}`
+                                      : "—"}
                             </p>
                             <p className="text-xs font-bold uppercase tracking-wider text-feldgrau">
                                 {staff.pay_model === "salary" ? "Salary/mo" : "Hourly"}
@@ -640,7 +842,8 @@ function StaffDetailDrawer({
                         </div>
                     </div>
 
-                    <div className="mt-4 space-y-2 text-xs">
+                    {/* Contact & employment details */}
+                    <div className="space-y-2 text-xs">
                         <div className="flex justify-between border-b border-isabelline pb-1.5">
                             <span className="font-medium tracking-tight text-feldgrau">Phone</span>
                             <span className="flex items-center gap-1 font-bold tracking-tight text-licorice">
@@ -661,28 +864,42 @@ function StaffDetailDrawer({
                             </div>
                         )}
                         <div className="flex justify-between border-b border-isabelline pb-1.5">
+                            <span className="font-medium tracking-tight text-feldgrau">Account Access</span>
+                            <span className={clsx("font-bold tracking-tight", staff.is_active ? "text-emerald-700" : "text-rose-700")}>
+                                {staff.is_active ? "Active (Can Sign In)" : "Deactivated (Blocked)"}
+                            </span>
+                        </div>
+                        <div className="flex justify-between border-b border-isabelline pb-1.5">
                             <span className="font-medium tracking-tight text-feldgrau">Joined</span>
                             <span className="font-bold tracking-tight text-licorice">
-                                {new Date(staff.created_at).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}
+                                {new Date(staff.created_at).toLocaleDateString("en-GB", {
+                                    day: "numeric",
+                                    month: "short",
+                                    year: "numeric",
+                                })}
                             </span>
                         </div>
                     </div>
 
-                    <div className="mt-4 grid grid-cols-2 gap-2">
+                    {/* Account Controls */}
+                    <div className="grid grid-cols-2 gap-2 pt-2">
                         <button
                             type="button"
                             onClick={onEdit}
-                            className="inline-flex items-center justify-center gap-1 rounded-full bg-licorice px-3 py-2 text-xs font-bold tracking-tight text-isabelline shadow-sm transition-all active:scale-95"
+                            className="inline-flex items-center justify-center gap-1 rounded-full bg-licorice px-3 py-2.5 text-xs font-bold tracking-tight text-isabelline shadow-sm transition-all active:scale-95"
                         >
                             <PencilSquareIcon className="h-3.5 w-3.5" strokeWidth={2.25} />
-                            Edit
+                            Edit Profile
                         </button>
                         <button
                             type="button"
-                            onClick={() => { onToggleActive(staff.id, staff.is_active); onClose(); }}
+                            onClick={() => {
+                                onToggleActive(staff.id, staff.is_active);
+                                onClose();
+                            }}
                             className={clsx(
-                                "inline-flex items-center justify-center gap-1 rounded-full px-3 py-2 text-xs font-bold tracking-tight transition-all active:scale-95",
-                                staff.is_active ? "bg-isabelline text-feldgrau ring-1 ring-licorice/8" : "bg-licorice text-isabelline",
+                                "inline-flex items-center justify-center gap-1 rounded-full px-3 py-2.5 text-xs font-bold tracking-tight transition-all active:scale-95",
+                                staff.is_active ? "bg-isabelline text-feldgrau ring-1 ring-licorice/8 hover:text-rose-600" : "bg-emerald-600 text-white",
                             )}
                         >
                             {staff.is_active ? "Deactivate" : "Activate"}
