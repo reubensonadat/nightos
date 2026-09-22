@@ -506,6 +506,97 @@ export const db = {
       TTL.MENU,
     ),
 
+  createProduct: async (product: {
+    venueId: string;
+    categoryId?: string | null;
+    name: string;
+    description?: string;
+    price: number;
+    costPrice?: number;
+    images?: string[];
+    station?: 'kitchen' | 'bar' | 'both';
+  }) => {
+    cacheInvalidate(`products:${product.venueId}`);
+    const { data, error } = await supabase
+      .from('products')
+      .insert({
+        venue_id: product.venueId,
+        category_id: product.categoryId || null,
+        name: product.name,
+        description: product.description || null,
+        price: product.price,
+        cost_price: product.costPrice || null,
+        images: product.images || [],
+        station: product.station || 'kitchen',
+        is_active: true,
+        is_archived: false,
+      })
+      .select()
+      .single();
+
+    return { data, error };
+  },
+
+  updateProduct: async (id: string, venueId: string, updates: Partial<DbProduct>) => {
+    cacheInvalidate(`products:${venueId}`);
+    const { data, error } = await supabase
+      .from('products')
+      .update(updates)
+      .eq('id', id)
+      .select()
+      .single();
+
+    return { data, error };
+  },
+
+  deleteProduct: async (id: string, venueId: string) => {
+    cacheInvalidate(`products:${venueId}`);
+    const { error } = await supabase
+      .from('products')
+      .update({ is_archived: true, is_active: false })
+      .eq('id', id);
+
+    return { data: !error, error };
+  },
+
+  createMenuCategory: async (venueId: string, name: string) => {
+    cacheInvalidate(`menu_cats:${venueId}`);
+    const { data, error } = await supabase
+      .from('menu_categories')
+      .insert({
+        venue_id: venueId,
+        name,
+        is_active: true,
+        sort_order: 99,
+      })
+      .select()
+      .single();
+
+    return { data, error };
+  },
+
+  updateMenuCategory: async (id: string, venueId: string, updates: Partial<DbMenuCategory>) => {
+    cacheInvalidate(`menu_cats:${venueId}`);
+    const { data, error } = await supabase
+      .from('menu_categories')
+      .update(updates)
+      .eq('id', id)
+      .select()
+      .single();
+
+    return { data, error };
+  },
+
+  deleteMenuCategory: async (id: string, venueId: string) => {
+    cacheInvalidate(`menu_cats:${venueId}`);
+    const { error } = await supabase
+      .from('menu_categories')
+      .update({ is_active: false })
+      .eq('id', id);
+
+    return { data: !error, error };
+  },
+
   modifierGroups: (venueId: string) =>
     cached<DbModifierGroup[]>(
       () =>
