@@ -125,7 +125,7 @@ export function useManagerDashboard(venueId: string | null, days: 7 | 30 = 7) {
 
     setStats((s) => ({ ...s, loading: true, error: null }));
 
-    const [paymentsRes, submissionsRes, billsRes, tablesRes, inventoryRes, staffRes, shiftsRes] =
+    const [paymentsRes, submissionsRes, billsRes, tablesRes, inventoryRes, staffRes, shiftsRes, coverageRes] =
       await Promise.all([
         db.paymentsSince(venueId, since),
         db.orderSubmissionsSince(venueId, since),
@@ -134,6 +134,7 @@ export function useManagerDashboard(venueId: string | null, days: 7 | 30 = 7) {
         db.inventoryByVenue(venueId),
         db.staffByVenue(venueId),
         db.activeShiftsByVenue(venueId),
+        db.shiftCoverage(venueId),
       ]);
 
     if (abortRef.current?.signal.aborted) return;
@@ -145,6 +146,7 @@ export function useManagerDashboard(venueId: string | null, days: 7 | 30 = 7) {
     const inventory = inventoryRes.data ?? [];
     const staff = staffRes.data ?? [];
     const shifts = shiftsRes.data ?? [];
+    const coverage = (coverageRes.data as { staff_id: string; shift_id: string | null }[] | null) ?? [];
 
     const error =
       paymentsRes.error || submissionsRes.error || billsRes.error || tablesRes.error ||
@@ -247,7 +249,11 @@ export function useManagerDashboard(venueId: string | null, days: 7 | 30 = 7) {
     });
 
     /* ── Staff ── */
-    const shiftStaffIds = new Set(shifts.map((sh) => sh.staff_id));
+    const activeCoverageStaffIds = coverage.filter((c) => c.shift_id).map((c) => c.staff_id);
+    const shiftStaffIds = new Set([
+      ...shifts.map((sh) => sh.staff_id),
+      ...activeCoverageStaffIds,
+    ]);
     const staffOnShift = shiftStaffIds.size;
     const countRole = (roles: string[]) =>
       staff.filter((m) => roles.includes(m.role) && shiftStaffIds.has(m.id)).length;
