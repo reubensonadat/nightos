@@ -10,7 +10,6 @@ import {
     EyeIcon,
     LockClosedIcon,
     MapIcon,
-    MegaphoneIcon,
     Squares2X2Icon,
     UserCircleIcon,
     UserIcon,
@@ -162,7 +161,7 @@ export function AdminLoginScreen({ onSignIn }: LoginProps) {
 
 /* ────────────────────────── Navigation Configuration ────────────────────────── */
 
-export type ManagerPage = "ops" | "shift-report" | "floorplan" | "orders" | "menu" | "staff" | "finance" | "crm" | "brand";
+export type ManagerPage = "ops" | "shift-report" | "floorplan" | "orders" | "menu" | "staff" | "finance" | "crm";
 
 type NavItem = {
     id: ManagerPage;
@@ -171,15 +170,14 @@ type NavItem = {
 };
 
 const NAV_ITEMS: NavItem[] = [
-    { id: "ops", label: "Live Ops", icon: Squares2X2Icon },
-    { id: "shift-report", label: "Shift Reports", icon: DocumentChartBarIcon },
-    { id: "floorplan", label: "Floor Plan", icon: MapIcon },
-    { id: "orders", label: "Order History", icon: ClipboardDocumentListIcon },
-    { id: "menu", label: "Menu Management", icon: ClipboardDocumentCheckIcon },
-    { id: "staff", label: "Staff Directory", icon: UsersIcon },
-    { id: "finance", label: "Finance & Payroll", icon: BanknotesIcon },
-    { id: "crm", label: "Customer CRM", icon: UserCircleIcon },
-    { id: "brand", label: "Brand Settings", icon: MegaphoneIcon },
+    { id: "ops", label: "Dashboard", icon: Squares2X2Icon },
+    { id: "shift-report", label: "Shift Report", icon: DocumentChartBarIcon },
+    { id: "floorplan", label: "Tables", icon: MapIcon },
+    { id: "orders", label: "All Orders", icon: ClipboardDocumentListIcon },
+    { id: "menu", label: "Menu & Inventory", icon: ClipboardDocumentCheckIcon },
+    { id: "staff", label: "Staff & Roles", icon: UsersIcon },
+    { id: "finance", label: "Financial Reports", icon: BanknotesIcon },
+    { id: "crm", label: "CRM & Marketing", icon: UserCircleIcon },
 ];
 
 /* ────────────────────────── Manager Shell Component ────────────────────────── */
