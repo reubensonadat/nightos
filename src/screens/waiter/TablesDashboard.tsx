@@ -8,6 +8,7 @@ import {
 import { formatGHS, formatGHSString } from "../../data/menu";
 import { db } from "../../lib/api";
 import { useRealtime } from "../../hooks/useRealtime";
+import { useAuth } from "../../context/AuthContext";
 import signoutBlackIcon from "../../assets/sign-out-black.svg";
 import bellRingingIcon from "../../assets/bell-ringing.svg";
 import { SignOutModal } from "../../components/SignOutModal";
@@ -167,6 +168,7 @@ function transformToTables(
 
 export function TablesDashboard({ venueId, staffName, staffId, onSignOut }: Props) {
     const navigate = useNavigate();
+    const { venue } = useAuth();
     const [tables, setTables] = useState<Table[]>([]);
     const [filter, setFilter] = useState<Filter>("all");
     const [loading, setLoading] = useState(true);
@@ -316,6 +318,11 @@ export function TablesDashboard({ venueId, staffName, staffId, onSignOut }: Prop
                             <span className="text-[13px] font-bold tracking-tight text-licorice">
                                 {staffName}
                             </span>
+                            {venue?.name && (
+                                <span className="text-[11px] font-semibold text-licorice/60">
+                                    {venue.name}
+                                </span>
+                            )}
                         </div>
                     </div>
 

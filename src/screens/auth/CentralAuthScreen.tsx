@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation, useSearchParams } from "react-router-dom";
 import toast from "react-hot-toast";
 import {
   DevicePhoneMobileIcon,
@@ -8,7 +8,8 @@ import {
   LockClosedIcon,
   UserIcon,
 } from "@heroicons/react/24/outline";
-import { useAuth, sectorPath } from "../../context/AuthContext";
+import { useAuth, sectorPath, isAllowedForTarget } from "../../context/AuthContext";
+import { useVenue } from "../../hooks/useVenue";
 import { authDb } from "../../lib/db/auth";
 import { AuthShell } from "./AuthShell";
 import { Divider, ErrorBanner, PrimaryButton, TextField } from "./AuthField";
@@ -94,10 +95,18 @@ function SocialAuthRow({
   );
 }
 
-export function CentralAuthScreen({ initialMode = "login" }: { initialMode?: "login" | "signup" }) {
+export function CentralAuthScreen({
+  initialMode = "login",
+  venueSlug,
+}: {
+  initialMode?: "login" | "signup";
+  venueSlug?: string | null;
+}) {
   const navigate = useNavigate();
   const location = useLocation();
   const [searchParams] = useSearchParams();
+  const activeVenueSlug = venueSlug || searchParams.get("venue");
+  const { venue: targetVenue } = useVenue(activeVenueSlug || undefined);
   const {
     isAuthenticated,
     isInitializing,
@@ -117,8 +126,8 @@ export function CentralAuthScreen({ initialMode = "login" }: { initialMode?: "lo
     if (fromParam && isAllowedForTarget(userRole, fromParam)) {
       return fromParam;
     }
-    return sectorPath(userRole);
-  }, [searchParams, location.state]);
+    return sectorPath(userRole, activeVenueSlug);
+  }, [searchParams, location.state, activeVenueSlug]);
 
   const [step, setStep] = useState<Step>(initialMode === "signup" ? "signup" : "login");
   const [shellMode, setShellMode] = useState<ShellMode>(initialMode === "signup" ? "signup" : "login");
@@ -390,10 +399,31 @@ export function CentralAuthScreen({ initialMode = "login" }: { initialMode?: "lo
       <AnimatePresence mode="wait">
         {step === "login" && (
           <motion.div key="login" {...slide}>
+            {targetVenue && activeVenueSlug && (
+              <div className="mb-6 flex items-center gap-3 rounded-2xl bg-khaki/15 p-3.5 ring-1 ring-khaki/30 text-left">
+                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-licorice font-bold text-isabelline shadow-sm">
+                  {targetVenue.logo_url ? (
+                    <img src={targetVenue.logo_url} alt={targetVenue.name} className="h-full w-full rounded-xl object-cover" />
+                  ) : (
+                    <span className="font-serif text-base">{targetVenue.name.slice(0, 2).toUpperCase()}</span>
+                  )}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-khaki">Signing into venue</span>
+                  </div>
+                  <p className="truncate text-[14.5px] font-black tracking-tight text-licorice">{targetVenue.name}</p>
+                </div>
+              </div>
+            )}
             <div className="mb-8 text-center">
-              <h1 className="text-[24px] font-black tracking-[-0.03em] text-licorice">Sign in to Bysen</h1>
+              <h1 className="text-[24px] font-black tracking-[-0.03em] text-licorice">
+                {targetVenue && activeVenueSlug ? `Sign in to ${targetVenue.name}` : "Sign in to Bysen"}
+              </h1>
               <p className="mt-2 text-[13px] leading-relaxed text-feldgrau">
-                Welcome back — enter your email or phone to continue.
+                {targetVenue && activeVenueSlug
+                  ? `Enter your email or phone to access ${targetVenue.name}.`
+                  : "Welcome back — enter your email or phone to continue."}
               </p>
             </div>
 

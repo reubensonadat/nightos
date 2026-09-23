@@ -249,8 +249,8 @@ export type DbStaffShift = {
   venue_id: string;
   clock_in: string;
   clock_out: string | null;
-  cash_balance_start: number;
-  cash_balance_end: number | null;
+  cash_balance_start?: number;
+  cash_balance_end?: number | null;
   status: 'active' | 'on_break' | 'closed';
   created_at: string;
 };
@@ -1337,13 +1337,18 @@ export const db = {
 
   /** Reads a venue_settings key (e.g. max_dwell_minutes) — staff-safe RPC. */
   getVenueSetting: async (venueId: string, key: string, fallback: number) => {
-    const { data, error } = await supabase.rpc('get_venue_setting', {
-      p_venue_id: venueId,
-      p_key: key,
-      p_default: fallback,
-    });
-    const raw = data === null || data === undefined ? fallback : Number(data);
-    return { data: Number.isFinite(raw) ? raw : fallback, error };
+    try {
+      const { data, error } = await supabase.rpc('get_venue_setting', {
+        p_venue_id: venueId,
+        p_key: key,
+        p_default: fallback,
+      });
+      if (error) return { data: fallback, error: null };
+      const raw = data === null || data === undefined ? fallback : Number(data);
+      return { data: Number.isFinite(raw) ? raw : fallback, error: null };
+    } catch {
+      return { data: fallback, error: null };
+    }
   },
 
   /* ── Table operations (waiter) ── */
@@ -1435,7 +1440,7 @@ export const db = {
     supabase
       .from('staff_shifts')
       .select(
-        'id, staff_id, venue_id, clock_in, clock_out, cash_balance_start, cash_balance_end, status, created_at',
+        'id, staff_id, venue_id, clock_in, clock_out, status, created_at',
       )
       .eq('venue_id', venueId)
       .in('status', ['active', 'on_break']),
@@ -1469,7 +1474,7 @@ export const db = {
   staffShiftsSince: async (venueId: string, sinceIso: string, untilIso?: string) => {
     let query = supabase
       .from('staff_shifts')
-      .select('id, staff_id, venue_id, clock_in, clock_out, cash_balance_start, cash_balance_end, status, created_at')
+      .select('id, staff_id, venue_id, clock_in, clock_out, status, created_at')
       .eq('venue_id', venueId)
       .gte('clock_in', sinceIso)
       .order('clock_in', { ascending: false });
@@ -1522,7 +1527,7 @@ export const db = {
       billsQ,
       subsQ,
       supabase.from('staff').select('id, venue_id, name, phone, email, role, is_active').eq('venue_id', venueId),
-      supabase.from('staff_shifts').select('id, staff_id, venue_id, clock_in, clock_out, cash_balance_start, cash_balance_end, status, created_at').eq('venue_id', venueId).gte('clock_in', sinceIso).order('clock_in', { ascending: false }),
+      supabase.from('staff_shifts').select('id, staff_id, venue_id, clock_in, clock_out, status, created_at').eq('venue_id', venueId).gte('clock_in', sinceIso).order('clock_in', { ascending: false }),
       logsQ,
     ]);
 

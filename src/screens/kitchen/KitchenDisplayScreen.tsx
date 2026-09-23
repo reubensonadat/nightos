@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState, useCallback, useRef } from "react";
 import { useRealtime } from "../../hooks/useRealtime";
+import { useAuth } from "../../context/AuthContext";
  
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 import { ArrowPathIcon, SpeakerWaveIcon } from "@heroicons/react/24/outline";
@@ -101,6 +102,7 @@ type Props = {
 
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 export function KitchenDisplayScreen({ venueId, staffId, staffName, onExit, onSignOut }: Props) {
+    const { venue } = useAuth();
     const [orders, setOrders] = useState<KitchenOrder[]>([]);
     const [now, setNow] = useState(() => Date.now());
     const [stationFilter, setStationFilter] = useState<StationFilter>("all");
@@ -257,6 +259,11 @@ export function KitchenDisplayScreen({ venueId, staffId, staffName, onExit, onSi
                                 <span className="text-[14px] font-bold tracking-tight">
                                     Kitchen Display
                                 </span>
+                                {venue?.name && (
+                                    <span className="text-[11px] font-semibold text-isabelline/60">
+                                        {venue.name}
+                                    </span>
+                                )}
                             </div>
                         </div>
 

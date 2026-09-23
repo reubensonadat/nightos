@@ -64,16 +64,18 @@ function CustomerShell({ venueId, tableId, tableLabel }: { venueId: string; tabl
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
 
-  const path = location.pathname;
+  const cleanPath = location.pathname.replace(/^\/v\/[^/]+/, "");
   let tab: NavTab = "menu";
-  if (path.startsWith("/tab")) tab = "tab";
-  if (path.startsWith("/orders")) tab = "orders";
+  if (cleanPath.startsWith("/tab")) tab = "tab";
+  if (cleanPath.startsWith("/orders")) tab = "orders";
 
   const setTab = useCallback((newTab: NavTab) => {
     const tableParam = searchParams.get("table");
     const query = tableParam ? `?table=${tableParam}` : "";
-    navigate(`/${newTab}${query}`);
-  }, [navigate, searchParams]);
+    const match = location.pathname.match(/^\/v\/([^/]+)/);
+    const slugPrefix = match ? `/v/${match[1]}` : "";
+    navigate(`${slugPrefix}/${newTab}${query}`);
+  }, [navigate, searchParams, location.pathname]);
 
   const [activeOrders, setActiveOrders] = useState<OrderSummary[]>([]);
   const [history, setHistory] = useState<OrderSummary[]>([]);
@@ -408,6 +410,10 @@ function CustomerFlow({ onSwitchMode, venueId, qrTable, qrLoading, qrError }: Cu
   const location = useLocation();
   const navigate = useNavigate();
 
+  const match = location.pathname.match(/^\/v\/([^/]+)/);
+  const slugPrefix = match ? `/v/${match[1]}` : "";
+  const cleanPath = location.pathname.replace(/^\/v\/[^/]+/, "");
+
   if (qrLoading) {
     return (
       <div className="min-h-svh bg-isabelline flex items-center justify-center">
@@ -434,8 +440,8 @@ function CustomerFlow({ onSwitchMode, venueId, qrTable, qrLoading, qrError }: Cu
   }
 
   if (qrTable) {
-    if (location.pathname === "/") {
-      return <Navigate to={`/menu${location.search}`} replace />;
+    if (cleanPath === "/" || cleanPath === "") {
+      return <Navigate to={`${slugPrefix}/menu${location.search}`} replace />;
     }
     return (
       <CustomerShell
@@ -446,18 +452,18 @@ function CustomerFlow({ onSwitchMode, venueId, qrTable, qrLoading, qrError }: Cu
     );
   }
 
-  if (location.pathname === "/reservations") {
-    return <ReservationsScreen onBack={() => navigate("/")} />;
+  if (cleanPath === "/reservations") {
+    return <ReservationsScreen onBack={() => navigate(`${slugPrefix}/menu`)} />;
   }
 
-  if (location.pathname.startsWith("/menu") || location.pathname.startsWith("/tab") || location.pathname.startsWith("/orders")) {
+  if (cleanPath.startsWith("/menu") || cleanPath.startsWith("/tab") || cleanPath.startsWith("/orders")) {
     return <CustomerShell venueId={venueId} tableId={null} />;
   }
 
   return (
     <LandingScreen
-      onEnterCustomer={() => navigate("/menu")}
-      onViewReservations={() => navigate("/reservations")}
+      onEnterCustomer={() => navigate(`${slugPrefix}/menu`)}
+      onViewReservations={() => navigate(`${slugPrefix}/reservations`)}
       onStaffPortal={() => onSwitchMode("waiter")}
       onKitchenDisplay={() => onSwitchMode("kitchen")}
       onManagerPortal={() => onSwitchMode("manager")}
@@ -473,7 +479,10 @@ function AppShell() {
   const [searchParams] = useSearchParams();
   const { user, signOut, staffSession, role, venue: authVenue, profile } = useAuth();
 
-  const targetSlug = authVenue?.slug || "velvet-lounge";
+  const match = location.pathname.match(/^\/v\/([^/]+)/);
+  const urlVenueSlug = match ? match[1] : null;
+
+  const targetSlug = urlVenueSlug || authVenue?.slug || "velvet-lounge";
   const { venue: loadedVenue, loading: venueLoading, error: venueError } = useVenue(targetSlug);
   const currentVenue = authVenue || loadedVenue;
   const venueId = currentVenue.id;
@@ -482,7 +491,8 @@ function AppShell() {
   const { table: qrTable, loading: qrLoading, error: qrError } = useQrTable(qrToken);
 
   const getModeFromPath = (): Mode => {
-    const path = location.pathname.replace(/^\/+/, "").split("/")[0];
+    const cleanPath = location.pathname.replace(/^\/v\/[^/]+/, "");
+    const path = cleanPath.replace(/^\/+/, "").split("/")[0];
     if (path === "waiter") return "waiter";
     if (path === "kitchen") return "kitchen";
     if (path === "manager") return "manager";
@@ -491,14 +501,15 @@ function AppShell() {
 
   const mode = getModeFromPath();
   const setMode = useCallback((newMode: Mode) => {
+    const slugPrefix = `/v/${currentVenue.slug || targetSlug}`;
     const paths: Record<Mode, string> = {
-      customer: "/switcher",
-      waiter: "/waiter",
-      kitchen: "/kitchen",
-      manager: "/manager/ops",
+      customer: `${slugPrefix}/menu`,
+      waiter: `${slugPrefix}/waiter`,
+      kitchen: `${slugPrefix}/kitchen`,
+      manager: `${slugPrefix}/manager/ops`,
     };
     navigate(paths[newMode]);
-  }, [navigate]);
+  }, [navigate, currentVenue.slug, targetSlug]);
 
   // Back button safety: never let the browser leave the app's first entry
   useEffect(() => {
@@ -511,9 +522,30 @@ function AppShell() {
     return () => window.removeEventListener("popstate", onPopState);
   }, []);
 
+  // Auto-rewrite table scan URL to include venue slug if missing
+  useEffect(() => {
+    if (qrTable && currentVenue && currentVenue.slug) {
+      if (!urlVenueSlug || urlVenueSlug !== currentVenue.slug) {
+        const cleanPath = location.pathname.replace(/^\/v\/[^/]+/, "") || "/menu";
+        const targetPath = cleanPath === "/" ? "/menu" : cleanPath;
+        navigate(`/v/${currentVenue.slug}${targetPath}${location.search}`, { replace: true });
+      }
+    }
+  }, [qrTable, currentVenue, urlVenueSlug, location.pathname, location.search, navigate]);
+
+  // Auto-prefix URL with active venue slug if missing for app routes
+  useEffect(() => {
+    if (!urlVenueSlug && currentVenue && currentVenue.slug) {
+      if (location.pathname !== "/" && location.pathname !== "/switcher") {
+        navigate(`/v/${currentVenue.slug}${location.pathname}${location.search}`, { replace: true });
+      }
+    }
+  }, [urlVenueSlug, currentVenue, location.pathname, location.search, navigate]);
+
   // Manager page is URL-driven: /manager/ops, /manager/shift-report, /manager/floorplan, ...
   const managerPage = useMemo<ManagerPage>(() => {
-    const seg = location.pathname.split("/")[2];
+    const cleanPath = location.pathname.replace(/^\/v\/[^/]+/, "");
+    const seg = cleanPath.split("/")[2];
     if (
       seg &&
       (seg === "ops" || seg === "shift-report" || seg === "floorplan" || seg === "orders" || seg === "menu" || seg === "staff" ||
@@ -525,16 +557,22 @@ function AppShell() {
   }, [location.pathname]);
 
   const goToManagerPage = useCallback(
-    (page: string) => navigate(page.startsWith("/") ? page : `/manager/${page}`),
-    [navigate],
+    (page: string) => {
+      const slugPrefix = `/v/${currentVenue.slug || targetSlug}`;
+      const pagePath = page.startsWith("/") ? page : `/manager/${page}`;
+      navigate(`${slugPrefix}${pagePath}`);
+    },
+    [navigate, currentVenue.slug, targetSlug],
   );
 
   // /manager defaults to the Live Ops sub-path
   useEffect(() => {
-    if (mode === "manager" && (location.pathname === "/manager" || location.pathname === "/manager/")) {
-      navigate("/manager/ops", { replace: true });
+    const cleanPath = location.pathname.replace(/^\/v\/[^/]+/, "");
+    if (mode === "manager" && (cleanPath === "/manager" || cleanPath === "/manager/")) {
+      const slugPrefix = `/v/${currentVenue.slug || targetSlug}`;
+      navigate(`${slugPrefix}/manager/ops`, { replace: true });
     }
-  }, [mode, location.pathname, navigate]);
+  }, [mode, location.pathname, navigate, currentVenue.slug, targetSlug]);
 
   const switchToCustomer = () => {
     setMode("customer");
@@ -545,7 +583,7 @@ function AppShell() {
       await signOut();
     } finally {
       setMode("customer");
-      navigate("/login", { replace: true });
+      navigate(`/v/${currentVenue.slug || targetSlug}/login`, { replace: true });
     }
   };
 
@@ -555,7 +593,7 @@ function AppShell() {
         <div className="max-w-md text-center">
           <p className="text-ink font-semibold text-lg">Venue not found</p>
           <p className="text-ink/60 text-sm mt-2 leading-relaxed">
-            The venue <strong>velvet-lounge</strong> doesn't exist in your database yet. Open the Supabase SQL
+            The venue <strong>{targetSlug}</strong> doesn't exist in your database yet. Open the Supabase SQL
             Editor and run <code className="rounded bg-ink/5 px-1.5 py-0.5 font-mono text-xs">supabase/02-clean-seed.sql</code>,
             then reload this page.
           </p>
@@ -582,35 +620,51 @@ function AppShell() {
 
       {mode === "waiter" && (
         <Routes>
-          <Route path="/waiter" element={
-            (staffSession || role === "owner" || role === "manager" || role === "waiter") ? (
-              <TablesDashboard
-                venueId={staffSession?.venue_id || authVenue?.id || venueId || ""}
-                staffName={staffSession?.name || profile?.name || "Manager"}
-                staffId={staffSession?.id || user?.id || ""}
-                role={staffSession?.role || "manager"}
-                onSignOut={handleSignOut}
-              />
-            ) : (
-              <Navigate to="/login?redirect=/waiter" replace state={{ from: "/waiter" }} />
-            )
-          } />
-          <Route path="/waiter/login" element={<Navigate to="/login?redirect=/waiter" replace state={{ from: "/waiter" }} />} />
-          <Route path="/waiter/shift" element={
-            (staffSession || role === "owner" || role === "manager" || role === "waiter") ? (
-              <ShiftPerformanceScreen
-                staffId={staffSession?.id || user?.id || ""}
-                staffName={staffSession?.name || profile?.name || "Manager"}
-              />
-            ) : (
-              <Navigate to="/login?redirect=/waiter/shift" replace state={{ from: "/waiter/shift" }} />
-            )
-          } />
-          <Route path="/waiter/table/:tableId" element={<TableLayout />}>
-            <Route index element={<OrderManagementScreen />} />
-            <Route path="ops" element={<TableOperationsScreen />} />
-            <Route path="invoice" element={<InvoiceSettlementScreen />} />
-          </Route>
+          {["/waiter", "/v/:slug/waiter"].map((p) => (
+            <Route
+              key={p}
+              path={p}
+              element={
+                (staffSession || role === "owner" || role === "manager" || role === "waiter") ? (
+                  <TablesDashboard
+                    venueId={staffSession?.venue_id || authVenue?.id || venueId || ""}
+                    staffName={staffSession?.name || profile?.name || "Manager"}
+                    staffId={staffSession?.id || user?.id || ""}
+                    role={staffSession?.role || "manager"}
+                    onSignOut={handleSignOut}
+                  />
+                ) : (
+                  <Navigate to={`/v/${currentVenue.slug || targetSlug}/login?redirect=/v/${currentVenue.slug || targetSlug}/waiter`} replace />
+                )
+              }
+            />
+          ))}
+          {["/waiter/login", "/v/:slug/waiter/login"].map((p) => (
+            <Route key={p} path={p} element={<Navigate to={`/v/${currentVenue.slug || targetSlug}/login?redirect=/v/${currentVenue.slug || targetSlug}/waiter`} replace />} />
+          ))}
+          {["/waiter/shift", "/v/:slug/waiter/shift"].map((p) => (
+            <Route
+              key={p}
+              path={p}
+              element={
+                (staffSession || role === "owner" || role === "manager" || role === "waiter") ? (
+                  <ShiftPerformanceScreen
+                    staffId={staffSession?.id || user?.id || ""}
+                    staffName={staffSession?.name || profile?.name || "Manager"}
+                  />
+                ) : (
+                  <Navigate to={`/v/${currentVenue.slug || targetSlug}/login?redirect=/v/${currentVenue.slug || targetSlug}/waiter/shift`} replace />
+                )
+              }
+            />
+          ))}
+          {["/waiter/table/:tableId", "/v/:slug/waiter/table/:tableId"].map((p) => (
+            <Route key={p} path={p} element={<TableLayout />}>
+              <Route index element={<OrderManagementScreen />} />
+              <Route path="ops" element={<TableOperationsScreen />} />
+              <Route path="invoice" element={<InvoiceSettlementScreen />} />
+            </Route>
+          ))}
         </Routes>
       )}
 
@@ -624,7 +678,7 @@ function AppShell() {
             onSignOut={handleSignOut}
           />
         ) : (
-          <Navigate to="/login?redirect=/kitchen" replace state={{ from: "/kitchen" }} />
+          <Navigate to={`/v/${currentVenue.slug || targetSlug}/login?redirect=/v/${currentVenue.slug || targetSlug}/kitchen`} replace />
         )
       )}
 
@@ -677,12 +731,16 @@ function AppRoutes() {
   const [searchParams] = useSearchParams();
   const { isAuthenticated, isInitializing, role } = useAuth();
 
-  const isAuthRoute = location.pathname === "/login" || location.pathname === "/signup";
-  const isVerifyRoute = location.pathname === "/verify-otp";
-  const isSetupRoute = location.pathname === "/setup";
+  const match = location.pathname.match(/^\/v\/([^/]+)/);
+  const venueSlug = match ? match[1] : null;
+  const strippedPath = venueSlug ? location.pathname.replace(/^\/v\/[^/]+/, "") || "/" : location.pathname;
+
+  const isAuthRoute = strippedPath === "/login" || strippedPath === "/signup";
+  const isVerifyRoute = strippedPath === "/verify-otp";
+  const isSetupRoute = strippedPath === "/setup";
   const isTableScan = Boolean(searchParams.get("table"));
-  const isPromoRoute = location.pathname === "/" && !isTableScan;
-  const isSwitcherRoute = location.pathname === "/switcher";
+  const isPromoRoute = (strippedPath === "/" || strippedPath === "") && !isTableScan && !venueSlug;
+  const isSwitcherRoute = strippedPath === "/switcher";
 
   if (isPromoRoute) return <PromoLandingScreen />;
   if (isSwitcherRoute) return <AppShell />;
@@ -695,7 +753,7 @@ function AppRoutes() {
       }
       return <Navigate to={role ? sectorPath(role) : "/setup"} replace />;
     }
-    return <CentralAuthScreen initialMode={location.pathname === "/signup" ? "signup" : "login"} />;
+    return <CentralAuthScreen initialMode={strippedPath === "/signup" ? "signup" : "login"} venueSlug={venueSlug} />;
   }
   if (isVerifyRoute) return <VerifyOtpScreen />;
   if (isSetupRoute) return <VenueSetupScreen />;

@@ -1,5 +1,7 @@
 import { useState, type FormEvent, type ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
+import toast from "react-hot-toast";
+import { useAuth } from "../../context/AuthContext";
 import {
     ArrowRightIcon,
     BanknotesIcon,
@@ -8,6 +10,7 @@ import {
     ClipboardDocumentListIcon,
     DocumentChartBarIcon,
     EyeIcon,
+    LinkIcon,
     LockClosedIcon,
     MapIcon,
     Squares2X2Icon,
@@ -192,10 +195,19 @@ type ShellProps = {
 
 export function ManagerShell({ managerName, activePage, onPageChange, onSignOut, children }: ShellProps) {
     const navigate = useNavigate();
+    const { venue } = useAuth();
     const [mobileNavOpen, setMobileNavOpen] = useState(false);
     const [showSignOutModal, setShowSignOutModal] = useState(false);
 
     const activeItem = NAV_ITEMS.find((item) => item.id === activePage) ?? NAV_ITEMS[0];
+    const venueName = venue?.name || "Velvet Lounge";
+    const venueSlug = venue?.slug || "velvet-lounge";
+
+    const handleCopyVenueLink = () => {
+        const link = `${window.location.origin}/v/${venueSlug}/login`;
+        navigator.clipboard.writeText(link);
+        toast.success(`Copied venue login link: ${link}`);
+    };
 
     return (
         <div className="relative min-h-svh w-full bg-isabelline font-sans text-licorice antialiased">
@@ -205,11 +217,17 @@ export function ManagerShell({ managerName, activePage, onPageChange, onSignOut,
             <aside className="hidden md:flex fixed inset-y-0 left-0 z-30 w-64 flex-col border-r border-licorice/8 bg-white">
                 {/* Brand */}
                 <div className="flex h-[60px] items-center gap-2.5 border-b border-licorice/8 px-5">
-                    <div className="flex h-9 w-9 items-center justify-center rounded-full bg-licorice text-isabelline shadow-[0_4px_14px_rgba(35,20,12,0.25)]">
-                        <span className="font-serif text-[15px] font-bold leading-none tracking-tight">V</span>
+                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-licorice text-isabelline shadow-[0_4px_14px_rgba(35,20,12,0.25)] overflow-hidden">
+                        {venue?.logo_url ? (
+                            <img src={venue.logo_url} alt={venueName} className="h-full w-full object-cover" />
+                        ) : (
+                            <span className="font-serif text-[15px] font-bold leading-none tracking-tight">
+                                {venueName.slice(0, 1).toUpperCase()}
+                            </span>
+                        )}
                     </div>
-                    <div className="flex flex-col leading-tight">
-                        <span className="text-[14px] font-bold tracking-tight text-licorice">Velvet Lounge</span>
+                    <div className="flex flex-col leading-tight min-w-0 flex-1">
+                        <span className="truncate text-[14px] font-bold tracking-tight text-licorice">{venueName}</span>
                     </div>
                 </div>
 
@@ -275,7 +293,8 @@ export function ManagerShell({ managerName, activePage, onPageChange, onSignOut,
                         <Bars3Icon className="h-4 w-4" strokeWidth={2.25} />
                     </button>
                     <div className="flex flex-col items-center leading-tight">
-                        <span className="text-[15px] font-bold tracking-tight text-licorice">{activeItem.label}</span>
+                        <span className="text-[14px] font-bold tracking-tight text-licorice">{venueName}</span>
+                        <span className="text-[10px] font-mono text-licorice/60 font-medium">{activeItem.label}</span>
                     </div>
                     <button
                         type="button"
@@ -299,10 +318,12 @@ export function ManagerShell({ managerName, activePage, onPageChange, onSignOut,
                         <div className="flex h-[60px] items-center justify-between border-b border-licorice/8 px-5">
                             <div className="flex items-center gap-2.5">
                                 <div className="flex h-8 w-8 items-center justify-center rounded-full bg-licorice text-isabelline">
-                                    <span className="font-serif text-[13px] font-bold leading-none tracking-tight">V</span>
+                                    <span className="font-serif text-[13px] font-bold leading-none tracking-tight">
+                                        {venueName.slice(0, 1).toUpperCase()}
+                                    </span>
                                 </div>
-                                <div className="flex flex-col leading-tight">
-                                    <span className="text-[14px] font-bold tracking-tight text-licorice">Velvet Lounge</span>
+                                <div className="flex flex-col leading-tight min-w-0">
+                                    <span className="truncate text-[14px] font-bold tracking-tight text-licorice">{venueName}</span>
                                 </div>
                             </div>
                             <button
@@ -351,9 +372,22 @@ export function ManagerShell({ managerName, activePage, onPageChange, onSignOut,
             <div className="md:pl-64">
                 {/* Desktop top bar */}
                 <header className="hidden md:flex h-[60px] sticky top-0 z-30 items-center justify-between border-b border-licorice/8 bg-isabelline/95 backdrop-blur-xl px-8">
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-3">
                         <h1 className="text-[15px] font-bold tracking-tight text-licorice">{activeItem.label}</h1>
+                        <span className="text-licorice/30">•</span>
+                        <div className="flex items-center gap-1.5 rounded-full bg-licorice/5 px-2.5 py-1 ring-1 ring-licorice/10">
+                            <span className="text-[11px] font-bold text-licorice">{venueName}</span>
+                        </div>
                     </div>
+
+                    <button
+                        type="button"
+                        onClick={handleCopyVenueLink}
+                        className="flex items-center gap-1.5 rounded-full bg-white px-3 py-1.5 text-[11.5px] font-semibold text-licorice shadow-sm ring-1 ring-licorice/10 hover:bg-licorice/5 transition-all active:scale-95"
+                    >
+                        <LinkIcon className="h-3.5 w-3.5 text-khaki" strokeWidth={2} />
+                        <span>Copy Venue Link</span>
+                    </button>
                 </header>
 
                 {/* Page content */}

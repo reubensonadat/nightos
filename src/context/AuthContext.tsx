@@ -43,10 +43,11 @@ const AuthContext = createContext<AuthContextValue>(null!)
 /** Where a signed-in user belongs after OTP: owner/manager → manager, kitchen/bar →
  * kitchen display, everyone else on staff → the waiter dashboard. */
 // eslint-disable-next-line react-refresh/only-export-components
-export function sectorPath(role: string | null): string {
-  if (role === 'owner' || role === 'manager') return '/manager'
-  if (role === 'kitchen' || role === 'bar') return '/kitchen'
-  return '/waiter'
+export function sectorPath(role: string | null, venueSlug?: string | null): string {
+  const prefix = venueSlug ? `/v/${venueSlug}` : '';
+  if (role === 'owner' || role === 'manager') return `${prefix}/manager/ops`;
+  if (role === 'kitchen' || role === 'bar') return `${prefix}/kitchen`;
+  return `${prefix}/waiter`;
 }
 
 // eslint-disable-next-line react-refresh/only-export-components

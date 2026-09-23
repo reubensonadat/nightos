@@ -174,11 +174,11 @@ export function AuthEmbers({ className }: AuthEmbersProps) {
 
     let raf = 0;
     let fade = 0;
-    const clock = new THREE.Clock();
+    const startTime = performance.now();
 
     const tick = () => {
       raf = requestAnimationFrame(tick);
-      const t = reduced ? 0 : clock.getElapsedTime();
+      const t = reduced ? 0 : (performance.now() - startTime) / 1000;
       silk.material.uniforms.uTime.value = t;
 
       const pos = geometry.attributes.position.array as Float32Array;
@@ -241,7 +241,6 @@ export function AuthEmbers({ className }: AuthEmbersProps) {
       if (document.hidden) {
         cancelAnimationFrame(raf);
       } else {
-        clock.getDelta();
         raf = requestAnimationFrame(tick);
       }
     });
