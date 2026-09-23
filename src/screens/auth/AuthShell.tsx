@@ -177,8 +177,8 @@ export function AuthShell({ mode, children, onBack, onSwitchMode }: AuthShellPro
           <div className="flex shrink-0 items-center justify-between px-8 pb-8">
             <p className="text-[11px] font-medium text-feldgrau/50">© 2026 Bysen</p>
             <div className="flex gap-5 text-[11px] font-medium text-feldgrau/50">
-              <a href="#" className="transition-colors hover:text-licorice">Privacy</a>
-              <a href="#" className="transition-colors hover:text-licorice">Terms</a>
+              <a href="/privacy" className="transition-colors hover:text-licorice">Privacy</a>
+              <a href="/terms" className="transition-colors hover:text-licorice">Terms</a>
             </div>
           </div>
         </motion.div>

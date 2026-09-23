@@ -11,6 +11,8 @@ import { CentralAuthScreen } from "./screens/auth/CentralAuthScreen";
 import { VerifyOtpScreen } from "./screens/auth/VerifyOtpScreen";
 import { VenueSetupScreen } from "./screens/auth/VenueSetupScreen";
 import { PromoLandingScreen } from "./screens/PromoLandingScreen";
+import { PrivacyPolicyScreen } from "./screens/legal/PrivacyPolicyScreen";
+import { TermsOfServiceScreen } from "./screens/legal/TermsOfServiceScreen";
 import { MenuScreen } from "./screens/MenuScreen";
 import { CartScreen } from "./screens/CartScreen";
 import { CheckoutScreen } from "./screens/CheckoutScreen";
@@ -794,11 +796,15 @@ function AppRoutes() {
   const isAuthRoute = strippedPath === "/login" || strippedPath === "/signup";
   const isVerifyRoute = strippedPath === "/verify-otp";
   const isSetupRoute = strippedPath === "/setup";
+  const isPrivacyRoute = strippedPath === "/privacy";
+  const isTermsRoute = strippedPath === "/terms";
   const isTableScan = Boolean(searchParams.get("table"));
   const isPromoRoute = (strippedPath === "/" || strippedPath === "") && !isTableScan && !venueSlug;
   const isSwitcherRoute = strippedPath === "/switcher";
 
   if (isPromoRoute) return <PromoLandingScreen />;
+  if (isPrivacyRoute) return <PrivacyPolicyScreen />;
+  if (isTermsRoute) return <TermsOfServiceScreen />;
   if (isSwitcherRoute) return <AppShell />;
 
   if (isAuthRoute) {
