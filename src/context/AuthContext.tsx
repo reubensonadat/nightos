@@ -49,6 +49,21 @@ export function sectorPath(role: string | null): string {
   return '/waiter'
 }
 
+// eslint-disable-next-line react-refresh/only-export-components
+export function isAllowedForTarget(role: string | null, target: string): boolean {
+  if (!role) return false
+  if (target.startsWith('/kitchen')) {
+    return role === 'owner' || role === 'manager' || role === 'kitchen' || role === 'bar'
+  }
+  if (target.startsWith('/waiter')) {
+    return role === 'owner' || role === 'manager' || role === 'waiter'
+  }
+  if (target.startsWith('/manager')) {
+    return role === 'owner' || role === 'manager'
+  }
+  return true
+}
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null)
   const [session, setSession] = useState<Session | null>(null)

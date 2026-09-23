@@ -5,7 +5,13 @@ import { formatGHS } from '../data/menu';
 export interface MenuItemCardProps {
     id: string;
     name: string;
+    /** Base (pre-tax) price. */
     price: number;
+    /**
+     * Price to display to the guest — gross (tax-inclusive) when the venue
+     * enables it. Falls back to `price` (base) when not provided.
+     */
+    displayPrice?: number;
     image?: string | null;
     description?: string | null;
     category?: string;
@@ -20,6 +26,7 @@ export interface MenuItemCardProps {
 export function MenuItemCard({
     name,
     price,
+    displayPrice,
     image,
     description,
     category,
@@ -63,8 +70,15 @@ export function MenuItemCard({
             <div className="mt-3 flex flex-col px-1">
                 {/* Row 1: Price and Plus Button */}
                 <div className="flex items-center justify-between">
-                    <span className="font-mono text-[16px] font-bold text-licorice">
-                        {formatGHS(price)}
+                    <span className="flex flex-col leading-tight">
+                        <span className="font-mono text-[16px] font-bold text-licorice">
+                            {formatGHS(displayPrice ?? price)}
+                        </span>
+                        {displayPrice !== undefined && displayPrice > price && (
+                            <span className="text-[9px] font-semibold uppercase tracking-[0.08em] text-feldgrau/70">
+                                incl. svc & VAT
+                            </span>
+                        )}
                     </span>
                     <button
                         type="button"

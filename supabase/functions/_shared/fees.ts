@@ -24,6 +24,21 @@ export function expectedBillAmountPesewas(bill: BillForVerification): number {
   return Math.round(Math.max(remaining, 0) * 100)
 }
 
+// Platform fee schedule — MUST mirror public.platform_fee_for() in the
+// database (supabase/03-fee-guard.sql). Flat tiers, hard ₵5 cap, and the
+// fee can never exceed the bill amount (sub-₵1 protection).
+// Financial calculation lives server-side only (PRD §4) — edge functions
+// use this; the browser never computes fees.
+export function platformFeeFor(amountGhs: number): number {
+  const amount = Math.max(amountGhs, 0)
+  const tier =
+    amount <= 50 ? 1.0 :
+    amount <= 100 ? 2.0 :
+    amount <= 150 ? 3.0 :
+    amount <= 200 ? 4.0 : 5.0
+  return Math.round(Math.min(tier, amount) * 100) / 100
+}
+
 // Paystack's `channel` values → our `payments.method` enum
 // ('mobile_money', 'card', 'bank_transfer', 'digital_wallet', 'cash').
 // Correct mapping matters for reports (§4.2.9): mobile_money must never be

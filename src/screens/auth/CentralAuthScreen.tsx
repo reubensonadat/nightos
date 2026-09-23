@@ -1,4 +1,4 @@
-﻿import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
@@ -96,6 +96,8 @@ function SocialAuthRow({
 
 export function CentralAuthScreen({ initialMode = "login" }: { initialMode?: "login" | "signup" }) {
   const navigate = useNavigate();
+  const location = useLocation();
+  const [searchParams] = useSearchParams();
   const {
     isAuthenticated,
     isInitializing,
@@ -109,6 +111,14 @@ export function CentralAuthScreen({ initialMode = "login" }: { initialMode?: "lo
     role,
     signOut,
   } = useAuth();
+
+  const getDestination = useCallback((userRole: string | null): string => {
+    const fromParam = searchParams.get("redirect") || (location.state as { from?: string } | undefined)?.from;
+    if (fromParam && isAllowedForTarget(userRole, fromParam)) {
+      return fromParam;
+    }
+    return sectorPath(userRole);
+  }, [searchParams, location.state]);
 
   const [step, setStep] = useState<Step>(initialMode === "signup" ? "signup" : "login");
   const [shellMode, setShellMode] = useState<ShellMode>(initialMode === "signup" ? "signup" : "login");
@@ -179,8 +189,8 @@ export function CentralAuthScreen({ initialMode = "login" }: { initialMode?: "lo
   useEffect(() => {
     if (!isAuthenticated || isInitializing) return;
     cancelNoAccount();
-    if (role) navigate(sectorPath(role), { replace: true });
-  }, [isAuthenticated, isInitializing, role, navigate, cancelNoAccount]);
+    if (role) navigate(getDestination(role), { replace: true });
+  }, [isAuthenticated, isInitializing, role, navigate, cancelNoAccount, getDestination]);
 
   const goLogin = useCallback(() => {
     cancelNoAccount();
@@ -221,7 +231,7 @@ export function CentralAuthScreen({ initialMode = "login" }: { initialMode?: "lo
         return;
       }
       toast.success("Welcome back.");
-      navigate(sectorPath(resolvedRole), { replace: true });
+      navigate(getDestination(resolvedRole), { replace: true });
       return;
     }
 
@@ -301,7 +311,7 @@ export function CentralAuthScreen({ initialMode = "login" }: { initialMode?: "lo
       return;
     }
     toast.success("Signed in.");
-    navigate(sectorPath(resolvedRole), { replace: true });
+    navigate(getDestination(resolvedRole), { replace: true });
   };
 
   const handleResend = async () => {

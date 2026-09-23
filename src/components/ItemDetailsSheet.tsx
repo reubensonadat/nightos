@@ -9,13 +9,16 @@ import {
 } from "@heroicons/react/24/solid";
 import { formatGHS, type MenuItem, type ModifierGroup, type ModifierOption } from "../data/menu";
 import { useCart } from "../context/CartContext";
+import { displayPrice } from "../lib/fees";
 
 type Props = {
     item: MenuItem | null;
+    /** Combined svc+VAT % for inclusive display (0/undefined = base prices). */
+    taxRatePct?: number;
     onClose: () => void;
 };
 
-export function ItemDetailsSheet({ item, onClose }: Props) {
+export function ItemDetailsSheet({ item, taxRatePct = 0, onClose }: Props) {
     const { addCustom } = useCart();
     const [qty, setQty] = useState(1);
     const [notes, setNotes] = useState("");
@@ -498,11 +501,18 @@ export function ItemDetailsSheet({ item, onClose }: Props) {
                                 focus:outline-none focus-visible:ring-2 focus-visible:ring-khaki
                             "
                         >
-                            <span className="text-[13px] font-semibold tracking-tight text-isabelline">
-                                {submitting ? "Adding…" : `Add to Cart`}
+                            <span className="flex flex-col items-start leading-tight">
+                                <span className="text-[13px] font-semibold tracking-tight text-isabelline">
+                                    {submitting ? "Adding…" : `Add to Cart`}
+                                </span>
+                                {taxRatePct > 0 && (
+                                    <span className="text-[9px] font-semibold uppercase tracking-[0.08em] text-isabelline/60">
+                                        incl. {taxRatePct}% svc & VAT
+                                    </span>
+                                )}
                             </span>
                             <span className="font-mono text-[14px] font-bold tabular-nums text-isabelline">
-                                {formatGHS(totalPrice)}
+                                {formatGHS(displayPrice(totalPrice, taxRatePct))}
                             </span>
                         </button>
                     </div>
