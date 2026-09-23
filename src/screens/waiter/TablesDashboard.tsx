@@ -414,11 +414,7 @@ export function TablesDashboard({ venueId, venueName, staffName, staffId, onSign
                         </span>
                         <p className="mt-2 max-w-sm text-[12px] leading-relaxed tracking-tight text-feldgrau">
                             This venue has no active tables in the database. Add tables from the
-                            manager side (or re-run{" "}
-                            <code className="rounded bg-isabelline px-1.5 py-0.5 font-mono text-[11px]">
-                                supabase/seed-velvet.sql
-                            </code>
-                            ), then refresh.
+                            manager Floor Plan, then refresh.
                         </p>
                     </div>
                 ) : filteredTables.length === 0 ? (

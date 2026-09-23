@@ -44,7 +44,7 @@ const DEFAULT_SEED_CATEGORIES = ["Starters", "Mains", "Cocktails", "Beer & Wine"
 const DEFAULT_SEED_PRODUCTS = [
     { name: "Crispy Honey Wings", category: "Starters", price: 85, costPrice: 32, station: "kitchen", description: "Honey glazed wings served with garlic ranch dip", image: PRESET_IMAGES[0].url },
     { name: "Prime Ribeye Steak", category: "Mains", price: 280, costPrice: 110, station: "kitchen", description: "400g grilled ribeye with truffle herb butter", image: PRESET_IMAGES[1].url },
-    { name: "Velvet House Burger", category: "Mains", price: 140, costPrice: 48, station: "kitchen", description: "Double wagyu patty, smoked cheddar, brioche bun", image: PRESET_IMAGES[2].url },
+    { name: "Signature House Burger", category: "Mains", price: 140, costPrice: 48, station: "kitchen", description: "Double wagyu patty, smoked cheddar, brioche bun", image: PRESET_IMAGES[2].url },
     { name: "Truffle Parmesan Fries", category: "Starters", price: 65, costPrice: 18, station: "kitchen", description: "Hand-cut fries tossed in truffle oil and parmesan", image: PRESET_IMAGES[3].url },
     { name: "Passion Fruit Mojito", category: "Cocktails", price: 95, costPrice: 22, station: "bar", description: "White rum, fresh passion fruit, mint, lime, soda", image: PRESET_IMAGES[4].url },
     { name: "Craft IPA Draft", category: "Beer & Wine", price: 55, costPrice: 18, station: "bar", description: "Local cold brewed IPA on tap", image: PRESET_IMAGES[5].url },

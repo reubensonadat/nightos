@@ -67,7 +67,7 @@ export function KitchenDisplayPromoSection() {
                     <li className="grid grid-cols-[28px_1fr] gap-2 items-center">
                       <span className="text-base font-medium text-slate-400 tabular-nums text-left leading-tight">2x</span>
                       <div className="flex-1 min-w-0">
-                        <p className="text-[15px] font-semibold text-slate-900 leading-tight tracking-tight">Velvet Sliders</p>
+                        <p className="text-[15px] font-semibold text-slate-900 leading-tight tracking-tight">Gourmet Sliders</p>
                         <p className="mt-0.5 flex items-center text-sm font-normal text-slate-500">Extra crispy</p>
                       </div>
                     </li>

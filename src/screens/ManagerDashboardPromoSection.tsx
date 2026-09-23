@@ -20,7 +20,7 @@ const WEEKLY_REVENUE = [
 
 const TOP_SELLERS = [
   { name: "Truffle Arancini", sold: 38, revenue: 3230 },
-  { name: "Velvet Sliders", sold: 29, revenue: 2465 },
+  { name: "Gourmet Sliders", sold: 29, revenue: 2465 },
   { name: "Grilled Octopus", sold: 21, revenue: 2730 },
 ];
 

@@ -644,7 +644,7 @@ export function ReservationsScreen({ onBack }: Props) {
 
                                         {/* Body */}
                                         <div className="flex items-center gap-4 p-4">
-                                            <RealQr value={`velvet://reservation/${ticket.id}`} />
+                                            <RealQr value={`bysen://reservation/${ticket.id}`} />
                                             <div className="flex-1 min-w-0">
                                                 <h3 className="font-serif text-[16px] font-bold italic leading-tight tracking-[-0.02em] text-licorice">
                                                     {ticket.customer_name}

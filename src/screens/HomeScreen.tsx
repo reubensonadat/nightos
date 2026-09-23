@@ -255,7 +255,7 @@ export function HomeScreen({ onEnter, onViewReservations, onStaffPortal, onKitch
                                 Live Jazz
                                 <br />
                                 <span className="italic font-serif font-medium text-khaki">
-                                    The Velvet Trio
+                                    The Live Jazz Trio
                                 </span>
                             </p>
                             <p className="mt-2 text-[10px] font-medium tracking-tight text-isabelline/60">

@@ -397,7 +397,7 @@ export function FloorplanScreen({ venueId }: { venueId?: string } = {}) {
                         <div className="mt-5 flex flex-col items-center justify-center rounded-[1.5rem] bg-isabelline px-6 py-16 text-center">
                             <p className="text-[12px] font-bold tracking-tight text-feldgrau">No tables yet</p>
                             <p className="mt-1 text-xs tracking-tight text-feldgrau/70">
-                                Re-run supabase/seed-velvet.sql to create Tables 1–8.
+                                Click "Add Table" above to add tables to your floor plan.
                             </p>
                         </div>
                     ) : (

@@ -19,7 +19,7 @@ type Props = {
 };
 
 const COLOR_PRESETS = [
-  { name: "Night Velvet", primary: "#1C130D", accent: "#C5A880" },
+  { name: "Midnight Amber", primary: "#1C130D", accent: "#C5A880" },
   { name: "Obsidian Gold", primary: "#121212", accent: "#D4AF37" },
   { name: "Royal Emerald", primary: "#0A2318", accent: "#52B788" },
   { name: "Midnight Navy", primary: "#0D1B2A", accent: "#64DFDF" },

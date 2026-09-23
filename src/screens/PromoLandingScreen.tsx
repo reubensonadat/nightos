@@ -4,7 +4,6 @@ import { ArrowRightIcon, Bars3Icon, XMarkIcon } from "@heroicons/react/24/outlin
 import { GuestExperienceSection } from "./GuestExperienceSection";
 import { FAQSection } from "./FAQSection";
 import heroImage from "../assets/hero-image.jpg";
-import logoImage from "../assets/logo.png";
 import { WaiterDashboardPromoSection } from "./WaiterDashboardPromoSection";
 import { KitchenDisplayPromoSection } from "./KitchenDisplayPromoSection";
 import { ManagerDashboardPromoSection } from "./ManagerDashboardPromoSection";
@@ -35,7 +34,7 @@ export function PromoLandingScreen() {
         <nav className="flex items-center justify-between w-full h-[60px]">
           {/* Logo */}
           <div className="flex items-center gap-3">
-            <img src={logoImage} alt="Bysen Logo" className="w-8 h-8 md:w-9 md:h-9 object-contain" />
+            <img src="/bysen-logo.jpg" alt="Bysen Logo" className="w-8 h-8 md:w-9 md:h-9 object-contain rounded-lg shadow-sm" />
             <span className="font-brand text-[18px] md:text-[21.6px] font-semibold tracking-tight text-[#c9935a]">
               Bysen
             </span>
@@ -176,7 +175,7 @@ export function PromoLandingScreen() {
           {/* Brand Info */}
           <div className="flex flex-col gap-6 md:max-w-sm">
             <div className="flex items-center gap-3">
-              <img src={logoImage} alt="Bysen Logo" className="w-10 h-10 object-contain" />
+              <img src="/bysen-logo.jpg" alt="Bysen Logo" className="w-10 h-10 object-contain rounded-lg shadow-sm" />
               <span className="font-brand text-[24px] font-semibold tracking-tight text-[#c9935a]">
                 Bysen
               </span>
