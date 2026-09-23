@@ -21,7 +21,7 @@ import { CustomerBottomNav } from "./components/CustomerBottomNav";
 import { PartyPrompt } from "./components/PartyPrompt";
 import { TablePinModal } from "./components/TablePinModal";
  
-import { ClockIcon } from "@heroicons/react/24/outline";
+import { ClockIcon, BuildingStorefrontIcon } from "@heroicons/react/24/outline";
 
 import { StaffAuthScreen } from "./screens/waiter/StaffAuthScreen";
 
@@ -46,7 +46,7 @@ import { CrmScreen } from "./screens/manager/CrmScreen";
 import { BrandSettingsScreen } from "./screens/manager/BrandSettingsScreen";
  
 import { ReservationsScreen } from "./screens/ReservationsScreen";
-import { useVenue } from "./hooks/useVenue";
+import { useVenue, DEFAULT_VENUE } from "./hooks/useVenue";
 import { useQrTable } from "./hooks/useQrTable";
 import { useCustomerSession } from "./hooks/useCustomerSession";
 
@@ -500,8 +500,16 @@ function AppShell() {
   const paramVenue = searchParams.get("venue") || searchParams.get("v");
 
   const targetSlug = urlVenueSlug || qrTable?.venue_id || paramVenue || authVenue?.slug || authVenue?.id || "velvet-lounge";
-  const { venue: loadedVenue, loading: venueLoading, error: venueError } = useVenue(targetSlug);
-  const currentVenue = authVenue || loadedVenue;
+  const { venue: loadedVenue, loading: venueLoading, error: venueError, isNotFound } = useVenue(targetSlug);
+
+  const isVenueNotFound = !venueLoading && (
+    (urlVenueSlug && (isNotFound || (loadedVenue && loadedVenue.slug !== urlVenueSlug))) ||
+    (!urlVenueSlug && isNotFound)
+  );
+
+  const currentVenue = (urlVenueSlug && loadedVenue?.slug === urlVenueSlug && !isNotFound)
+    ? loadedVenue
+    : (authVenue || loadedVenue || DEFAULT_VENUE);
   const venueId = currentVenue.id;
 
   // Dynamic document title matching the active venue
@@ -608,16 +616,53 @@ function AppShell() {
     }
   };
 
-  if (!authVenue && !venueLoading && venueError) {
+  if (venueLoading && urlVenueSlug && loadedVenue?.slug !== urlVenueSlug) {
     return (
-      <div className="min-h-svh bg-isabelline flex items-center justify-center px-8">
-        <div className="max-w-md text-center">
-          <p className="text-ink font-semibold text-lg">Venue not found</p>
-          <p className="text-ink/60 text-sm mt-2 leading-relaxed">
-            The venue <strong>{targetSlug}</strong> doesn't exist in your database yet. Open the Supabase SQL
-            Editor and run <code className="rounded bg-ink/5 px-1.5 py-0.5 font-mono text-xs">supabase/02-clean-seed.sql</code>,
-            then reload this page.
+      <div className="min-h-svh bg-isabelline flex items-center justify-center font-sans">
+        <div className="flex flex-col items-center gap-3">
+          <div className="h-9 w-9 animate-spin rounded-full border-3 border-licorice/20 border-t-licorice" />
+          <span className="text-xs font-semibold uppercase tracking-wider text-feldgrau">Loading venue...</span>
+        </div>
+      </div>
+    );
+  }
+
+  if (isVenueNotFound) {
+    const invalidSlug = urlVenueSlug || targetSlug;
+    return (
+      <div className="min-h-svh bg-isabelline flex items-center justify-center px-6 py-12 font-sans antialiased">
+        <div className="w-full max-w-md text-center bg-white rounded-3xl p-8 shadow-xl border border-licorice/8 animate-velvet-scale-in">
+          <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-2xl bg-red-50 text-red-600 ring-1 ring-red-100 shadow-sm">
+            <BuildingStorefrontIcon className="h-8 w-8 stroke-[1.75]" />
+          </div>
+          <span className="inline-block rounded-full bg-red-100/60 px-3 py-1 text-[11px] font-bold uppercase tracking-wider text-red-700 mb-3">
+            404 • Venue Not Found
+          </span>
+          <h1 className="text-2xl font-black tracking-tight text-licorice">
+            Venue Does Not Exist
+          </h1>
+          <p className="mt-3 text-[13.5px] leading-relaxed text-feldgrau">
+            We couldn't find a venue matching <code className="rounded bg-licorice/5 px-2 py-0.5 font-mono text-[12px] font-semibold text-licorice">/v/{invalidSlug}</code>.
+            Please check the URL spelling or return to a valid venue.
           </p>
+          <div className="mt-7 flex flex-col gap-2.5">
+            {authVenue && authVenue.slug !== invalidSlug && (
+              <button
+                type="button"
+                onClick={() => navigate(`/v/${authVenue.slug}/manager/ops`)}
+                className="w-full rounded-xl bg-licorice py-3 text-sm font-bold text-isabelline shadow-md hover:bg-licorice/90 transition-all active:scale-[0.98]"
+              >
+                Go to {authVenue.name} Dashboard
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={() => navigate(`/v/velvet-lounge/login`)}
+              className="w-full rounded-xl border border-licorice/15 bg-isabelline/50 py-3 text-sm font-bold text-licorice hover:bg-isabelline transition-all active:scale-[0.98]"
+            >
+              Back to Sign In
+            </button>
+          </div>
         </div>
       </div>
     );

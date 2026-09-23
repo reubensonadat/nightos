@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { db, type DbVenue } from '../lib/api';
 import { useAuth } from '../context/AuthContext';
 
-const DEFAULT_VENUE: DbVenue = {
+export const DEFAULT_VENUE: DbVenue = {
   id: 'a0000000-0000-0000-0000-000000000001',
   owner_id: '',
   name: 'Velvet Lounge',
@@ -41,30 +41,34 @@ export function useVenue(slugOrId?: string) {
     /* safely fallback when used outside AuthProvider */
   }
 
-  // If no slug/id or default 'velvet-lounge' is given, but an active auth venue exists, use it
-  const initialVenue = (
-    (!slugOrId || slugOrId === 'velvet-lounge') && authVenue
-      ? authVenue
-      : (slugOrId && authVenue && (authVenue.id === slugOrId || authVenue.slug === slugOrId) ? authVenue : DEFAULT_VENUE)
+  const matchesAuth = Boolean(
+    authVenue && slugOrId && (authVenue.id === slugOrId || authVenue.slug === slugOrId)
   );
 
+  const initialVenue: DbVenue = matchesAuth
+    ? authVenue!
+    : (authVenue || DEFAULT_VENUE);
+
   const [venue, setVenue] = useState<DbVenue>(initialVenue);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState<boolean>(!matchesAuth && Boolean(slugOrId));
   const [error, setError] = useState<string | null>(null);
+  const [isNotFound, setIsNotFound] = useState<boolean>(false);
 
   useEffect(() => {
     // If matching active auth venue, update immediately
-    if (authVenue && (!slugOrId || slugOrId === 'velvet-lounge' || slugOrId === authVenue.slug || slugOrId === authVenue.id)) {
+    if (authVenue && (slugOrId === authVenue.slug || slugOrId === authVenue.id)) {
       setVenue(authVenue);
       setLoading(false);
+      setError(null);
+      setIsNotFound(false);
       return;
     }
 
     if (!slugOrId) {
-      if (authVenue) {
-        setVenue(authVenue);
-      }
+      setVenue(authVenue || DEFAULT_VENUE);
       setLoading(false);
+      setError(null);
+      setIsNotFound(false);
       return;
     }
 
@@ -73,6 +77,7 @@ export function useVenue(slugOrId?: string) {
     async function load(identifier: string) {
       setLoading(true);
       setError(null);
+      setIsNotFound(false);
 
       const isUuid = UUID_REGEX.test(identifier);
       const { data, error: err } = isUuid
@@ -81,11 +86,21 @@ export function useVenue(slugOrId?: string) {
 
       if (cancelled) return;
       if (err || !data) {
-        setError('Could not load venue');
+        if (identifier === 'velvet-lounge') {
+          setVenue(DEFAULT_VENUE);
+          setError(null);
+          setIsNotFound(false);
+        } else {
+          setVenue(DEFAULT_VENUE);
+          setError(`Venue "${identifier}" not found`);
+          setIsNotFound(true);
+        }
         setLoading(false);
         return;
       }
       setVenue(data);
+      setError(null);
+      setIsNotFound(false);
       setLoading(false);
     }
 
@@ -95,5 +110,5 @@ export function useVenue(slugOrId?: string) {
     };
   }, [slugOrId, authVenue]);
 
-  return { venue, loading, error };
+  return { venue, loading, error, isNotFound };
 }
