@@ -552,7 +552,8 @@ function AppShell() {
 
   // Auto-prefix URL with active venue slug if missing for app routes
   useEffect(() => {
-    if (!urlVenueSlug && currentVenue && currentVenue.slug) {
+    const isLegalPath = ["/privacy", "/privacypolicy", "/privacy-policy", "/terms", "/termsofservice", "/terms-of-service"].includes(location.pathname);
+    if (!urlVenueSlug && currentVenue && currentVenue.slug && !isLegalPath) {
       if (location.pathname !== "/" && location.pathname !== "/switcher") {
         navigate(`/v/${currentVenue.slug}${location.pathname}${location.search}`, { replace: true });
       }
@@ -793,18 +794,26 @@ function AppRoutes() {
   const venueSlug = match ? match[1] : null;
   const strippedPath = venueSlug ? location.pathname.replace(/^\/v\/[^/]+/, "") || "/" : location.pathname;
 
+  const isPrivacyRoute = ["/privacy", "/privacypolicy", "/privacy-policy"].includes(strippedPath);
+  const isTermsRoute = ["/terms", "/termsofservice", "/terms-of-service"].includes(strippedPath);
+
+  if (isPrivacyRoute) {
+    if (venueSlug || location.pathname !== "/privacypolicy") return <Navigate to="/privacypolicy" replace />;
+    return <PrivacyPolicyScreen />;
+  }
+  if (isTermsRoute) {
+    if (venueSlug || location.pathname !== "/termsofservice") return <Navigate to="/termsofservice" replace />;
+    return <TermsOfServiceScreen />;
+  }
+
   const isAuthRoute = strippedPath === "/login" || strippedPath === "/signup";
   const isVerifyRoute = strippedPath === "/verify-otp";
   const isSetupRoute = strippedPath === "/setup";
-  const isPrivacyRoute = strippedPath === "/privacy";
-  const isTermsRoute = strippedPath === "/terms";
   const isTableScan = Boolean(searchParams.get("table"));
   const isPromoRoute = (strippedPath === "/" || strippedPath === "") && !isTableScan && !venueSlug;
   const isSwitcherRoute = strippedPath === "/switcher";
 
   if (isPromoRoute) return <PromoLandingScreen />;
-  if (isPrivacyRoute) return <PrivacyPolicyScreen />;
-  if (isTermsRoute) return <TermsOfServiceScreen />;
   if (isSwitcherRoute) return <AppShell />;
 
   if (isAuthRoute) {

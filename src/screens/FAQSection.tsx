@@ -4,23 +4,23 @@ import { ChevronDownIcon } from '@heroicons/react/24/outline';
 const faqs = [
   {
     question: "How long does it take to get up and running with Bysen?",
-    answer: "Implementation typically takes 1-2 weeks depending on your venue size. Our team handles your menu import and floor plan setup, so you can focus on operations."
+    answer: "Setup is fast and self-serve. Bysen provides standard instructional materials so you can set up your venue independently at no additional cost. If you prefer hands-on configuration by our team, we offer a dedicated setup service for a one-time fee."
   },
   {
-    question: "Does Bysen charge transaction fees on top of the monthly subscription?",
-    answer: "No, Bysen charges a flat monthly software subscription. We don't take a percentage of your sales or add hidden transaction fees."
+    question: "Does Bysen charge monthly subscription fees or transaction fees?",
+    answer: "Bysen does not charge recurring monthly software subscription fees. Instead, we charge a tiered platform fee per transaction based on the order total (from 1.00 GHS for orders up to 50 GHS, up to 5.00 GHS for orders over 200 GHS). Digital payments via Paystack carry a separate 2% processing fee."
   },
   {
     question: "Can guests use the QR ordering without downloading an app?",
-    answer: "Yes, our entire QR ordering flow is web-based. Guests simply scan the code with their camera and order immediately through their browser without any downloads."
+    answer: "Yes, our entire QR ordering flow is web-based. Guests simply scan the table QR code with their smartphone camera and order immediately through their mobile browser without downloading any apps."
   },
   {
     question: "Which POS hardware does Bysen work with?",
-    "answer": "Bysen is hardware agnostic and cloud-based. You can run our Kitchen Displays and Manager Dashboards on any modern tablet, iPad, or touchscreen device."
+    answer: "Bysen is exclusively a cloud-based software provider (Bring Your Own Device). You can run Kitchen Displays, Waiter Workspaces, and Manager Dashboards on any existing tablet, iPad, laptop, smartphone, or touchscreen device with an active internet connection."
   },
   {
     question: "What happens to my data if I decide to leave Bysen?",
-    answer: "Your data is always yours. On request, we export a full archive of your transaction history, menu configurations, and customer records in standard CSV and JSON formats within 5 business days. Data is deleted from our servers within 30 days of account closure."
+    answer: "Your data is always yours. There are no minimum lock-in periods (7 days cancellation notice). Upon request, Bysen will export a comprehensive copy of your sales records within 30 days. Staff account data is deleted within 30 days of account closure, while transaction records are retained for 5 years to fulfill legal accounting obligations under Ghana law."
   }
 ];
 

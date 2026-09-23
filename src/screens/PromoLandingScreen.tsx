@@ -73,15 +73,18 @@ export function PromoLandingScreen() {
           </button>
 
           {/* Nav Links - Hidden on mobile */}
-          <div className="hidden lg:flex items-center gap-8">
+          <div className="hidden lg:flex items-center gap-7">
+            <button onClick={() => scrollToSection('home')} className="text-[14px] font-medium hover:text-white transition-colors">
+              Home
+            </button>
             <button onClick={() => scrollToSection('platform')} className="text-[14px] font-medium hover:text-white transition-colors">
               Platform
             </button>
             <button onClick={() => scrollToSection('pricing')} className="text-[14px] font-medium hover:text-white transition-colors">
               Pricing
             </button>
-            <button onClick={() => scrollToSection('integrations')} className="text-[14px] font-medium hover:text-white transition-colors">
-              Integrations
+            <button onClick={() => scrollToSection('faq')} className="text-[14px] font-medium hover:text-white transition-colors">
+              FAQ
             </button>
             <button onClick={() => scrollToSection('about')} className="text-[14px] font-medium hover:text-white transition-colors">
               About
@@ -102,19 +105,22 @@ export function PromoLandingScreen() {
         </nav>
 
         {/* Mobile Dropdown Menu */}
-        <div className={`lg:hidden absolute top-full left-0 w-full bg-[#1a110b] border-t border-white/5 shadow-2xl py-6 px-5 flex flex-col gap-6 transition-all duration-300 ease-in-out ${
+        <div className={`lg:hidden absolute top-full left-0 w-full bg-[#1a110b] border-t border-white/5 shadow-2xl py-6 px-5 flex flex-col gap-5 transition-all duration-300 ease-in-out ${
           isMobileMenuOpen 
             ? 'opacity-100 translate-y-0 pointer-events-auto' 
             : 'opacity-0 -translate-y-4 pointer-events-none'
         }`}>
+          <button onClick={() => scrollToSection('home')} className="text-left text-[16px] font-medium hover:text-white transition-colors">
+            Home
+          </button>
           <button onClick={() => scrollToSection('platform')} className="text-left text-[16px] font-medium hover:text-white transition-colors">
             Platform
           </button>
           <button onClick={() => scrollToSection('pricing')} className="text-left text-[16px] font-medium hover:text-white transition-colors">
             Pricing
           </button>
-          <button onClick={() => scrollToSection('integrations')} className="text-left text-[16px] font-medium hover:text-white transition-colors">
-            Integrations
+          <button onClick={() => scrollToSection('faq')} className="text-left text-[16px] font-medium hover:text-white transition-colors">
+            FAQ
           </button>
           <button onClick={() => scrollToSection('about')} className="text-left text-[16px] font-medium hover:text-white transition-colors">
             About
@@ -233,7 +239,7 @@ export function PromoLandingScreen() {
                 <h3 className="mt-2 text-2xl font-black text-white">Full Operations Suite</h3>
                 <p className="mt-2 text-sm text-[#f4f3e8]/70">Everything your venue needs to take orders and operate live.</p>
                 <div className="mt-6 flex items-baseline gap-2">
-                  <span className="text-4xl font-extrabold text-white">Flat ₵1 – ₵5</span>
+                  <span className="text-4xl font-extrabold text-white">Flat ₵1 – ₵10</span>
                   <span className="text-sm text-[#f4f3e8]/50">/ settled order</span>
                 </div>
                 <ul className="mt-8 space-y-3 text-sm text-[#f4f3e8]/80">
@@ -251,9 +257,9 @@ export function PromoLandingScreen() {
               </button>
             </div>
 
-            <div id="integrations" className="rounded-3xl border border-white/10 bg-[#1a110b] p-8 flex flex-col justify-between">
+            <div className="rounded-3xl border border-white/10 bg-[#1a110b] p-8 flex flex-col justify-between">
               <div>
-                <span className="text-[12px] font-bold uppercase tracking-widest text-[#f4f3e8]/50">Integrations</span>
+                <span className="text-[12px] font-bold uppercase tracking-widest text-[#f4f3e8]/50">Payments &amp; Infrastructure</span>
                 <h3 className="mt-2 text-2xl font-black text-white">Built for Ghana & Beyond</h3>
                 <p className="mt-2 text-sm text-[#f4f3e8]/70">Native payment processing and hardware compatibility.</p>
                 <ul className="mt-8 space-y-4 text-sm text-[#f4f3e8]/80">
