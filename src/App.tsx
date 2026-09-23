@@ -538,7 +538,7 @@ function AppShell() {
     if (
       seg &&
       (seg === "ops" || seg === "shift-report" || seg === "floorplan" || seg === "orders" || seg === "menu" || seg === "staff" ||
-        seg === "finance" || seg === "crm" || seg === "brand")
+        seg === "finance" || seg === "crm")
     ) {
       return seg as ManagerPage;
     }

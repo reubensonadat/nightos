@@ -52,9 +52,7 @@ Under your R2 bucket **Settings** → **CORS Policy**, add the following JSON po
 [
   {
     "AllowedOrigins": [
-      "http://localhost:5173",
-      "https://*.pages.dev",
-      "https://yourdomain.com"
+      "*"
     ],
     "AllowedMethods": [
       "GET",
@@ -90,6 +88,14 @@ Under your R2 bucket **Settings** → **CORS Policy**, add the following JSON po
 ### Step 5: Configure Secrets in Supabase Edge Functions
 In your **Supabase Dashboard** → **Project Settings** → **Edge Functions** → **Secrets** (or via Supabase CLI), add the following secrets:
 
+```bash
+npx supabase secrets set \
+  R2_ACCOUNT_ID="your-cloudflare-account-id" \
+  R2_ACCESS_KEY_ID="your-r2-access-key-id" \
+  R2_SECRET_ACCESS_KEY="your-r2-secret-access-key" \
+  R2_BUCKET_NAME="your-r2-bucket-name" \
+  R2_PUBLIC_URL="https://media.yourdomain.com"
+```
 
 ---
 
