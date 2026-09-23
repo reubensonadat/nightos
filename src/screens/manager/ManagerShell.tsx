@@ -176,7 +176,7 @@ export function AdminLoginScreen({ venueName, venueLogo, onSignIn }: LoginProps)
 
 /* ────────────────────────── Navigation Configuration ────────────────────────── */
 
-export type ManagerPage = "ops" | "shift-report" | "floorplan" | "orders" | "menu" | "staff" | "finance" | "crm";
+export type ManagerPage = "ops" | "shift-report" | "floorplan" | "orders" | "menu" | "staff" | "finance" | "crm" | "brand";
 
 type NavItem = {
     id: ManagerPage;
@@ -193,6 +193,7 @@ const NAV_ITEMS: NavItem[] = [
     { id: "staff", label: "Staff & Roles", icon: UsersIcon },
     { id: "finance", label: "Financial Reports", icon: BanknotesIcon },
     { id: "crm", label: "CRM & Marketing", icon: UserCircleIcon },
+    { id: "brand", label: "Brand & Tax Settings", icon: BuildingStorefrontIcon },
 ];
 
 /* ────────────────────────── Manager Shell Component ────────────────────────── */
