@@ -49,8 +49,8 @@ function tierOf(profile: DbCustomerProfile): Tier {
 
 /* ────────────────────────── Component ────────────────────────── */
 
-export function CrmScreen() {
-    const { venue } = useVenue("velvet-lounge");
+export function CrmScreen({ venueId }: { venueId?: string } = {}) {
+    const { venue } = useVenue(venueId);
     const [customers, setCustomers] = useState<CustomerRow[]>([]);
     const [total, setTotal] = useState(0);
     const [page, setPage] = useState(0);

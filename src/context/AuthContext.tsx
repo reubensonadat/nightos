@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react'
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { authDb } from '../lib/db/auth'
 import { cacheClear } from '../lib/cache'
@@ -21,6 +21,8 @@ type AuthContextValue = {
   session: Session | null
   profile: Profile | null
   venue: DbVenue | null
+  venues: DbVenue[]
+  switchVenue: (venueId: string) => void
   role: string | null
   staffSession: DbStaffSession | null
   isInitializing: boolean
@@ -69,6 +71,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<Session | null>(null)
   const [profile, setProfile] = useState<Profile | null>(null)
   const [venue, setVenue] = useState<DbVenue | null>(null)
+  const [venues, setVenues] = useState<DbVenue[]>([])
   const [role, setRole] = useState<string | null>(null)
   const [staffSession, setStaffSession] = useState<DbStaffSession | null>(null)
   const [isInitializing, setIsInitializing] = useState(true)
@@ -84,23 +87,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (!userId) {
       setProfile(null)
       setVenue(null)
+      setVenues([])
       setRole(null)
       setStaffSession(null)
       return null
     }
 
-    // 1. Check if user owns a venue
-    const { data: v } = await authDb.venueByOwner(userId)
-    if (v) {
-      const venueObj = v as DbVenue
-      setVenue(venueObj)
+    // 1. Check if user owns venues (support multi-venue switching)
+    const { data: vList } = await authDb.venuesByOwner(userId)
+    if (vList && vList.length > 0) {
+      const ownerVenues = vList as DbVenue[]
+      setVenues(ownerVenues)
+      const savedId = localStorage.getItem('nightos:active_venue_id')
+      const active = ownerVenues.find((x) => x.id === savedId) || ownerVenues[0]
+      setVenue(active)
       setRole('owner')
       setStaffSession(null)
       setProfile({
         id: userId,
-        email: userEmail ?? (venueObj.email || null),
-        phone_number: userPhone ?? (venueObj.phone || null),
-        name: venueObj.name || null,
+        email: userEmail ?? (active.email || null),
+        phone_number: userPhone ?? (active.phone || null),
+        name: active.name || null,
       })
       return 'owner'
     }
@@ -112,6 +119,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (staffData) {
         const sd = staffData as Record<string, unknown>
         setVenue(sd.venue as DbVenue)
+        setVenues(sd.venue ? [sd.venue as DbVenue] : [])
         setRole(sd.role as string)
 
         const { data, error } = await supabase
@@ -180,6 +188,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (staffByEmail && staffByEmail.venue_id) {
         const venueObj = staffByEmail.venues as unknown as DbVenue
         setVenue(venueObj)
+        setVenues(venueObj ? [venueObj] : [])
         setRole(staffByEmail.role)
         setStaffSession({
           id: staffByEmail.id,
@@ -218,6 +227,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (venueByEmail) {
         const venueObj = venueByEmail as DbVenue
         setVenue(venueObj)
+        setVenues([venueObj])
         setRole('owner')
         setStaffSession(null)
         setProfile({
@@ -231,6 +241,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
 
     setVenue(null)
+    setVenues([])
     setRole(null)
     setStaffSession(null)
     return null
@@ -481,14 +492,44 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setSession(null)
     setProfile(null)
     setVenue(null)
+    setVenues([])
     setRole(null)
     setStaffSession(null)
+    try {
+      localStorage.removeItem('nightos:active_venue_id')
+    } catch {
+      /* ignore */
+    }
   }
+
+  const switchVenue = useCallback((venueId: string) => {
+    setVenues((prev) => {
+      const found = prev.find((v) => v.id === venueId)
+      if (found) {
+        setVenue(found)
+        try {
+          localStorage.setItem('nightos:active_venue_id', found.id)
+        } catch {
+          /* ignore */
+        }
+      }
+      return prev
+    })
+  }, [])
 
   const refreshVenue = async () => {
     if (!user?.id) return
-    const { data: v } = await authDb.venueByOwner(user.id)
-    setVenue((v as DbVenue) ?? null)
+    const { data: vList } = await authDb.venuesByOwner(user.id)
+    if (vList && vList.length > 0) {
+      const ownerVenues = vList as DbVenue[]
+      setVenues(ownerVenues)
+      const savedId = localStorage.getItem('nightos:active_venue_id')
+      const active = ownerVenues.find((x) => x.id === savedId) || ownerVenues[0]
+      setVenue(active)
+    } else {
+      const { data: v } = await authDb.venueByOwner(user.id)
+      setVenue((v as DbVenue) ?? null)
+    }
   }
 
   const refreshStaffSession = async () => {
@@ -502,6 +543,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       session,
       profile,
       venue,
+      venues,
+      switchVenue,
       role,
       staffSession,
       isInitializing,
@@ -516,10 +559,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       verifyPhoneOtp,
       signOut,
       refreshVenue,
-      refreshStaffSession
+      refreshStaffSession,
     }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [user, session, profile, venue, role, staffSession, isInitializing],
+    [user, session, profile, venue, venues, switchVenue, role, staffSession, isInitializing],
   )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

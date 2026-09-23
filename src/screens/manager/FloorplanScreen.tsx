@@ -189,8 +189,8 @@ function TableActiveOrders({ billId, waiterName }: { billId: string; waiterName?
 
 /* ────────────────────────── Component ────────────────────────── */
 
-export function FloorplanScreen() {
-    const { venue } = useVenue("velvet-lounge");
+export function FloorplanScreen({ venueId }: { venueId?: string } = {}) {
+    const { venue } = useVenue(venueId);
     const [tables, setTables] = useState<FloorTable[]>([]);
     const [loading, setLoading] = useState(true);
     const [selectedId, setSelectedId] = useState<string | null>(null);

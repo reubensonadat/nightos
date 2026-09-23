@@ -114,6 +114,7 @@ const FILTERS: { id: Filter; label: string }[] = [
 
 type Props = {
     venueId: string;
+    venueName?: string;
     staffName: string;
     staffId: string;
     onSignOut: () => void;
@@ -165,7 +166,7 @@ function transformToTables(
     });
 }
 
-export function TablesDashboard({ venueId, staffName, staffId, onSignOut }: Props) {
+export function TablesDashboard({ venueId, venueName, staffName, staffId, onSignOut }: Props) {
     const navigate = useNavigate();
     const [tables, setTables] = useState<Table[]>([]);
     const [filter, setFilter] = useState<Filter>("all");
@@ -609,7 +610,7 @@ export function TablesDashboard({ venueId, staffName, staffId, onSignOut }: Prop
                     tableNumber={selectedQrTable.number}
                     tableLabel={selectedQrTable.label}
                     area={selectedQrTable.area}
-                    venueName="VELVET LOUNGE"
+                    venueName={venueName || "VENUE"}
                     qrCodeToken={selectedQrTable.qrCodeToken}
                 />
             )}

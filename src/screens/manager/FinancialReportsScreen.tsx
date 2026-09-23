@@ -24,8 +24,8 @@ const CHART_COLORS = ["#23140C", "#D0BA98", "#606F69", "#91040C", "#A9CFE0"];
    COMPONENT
    ═══════════════════════════════════════════════════════════════════════════ */
 
-export function FinancialReportsScreen() {
-    const { venue } = useVenue("velvet-lounge");
+export function FinancialReportsScreen({ venueId }: { venueId?: string } = {}) {
+    const { venue } = useVenue(venueId);
     const [timeFilter, setTimeFilter] = useState<string>("30D");
     const [customStart, setCustomStart] = useState("");
     const [customEnd, setCustomEnd] = useState("");

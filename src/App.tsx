@@ -472,14 +472,21 @@ function AppShell() {
   const location = useLocation();
   const [searchParams] = useSearchParams();
   const { user, signOut, staffSession, role, venue: authVenue, profile } = useAuth();
+  const qrToken = searchParams.get("table");
+  const { table: qrTable, loading: qrLoading, error: qrError } = useQrTable(qrToken);
 
-  const targetSlug = authVenue?.slug || "velvet-lounge";
-  const { venue: loadedVenue, loading: venueLoading, error: venueError } = useVenue(targetSlug);
+  const paramVenue = searchParams.get("venue") || searchParams.get("v");
+  const targetSlugOrId = qrTable?.venue_id || paramVenue || authVenue?.slug || authVenue?.id || "velvet-lounge";
+  const { venue: loadedVenue, loading: venueLoading, error: venueError } = useVenue(targetSlugOrId);
   const currentVenue = authVenue || loadedVenue;
   const venueId = currentVenue.id;
 
-  const qrToken = searchParams.get("table");
-  const { table: qrTable, loading: qrLoading, error: qrError } = useQrTable(qrToken);
+  // Dynamic document title matching the active venue
+  useEffect(() => {
+    if (currentVenue?.name) {
+      document.title = `${currentVenue.name} · Bysen`;
+    }
+  }, [currentVenue?.name]);
 
   const getModeFromPath = (): Mode => {
     const path = location.pathname.replace(/^\/+/, "").split("/")[0];
@@ -586,6 +593,7 @@ function AppShell() {
             (staffSession || role === "owner" || role === "manager" || role === "waiter") ? (
               <TablesDashboard
                 venueId={staffSession?.venue_id || authVenue?.id || venueId || ""}
+                venueName={currentVenue?.name}
                 staffName={staffSession?.name || profile?.name || "Manager"}
                 staffId={staffSession?.id || user?.id || ""}
                 role={staffSession?.role || "manager"}
@@ -632,19 +640,21 @@ function AppShell() {
         <ProtectedRoute>
           <VenueRequired>
             <ManagerShell
+              venueName={currentVenue?.name}
+              venueLogo={currentVenue?.logo_url}
               managerName={user?.email?.split("@")[0] || profile?.name || staffSession?.name || "Manager"}
               activePage={managerPage}
               onPageChange={goToManagerPage}
               onSignOut={handleSignOut}
             >
-              {managerPage === "ops" && <LiveOpsScreen onNavigate={goToManagerPage} />}
-              {managerPage === "shift-report" && <ShiftReportScreen />}
-              {managerPage === "floorplan" && <FloorplanScreen />}
+              {managerPage === "ops" && <LiveOpsScreen venueId={venueId} onNavigate={goToManagerPage} />}
+              {managerPage === "shift-report" && <ShiftReportScreen venueId={venueId} />}
+              {managerPage === "floorplan" && <FloorplanScreen venueId={venueId} />}
               {managerPage === "orders" && <ManagerOrdersScreen venueId={venueId} />}
-              {managerPage === "menu" && <MenuManagerScreen />}
-              {managerPage === "staff" && <StaffManagerScreen />}
-              {managerPage === "finance" && <FinancialReportsScreen />}
-              {managerPage === "crm" && <CrmScreen />}
+              {managerPage === "menu" && <MenuManagerScreen venueId={venueId} />}
+              {managerPage === "staff" && <StaffManagerScreen venueId={venueId} />}
+              {managerPage === "finance" && <FinancialReportsScreen venueId={venueId} />}
+              {managerPage === "crm" && <CrmScreen venueId={venueId} />}
             </ManagerShell>
           </VenueRequired>
         </ProtectedRoute>

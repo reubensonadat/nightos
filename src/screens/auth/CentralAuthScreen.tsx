@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation, useSearchParams } from "react-router-dom";
 import toast from "react-hot-toast";
 import {
   DevicePhoneMobileIcon,
@@ -8,7 +8,7 @@ import {
   LockClosedIcon,
   UserIcon,
 } from "@heroicons/react/24/outline";
-import { useAuth, sectorPath } from "../../context/AuthContext";
+import { useAuth, sectorPath, isAllowedForTarget } from "../../context/AuthContext";
 import { authDb } from "../../lib/db/auth";
 import { AuthShell } from "./AuthShell";
 import { Divider, ErrorBanner, PrimaryButton, TextField } from "./AuthField";

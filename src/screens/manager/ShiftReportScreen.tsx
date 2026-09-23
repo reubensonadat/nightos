@@ -85,6 +85,7 @@ type VoidItemDetail = {
 };
 
 type Props = {
+    venueId?: string;
     isModal?: boolean;
     onClose?: () => void;
 };
@@ -93,8 +94,8 @@ type Props = {
    COMPONENT
    ═══════════════════════════════════════════════════════════════════════════ */
 
-export function ShiftReportScreen({ isModal = false, onClose }: Props) {
-    const { venue } = useVenue("velvet-lounge");
+export function ShiftReportScreen({ venueId, isModal = false, onClose }: Props) {
+    const { venue } = useVenue(venueId);
     const [range, setRange] = useState<ShiftFilterRange>("CURRENT");
     const [customStart, setCustomStart] = useState("");
     const [customEnd, setCustomEnd] = useState("");
