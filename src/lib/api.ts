@@ -362,18 +362,34 @@ export const db = {
     cacheInvalidate(`tables:${args.venueId}`);
     const { data: existing } = await supabase
       .from('tables')
-      .select('id')
+      .select('id, is_active')
       .eq('venue_id', args.venueId)
       .eq('table_number', args.tableNumber)
       .maybeSingle();
 
-    if (existing) {
-      return { data: null, error: { message: `Table number ${args.tableNumber} already exists in this venue.` } };
-    }
-
     const randomSuffix = Math.random().toString(36).substring(2, 8);
     const token = `VL-TABLE-${String(args.tableNumber).padStart(2, '0')}-${randomSuffix}`;
     const label = args.tableLabel || `Table ${String(args.tableNumber).padStart(2, '0')}`;
+
+    if (existing) {
+      if (!existing.is_active) {
+        const { data: reactivated, error: reactivateErr } = await supabase
+          .from('tables')
+          .update({
+            table_label: label,
+            capacity: args.capacity,
+            area: args.area,
+            qr_code_token: token,
+            is_active: true,
+          })
+          .eq('id', existing.id)
+          .select()
+          .single();
+        return { data: reactivated, error: reactivateErr };
+      }
+      return { data: null, error: { message: `Table number ${args.tableNumber} already exists in this venue.` } };
+    }
+
     const { data, error } = await supabase
       .from('tables')
       .insert({
@@ -389,6 +405,23 @@ export const db = {
       .single();
 
     if (error && (error.code === '23505' || error.message?.includes('tables_venue_id_table_number_key'))) {
+      // Fallback: Reactivate if soft-deleted in DB
+      const { data: reactivated, error: reactivateErr } = await supabase
+        .from('tables')
+        .update({
+          table_label: label,
+          capacity: args.capacity,
+          area: args.area,
+          is_active: true,
+        })
+        .eq('venue_id', args.venueId)
+        .eq('table_number', args.tableNumber)
+        .select()
+        .single();
+
+      if (!reactivateErr && reactivated) {
+        return { data: reactivated, error: null };
+      }
       return { data: null, error: { message: `Table number ${args.tableNumber} already exists in this venue.` } };
     }
 
@@ -402,13 +435,13 @@ export const db = {
     if (updates.tableNumber !== undefined) {
       const { data: existing } = await supabase
         .from('tables')
-        .select('id')
+        .select('id, is_active')
         .eq('venue_id', venueId)
         .eq('table_number', updates.tableNumber)
         .neq('id', id)
         .maybeSingle();
 
-      if (existing) {
+      if (existing && existing.is_active) {
         return { data: null, error: { message: `Table number ${updates.tableNumber} already exists in this venue.` } };
       }
     }
