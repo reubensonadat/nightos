@@ -43,6 +43,7 @@ import { StaffManagerScreen } from "./screens/manager/StaffManagerScreen";
 import { ShiftReportScreen } from "./screens/manager/ShiftReportScreen";
 import { FinancialReportsScreen } from "./screens/manager/FinancialReportsScreen";
 import { CrmScreen } from "./screens/manager/CrmScreen";
+import { BrandSettingsScreen } from "./screens/manager/BrandSettingsScreen";
  
 import { ReservationsScreen } from "./screens/ReservationsScreen";
 import { useVenue } from "./hooks/useVenue";
@@ -195,7 +196,7 @@ function CustomerShell({ venueId, tableId, tableLabel }: { venueId: string; tabl
 
         const summaries: OrderSummary[] = await Promise.all(
           subs.map(async (s) => {
-            const { data: items } = await db.orderItemsBySubmission(s.id);
+            const { data: items } = await db.orderItemsBySubmission(s.id, sessionToken);
             const itemList = items ?? [];
             const total = itemList.reduce((sum, i) => sum + Number(i.line_total || 0), 0);
             const count = itemList.reduce((sum, i) => sum + i.quantity, 0);
@@ -250,21 +251,33 @@ function CustomerShell({ venueId, tableId, tableLabel }: { venueId: string; tabl
     setTab("orders");
   }, [setTab]);
 
+  const [isPayingBill, setIsPayingBill] = useState(false);
+
+  const handlePayBill = useCallback((order?: OrderSummary) => {
+    if (order) setPayingOrder(order);
+    setIsPayingBill(true);
+  }, []);
+
   const handlePaid = useCallback(() => {
-    if (!payingOrder) return;
-    setHistory((prev) => [payingOrder, ...prev]);
-    setActiveOrders((prev) => prev.filter((o) => o.orderNumber !== payingOrder.orderNumber));
+    if (payingOrder) {
+      setHistory((prev) => [payingOrder, ...prev]);
+      setActiveOrders((prev) => prev.filter((o) => o.orderNumber !== payingOrder.orderNumber));
+    }
     setPayingOrder(null);
+    setIsPayingBill(false);
   }, [payingOrder]);
 
-  if (payingOrder) {
+  if (isPayingBill || payingOrder) {
     return (
       <CheckoutScreen
-        total={payingOrder.total}
-        billId={bill?.id || payingOrder.billId || ""}
-        venueId={payingOrder.venueId || venueId}
+        total={payingOrder?.total || bill?.total || 0}
+        billId={bill?.id || payingOrder?.billId || ""}
+        venueId={payingOrder?.venueId || venueId}
         sessionToken={session?.session_token}
-        onBack={() => setPayingOrder(null)}
+        onBack={() => {
+          setPayingOrder(null);
+          setIsPayingBill(false);
+        }}
         onPaid={handlePaid}
       />
     );
@@ -348,6 +361,7 @@ function CustomerShell({ venueId, tableId, tableLabel }: { venueId: string; tabl
           onBack={() => setTab("menu")}
           onContinueShopping={() => setTab("menu")}
           onOrderSent={handleOrderSent}
+          onPayBill={() => handlePayBill()}
           onCallWaiter={bill?.id ? handleCallWaiter : undefined}
           callingWaiter={callingWaiter}
           waiterCalled={waiterCalled}
@@ -362,7 +376,7 @@ function CustomerShell({ venueId, tableId, tableLabel }: { venueId: string; tabl
           venueName={venueName}
           billId={bill?.id ?? null}
           sessionToken={session?.session_token}
-          onPayBill={setPayingOrder}
+          onPayBill={handlePayBill}
           onBack={() => setTab("tab")}
           onCallWaiter={bill?.id ? handleCallWaiter : undefined}
           callingWaiter={callingWaiter}
@@ -478,17 +492,24 @@ function AppShell() {
   const location = useLocation();
   const [searchParams] = useSearchParams();
   const { user, signOut, staffSession, role, venue: authVenue, profile } = useAuth();
+  const qrToken = searchParams.get("table");
+  const { table: qrTable, loading: qrLoading, error: qrError } = useQrTable(qrToken);
 
   const match = location.pathname.match(/^\/v\/([^/]+)/);
   const urlVenueSlug = match ? match[1] : null;
+  const paramVenue = searchParams.get("venue") || searchParams.get("v");
 
-  const targetSlug = urlVenueSlug || authVenue?.slug || "velvet-lounge";
+  const targetSlug = urlVenueSlug || qrTable?.venue_id || paramVenue || authVenue?.slug || authVenue?.id || "velvet-lounge";
   const { venue: loadedVenue, loading: venueLoading, error: venueError } = useVenue(targetSlug);
   const currentVenue = authVenue || loadedVenue;
   const venueId = currentVenue.id;
 
-  const qrToken = searchParams.get("table");
-  const { table: qrTable, loading: qrLoading, error: qrError } = useQrTable(qrToken);
+  // Dynamic document title matching the active venue
+  useEffect(() => {
+    if (currentVenue?.name) {
+      document.title = `${currentVenue.name} · Bysen`;
+    }
+  }, [currentVenue?.name]);
 
   const getModeFromPath = (): Mode => {
     const cleanPath = location.pathname.replace(/^\/v\/[^/]+/, "");
@@ -549,7 +570,7 @@ function AppShell() {
     if (
       seg &&
       (seg === "ops" || seg === "shift-report" || seg === "floorplan" || seg === "orders" || seg === "menu" || seg === "staff" ||
-        seg === "finance" || seg === "crm")
+        seg === "finance" || seg === "crm" || seg === "brand")
     ) {
       return seg as ManagerPage;
     }
@@ -628,6 +649,7 @@ function AppShell() {
                 (staffSession || role === "owner" || role === "manager" || role === "waiter") ? (
                   <TablesDashboard
                     venueId={staffSession?.venue_id || authVenue?.id || venueId || ""}
+                    venueName={currentVenue?.name}
                     staffName={staffSession?.name || profile?.name || "Manager"}
                     staffId={staffSession?.id || user?.id || ""}
                     role={staffSession?.role || "manager"}
@@ -686,19 +708,22 @@ function AppShell() {
         <ProtectedRoute>
           <VenueRequired>
             <ManagerShell
+              venueName={currentVenue?.name}
+              venueLogo={currentVenue?.logo_url}
               managerName={user?.email?.split("@")[0] || profile?.name || staffSession?.name || "Manager"}
               activePage={managerPage}
               onPageChange={goToManagerPage}
               onSignOut={handleSignOut}
             >
-              {managerPage === "ops" && <LiveOpsScreen onNavigate={goToManagerPage} />}
-              {managerPage === "shift-report" && <ShiftReportScreen />}
-              {managerPage === "floorplan" && <FloorplanScreen />}
+              {managerPage === "ops" && <LiveOpsScreen venueId={venueId} onNavigate={goToManagerPage} />}
+              {managerPage === "shift-report" && <ShiftReportScreen venueId={venueId} />}
+              {managerPage === "floorplan" && <FloorplanScreen venueId={venueId} />}
               {managerPage === "orders" && <ManagerOrdersScreen venueId={venueId} />}
-              {managerPage === "menu" && <MenuManagerScreen />}
-              {managerPage === "staff" && <StaffManagerScreen />}
-              {managerPage === "finance" && <FinancialReportsScreen />}
-              {managerPage === "crm" && <CrmScreen />}
+              {managerPage === "menu" && <MenuManagerScreen venueId={venueId} />}
+              {managerPage === "staff" && <StaffManagerScreen venueId={venueId} />}
+              {managerPage === "finance" && <FinancialReportsScreen venueId={venueId} />}
+              {managerPage === "crm" && <CrmScreen venueId={venueId} />}
+              {managerPage === "brand" && <BrandSettingsScreen venueId={venueId} />}
             </ManagerShell>
           </VenueRequired>
         </ProtectedRoute>

@@ -29,14 +29,13 @@ type Props = {
     onBack?: () => void;
     onContinueShopping?: () => void;
     onOrderSent?: (order: OrderSummary) => void;
+    onPayBill?: () => void;
     onCallWaiter?: () => void;
     callingWaiter?: boolean;
     waiterCalled?: boolean;
 };
 
-
-
-export function CartScreen({ venueId, tableLabel, tablePin, billId, customerSessionId, sessionToken, onBack, onContinueShopping, onOrderSent, onCallWaiter, callingWaiter, waiterCalled }: Props) {
+export function CartScreen({ venueId, tableLabel, tablePin, billId, customerSessionId, sessionToken, onBack, onContinueShopping, onOrderSent, onPayBill, onCallWaiter, callingWaiter, waiterCalled }: Props) {
     const { lines, subtotal, setQty, remove, clear } = useCart();
     const [orderNotes, setOrderNotes] = useState("");
     const [sending, setSending] = useState(false);
@@ -633,9 +632,10 @@ export function CartScreen({ venueId, tableLabel, tablePin, billId, customerSess
             </section>
 
             {/* ═══════════════════════════════════════════════════════════
-                STICKY BOTTOM CTA — Send to Kitchen (only when draft items exist)
+                STICKY BOTTOM CTA — Send to Kitchen (when draft items exist)
+                OR Pay Table Bill (when draft is empty and placed items exist)
               ═══════════════════════════════════════════════════════════ */}
-            {hasDraft && (
+            {hasDraft ? (
                 <div className="fixed inset-x-0 bottom-[calc(60px+env(safe-area-inset-bottom))] z-40 flex justify-center px-5 pb-[max(env(safe-area-inset-bottom),18px)] pt-3 bg-gradient-to-t from-isabelline via-isabelline/95 to-transparent">
                     <button
                         type="button"
@@ -689,7 +689,41 @@ export function CartScreen({ venueId, tableLabel, tablePin, billId, customerSess
                         </span>
                     </button>
                 </div>
-            )}
+            ) : hasPlaced && onPayBill ? (
+                <div className="fixed inset-x-0 bottom-[calc(60px+env(safe-area-inset-bottom))] z-40 flex justify-center px-5 pb-[max(env(safe-area-inset-bottom),18px)] pt-3 bg-gradient-to-t from-isabelline via-isabelline/95 to-transparent">
+                    <button
+                        type="button"
+                        onClick={onPayBill}
+                        className="
+                            group flex w-full max-w-md md:max-w-2xl items-center justify-between
+                            gap-3 rounded-full bg-licorice px-6 py-4
+                            shadow-[0_20px_50px_rgba(35,20,12,0.25)]
+                            ring-1 ring-licorice/80
+                            transition-all duration-200 ease-out
+                            hover:bg-licorice/95 hover:shadow-[0_24px_60px_rgba(35,20,12,0.30)]
+                            active:scale-[0.985]
+                            focus:outline-none focus-visible:ring-2 focus-visible:ring-khaki
+                        "
+                    >
+                        <span className="flex flex-col items-start leading-tight">
+                            <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-khaki">
+                                Table Balance Due
+                            </span>
+                            <span className="text-[15px] font-bold tracking-tight text-isabelline">
+                                Pay Bill Now
+                            </span>
+                        </span>
+                        <div className="flex items-center gap-3">
+                            <span className="font-mono text-[16px] font-bold text-khaki">
+                                {formatGHS(total)}
+                            </span>
+                            <span className="flex h-9 w-9 items-center justify-center rounded-full bg-khaki text-licorice transition-transform duration-200 group-hover:translate-x-0.5">
+                                <ArrowRightIcon className="h-4 w-4" strokeWidth={2.5} />
+                            </span>
+                        </div>
+                    </button>
+                </div>
+            ) : null}
         </main>
     );
 }

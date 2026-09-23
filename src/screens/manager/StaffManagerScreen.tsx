@@ -60,8 +60,8 @@ function roleLabel(role: string): string {
     return ROLE_OPTIONS.find((r) => r.value === role)?.label ?? role;
 }
 
-export function StaffManagerScreen() {
-    const { venue } = useVenue("velvet-lounge");
+export function StaffManagerScreen({ venueId }: { venueId?: string } = {}) {
+    const { venue } = useVenue(venueId);
     const [staff, setStaff] = useState<StaffRow[]>([]);
     const [shiftStaffIds, setShiftStaffIds] = useState<Set<string>>(new Set());
     const [loading, setLoading] = useState(true);

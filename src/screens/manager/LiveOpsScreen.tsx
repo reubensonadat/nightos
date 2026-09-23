@@ -56,8 +56,8 @@ function formatDwell(mins: number): string {
    COMPONENT
    ═══════════════════════════════════════════════════════════════════════════ */
 
-export function LiveOpsScreen({ onNavigate }: { onNavigate?: (page: string) => void }) {
-    const { venue } = useVenue('velvet-lounge');
+export function LiveOpsScreen({ venueId, onNavigate }: { venueId?: string; onNavigate?: (page: string) => void }) {
+    const { venue } = useVenue(venueId);
     const [range, setRange] = useState<7 | 30>(7);
     const s = useManagerDashboard(venue.id, range);
 

@@ -17,6 +17,7 @@ declare global {
         transaction_charge?: number;
         bearer?: string;
         metadata?: Record<string, unknown>;
+        channels?: string[];
         callback: (response: { reference: string }) => void;
         onClose: () => void;
       }) => { openIframe: () => void };
@@ -29,6 +30,7 @@ type Props = {
   amount: number;
   billId: string;
   venueId: string;
+  channels?: ('card' | 'mobile_money')[];
   onSuccess: (reference: string) => void;
   onClose?: () => void;
   children?: React.ReactNode;
@@ -41,6 +43,7 @@ export function PaystackButton({
   amount,
   billId,
   venueId,
+  channels,
   onSuccess,
   onClose,
   children,
@@ -94,6 +97,7 @@ export function PaystackButton({
       amount: amountPesewas,
       currency: 'GHS',
       ref,
+      ...(channels && channels.length > 0 ? { channels } : {}),
       metadata: {
         bill_id: billId,
         venue_id: venueId,
@@ -109,7 +113,7 @@ export function PaystackButton({
 
     const handler = window.PaystackPop.setup(config);
     handler.openIframe();
-  }, [amount, billId, venueId, email, onSuccess, onClose]);
+  }, [amount, billId, venueId, email, channels, onSuccess, onClose]);
 
   return (
     <button

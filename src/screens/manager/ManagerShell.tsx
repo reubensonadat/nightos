@@ -1,4 +1,4 @@
-import { useState, type FormEvent, type ReactNode } from "react";
+import { useState, useRef, useEffect, type FormEvent, type ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
 import { useAuth } from "../../context/AuthContext";
@@ -6,6 +6,9 @@ import {
     ArrowRightIcon,
     BanknotesIcon,
     Bars3Icon,
+    BuildingStorefrontIcon,
+    CheckIcon,
+    ChevronUpDownIcon,
     ClipboardDocumentCheckIcon,
     ClipboardDocumentListIcon,
     DocumentChartBarIcon,
@@ -23,13 +26,21 @@ import { ShieldCheckIcon } from "@heroicons/react/24/solid";
 import signoutBlackIcon from "../../assets/sign-out-black.svg";
 import { ManagerSignOutModal } from "../../components/ManagerSignOutModal";
 
+
 /* ────────────────────────── Admin Login Screen ────────────────────────── */
 
 type LoginProps = {
+    venueName?: string;
+    venueLogo?: string | null;
     onSignIn: (managerName: string) => void;
 };
 
-export function AdminLoginScreen({ onSignIn }: LoginProps) {
+export function AdminLoginScreen({ venueName, venueLogo, onSignIn }: LoginProps) {
+    const { venue: authVenue } = useAuth();
+    const displayName = venueName || authVenue?.name || "Velvet Lounge";
+    const displayInitial = (displayName.trim().charAt(0) || "V").toUpperCase();
+    const displayLogo = venueLogo || authVenue?.logo_url;
+
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
     const [showPassword, setShowPassword] = useState(false);
@@ -56,11 +67,15 @@ export function AdminLoginScreen({ onSignIn }: LoginProps) {
             {/* Top brand bar */}
             <div className="px-6 pt-[max(env(safe-area-inset-top),24px)] pb-4">
                 <div className="flex items-center gap-2.5">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-licorice text-isabelline shadow-[0_4px_14px_rgba(35,20,12,0.25)]">
-                        <span className="font-serif text-[16px] font-bold leading-none tracking-tight">V</span>
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-licorice text-isabelline shadow-[0_4px_14px_rgba(35,20,12,0.25)] overflow-hidden">
+                        {displayLogo ? (
+                            <img src={displayLogo} alt={displayName} className="h-full w-full object-cover" />
+                        ) : (
+                            <span className="font-serif text-[16px] font-bold leading-none tracking-tight">{displayInitial}</span>
+                        )}
                     </div>
                     <div className="flex flex-col leading-tight">
-                        <span className="text-[14px] font-bold tracking-tight text-licorice">Velvet Lounge</span>
+                        <span className="text-[14px] font-bold tracking-tight text-licorice">{displayName}</span>
                         <span className="text-xs font-semibold uppercase text-feldgrau">Manager Portal · Bysen</span>
                     </div>
                 </div>
@@ -164,7 +179,7 @@ export function AdminLoginScreen({ onSignIn }: LoginProps) {
 
 /* ────────────────────────── Navigation Configuration ────────────────────────── */
 
-export type ManagerPage = "ops" | "shift-report" | "floorplan" | "orders" | "menu" | "staff" | "finance" | "crm";
+export type ManagerPage = "ops" | "shift-report" | "floorplan" | "orders" | "menu" | "staff" | "finance" | "crm" | "brand";
 
 type NavItem = {
     id: ManagerPage;
@@ -181,27 +196,45 @@ const NAV_ITEMS: NavItem[] = [
     { id: "staff", label: "Staff & Roles", icon: UsersIcon },
     { id: "finance", label: "Financial Reports", icon: BanknotesIcon },
     { id: "crm", label: "CRM & Marketing", icon: UserCircleIcon },
+    { id: "brand", label: "Brand & Tax Settings", icon: BuildingStorefrontIcon },
 ];
 
 /* ────────────────────────── Manager Shell Component ────────────────────────── */
 
 type ShellProps = {
     managerName: string;
+    venueName?: string;
+    venueLogo?: string | null;
     activePage: ManagerPage;
     onPageChange: (page: ManagerPage) => void;
     onSignOut: () => void;
     children: ReactNode;
 };
 
-export function ManagerShell({ managerName, activePage, onPageChange, onSignOut, children }: ShellProps) {
+export function ManagerShell({ managerName, venueName, venueLogo, activePage, onPageChange, onSignOut, children }: ShellProps) {
     const navigate = useNavigate();
-    const { venue } = useAuth();
+    const { venue: authVenue, venues, switchVenue, staffSession } = useAuth();
     const [mobileNavOpen, setMobileNavOpen] = useState(false);
     const [showSignOutModal, setShowSignOutModal] = useState(false);
+    const [venueDropdownOpen, setVenueDropdownOpen] = useState(false);
+    const venueDropdownRef = useRef<HTMLDivElement | null>(null);
+
+    const displayVenueName = venueName || authVenue?.name || staffSession?.venue_name || "Velvet Lounge";
+    const displayVenueLogo = venueLogo || authVenue?.logo_url || null;
+    const displayVenueInitial = (displayVenueName.trim().charAt(0) || "V").toUpperCase();
+
+    useEffect(() => {
+        const handleClickOutside = (e: MouseEvent) => {
+            if (venueDropdownRef.current && !venueDropdownRef.current.contains(e.target as Node)) {
+                setVenueDropdownOpen(false);
+            }
+        };
+        document.addEventListener("mousedown", handleClickOutside);
+        return () => document.removeEventListener("mousedown", handleClickOutside);
+    }, []);
 
     const activeItem = NAV_ITEMS.find((item) => item.id === activePage) ?? NAV_ITEMS[0];
-    const venueName = venue?.name || "Velvet Lounge";
-    const venueSlug = venue?.slug || "velvet-lounge";
+    const venueSlug = authVenue?.slug || "velvet-lounge";
 
     const handleCopyVenueLink = () => {
         const link = `${window.location.origin}/v/${venueSlug}/login`;
@@ -215,20 +248,88 @@ export function ManagerShell({ managerName, activePage, onPageChange, onSignOut,
                 DESKTOP SIDEBAR (md and up)
               ═══════════════════════════════════════════════════════════ */}
             <aside className="hidden md:flex fixed inset-y-0 left-0 z-30 w-64 flex-col border-r border-licorice/8 bg-white">
-                {/* Brand */}
-                <div className="flex h-[60px] items-center gap-2.5 border-b border-licorice/8 px-5">
-                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-licorice text-isabelline shadow-[0_4px_14px_rgba(35,20,12,0.25)] overflow-hidden">
-                        {venue?.logo_url ? (
-                            <img src={venue.logo_url} alt={venueName} className="h-full w-full object-cover" />
-                        ) : (
-                            <span className="font-serif text-[15px] font-bold leading-none tracking-tight">
-                                {venueName.slice(0, 1).toUpperCase()}
+                {/* Brand Header with Multi-Venue Switcher */}
+                <div className="relative border-b border-licorice/8 px-4 py-3" ref={venueDropdownRef}>
+                    <div
+                        onClick={() => {
+                            if (venues && venues.length > 1) {
+                                setVenueDropdownOpen((v) => !v);
+                            }
+                        }}
+                        className={`flex h-11 items-center gap-2.5 rounded-xl px-2 transition-all ${
+                            venues && venues.length > 1
+                                ? "cursor-pointer hover:bg-isabelline/70"
+                                : ""
+                        }`}
+                        title={venues && venues.length > 1 ? "Click to switch venue" : displayVenueName}
+                    >
+                        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-licorice text-isabelline shadow-[0_4px_14px_rgba(35,20,12,0.25)] overflow-hidden">
+                            {displayVenueLogo ? (
+                                <img src={displayVenueLogo} alt={displayVenueName} className="h-full w-full object-cover" />
+                            ) : (
+                                <span className="font-serif text-[15px] font-bold leading-none tracking-tight">
+                                    {displayVenueInitial}
+                                </span>
+                            )}
+                        </div>
+                        <div className="flex flex-col leading-tight min-w-0 flex-1">
+                            <span className="text-[13.5px] font-bold tracking-tight text-licorice truncate">
+                                {displayVenueName}
                             </span>
+                            <span className="text-[10px] font-semibold uppercase text-feldgrau tracking-wider">
+                                {venues && venues.length > 1 ? "Switch Venue ▾" : "Manager Portal"}
+                            </span>
+                        </div>
+                        {venues && venues.length > 1 && (
+                            <ChevronUpDownIcon className="h-4 w-4 shrink-0 text-feldgrau/70" strokeWidth={2} />
                         )}
                     </div>
-                    <div className="flex flex-col leading-tight min-w-0 flex-1">
-                        <span className="truncate text-[14px] font-bold tracking-tight text-licorice">{venueName}</span>
-                    </div>
+
+                    {/* Venue Switcher Dropdown */}
+                    {venueDropdownOpen && venues && venues.length > 1 && (
+                        <div className="absolute left-3 right-3 top-[calc(100%+4px)] z-50 rounded-xl bg-white p-1.5 shadow-xl ring-1 ring-licorice/10 animate-velvet-scale-in">
+                            <div className="flex items-center justify-between px-2.5 py-1">
+                                <span className="text-[10px] font-bold uppercase tracking-wider text-feldgrau">
+                                    Your Venues ({venues.length})
+                                </span>
+                            </div>
+                            <div className="max-h-56 overflow-y-auto space-y-0.5">
+                                {venues.map((v) => {
+                                    const isCurrent = v.id === authVenue?.id;
+                                    const init = (v.name.trim().charAt(0) || "V").toUpperCase();
+                                    return (
+                                        <button
+                                            key={v.id}
+                                            type="button"
+                                            onClick={() => {
+                                                switchVenue(v.id);
+                                                setVenueDropdownOpen(false);
+                                            }}
+                                            className={`flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left transition-colors ${
+                                                isCurrent
+                                                    ? "bg-licorice text-isabelline font-bold"
+                                                    : "hover:bg-isabelline text-licorice font-medium"
+                                            }`}
+                                        >
+                                            <div
+                                                className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-bold overflow-hidden ${
+                                                    isCurrent ? "bg-white text-licorice" : "bg-licorice/10 text-licorice"
+                                                }`}
+                                            >
+                                                {v.logo_url ? (
+                                                    <img src={v.logo_url} alt={v.name} className="h-full w-full object-cover" />
+                                                ) : (
+                                                    init
+                                                )}
+                                            </div>
+                                            <span className="flex-1 truncate text-[12.5px]">{v.name}</span>
+                                            {isCurrent && <CheckIcon className="h-4 w-4 shrink-0 text-isabelline" strokeWidth={2.5} />}
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                    )}
                 </div>
 
                 {/* Nav */}
@@ -293,7 +394,7 @@ export function ManagerShell({ managerName, activePage, onPageChange, onSignOut,
                         <Bars3Icon className="h-4 w-4" strokeWidth={2.25} />
                     </button>
                     <div className="flex flex-col items-center leading-tight">
-                        <span className="text-[14px] font-bold tracking-tight text-licorice">{venueName}</span>
+                        <span className="text-[14px] font-bold tracking-tight text-licorice">{displayVenueName}</span>
                         <span className="text-[10px] font-mono text-licorice/60 font-medium">{activeItem.label}</span>
                     </div>
                     <button
@@ -316,25 +417,63 @@ export function ManagerShell({ managerName, activePage, onPageChange, onSignOut,
                     />
                     <aside className="relative flex w-72 max-w-[85vw] flex-col bg-white shadow-2xl">
                         <div className="flex h-[60px] items-center justify-between border-b border-licorice/8 px-5">
-                            <div className="flex items-center gap-2.5">
-                                <div className="flex h-8 w-8 items-center justify-center rounded-full bg-licorice text-isabelline">
-                                    <span className="font-serif text-[13px] font-bold leading-none tracking-tight">
-                                        {venueName.slice(0, 1).toUpperCase()}
-                                    </span>
+                            <div className="flex items-center gap-2.5 min-w-0 flex-1 mr-2">
+                                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-licorice text-isabelline overflow-hidden">
+                                    {displayVenueLogo ? (
+                                        <img src={displayVenueLogo} alt={displayVenueName} className="h-full w-full object-cover" />
+                                    ) : (
+                                        <span className="font-serif text-[13px] font-bold leading-none tracking-tight">
+                                            {displayVenueInitial}
+                                        </span>
+                                    )}
                                 </div>
                                 <div className="flex flex-col leading-tight min-w-0">
-                                    <span className="truncate text-[14px] font-bold tracking-tight text-licorice">{venueName}</span>
+                                    <span className="text-[14px] font-bold tracking-tight text-licorice truncate">{displayVenueName}</span>
+                                    <span className="text-[10px] font-semibold uppercase text-feldgrau tracking-wider">Manager</span>
                                 </div>
                             </div>
                             <button
                                 type="button"
                                 onClick={() => setMobileNavOpen(false)}
                                 aria-label="Close navigation"
-                                className="flex h-8 w-8 items-center justify-center rounded-full bg-isabelline text-licorice"
+                                className="flex h-8 w-8 items-center justify-center rounded-full bg-isabelline text-licorice shrink-0"
                             >
                                 <XMarkIcon className="h-4 w-4" strokeWidth={2.25} />
                             </button>
                         </div>
+
+                        {/* Mobile multi-venue switcher */}
+                        {venues && venues.length > 1 && (
+                            <div className="border-b border-licorice/8 px-4 py-3 bg-isabelline/40">
+                                <p className="px-1 pb-1.5 text-[10px] font-bold uppercase tracking-wider text-feldgrau">
+                                    Switch Venue
+                                </p>
+                                <div className="space-y-1">
+                                    {venues.map((v) => {
+                                        const isCurrent = v.id === authVenue?.id;
+                                        return (
+                                            <button
+                                                key={v.id}
+                                                type="button"
+                                                onClick={() => {
+                                                    switchVenue(v.id);
+                                                    setMobileNavOpen(false);
+                                                }}
+                                                className={`flex w-full items-center justify-between rounded-lg px-2.5 py-1.5 text-xs font-bold transition-colors ${
+                                                    isCurrent
+                                                        ? "bg-licorice text-isabelline"
+                                                        : "bg-white text-licorice hover:bg-isabelline"
+                                                }`}
+                                            >
+                                                <span className="truncate">{v.name}</span>
+                                                {isCurrent && <CheckIcon className="h-3.5 w-3.5 shrink-0" strokeWidth={2.5} />}
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+                        )}
+
                         <nav className="flex-1 overflow-y-auto px-3 py-4">
                             {NAV_ITEMS.map((item) => {
                                 const Icon = item.icon;
@@ -376,7 +515,7 @@ export function ManagerShell({ managerName, activePage, onPageChange, onSignOut,
                         <h1 className="text-[15px] font-bold tracking-tight text-licorice">{activeItem.label}</h1>
                         <span className="text-licorice/30">•</span>
                         <div className="flex items-center gap-1.5 rounded-full bg-licorice/5 px-2.5 py-1 ring-1 ring-licorice/10">
-                            <span className="text-[11px] font-bold text-licorice">{venueName}</span>
+                            <span className="text-[11px] font-bold text-licorice">{displayVenueName}</span>
                         </div>
                     </div>
 

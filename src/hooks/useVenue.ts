@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { db, type DbVenue } from '../lib/api';
+import { useAuth } from '../context/AuthContext';
 
 const DEFAULT_VENUE: DbVenue = {
   id: 'a0000000-0000-0000-0000-000000000001',
@@ -14,8 +15,6 @@ const DEFAULT_VENUE: DbVenue = {
   payment_model: 'POSTPAY',
   service_charge_pct: 10,
   vat_pct: 12.5,
-  // Inclusive price display is the product default: guests see the exact
-  // amount they'll pay. Venues opt out via the Pricing & Tax manager tab.
   tax_inclusive: true,
   currency: 'GHS',
   timezone: 'Africa/Accra',
@@ -30,26 +29,56 @@ const DEFAULT_VENUE: DbVenue = {
   brand_light_blue: null,
 };
 
-export function useVenue(slug?: string) {
-  const [venue, setVenue] = useState<DbVenue>(DEFAULT_VENUE);
-  const [loading, setLoading] = useState(true);
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+export function useVenue(slugOrId?: string) {
+  let authVenue: DbVenue | null = null;
+  try {
+    // eslint-disable-next-line react-hooks/rules-of-hooks
+    const auth = useAuth();
+    authVenue = auth.venue;
+  } catch {
+    /* safely fallback when used outside AuthProvider */
+  }
+
+  // If no slug/id or default 'velvet-lounge' is given, but an active auth venue exists, use it
+  const initialVenue = (
+    (!slugOrId || slugOrId === 'velvet-lounge') && authVenue
+      ? authVenue
+      : (slugOrId && authVenue && (authVenue.id === slugOrId || authVenue.slug === slugOrId) ? authVenue : DEFAULT_VENUE)
+  );
+
+  const [venue, setVenue] = useState<DbVenue>(initialVenue);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const venueSlug = slug;
-    if (!venueSlug) {
+    // If matching active auth venue, update immediately
+    if (authVenue && (!slugOrId || slugOrId === 'velvet-lounge' || slugOrId === authVenue.slug || slugOrId === authVenue.id)) {
+      setVenue(authVenue);
+      setLoading(false);
+      return;
+    }
 
-      // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (!slugOrId) {
+      if (authVenue) {
+        setVenue(authVenue);
+      }
       setLoading(false);
       return;
     }
 
     let cancelled = false;
 
-    async function load(currentSlug: string) {
+    async function load(identifier: string) {
       setLoading(true);
       setError(null);
-      const { data, error: err } = await db.venueBySlug(currentSlug);
+
+      const isUuid = UUID_REGEX.test(identifier);
+      const { data, error: err } = isUuid
+        ? await db.venueById(identifier)
+        : await db.venueBySlug(identifier);
+
       if (cancelled) return;
       if (err || !data) {
         setError('Could not load venue');
@@ -60,14 +89,11 @@ export function useVenue(slug?: string) {
       setLoading(false);
     }
 
-    const init = async () => {
-      await load(venueSlug);
-    };
-    init();
+    load(slugOrId);
     return () => {
       cancelled = true;
     };
-  }, [slug]);
+  }, [slugOrId, authVenue]);
 
   return { venue, loading, error };
 }

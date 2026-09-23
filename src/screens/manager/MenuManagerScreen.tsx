@@ -51,8 +51,8 @@ const DEFAULT_SEED_PRODUCTS = [
     { name: "Chocolate Lava Cake", category: "Desserts", price: 75, costPrice: 25, station: "kitchen", description: "Warm molten chocolate cake with vanilla bean ice cream", image: PRESET_IMAGES[7].url },
 ];
 
-export function MenuManagerScreen() {
-    const { venue } = useVenue("velvet-lounge");
+export function MenuManagerScreen({ venueId }: { venueId?: string } = {}) {
+    const { venue } = useVenue(venueId);
     const [searchParams, setSearchParams] = useSearchParams();
 
     // Active Tab: "menu" | "categories" | "top-sellers" | "pricing"

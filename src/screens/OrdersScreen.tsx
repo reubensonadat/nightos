@@ -451,7 +451,7 @@ export function OrdersScreen({ activeOrders, history, tableLabel, tablePin, bill
       )}
 
       {/* ── Fixed Bottom Payment Banner ── */}
-      {billTotal > 0 && payableOrder && (
+      {billTotal > 0 && (
         <div className="fixed bottom-[calc(70px+env(safe-area-inset-bottom))] left-0 right-0 z-40 px-5 max-w-7xl mx-auto">
           <div className="rounded-2xl bg-licorice p-4 shadow-[0_12px_32px_rgba(35,20,12,0.35)] ring-1 ring-white/10 flex items-center justify-between gap-4">
             <div>
@@ -464,7 +464,20 @@ export function OrdersScreen({ activeOrders, history, tableLabel, tablePin, bill
             </div>
             <button
               type="button"
-              onClick={() => onPayBill(payableOrder)}
+              onClick={() => {
+                if (payableOrder) {
+                  onPayBill(payableOrder);
+                } else {
+                  onPayBill({
+                    orderNumber: _billId ? _billId.slice(0, 8).toUpperCase() : "BILL",
+                    total: billTotal,
+                    itemCount: 1,
+                    items: [],
+                    sentAt: Date.now(),
+                    billId: _billId ?? undefined,
+                  });
+                }
+              }}
               className="inline-flex items-center gap-2 rounded-full bg-khaki px-5 py-2.5 text-[12px] font-extrabold tracking-tight text-licorice transition-all hover:bg-khaki/90 active:scale-95 shadow-sm"
             >
               <span>Pay Bill Now</span>

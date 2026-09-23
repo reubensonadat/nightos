@@ -994,13 +994,16 @@ export const db = {
       .order('created_at', { ascending: false });
   },
 
-  orderItemsBySubmission: (submissionId: string) =>
-    supabase
-      .from('order_items')
-      .select(
-        'id, submission_id, bill_id, product_id, product_name, quantity, unit_price, modifier_snapshot, modifier_price_adjustment, line_total, status, notes, guest_name, customer_session_id, created_at',
-      )
-      .eq('submission_id', submissionId),
+  orderItemsBySubmission: (submissionId: string, sessionToken?: string | null) =>
+    withSession(
+      supabase
+        .from('order_items')
+        .select(
+          'id, submission_id, bill_id, product_id, product_name, quantity, unit_price, modifier_snapshot, modifier_price_adjustment, line_total, status, notes, guest_name, customer_session_id, created_at',
+        )
+        .eq('submission_id', submissionId),
+      sessionToken,
+    ),
 
   /** All items on a bill, customer-scoped (x-session-token header). Used for
    *  the whole-stay receipt. */
