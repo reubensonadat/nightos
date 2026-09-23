@@ -12,6 +12,7 @@ import { formatGHS, formatGHSString } from "../data/menu";
 import { PaystackButton } from "../components/PaystackButton";
 import { ReceiptDownloader } from "../components/ReceiptDownloader";
 import { db, type DbBill, type DbVenue } from "../lib/api";
+import { useRealtime } from "../hooks/useRealtime";
 
 const sleep = (ms: number) => new Promise<void>((resolve) => window.setTimeout(resolve, ms));
 
@@ -91,6 +92,14 @@ export function CheckoutScreen({ total, billId, venueId, sessionToken, onBack, o
                     if (cancelled) return;
                     if (data) {
                         setBill(data as DbBill);
+                        const b = data as DbBill;
+                        if (b.status === 'paid' || (Number(b.amount_paid || 0) >= Number(b.total || 0) && Number(b.total || 0) > 0)) {
+                            setPaid(true);
+                        }
+                        if (b.assistance_type === 'cash_settlement') {
+                            setCashRequested(true);
+                            setMethod('cash');
+                        }
                         const t = (data as { tables?: { table_label?: string } | null }).tables;
                         if (t?.table_label) setTableLabel(t.table_label);
                     }
@@ -111,22 +120,55 @@ export function CheckoutScreen({ total, billId, venueId, sessionToken, onBack, o
         };
     }, [billId, venueId]);
 
+    // ── Live Supabase Realtime Settlement Listeners ──
+    useRealtime({
+        table: 'bills',
+        filter: billId ? `id=eq.${billId}` : undefined,
+        onUpdate: (updatedRow: Record<string, unknown>) => {
+            const status = String(updatedRow.status || '');
+            const amountPaid = Number(updatedRow.amount_paid || 0);
+            const billTotal = Number(updatedRow.total || 0);
+
+            if (status === 'paid' || (amountPaid >= billTotal && billTotal > 0)) {
+                setPaid(true);
+                toast.success("Bill confirmed paid! Thank you.", { icon: "🎉" });
+                onPaid?.();
+            } else if (updatedRow.assistance_type === 'cash_settlement') {
+                setCashRequested(true);
+            } else if (updatedRow.assistance_type === null) {
+                setCashRequested(false);
+            }
+        },
+    });
+
+    useRealtime({
+        table: 'payments',
+        filter: billId ? `bill_id=eq.${billId}` : undefined,
+        onInsert: () => {
+            setPaid(true);
+            toast.success("Payment recorded! Thank you.", { icon: "💳" });
+            onPaid?.();
+        },
+    });
+
     const isPrepay = venue?.payment_model === 'PREPAY' || bill?.payment_model === 'PREPAY';
 
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const { subtotal, serviceCharge, vat, billTotal, payAmount } = useMemo(() => {
+    // Reconciled bill math: convenience fee is incorporated into displayed subtotal so Subtotal + VAT = Total
+    const { subtotal, serviceCharge, vat, billTotal, payAmount, totalPaid } = useMemo(() => {
         if (bill) {
+            const fee = Number((bill as { convenience_fee?: number })?.convenience_fee || 0);
             const remainingAmount = Math.max(0, Math.round((bill.total - bill.amount_paid) * 100) / 100);
+            const displayedSubtotal = Math.round(((bill.subtotal || 0) + fee) * 100) / 100;
             return {
-                subtotal: bill.subtotal,
-                serviceCharge: bill.service_charge,
-                vat: bill.vat,
+                subtotal: displayedSubtotal,
+                serviceCharge: bill.service_charge || 0,
+                vat: bill.vat || 0,
                 billTotal: bill.total,
                 payAmount: remainingAmount,
+                totalPaid: bill.total,
             };
         }
-        // Fallback while the bill loads (legacy prop math, never used for charging)
-         
+        // Fallback while the bill loads
         const sub = total / 1.225;
         return {
             subtotal: Math.round(sub * 100) / 100,
@@ -134,12 +176,12 @@ export function CheckoutScreen({ total, billId, venueId, sessionToken, onBack, o
             vat: Math.round(sub * 0.125 * 100) / 100,
             billTotal: total,
             payAmount: total,
+            totalPaid: total,
         };
     }, [bill, total]);
 
-    // Cash never charges the customer — a waiter confirms the payment on their
-    // own device (Invariant 10 / §1.6.3). The customer-side CTA is only a
-    // request for the waiter; no money is written from the browser.
+    // Cash never charges the customer directly — a waiter confirms the payment on their
+    // own device. The customer-side CTA is a request for the waiter.
     const handleCashRequest = async () => {
         if (!billId) {
             toast.error("Something went wrong — please try again.");
@@ -157,6 +199,17 @@ export function CheckoutScreen({ total, billId, venueId, sessionToken, onBack, o
             toast.error("Could not notify waiter. Please try again.");
         } finally {
             setPaying(false);
+        }
+    };
+
+    const handleCancelCashRequest = async () => {
+        if (!billId) return;
+        try {
+            await db.clearWaiterAssistance(billId);
+            setCashRequested(false);
+            toast("Cash request cancelled. You can select another payment option.", { icon: "ℹ️" });
+        } catch {
+            setCashRequested(false);
         }
     };
 
@@ -228,45 +281,64 @@ export function CheckoutScreen({ total, billId, venueId, sessionToken, onBack, o
                     <div className="absolute bottom-0 -left-20 h-64 w-64 rounded-full bg-light-blue blur-[80px] opacity-20" />
                 </div>
                 <div className="relative z-10 w-full max-w-sm animate-velvet-scale-in">
-                    <ReceiptDownloader fileName={`Receipt-${billId.slice(0, 8)}.png`}>
-                        <div className="flex flex-col items-center text-center">
-                            <div className="relative">
-                                <div className="absolute inset-0 animate-ping rounded-full bg-khaki/30" />
-                                <div className="relative flex h-20 w-20 items-center justify-center rounded-full bg-licorice shadow-[0_16px_40px_rgba(35,20,12,0.25)]">
-                                    <CheckCircleIcon className="h-10 w-10 text-khaki" strokeWidth={2} />
-                                </div>
-                            </div>
-                            <p className="mt-6 text-[11px] font-bold uppercase tracking-[0.22em] text-feldgrau">
-                                // eslint-disable-next-line react-hooks/set-state-in-effect
-                                Payment Received
-                            </p>
-                            <h1 className="mt-2 text-[2rem] font-black leading-tight tracking-[-0.04em] text-licorice">
-                                Thank you
-                            </h1>
-                            <p className="mt-3 text-[13px] leading-relaxed text-feldgrau/80">
-                                Your order has been placed successfully and the payment has been recorded.
-                            </p>
-                            
-                            <div className="mt-6 w-full rounded-xl bg-isabelline p-4 text-left border border-licorice/5">
-                                <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-feldgrau mb-2 text-center">Order Summary</p>
-                                <div className="flex justify-between items-center py-2 border-b border-licorice/5">
-                                    <span className="text-[13px] font-semibold text-licorice">Order Code</span>
-                                    <span className="text-[13px] font-bold text-licorice tracking-widest">{billId.slice(0, 8).toUpperCase()}</span>
-                                </div>
-                                <div className="flex justify-between items-center py-2">
-                                    <span className="text-[13px] font-semibold text-licorice">Amount Paid</span>
-                                    <span className="text-[13px] font-bold text-licorice">GH₵ {payAmount.toFixed(2)}</span>
-                                </div>
+                    <div className="flex flex-col items-center text-center">
+                        <div className="relative">
+                            <div className="absolute inset-0 animate-ping rounded-full bg-khaki/30" />
+                            <div className="relative flex h-20 w-20 items-center justify-center rounded-full bg-licorice shadow-[0_16px_40px_rgba(35,20,12,0.25)]">
+                                <CheckCircleIcon className="h-10 w-10 text-khaki" strokeWidth={2} />
                             </div>
                         </div>
-                    </ReceiptDownloader>
-                    <button
-                        type="button"
-                        onClick={onBack}
-                        className="mt-6 w-full flex items-center justify-center gap-2 rounded-full border border-licorice/10 bg-transparent px-5 py-3 text-[13px] font-bold tracking-tight text-licorice transition-all duration-200 hover:bg-black/5 active:scale-95"
-                    >
-                        Back to Menu
-                    </button>
+                        <p className="mt-6 text-[11px] font-bold uppercase tracking-[0.22em] text-khaki">
+                            Payment Confirmed
+                        </p>
+                        <h1 className="mt-2 text-[2rem] font-black leading-tight tracking-[-0.04em] text-licorice">
+                            Thank you
+                        </h1>
+                        <p className="mt-2 text-[13px] leading-relaxed text-feldgrau">
+                            Your payment has been received and your table bill is settled.
+                        </p>
+                        
+                        <div className="mt-5 w-full rounded-2xl bg-white p-4 text-left shadow-[0_4px_16px_rgba(35,20,12,0.04)] ring-1 ring-isabelline">
+                            <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-feldgrau mb-2 text-center">Order Summary</p>
+                            <div className="flex justify-between items-center py-2 border-b border-isabelline">
+                                <span className="text-[12px] font-semibold text-feldgrau">Reference</span>
+                                <span className="font-mono text-[13px] font-bold text-licorice tracking-wider">{billId.slice(0, 8).toUpperCase()}</span>
+                            </div>
+                            {tableLabel && (
+                                <div className="flex justify-between items-center py-2 border-b border-isabelline">
+                                    <span className="text-[12px] font-semibold text-feldgrau">Table</span>
+                                    <span className="text-[13px] font-bold text-licorice">Table {tableLabel}</span>
+                                </div>
+                            )}
+                            <div className="flex justify-between items-center py-2 border-b border-isabelline">
+                                <span className="text-[12px] font-semibold text-feldgrau">Payment Method</span>
+                                <span className="text-[13px] font-bold capitalize text-licorice">{method === 'momo' ? 'Mobile Money' : method === 'card' ? 'Card' : 'Cash'}</span>
+                            </div>
+                            <div className="flex justify-between items-center pt-2">
+                                <span className="text-[13px] font-bold text-licorice">Total Settled</span>
+                                <span className="font-mono text-[16px] font-black text-licorice">{formatGHS(totalPaid || billTotal || total)}</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="mt-6 space-y-3">
+                        <ReceiptDownloader fileName={`Receipt-${billId.slice(0, 8)}.png`}>
+                            <button
+                                type="button"
+                                className="w-full flex items-center justify-center gap-2 rounded-full bg-licorice px-5 py-3.5 text-[13px] font-bold tracking-tight text-khaki shadow-[0_12px_32px_rgba(35,20,12,0.2)] transition-all hover:bg-licorice/95 active:scale-95"
+                            >
+                                <span>📥 Download Receipt (PNG)</span>
+                            </button>
+                        </ReceiptDownloader>
+
+                        <button
+                            type="button"
+                            onClick={onBack}
+                            className="w-full flex items-center justify-center gap-2 rounded-full border border-licorice/15 bg-white px-5 py-3 text-[13px] font-bold tracking-tight text-licorice shadow-sm transition-all hover:bg-isabelline active:scale-95"
+                        >
+                            Return to Menu
+                        </button>
+                    </div>
                 </div>
             </main>
         );
@@ -340,14 +412,26 @@ export function CheckoutScreen({ total, billId, venueId, sessionToken, onBack, o
                                 {formatGHS(subtotal)}
                             </span>
                         </div>
-                        <div className="flex items-center justify-between text-[12px]">
-                            <span className="tracking-tight text-feldgrau">
-                                VAT <span className="text-feldgrau/60">({venue?.vat_pct ?? 12.5}%)</span>
-                            </span>
-                            <span className="font-mono font-bold tabular-nums text-licorice">
-                                {formatGHS(vat)}
-                            </span>
-                        </div>
+                        {serviceCharge > 0 && (
+                            <div className="flex items-center justify-between text-[12px]">
+                                <span className="tracking-tight text-feldgrau">
+                                    Service Charge <span className="text-feldgrau/60">({venue?.service_charge_pct ?? 10}%)</span>
+                                </span>
+                                <span className="font-mono font-bold tabular-nums text-licorice">
+                                    {formatGHS(serviceCharge)}
+                                </span>
+                            </div>
+                        )}
+                        {vat > 0 && (
+                            <div className="flex items-center justify-between text-[12px]">
+                                <span className="tracking-tight text-feldgrau">
+                                    VAT <span className="text-feldgrau/60">({venue?.vat_pct ?? 12.5}%)</span>
+                                </span>
+                                <span className="font-mono font-bold tabular-nums text-licorice">
+                                    {formatGHS(vat)}
+                                </span>
+                            </div>
+                        )}
                     </div>
 
                     {/* Bill Total */}
@@ -519,6 +603,7 @@ export function CheckoutScreen({ total, billId, venueId, sessionToken, onBack, o
                         amount={payAmount}
                         billId={billId}
                         venueId={venueId}
+                        channels={method === 'momo' ? ['mobile_money'] : ['card']}
                         onSuccess={handlePaystackSuccess}
                         onClose={() => setPaying(false)}
                         className="
@@ -545,40 +630,61 @@ export function CheckoutScreen({ total, billId, venueId, sessionToken, onBack, o
                         </span>
                     </PaystackButton>
                 ) : method === 'cash' ? (
-                    <button
-                        type="button"
-                        onClick={handleCashRequest}
-                        disabled={cashRequested}
-                        className="
-                            group flex w-full max-w-md md:max-w-2xl items-center justify-between
-                            gap-3 rounded-full bg-licorice px-6 py-4
-                            shadow-[0_20px_50px_rgba(35,20,12,0.25)]
-                            ring-1 ring-licorice/80
-                            transition-all duration-200 ease-out
-                            hover:bg-licorice/95 hover:shadow-[0_24px_60px_rgba(35,20,12,0.30)]
-                            active:scale-[0.985]
-                            focus:outline-none focus-visible:ring-2 focus-visible:ring-khaki
-                            disabled:opacity-70
-                        "
-                    >
-                        <span className="flex flex-col items-start leading-tight">
-                            <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-khaki">
-                                {cashRequested ? "Waiter notified" : "Pay with cash"}
-                            </span>
-                            <span className="text-[15px] font-bold tracking-tight text-isabelline">
-                                {cashRequested
-                                    ? "Your waiter will confirm the payment"
-                                    : `Confirm ${formatGHSString(payAmount)} with your waiter`}
-                            </span>
-                        </span>
-                        <span className="flex h-9 w-9 items-center justify-center rounded-full bg-isabelline text-licorice">
-                            {cashRequested ? (
-                                <CheckIcon className="h-4 w-4" strokeWidth={3} />
-                            ) : (
-                                <BanknotesIcon className="h-4 w-4" strokeWidth={2} />
-                            )}
-                        </span>
-                    </button>
+                    <div className="flex w-full max-w-md md:max-w-2xl flex-col items-center gap-2">
+                        {cashRequested ? (
+                            <>
+                                <div className="flex w-full items-center justify-between gap-3 rounded-full bg-licorice px-6 py-4 shadow-[0_20px_50px_rgba(35,20,12,0.25)] ring-2 ring-khaki/40">
+                                    <span className="flex flex-col items-start leading-tight">
+                                        <span className="inline-flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-[0.18em] text-khaki">
+                                            <span className="h-2 w-2 rounded-full bg-khaki animate-ping" />
+                                            Waiter Notified
+                                        </span>
+                                        <span className="text-[14px] font-bold tracking-tight text-isabelline">
+                                            Your waiter is on their way with the bill
+                                        </span>
+                                    </span>
+                                    <span className="flex h-9 w-9 items-center justify-center rounded-full bg-khaki text-licorice">
+                                        <BanknotesIcon className="h-4 w-4 animate-bounce" strokeWidth={2.5} />
+                                    </span>
+                                </div>
+                                <button
+                                    type="button"
+                                    onClick={handleCancelCashRequest}
+                                    className="text-[11px] font-bold text-licorice/70 hover:text-licorice underline underline-offset-4 py-1 transition-colors"
+                                >
+                                    Cancel & choose Mobile Money or Card
+                                </button>
+                            </>
+                        ) : (
+                            <button
+                                type="button"
+                                onClick={handleCashRequest}
+                                disabled={paying}
+                                className="
+                                    group flex w-full items-center justify-between
+                                    gap-3 rounded-full bg-licorice px-6 py-4
+                                    shadow-[0_20px_50px_rgba(35,20,12,0.25)]
+                                    ring-1 ring-licorice/80
+                                    transition-all duration-200 ease-out
+                                    hover:bg-licorice/95 hover:shadow-[0_24px_60px_rgba(35,20,12,0.30)]
+                                    active:scale-[0.985]
+                                    focus:outline-none focus-visible:ring-2 focus-visible:ring-khaki
+                                "
+                            >
+                                <span className="flex flex-col items-start leading-tight">
+                                    <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-khaki">
+                                        Pay with cash
+                                    </span>
+                                    <span className="text-[15px] font-bold tracking-tight text-isabelline">
+                                        Notify waiter for {formatGHSString(payAmount)}
+                                    </span>
+                                </span>
+                                <span className="flex h-9 w-9 items-center justify-center rounded-full bg-isabelline text-licorice">
+                                    <BanknotesIcon className="h-4 w-4" strokeWidth={2} />
+                                </span>
+                            </button>
+                        )}
+                    </div>
                 ) : (
                     <button
                         type="button"

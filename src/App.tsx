@@ -43,6 +43,7 @@ import { StaffManagerScreen } from "./screens/manager/StaffManagerScreen";
 import { ShiftReportScreen } from "./screens/manager/ShiftReportScreen";
 import { FinancialReportsScreen } from "./screens/manager/FinancialReportsScreen";
 import { CrmScreen } from "./screens/manager/CrmScreen";
+import { BrandSettingsScreen } from "./screens/manager/BrandSettingsScreen";
  
 import { ReservationsScreen } from "./screens/ReservationsScreen";
 import { useVenue } from "./hooks/useVenue";
@@ -193,7 +194,7 @@ function CustomerShell({ venueId, tableId, tableLabel }: { venueId: string; tabl
 
         const summaries: OrderSummary[] = await Promise.all(
           subs.map(async (s) => {
-            const { data: items } = await db.orderItemsBySubmission(s.id);
+            const { data: items } = await db.orderItemsBySubmission(s.id, sessionToken);
             const itemList = items ?? [];
             const total = itemList.reduce((sum, i) => sum + Number(i.line_total || 0), 0);
             const count = itemList.reduce((sum, i) => sum + i.quantity, 0);
@@ -248,21 +249,33 @@ function CustomerShell({ venueId, tableId, tableLabel }: { venueId: string; tabl
     setTab("orders");
   }, [setTab]);
 
+  const [isPayingBill, setIsPayingBill] = useState(false);
+
+  const handlePayBill = useCallback((order?: OrderSummary) => {
+    if (order) setPayingOrder(order);
+    setIsPayingBill(true);
+  }, []);
+
   const handlePaid = useCallback(() => {
-    if (!payingOrder) return;
-    setHistory((prev) => [payingOrder, ...prev]);
-    setActiveOrders((prev) => prev.filter((o) => o.orderNumber !== payingOrder.orderNumber));
+    if (payingOrder) {
+      setHistory((prev) => [payingOrder, ...prev]);
+      setActiveOrders((prev) => prev.filter((o) => o.orderNumber !== payingOrder.orderNumber));
+    }
     setPayingOrder(null);
+    setIsPayingBill(false);
   }, [payingOrder]);
 
-  if (payingOrder) {
+  if (isPayingBill || payingOrder) {
     return (
       <CheckoutScreen
-        total={payingOrder.total}
-        billId={bill?.id || payingOrder.billId || ""}
-        venueId={payingOrder.venueId || venueId}
+        total={payingOrder?.total || bill?.total || 0}
+        billId={bill?.id || payingOrder?.billId || ""}
+        venueId={payingOrder?.venueId || venueId}
         sessionToken={session?.session_token}
-        onBack={() => setPayingOrder(null)}
+        onBack={() => {
+          setPayingOrder(null);
+          setIsPayingBill(false);
+        }}
         onPaid={handlePaid}
       />
     );
@@ -346,6 +359,7 @@ function CustomerShell({ venueId, tableId, tableLabel }: { venueId: string; tabl
           onBack={() => setTab("menu")}
           onContinueShopping={() => setTab("menu")}
           onOrderSent={handleOrderSent}
+          onPayBill={() => handlePayBill()}
           onCallWaiter={bill?.id ? handleCallWaiter : undefined}
           callingWaiter={callingWaiter}
           waiterCalled={waiterCalled}
@@ -360,7 +374,7 @@ function CustomerShell({ venueId, tableId, tableLabel }: { venueId: string; tabl
           venueName={venueName}
           billId={bill?.id ?? null}
           sessionToken={session?.session_token}
-          onPayBill={setPayingOrder}
+          onPayBill={handlePayBill}
           onBack={() => setTab("tab")}
           onCallWaiter={bill?.id ? handleCallWaiter : undefined}
           callingWaiter={callingWaiter}
@@ -655,6 +669,7 @@ function AppShell() {
               {managerPage === "staff" && <StaffManagerScreen venueId={venueId} />}
               {managerPage === "finance" && <FinancialReportsScreen venueId={venueId} />}
               {managerPage === "crm" && <CrmScreen venueId={venueId} />}
+              {managerPage === "brand" && <BrandSettingsScreen venueId={venueId} />}
             </ManagerShell>
           </VenueRequired>
         </ProtectedRoute>
