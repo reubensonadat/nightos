@@ -14,7 +14,9 @@ const DEFAULT_VENUE: DbVenue = {
   payment_model: 'POSTPAY',
   service_charge_pct: 10,
   vat_pct: 12.5,
-  tax_inclusive: false,
+  // Inclusive price display is the product default: guests see the exact
+  // amount they'll pay. Venues opt out via the Pricing & Tax manager tab.
+  tax_inclusive: true,
   currency: 'GHS',
   timezone: 'Africa/Accra',
   is_active: true,
@@ -36,7 +38,7 @@ export function useVenue(slug?: string) {
   useEffect(() => {
     const venueSlug = slug;
     if (!venueSlug) {
-       
+
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setLoading(false);
       return;

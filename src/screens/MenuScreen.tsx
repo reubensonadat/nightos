@@ -20,6 +20,7 @@ import { useCart } from "../context/CartContext";
 import { ItemDetailsSheet } from "../components/ItemDetailsSheet";
 import { db, type DbProduct, type DbModifierOption } from "../lib/api";
 import { supabase } from "../lib/supabase";
+import { displayPrice, venueDisplayTaxPct } from "../lib/fees";
 
 import { TablePinBanner } from "../components/TablePinBanner";
 import bellRingingIcon from "../assets/bell-ringing.svg";
@@ -125,6 +126,8 @@ export function MenuScreen({ venueId, venueName, tableLabel, waiterName, tablePi
     const [activeItemId, setActiveItemId] = useState<string | null>(null);
     const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
     const [loading, setLoading] = useState(true);
+    // Combined svc+VAT % applied to customer-facing prices (0 = show base).
+    const [taxPct, setTaxPct] = useState(0);
     const [callingWaiter, setCallingWaiter] = useState(false);
     const [waiterCalled, setWaiterCalled] = useState(false);
     const { addQuick, subtotal, itemCount, toggleFavorite, isFavorite } =
@@ -155,6 +158,11 @@ export function MenuScreen({ venueId, venueName, tableLabel, waiterName, tablePi
         fetchProducts(venueId).then(items => {
             setMenuItems(items);
             setLoading(false);
+        });
+        // Venue tax config drives inclusive price display. Failure is
+        // non-fatal: base prices are shown (venueDisplayTaxPct → 0).
+        db.venueById(venueId).then(({ data }) => {
+            setTaxPct(venueDisplayTaxPct(data));
         });
     }, [venueId]);
 
@@ -390,6 +398,7 @@ export function MenuScreen({ venueId, venueName, tableLabel, waiterName, tablePi
                                         id={item.id}
                                         name={item.name}
                                         price={item.price}
+                                        displayPrice={taxPct > 0 ? displayPrice(item.price, taxPct) : undefined}
                                         image={item.image}
                                         description={item.description}
                                         category={item.category}
@@ -424,10 +433,10 @@ export function MenuScreen({ venueId, venueName, tableLabel, waiterName, tablePi
                             </span>
                             <div className="flex flex-col items-start leading-tight">
                                 <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-khaki">
-                                    Your tab
+                                    Your tab{taxPct > 0 ? " · incl. taxes" : ""}
                                 </span>
                                 <span className="text-[15px] font-bold tracking-tight text-isabelline">
-                                    {formatGHS(subtotal)}
+                                    {formatGHS(displayPrice(subtotal, taxPct))}
                                 </span>
                             </div>
                         </div>
@@ -440,7 +449,7 @@ export function MenuScreen({ venueId, venueName, tableLabel, waiterName, tablePi
             )}
 
             {/* ── Item Details Bottom Sheet ── */}
-            <ItemDetailsSheet item={activeItem} onClose={() => setActiveItemId(null)} />
+            <ItemDetailsSheet item={activeItem} taxRatePct={taxPct} onClose={() => setActiveItemId(null)} />
         </main>
     );
 }

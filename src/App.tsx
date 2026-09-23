@@ -4,7 +4,7 @@ import toast from "react-hot-toast";
 import { Toaster } from "react-hot-toast";
 import { useRealtime } from "./hooks/useRealtime";
 import { CartProvider, useCart } from "./context/CartContext";
-import { AuthProvider, sectorPath, useAuth } from "./context/AuthContext";
+import { AuthProvider, sectorPath, isAllowedForTarget, useAuth } from "./context/AuthContext";
 import { NetworkProvider } from "./context/NetworkContext";
 import { ProtectedRoute, VenueRequired } from "./screens/auth/ProtectedRoute";
 import { CentralAuthScreen } from "./screens/auth/CentralAuthScreen";
@@ -592,10 +592,10 @@ function AppShell() {
                 onSignOut={handleSignOut}
               />
             ) : (
-              <Navigate to="/login" replace />
+              <Navigate to="/login?redirect=/waiter" replace state={{ from: "/waiter" }} />
             )
           } />
-          <Route path="/waiter/login" element={<Navigate to="/login" replace />} />
+          <Route path="/waiter/login" element={<Navigate to="/login?redirect=/waiter" replace state={{ from: "/waiter" }} />} />
           <Route path="/waiter/shift" element={
             (staffSession || role === "owner" || role === "manager" || role === "waiter") ? (
               <ShiftPerformanceScreen
@@ -603,7 +603,7 @@ function AppShell() {
                 staffName={staffSession?.name || profile?.name || "Manager"}
               />
             ) : (
-              <Navigate to="/login" replace />
+              <Navigate to="/login?redirect=/waiter/shift" replace state={{ from: "/waiter/shift" }} />
             )
           } />
           <Route path="/waiter/table/:tableId" element={<TableLayout />}>
@@ -624,7 +624,7 @@ function AppShell() {
             onSignOut={handleSignOut}
           />
         ) : (
-          <Navigate to="/login" replace />
+          <Navigate to="/login?redirect=/kitchen" replace state={{ from: "/kitchen" }} />
         )
       )}
 
@@ -689,6 +689,10 @@ function AppRoutes() {
 
   if (isAuthRoute) {
     if (isAuthenticated && !isInitializing) {
+      const redirectParam = searchParams.get("redirect") || (location.state as { from?: string } | undefined)?.from;
+      if (redirectParam && isAllowedForTarget(role, redirectParam)) {
+        return <Navigate to={redirectParam} replace />;
+      }
       return <Navigate to={role ? sectorPath(role) : "/setup"} replace />;
     }
     return <CentralAuthScreen initialMode={location.pathname === "/signup" ? "signup" : "login"} />;
