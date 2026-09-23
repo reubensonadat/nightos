@@ -8,8 +8,15 @@ import OtpInput from "../../components/OtpInput";
 const OTP_COOLDOWN_SECONDS = 60;
 const OTP_STORAGE_KEY = "bysen:otp_pending";
 
-export function StaffAuthScreen() {
-    const { signInWithPhone, verifyPhoneOtp, staffSession, role } = useAuth();
+type StaffAuthProps = {
+    venueName?: string;
+    venueLogo?: string | null;
+};
+
+export function StaffAuthScreen({ venueName, venueLogo }: StaffAuthProps = {}) {
+    const { signInWithPhone, verifyPhoneOtp, staffSession, role, venue } = useAuth();
+    const displayName = venueName || venue?.name || staffSession?.venue_name || "Your Venue";
+    const displayLogo = venueLogo || venue?.logo_url;
     
     // State to toggle between "phone" entry and "verify" OTP
     const [step, setStep] = useState<"phone" | "verify">(() => {
@@ -169,7 +176,11 @@ export function StaffAuthScreen() {
                 <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-white/10 via-[#0a0a0a] to-[#050505] p-12 flex flex-col justify-between text-white">
                     <div className="inline-block group mb-8">
                         <div className="bg-white p-1 rounded-md shadow-sm flex items-center justify-center transition-transform group-hover:scale-105 inline-block">
-                            <div className="h-6 w-auto px-2 font-bold text-black flex items-center justify-center">Velvet Lounge</div>
+                            {displayLogo ? (
+                                <img src={displayLogo} alt={displayName} className="h-6 w-auto max-w-[140px] object-contain rounded" />
+                            ) : (
+                                <div className="h-6 w-auto px-2 font-bold text-black flex items-center justify-center">{displayName}</div>
+                            )}
                         </div>
                     </div>
 
@@ -217,7 +228,7 @@ export function StaffAuthScreen() {
                 <div className="absolute top-6 left-6 lg:hidden z-10">
                     <div className="inline-block group mb-6">
                         <div className="bg-white p-1 rounded-md shadow-sm flex items-center justify-center transition-transform group-hover:scale-105 inline-block">
-                            <div className="h-5 w-auto px-1.5 font-bold text-black flex items-center justify-center text-sm">Velvet Lounge</div>
+                            <div className="h-5 w-auto px-1.5 font-bold text-black flex items-center justify-center text-sm">{displayName}</div>
                         </div>
                     </div>
                 </div>

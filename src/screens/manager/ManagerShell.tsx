@@ -37,8 +37,8 @@ type LoginProps = {
 
 export function AdminLoginScreen({ venueName, venueLogo, onSignIn }: LoginProps) {
     const { venue: authVenue } = useAuth();
-    const displayName = venueName || authVenue?.name || "Velvet Lounge";
-    const displayInitial = (displayName.trim().charAt(0) || "V").toUpperCase();
+    const displayName = venueName || authVenue?.name || "Your Venue";
+    const displayInitial = (displayName.trim().charAt(0) || "B").toUpperCase();
     const displayLogo = venueLogo || authVenue?.logo_url;
 
     const [email, setEmail] = useState("");
@@ -108,7 +108,7 @@ export function AdminLoginScreen({ venueName, venueLogo, onSignIn }: LoginProps)
                                     autoFocus
                                     value={email}
                                     onChange={(e) => setEmail(e.target.value)}
-                                    placeholder="manager@velvetlounge.gh"
+                                    placeholder="manager@venue.com"
                                     className="flex-1 min-w-0 bg-transparent text-[13px] text-licorice placeholder:text-feldgrau/50 focus:outline-none"
                                 />
                             </div>
@@ -219,9 +219,9 @@ export function ManagerShell({ managerName, venueName, venueLogo, activePage, on
     const [venueDropdownOpen, setVenueDropdownOpen] = useState(false);
     const venueDropdownRef = useRef<HTMLDivElement | null>(null);
 
-    const displayVenueName = venueName || authVenue?.name || staffSession?.venue_name || "Velvet Lounge";
+    const displayVenueName = venueName || authVenue?.name || staffSession?.venue_name || "Your Venue";
     const displayVenueLogo = venueLogo || authVenue?.logo_url || null;
-    const displayVenueInitial = (displayVenueName.trim().charAt(0) || "V").toUpperCase();
+    const displayVenueInitial = (displayVenueName.trim().charAt(0) || "B").toUpperCase();
 
     useEffect(() => {
         const handleClickOutside = (e: MouseEvent) => {
@@ -234,12 +234,12 @@ export function ManagerShell({ managerName, venueName, venueLogo, activePage, on
     }, []);
 
     const activeItem = NAV_ITEMS.find((item) => item.id === activePage) ?? NAV_ITEMS[0];
-    const venueSlug = authVenue?.slug || "velvet-lounge";
+    const venueSlug = authVenue?.slug || "";
 
     const handleCopyVenueLink = () => {
-        const link = `${window.location.origin}/v/${venueSlug}/login`;
+        const link = venueSlug ? `${window.location.origin}/v/${venueSlug}/login` : `${window.location.origin}/login`;
         navigator.clipboard.writeText(link);
-        toast.success(`Copied venue login link: ${link}`);
+        toast.success(`Copied login link: ${link}`);
     };
 
     return (

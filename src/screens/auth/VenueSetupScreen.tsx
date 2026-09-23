@@ -83,7 +83,7 @@ export function VenueSetupScreen() {
                 <input type="text" value={name}
                   onChange={(e) => setName(e.target.value)}
                   onKeyDown={(e) => e.key === 'Enter' && canAdvance && setStep(1)}
-                  placeholder="e.g. Velvet Lounge"
+                  placeholder="e.g. Accra City Bistro"
                   autoFocus
                   className="flex-1 min-w-0 bg-transparent text-[13px] text-licorice placeholder:text-feldgrau/50 focus:outline-none" />
               </div>
@@ -104,7 +104,7 @@ export function VenueSetupScreen() {
                   <span className="text-[12px] text-feldgrau">bysen.app/</span>
                   <input type="text" value={slug}
                     onChange={(e) => setSlug(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ''))}
-                    placeholder="velvet-lounge"
+                    placeholder="accra-bistro"
                     autoFocus
                     className="flex-1 min-w-0 bg-transparent text-[13px] text-licorice placeholder:text-feldgrau/50 focus:outline-none font-mono" />
                 </div>

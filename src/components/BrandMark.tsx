@@ -4,15 +4,18 @@ import { BysenIcon } from "./BysenLogo";
 type Props = {
     size?: "sm" | "md";
     showLabel?: boolean;
+    venueName?: string;
 };
 
 /**
- * Velvet Lounge brand mark — the "V" pill.
- * Used in the top-left of every customer screen for brand consistency.
+ * Venue brand mark pill.
+ * Used in the top-left of customer screens for brand consistency.
  */
-export function BrandMark({ size = "md", showLabel = true }: Props) {
+export function BrandMark({ size = "md", showLabel = true, venueName }: Props) {
     const dim = size === "sm" ? "h-8 w-8" : "h-9 w-9";
     const glyph = size === "sm" ? "text-[13px]" : "text-[15px]";
+    const name = venueName || "Bysen";
+    const initial = name.trim().charAt(0).toUpperCase() || "B";
 
     return (
         <div className="flex items-center gap-2.5">
@@ -24,13 +27,13 @@ export function BrandMark({ size = "md", showLabel = true }: Props) {
         `}
             >
                 <span className={`font-serif ${glyph} font-bold leading-none tracking-tight`}>
-                    V
+                    {initial}
                 </span>
             </div>
             {showLabel && (
                 <div className="flex flex-col leading-tight">
                     <span className="text-[13px] font-semibold tracking-tight text-licorice">
-                        Velvet Lounge
+                        {name}
                     </span>
                     <div className="flex items-center gap-1">
                         <BysenIcon size="xs" />

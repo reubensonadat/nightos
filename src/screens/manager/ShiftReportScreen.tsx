@@ -499,7 +499,7 @@ export function ShiftReportScreen({ venueId, isModal = false, onClose }: Props) 
                         End of Shift Summary
                     </h1>
                     <p className="text-xs font-semibold text-feldgrau mt-0.5">
-                        {rangeLabel} &middot; {venue.name || "Velvet Lounge"}
+                        {rangeLabel} &middot; {venue.name || "Shift Report"}
                     </p>
                 </div>
 

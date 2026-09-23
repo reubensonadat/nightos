@@ -572,7 +572,7 @@ export function FloorplanScreen({ venueId }: { venueId?: string } = {}) {
                     tableNumber={showQrFor.table_number}
                     tableLabel={showQrFor.table_label}
                     area={showQrFor.area}
-                    venueName={venue?.name || "VELVET LOUNGE"}
+                    venueName={venue?.name || "YOUR VENUE"}
                     qrCodeToken={showQrFor.qr_code_token}
                 />
             )}

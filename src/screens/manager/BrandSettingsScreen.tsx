@@ -386,7 +386,7 @@ export function BrandSettingsScreen({ venueId }: Props) {
                 required
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                placeholder="e.g. Velvet Lounge"
+                placeholder="e.g. Accra City Bistro"
                 className="mt-1.5 w-full rounded-xl border border-licorice/15 bg-white px-3.5 py-2.5 text-[13px] font-semibold text-licorice shadow-sm focus:border-licorice focus:outline-none"
               />
             </div>

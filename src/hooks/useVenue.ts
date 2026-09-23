@@ -3,18 +3,18 @@ import { db, type DbVenue } from '../lib/api';
 import { useAuth } from '../context/AuthContext';
 
 export const DEFAULT_VENUE: DbVenue = {
-  id: 'a0000000-0000-0000-0000-000000000001',
+  id: '00000000-0000-0000-0000-000000000000',
   owner_id: '',
-  name: 'Velvet Lounge',
-  slug: 'velvet-lounge',
-  description: 'Premium nightclub experience',
+  name: 'Your Venue',
+  slug: '',
+  description: 'Point of sale and venue operations',
   logo_url: null,
-  address: 'Accra, Ghana',
-  phone: '+233 24 000 0000',
-  email: 'hello@velvetlounge.gh',
+  address: '',
+  phone: '',
+  email: '',
   payment_model: 'POSTPAY',
-  service_charge_pct: 10,
-  vat_pct: 12.5,
+  service_charge_pct: 0,
+  vat_pct: 0,
   tax_inclusive: true,
   currency: 'GHS',
   timezone: 'Africa/Accra',
@@ -86,15 +86,9 @@ export function useVenue(slugOrId?: string) {
 
       if (cancelled) return;
       if (err || !data) {
-        if (identifier === 'velvet-lounge') {
-          setVenue(DEFAULT_VENUE);
-          setError(null);
-          setIsNotFound(false);
-        } else {
-          setVenue(DEFAULT_VENUE);
-          setError(`Venue "${identifier}" not found`);
-          setIsNotFound(true);
-        }
+        setVenue(DEFAULT_VENUE);
+        setError(`Venue "${identifier}" not found`);
+        setIsNotFound(true);
         setLoading(false);
         return;
       }

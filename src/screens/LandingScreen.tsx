@@ -91,7 +91,7 @@ export function LandingScreen({ onEnterCustomer, onViewReservations, onStaffPort
                     <div className="flex items-center justify-between">
                         <BysenLogo light size="lg" />
                         <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-isabelline/50">
-                            Velvet Lounge · Accra
+                            Modern Venue Operations
                         </span>
                     </div>
 
@@ -101,7 +101,7 @@ export function LandingScreen({ onEnterCustomer, onViewReservations, onStaffPort
                         <span className="italic font-serif font-bold text-khaki">on one screen.</span>
                     </h1>
                     <p className="mt-4 max-w-[340px] text-[13.5px] leading-[1.6] tracking-tight text-isabelline/65">
-                        Bysen is the QR-ordering + operations system for Velvet Lounge: guests order from their
+                        Bysen is the QR-ordering + operations system: guests order from their
                         phones, tickets hit the kitchen instantly, waiters settle on the floor, and the manager sees
                         every cedi in real time.
                     </p>

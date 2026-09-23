@@ -47,7 +47,7 @@ const TODAY_LABEL = new Date().toLocaleDateString("en-GH", {
 });
 
 export function HomeScreen({ onEnter, onViewReservations, onStaffPortal, onKitchenDisplay, onManagerPortal }: Props) {
-    const { venue } = useVenue('velvet-lounge');
+    const { venue } = useVenue();
 
     // Live happy-hour countdown — gives the page a "living" feel
     const [now, setNow] = useState(new Date());

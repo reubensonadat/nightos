@@ -985,7 +985,7 @@ function AddStaffModal({ onAdd, onClose }: {
                     </div>
                     <div>
                         <label className="text-xs font-bold uppercase text-feldgrau">Email</label>
-                        <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="kojo@velvetlounge.gh"
+                        <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="staff@venue.com"
                             className="mt-1 w-full rounded-lg bg-isabelline px-3 py-2 text-[12px] text-licorice placeholder:text-feldgrau/50 ring-1 ring-licorice/8 focus:outline-none focus:ring-2 focus:ring-licorice/20" />
                     </div>
                     <div>
@@ -1193,7 +1193,7 @@ function EditStaffModal({ staff, onSave, onClose }: {
 
                     <div>
                         <label className="text-xs font-bold uppercase text-feldgrau">Email</label>
-                        <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="kojo@velvetlounge.gh"
+                        <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="staff@venue.com"
                             className="mt-1 w-full rounded-lg bg-isabelline px-3 py-2 text-[12px] text-licorice placeholder:text-feldgrau/50 ring-1 ring-licorice/8 focus:outline-none focus:ring-2 focus:ring-licorice/20" />
                     </div>
 

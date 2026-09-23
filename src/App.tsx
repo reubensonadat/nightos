@@ -10,7 +10,6 @@ import { ProtectedRoute, VenueRequired } from "./screens/auth/ProtectedRoute";
 import { CentralAuthScreen } from "./screens/auth/CentralAuthScreen";
 import { VerifyOtpScreen } from "./screens/auth/VerifyOtpScreen";
 import { VenueSetupScreen } from "./screens/auth/VenueSetupScreen";
-import { LandingScreen } from "./screens/LandingScreen";
 import { PromoLandingScreen } from "./screens/PromoLandingScreen";
 import { MenuScreen } from "./screens/MenuScreen";
 import { CartScreen } from "./screens/CartScreen";
@@ -22,8 +21,6 @@ import { PartyPrompt } from "./components/PartyPrompt";
 import { TablePinModal } from "./components/TablePinModal";
  
 import { ClockIcon, BuildingStorefrontIcon } from "@heroicons/react/24/outline";
-
-import { StaffAuthScreen } from "./screens/waiter/StaffAuthScreen";
 
 import { TablesDashboard } from "./screens/waiter/TablesDashboard";
 import { OrderManagementScreen } from "./screens/waiter/OrderManagementScreen";
@@ -292,7 +289,7 @@ function CustomerShell({ venueId, tableId, tableLabel }: { venueId: string; tabl
           </div>
           <h1 className="text-[22px] font-black tracking-tight text-licorice">Your visit timed out</h1>
           <p className="text-[13px] text-licorice/70 mt-2 leading-relaxed">
-            {venueName ?? "Velvet Lounge"} ({tableLabel ?? "this table"}) ended this visit because no
+            {venueName ?? "The venue"} ({tableLabel ?? "this table"}) ended this visit because no
             order was placed within 20 minutes. Scan the QR code on the table again to start over.
           </p>
           <button
@@ -399,7 +396,7 @@ function CustomerShell({ venueId, tableId, tableLabel }: { venueId: string; tabl
 
       {partyPromptOpen && pinUnlocked && (
         <PartyPrompt
-          venueName={venueName ?? "Velvet Lounge"}
+          venueName={venueName ?? "Your Venue"}
           tableLabel={tableLabel}
           initialSize={bill?.guest_count || session?.party_size || 1}
           onConfirm={handlePartyConfirm}
@@ -470,19 +467,7 @@ function CustomerFlow({ onSwitchMode, venueId, qrTable, qrLoading, qrError }: Cu
     return <ReservationsScreen onBack={() => navigate(`${slugPrefix}/menu`)} />;
   }
 
-  if (cleanPath.startsWith("/menu") || cleanPath.startsWith("/tab") || cleanPath.startsWith("/orders")) {
-    return <CustomerShell venueId={venueId} tableId={null} />;
-  }
-
-  return (
-    <LandingScreen
-      onEnterCustomer={() => navigate(`${slugPrefix}/menu`)}
-      onViewReservations={() => navigate(`${slugPrefix}/reservations`)}
-      onStaffPortal={() => onSwitchMode("waiter")}
-      onKitchenDisplay={() => onSwitchMode("kitchen")}
-      onManagerPortal={() => onSwitchMode("manager")}
-    />
-  );
+  return <CustomerShell venueId={venueId} tableId={null} />;
 }
 
 /* ──────────────────── App Shell ──────────────────── */
@@ -499,7 +484,7 @@ function AppShell() {
   const urlVenueSlug = match ? match[1] : null;
   const paramVenue = searchParams.get("venue") || searchParams.get("v");
 
-  const targetSlug = urlVenueSlug || qrTable?.venue_id || paramVenue || authVenue?.slug || authVenue?.id || "velvet-lounge";
+  const targetSlug = urlVenueSlug || qrTable?.venue_id || paramVenue || authVenue?.slug || authVenue?.id || "";
   const { venue: loadedVenue, loading: venueLoading, error: venueError, isNotFound } = useVenue(targetSlug);
 
   const isVenueNotFound = !venueLoading && (
@@ -530,12 +515,13 @@ function AppShell() {
 
   const mode = getModeFromPath();
   const setMode = useCallback((newMode: Mode) => {
-    const slugPrefix = `/v/${currentVenue.slug || targetSlug}`;
+    const slug = currentVenue.slug || targetSlug;
+    const slugPrefix = slug ? `/v/${slug}` : "";
     const paths: Record<Mode, string> = {
-      customer: `${slugPrefix}/menu`,
-      waiter: `${slugPrefix}/waiter`,
-      kitchen: `${slugPrefix}/kitchen`,
-      manager: `${slugPrefix}/manager/ops`,
+      customer: slugPrefix ? `${slugPrefix}/menu` : "/menu",
+      waiter: slugPrefix ? `${slugPrefix}/waiter` : "/waiter",
+      kitchen: slugPrefix ? `${slugPrefix}/kitchen` : "/kitchen",
+      manager: slugPrefix ? `${slugPrefix}/manager/ops` : "/manager/ops",
     };
     navigate(paths[newMode]);
   }, [navigate, currentVenue.slug, targetSlug]);
@@ -612,7 +598,7 @@ function AppShell() {
       await signOut();
     } finally {
       setMode("customer");
-      navigate(`/v/${currentVenue.slug || targetSlug}/login`, { replace: true });
+      navigate("/login", { replace: true });
     }
   };
 
@@ -657,7 +643,7 @@ function AppShell() {
             )}
             <button
               type="button"
-              onClick={() => navigate(`/v/velvet-lounge/login`)}
+              onClick={() => navigate("/login")}
               className="w-full rounded-xl border border-licorice/15 bg-isabelline/50 py-3 text-sm font-bold text-licorice hover:bg-isabelline transition-all active:scale-[0.98]"
             >
               Back to Sign In
@@ -701,13 +687,13 @@ function AppShell() {
                     onSignOut={handleSignOut}
                   />
                 ) : (
-                  <Navigate to={`/v/${currentVenue.slug || targetSlug}/login?redirect=/v/${currentVenue.slug || targetSlug}/waiter`} replace />
+                  <Navigate to={`/login?redirect=${encodeURIComponent(location.pathname + location.search)}`} replace />
                 )
               }
             />
           ))}
           {["/waiter/login", "/v/:slug/waiter/login"].map((p) => (
-            <Route key={p} path={p} element={<Navigate to={`/v/${currentVenue.slug || targetSlug}/login?redirect=/v/${currentVenue.slug || targetSlug}/waiter`} replace />} />
+            <Route key={p} path={p} element={<Navigate to={`/login?redirect=/waiter`} replace />} />
           ))}
           {["/waiter/shift", "/v/:slug/waiter/shift"].map((p) => (
             <Route
@@ -720,7 +706,7 @@ function AppShell() {
                     staffName={staffSession?.name || profile?.name || "Manager"}
                   />
                 ) : (
-                  <Navigate to={`/v/${currentVenue.slug || targetSlug}/login?redirect=/v/${currentVenue.slug || targetSlug}/waiter/shift`} replace />
+                  <Navigate to={`/login?redirect=${encodeURIComponent(location.pathname + location.search)}`} replace />
                 )
               }
             />
@@ -745,7 +731,7 @@ function AppShell() {
             onSignOut={handleSignOut}
           />
         ) : (
-          <Navigate to={`/v/${currentVenue.slug || targetSlug}/login?redirect=/v/${currentVenue.slug || targetSlug}/kitchen`} replace />
+          <Navigate to={`/login?redirect=${encodeURIComponent(location.pathname + location.search)}`} replace />
         )
       )}
 

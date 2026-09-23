@@ -108,7 +108,7 @@ type Props = {
 };
 
 export function ReservationsScreen({ onBack }: Props) {
-    const { venue } = useVenue("velvet-lounge");
+    const { venue } = useVenue();
     const [tab, setTab] = useState<Tab>("events");
     const [selectedDate, setSelectedDate] = useState(getNextDays(7)[0].iso);
     const [selectedTime, setSelectedTime] = useState("7:00 PM");
@@ -237,7 +237,7 @@ export function ReservationsScreen({ onBack }: Props) {
                             Reservations
                         </span>
                         <span className="text-[9px] font-semibold uppercase tracking-[0.18em] text-feldgrau">
-                            {venue?.name ?? "Velvet Lounge"}
+                            {venue?.name ?? "Your Venue"}
                         </span>
                     </div>
 

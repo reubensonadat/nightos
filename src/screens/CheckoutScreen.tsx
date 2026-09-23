@@ -400,7 +400,7 @@ export function CheckoutScreen({ total, billId, venueId, sessionToken, onBack, o
                             Bill Summary
                         </span>
                         <span className="text-[10px] font-bold uppercase tracking-wider text-feldgrau">
-                            {venue?.name || "Velvet Lounge"}
+                            {venue?.name || "Your Bill"}
                         </span>
                     </div>
 
