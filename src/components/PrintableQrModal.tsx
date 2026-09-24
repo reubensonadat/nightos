@@ -20,12 +20,16 @@ export const PrintableQrModal: React.FC<PrintableQrModalProps> = ({
     tableNumber,
     tableLabel,
     area,
+    venueName,
     qrCodeToken,
 }) => {
     const [copied, setCopied] = useState(false);
     const canvasRef = useRef<HTMLCanvasElement>(null);
 
     const qrUrl = `${window.location.origin}/?table=${encodeURIComponent(qrCodeToken)}`;
+    const displayVenue = (venueName && venueName.trim() ? venueName.trim() : "BYSEN").toUpperCase();
+    const tableTitle = tableLabel || `TABLE ${String(tableNumber).padStart(2, "0")}`;
+    const tableDetail = area ? `${tableTitle.toUpperCase()} · ${area.toUpperCase()}` : tableTitle.toUpperCase();
 
     useEffect(() => {
         if (isOpen && canvasRef.current) {
@@ -33,7 +37,7 @@ export const PrintableQrModal: React.FC<PrintableQrModalProps> = ({
                 width: 210,
                 margin: 1,
                 color: {
-                    dark: "#23140C",
+                    dark: "#000000",
                     light: "#FFFFFF",
                 },
             }).catch(console.error);
@@ -48,6 +52,7 @@ export const PrintableQrModal: React.FC<PrintableQrModalProps> = ({
                 tableNumber,
                 tableLabel,
                 area,
+                venueName,
                 qrUrl,
             });
             toast.success(`Downloaded Table ${String(tableNumber).padStart(2, "0")} QR Code`);
@@ -80,7 +85,7 @@ export const PrintableQrModal: React.FC<PrintableQrModalProps> = ({
                 {/* Header */}
                 <div className="flex items-center justify-between border-b border-isabelline px-5 py-3">
                     <div>
-                        <p className="text-xs font-bold uppercase text-feldgrau">QR Code</p>
+                        <p className="text-xs font-bold uppercase text-feldgrau">QR Code Card</p>
                         <h3 className="text-[14px] font-bold tracking-tight text-licorice">
                             Table {String(tableNumber).padStart(2, "0")}{area ? ` · ${area}` : ""}
                         </h3>
@@ -95,15 +100,39 @@ export const PrintableQrModal: React.FC<PrintableQrModalProps> = ({
                     </button>
                 </div>
 
-                {/* Content */}
-                <div className="flex flex-col items-center px-5 py-6">
-                    <canvas ref={canvasRef} className="rounded-md" />
-                    <p className="mt-3 text-xs font-bold uppercase tracking-wider text-feldgrau">
-                        SCAN TO ORDER
-                    </p>
-                    <p className="mt-0.5 break-all text-center text-xs tracking-tight text-feldgrau/70">
-                        {qrUrl}
-                    </p>
+                {/* Printable Card Live Preview */}
+                <div className="p-4 bg-isabelline/40">
+                    <div className="flex flex-col items-center rounded-xl bg-white p-5 shadow-sm border border-black/5 text-center">
+                        {/* Venue Name */}
+                        <h2 className="font-serif text-2xl font-bold tracking-widest text-slate-900 uppercase">
+                            {displayVenue}
+                        </h2>
+
+                        {/* MENU */}
+                        <h3 className="mt-2 text-sm font-bold tracking-[0.25em] text-slate-900 uppercase">
+                            MENU
+                        </h3>
+
+                        {/* Table / Area Detail */}
+                        <p className="mt-1 text-[11px] font-bold tracking-wider text-slate-500 uppercase">
+                            {tableDetail}
+                        </p>
+
+                        {/* Streamlined Call to Action */}
+                        <p className="mt-3.5 text-xs font-bold tracking-[0.2em] text-slate-800 uppercase">
+                            SCAN TO ORDER
+                        </p>
+
+                        {/* QR Code Canvas */}
+                        <div className="mt-4 flex justify-center">
+                            <canvas ref={canvasRef} className="rounded-md border border-slate-100" />
+                        </div>
+
+                        {/* URL Subtext */}
+                        <p className="mt-2.5 break-all text-[10px] tracking-tight text-slate-400">
+                            {qrUrl}
+                        </p>
+                    </div>
                 </div>
 
                 {/* Footer Buttons */}

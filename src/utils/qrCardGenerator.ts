@@ -9,13 +9,19 @@ export interface QrCardOptions {
 }
 
 /**
- * Generates a clean PNG canvas containing Table Name/Number at top, QR code in middle, and "SCAN TO ORDER" at bottom.
+ * Generates a clean PNG canvas matching the printable QR card format:
+ * - Venue Name (bold serif header at top)
+ * - MENU
+ * - Table / Area label (e.g. TABLE 01 · PATIO)
+ * - OPEN YOUR CAMERA APP
+ * - ✦ SCAN THIS QR CODE TO SEE OUR MENU
+ * - Centered QR Code
  */
 export async function generatePrintableQrCanvas(options: QrCardOptions): Promise<HTMLCanvasElement> {
-  const { tableNumber, tableLabel, area, qrUrl } = options;
+  const { tableNumber, tableLabel, area, venueName, qrUrl } = options;
 
-  const width = 600;
-  const height = 760;
+  const width = 700;
+  const height = 920;
   const canvas = document.createElement('canvas');
   canvas.width = width;
   canvas.height = height;
@@ -27,42 +33,67 @@ export async function generatePrintableQrCanvas(options: QrCardOptions): Promise
   ctx.fillStyle = '#FFFFFF';
   ctx.fillRect(0, 0, width, height);
 
-  // 1. Top Header: Table Name and Number
-  const titleText = tableLabel || `Table ${String(tableNumber).padStart(2, '0')}`;
-  const headerText = area ? `${titleText} · ${area}` : titleText;
-
-  ctx.fillStyle = '#23140C';
-  ctx.font = 'bold 36px system-ui, -apple-system, sans-serif';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'top';
-  ctx.fillText(headerText, width / 2, 45);
 
-  // 2. Middle: Render QR Code centered
+  let currentY = 55;
+
+  // 1. Top Header: Venue Name (or fallback to BYSEN)
+  const venueText = (venueName && venueName.trim() ? venueName.trim() : 'BYSEN').toUpperCase();
+  ctx.fillStyle = '#111111';
+  ctx.font = 'bold 52px "Georgia", "Times New Roman", serif';
+  ctx.letterSpacing = '3px';
+  ctx.fillText(venueText, width / 2, currentY);
+
+  currentY += 75;
+
+  // 2. Sub-Header: MENU
+  ctx.fillStyle = '#111111';
+  ctx.font = 'bold 30px system-ui, -apple-system, sans-serif';
+  ctx.letterSpacing = '4px';
+  ctx.fillText('MENU', width / 2, currentY);
+
+  currentY += 45;
+
+  // 3. Table / Area info
+  const tableTitle = tableLabel || `TABLE ${String(tableNumber).padStart(2, '0')}`;
+  const tableDetail = area ? `${tableTitle.toUpperCase()} · ${area.toUpperCase()}` : tableTitle.toUpperCase();
+
+  ctx.fillStyle = '#555555';
+  ctx.font = 'bold 20px system-ui, -apple-system, sans-serif';
+  ctx.letterSpacing = '2px';
+  ctx.fillText(tableDetail, width / 2, currentY);
+
+  currentY += 55;
+
+  // 4. Streamlined Call to Action
+  ctx.fillStyle = '#222222';
+  ctx.font = 'bold 22px system-ui, -apple-system, sans-serif';
+  ctx.letterSpacing = '3px';
+  ctx.fillText('SCAN TO ORDER', width / 2, currentY);
+
+  currentY += 50;
+
+  // 5. Middle: Render QR Code centered
+  const qrSize = 480;
   const tempQrCanvas = document.createElement('canvas');
   await QRCode.toCanvas(tempQrCanvas, qrUrl, {
-    width: 480,
+    width: qrSize,
     margin: 1,
     color: {
-      dark: '#23140C',
+      dark: '#000000',
       light: '#FFFFFF',
     },
   });
 
-  ctx.drawImage(tempQrCanvas, 60, 110, 480, 480);
-
-  // 3. Bottom: Text "SCAN TO ORDER"
-  ctx.fillStyle = '#4E5340';
-  ctx.font = 'bold 32px system-ui, -apple-system, sans-serif';
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'top';
-  ctx.letterSpacing = '3px';
-  ctx.fillText('SCAN TO ORDER', width / 2, 635);
+  const qrX = (width - qrSize) / 2;
+  ctx.drawImage(tempQrCanvas, qrX, currentY, qrSize, qrSize);
 
   return canvas;
 }
 
 /**
- * Triggers a file download of the PNG containing Table Name/Number + QR code + "SCAN TO ORDER" text.
+ * Triggers a file download of the PNG printable QR card.
  */
 export async function downloadPrintableQrCard(options: QrCardOptions): Promise<void> {
   const canvas = await generatePrintableQrCanvas(options);
@@ -72,3 +103,4 @@ export async function downloadPrintableQrCard(options: QrCardOptions): Promise<v
   a.download = `table-${tableNum}-qr.png`;
   a.click();
 }
+
