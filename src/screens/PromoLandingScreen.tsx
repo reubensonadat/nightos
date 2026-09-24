@@ -239,7 +239,7 @@ export function PromoLandingScreen() {
                 <h3 className="mt-2 text-2xl font-black text-white">Full Operations Suite</h3>
                 <p className="mt-2 text-sm text-[#f4f3e8]/70">Everything your venue needs to take orders and operate live.</p>
                 <div className="mt-6 flex items-baseline gap-2">
-                  <span className="text-4xl font-extrabold text-white">Flat ₵1 – ₵10</span>
+                  <span className="text-4xl font-extrabold text-white">Flat ₵1 – ₵15</span>
                   <span className="text-sm text-[#f4f3e8]/50">/ settled order</span>
                 </div>
                 <ul className="mt-8 space-y-3 text-sm text-[#f4f3e8]/80">

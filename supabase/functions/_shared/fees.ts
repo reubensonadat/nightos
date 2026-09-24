@@ -1,11 +1,11 @@
 export function computeBillTotal(
   subtotal: number,
-  serviceChargePct: number,
-  vatPct: number
+  serviceChargePct: number = 0,
+  vatPct: number = 0
 ): { subtotal: number; serviceCharge: number; vat: number; total: number } {
-  const serviceCharge = Math.round(subtotal * (serviceChargePct / 100) * 100) / 100
+  const serviceCharge = 0
   const vat = Math.round(subtotal * (vatPct / 100) * 100) / 100
-  const total = subtotal + serviceCharge + vat
+  const total = subtotal + vat
   return { subtotal, serviceCharge, vat, total }
 }
 
@@ -25,7 +25,7 @@ export function expectedBillAmountPesewas(bill: BillForVerification): number {
 }
 
 // Platform fee schedule — MUST mirror public.platform_fee_for() in the
-// database (supabase/03-fee-guard.sql). Flat tiers, hard ₵5 cap, and the
+// database (supabase/03-fee-guard.sql). Flat tiers, hard ₵15 cap, and the
 // fee can never exceed the bill amount (sub-₵1 protection).
 // Financial calculation lives server-side only (PRD §4) — edge functions
 // use this; the browser never computes fees.
@@ -35,7 +35,9 @@ export function platformFeeFor(amountGhs: number): number {
     amount <= 50 ? 1.0 :
     amount <= 100 ? 2.0 :
     amount <= 150 ? 3.0 :
-    amount <= 200 ? 4.0 : 5.0
+    amount <= 200 ? 4.0 :
+    amount <= 500 ? 7.0 :
+    amount <= 700 ? 12.0 : 15.0
   return Math.round(Math.min(tier, amount) * 100) / 100
 }
 

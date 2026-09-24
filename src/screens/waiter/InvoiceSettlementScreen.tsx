@@ -273,10 +273,6 @@ export function InvoiceSettlementScreen() {
                                     <span className="font-mono tabular-nums">{formatGHS(activeBill.subtotal)}</span>
                                 </div>
                                 <div className="flex justify-between text-feldgrau">
-                                    <span>Service charge</span>
-                                    <span className="font-mono tabular-nums">{formatGHS(activeBill.service_charge)}</span>
-                                </div>
-                                <div className="flex justify-between text-feldgrau">
                                     <span>VAT</span>
                                     <span className="font-mono tabular-nums">{formatGHS(activeBill.vat)}</span>
                                 </div>
@@ -437,10 +433,6 @@ export function InvoiceSettlementScreen() {
                             <div className="flex justify-between text-isabelline/60">
                                 <span>Subtotal</span>
                                 <span className="font-mono tabular-nums">{formatGHS(bill.subtotal)}</span>
-                            </div>
-                            <div className="flex justify-between text-isabelline/60">
-                                <span>Service charge</span>
-                                <span className="font-mono tabular-nums">{formatGHS(bill.service_charge)}</span>
                             </div>
                             <div className="flex justify-between text-isabelline/60">
                                 <span>VAT</span>

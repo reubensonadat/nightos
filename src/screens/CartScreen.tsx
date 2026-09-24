@@ -89,19 +89,19 @@ export function CartScreen({ venueId, tableLabel, tablePin, billId, customerSess
         },
     });
 
-    // Venue-driven bill math (falls back to 10% / 12.5% only until the venue loads)
-    const [venueFees, setVenueFees] = useState<{ serviceChargePct: number; vatPct: number }>({
-        serviceChargePct: 10,
+    // Venue-driven bill math (falls back to 12.5% only until the venue loads)
+    const [venueTax, setVenueTax] = useState<{ vatPct: number; taxInclusive: boolean }>({
         vatPct: 12.5,
+        taxInclusive: true,
     });
 
     useEffect(() => {
         let active = true;
         db.venueById(venueId).then(({ data, error }) => {
             if (!active || error || !data) return;
-            setVenueFees({
-                serviceChargePct: data.service_charge_pct ?? 10,
+            setVenueTax({
                 vatPct: data.vat_pct ?? 12.5,
+                taxInclusive: data.tax_inclusive ?? true,
             });
         });
         return () => {
@@ -114,13 +114,24 @@ export function CartScreen({ venueId, tableLabel, tablePin, billId, customerSess
     const combinedSubtotal = draftSubtotal + placedSubtotal;
 
     const { vat, total } = useMemo(() => {
-        const service = Math.round(combinedSubtotal * (venueFees.serviceChargePct / 100) * 100) / 100;
-        const tax = Math.round(combinedSubtotal * (venueFees.vatPct / 100) * 100) / 100;
-        return {
-            vat: tax,
-            total: combinedSubtotal + service + tax,
-        };
-    }, [combinedSubtotal, venueFees]);
+        if (venueTax.vatPct <= 0) {
+            return { vat: 0, total: combinedSubtotal };
+        }
+        if (venueTax.taxInclusive) {
+            const net = combinedSubtotal / (1 + venueTax.vatPct / 100);
+            const tax = combinedSubtotal - net;
+            return {
+                vat: Math.round(tax * 100) / 100,
+                total: combinedSubtotal,
+            };
+        } else {
+            const tax = Math.round(combinedSubtotal * (venueTax.vatPct / 100) * 100) / 100;
+            return {
+                vat: tax,
+                total: Math.round((combinedSubtotal + tax) * 100) / 100,
+            };
+        }
+    }, [combinedSubtotal, venueTax]);
 
     const handleSendToKitchen = async () => {
         if (!billId || !customerSessionId) {
@@ -606,7 +617,7 @@ export function CartScreen({ venueId, tableLabel, tablePin, billId, customerSess
                         </div>
                         <div className="flex items-center justify-between text-[12px]">
                             <span className="tracking-tight text-isabelline/70">
-                                VAT <span className="text-isabelline/40">({venueFees.vatPct}%)</span>
+                                VAT <span className="text-isabelline/40">({venueTax.vatPct}%)</span>
                             </span>
                             <span className="font-mono font-bold tabular-nums text-isabelline">
                                 {formatGHS(vat)}

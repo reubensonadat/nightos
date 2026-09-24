@@ -8,7 +8,7 @@ const faqs = [
   },
   {
     question: "Does Bysen charge monthly subscription fees or transaction fees?",
-    answer: "Bysen does not charge recurring monthly software subscription fees. Instead, we charge a tiered platform fee per transaction based on the order total (from 1.00 GHS for orders up to 50 GHS, up to 5.00 GHS for orders over 200 GHS). Digital payments via Paystack carry a separate 2% processing fee."
+    answer: "Bysen does not charge recurring monthly software subscription fees. Instead, we charge a tiered platform fee per transaction based on the order total (from 1.00 GHS for orders up to 50 GHS, up to 15.00 GHS for orders over 700 GHS). Digital payments via Paystack carry a separate 2% processing fee."
   },
   {
     question: "Can guests use the QR ordering without downloading an app?",

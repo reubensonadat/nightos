@@ -147,7 +147,7 @@ export function TermsOfServiceScreen() {
               <div>
                 <p><strong className="text-white">Venue Account Responsibilities:</strong> The Venue and its authorized managers agree to:</p>
                 <ul className="list-disc pl-6 mt-2 space-y-1 text-[#f4f3e8]/75">
-                  <li>Maintain accurate menu pricing, VAT, and service charge rates in accordance with applicable tax regulations.</li>
+                  <li>Maintain accurate menu pricing and VAT rates in accordance with applicable tax regulations.</li>
                   <li>Safeguard manager login credentials and staff PINs against unauthorized disclosure.</li>
                   <li>Fulfill food and beverage orders placed and paid for by customers through the system.</li>
                 </ul>
@@ -171,7 +171,9 @@ export function TermsOfServiceScreen() {
                   <li>Transactions between 51.00 GHS and 100.00 GHS: 2.00 GHS</li>
                   <li>Transactions between 101.00 GHS and 150.00 GHS: 3.00 GHS</li>
                   <li>Transactions between 151.00 GHS and 200.00 GHS: 4.00 GHS</li>
-                  <li>Transactions over 200.00 GHS: 5.00 GHS</li>
+                  <li>Transactions between 200.00 GHS and 500.00 GHS: 7.00 GHS</li>
+                  <li>Transactions between 501.00 GHS and 700.00 GHS: 12.00 GHS</li>
+                  <li>Transactions over 700.00 GHS: 15.00 GHS</li>
                 </ul>
               </div>
               <p>
