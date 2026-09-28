@@ -84,31 +84,27 @@ export function MenuManagerScreen({ venueId }: { venueId?: string } = {}) {
     const [newCategoryName, setNewCategoryName] = useState("");
 
     // ── Pricing & Tax (venue-level; drives bill math + inclusive display) ──
-    const [svcPct, setSvcPct] = useState("10");
     const [vatPct, setVatPct] = useState("12.5");
     const [taxInclusive, setTaxInclusive] = useState(false);
     const [savingTax, setSavingTax] = useState(false);
 
     useEffect(() => {
         if (!venue.id || venue.id === "00000000-0000-0000-0000-000000000000") return;
-        setSvcPct(String(venue.service_charge_pct ?? 10));
         setVatPct(String(venue.vat_pct ?? 12.5));
         setTaxInclusive(Boolean(venue.tax_inclusive));
-    }, [venue.id, venue.service_charge_pct, venue.vat_pct, venue.tax_inclusive]);
+    }, [venue.id, venue.vat_pct, venue.tax_inclusive]);
 
     const handleSaveTax = async () => {
         if (!venue.id || venue.id === "00000000-0000-0000-0000-000000000000") return;
-        const svc = Math.min(Math.max(parseFloat(svcPct) || 0, 0), 100);
         const vat = Math.min(Math.max(parseFloat(vatPct) || 0, 0), 100);
         setSavingTax(true);
         try {
             const { error } = await db.updateVenue(venue.id, {
-                service_charge_pct: svc,
+                service_charge_pct: 0,
                 vat_pct: vat,
                 tax_inclusive: taxInclusive,
             });
             if (error) throw error;
-            setSvcPct(String(svc));
             setVatPct(String(vat));
             toast.success("Pricing & tax settings saved.");
         } catch (err) {
@@ -768,29 +764,13 @@ export function MenuManagerScreen({ venueId }: { venueId?: string } = {}) {
                     <div className="rounded-2xl border border-licorice/8 bg-white p-6 shadow-sm">
                         <h2 className="text-lg font-bold tracking-tight text-licorice">Pricing & Tax</h2>
                         <p className="mt-1 max-w-lg text-[12px] leading-[1.5] tracking-tight text-feldgrau">
-                            These rates are applied to every bill by the database — the guest app never computes them.
-                            Set both to 0% if your venue doesn't charge service or VAT.
+                            VAT is applied to guest bills based on your venue settings. Set to 0% if your venue is not registered for VAT.
                         </p>
 
-                        <div className="mt-6 grid gap-5 sm:grid-cols-2">
+                        <div className="mt-6 max-w-xs">
                             <label className="flex flex-col gap-1.5">
                                 <span className="text-[11px] font-bold uppercase tracking-[0.12em] text-feldgrau">
-                                    Service charge (%)
-                                </span>
-                                <input
-                                    type="number"
-                                    min={0}
-                                    max={100}
-                                    step={0.5}
-                                    value={svcPct}
-                                    onChange={(e) => setSvcPct(e.target.value)}
-                                    disabled={savingTax}
-                                    className="rounded-lg border border-licorice/10 bg-isabelline px-3.5 py-2.5 font-mono text-sm font-bold tabular-nums text-licorice outline-none focus:ring-2 focus:ring-khaki disabled:opacity-60"
-                                />
-                            </label>
-                            <label className="flex flex-col gap-1.5">
-                                <span className="text-[11px] font-bold uppercase tracking-[0.12em] text-feldgrau">
-                                    VAT (%)
+                                    VAT Rate (%)
                                 </span>
                                 <input
                                     type="number"

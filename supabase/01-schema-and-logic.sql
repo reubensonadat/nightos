@@ -593,15 +593,53 @@ CREATE OR REPLACE FUNCTION public.recalculate_bill()
 RETURNS trigger AS $$
 DECLARE
     v_bill_id uuid;
+    v_tax_inclusive boolean;
+    v_vat_pct numeric;
+    v_gross_items numeric;
+    v_subtotal numeric;
+    v_vat numeric;
+    v_total numeric;
 BEGIN
     v_bill_id := COALESCE(NEW.bill_id, OLD.bill_id);
+    IF v_bill_id IS NULL THEN
+        RETURN COALESCE(NEW, OLD);
+    END IF;
+
+    SELECT COALESCE(v.tax_inclusive, true), COALESCE(v.vat_pct, 0)
+    INTO v_tax_inclusive, v_vat_pct
+    FROM public.bills b
+    JOIN public.venues v ON v.id = b.venue_id
+    WHERE b.id = v_bill_id;
+
+    SELECT COALESCE(SUM(oi.line_total), 0)
+    INTO v_gross_items
+    FROM public.order_items oi
+    WHERE oi.bill_id = v_bill_id;
+
+    IF v_vat_pct > 0 THEN
+        IF v_tax_inclusive THEN
+            v_total := v_gross_items;
+            v_subtotal := ROUND(v_gross_items / (1 + (v_vat_pct / 100)), 2);
+            v_vat := v_total - v_subtotal;
+        ELSE
+            v_subtotal := v_gross_items;
+            v_vat := ROUND(v_subtotal * (v_vat_pct / 100), 2);
+            v_total := v_subtotal + v_vat;
+        END IF;
+    ELSE
+        v_subtotal := v_gross_items;
+        v_vat := 0.00;
+        v_total := v_gross_items;
+    END IF;
+
     UPDATE public.bills b
     SET
-        subtotal = (SELECT COALESCE(SUM(oi.line_total), 0) FROM public.order_items oi WHERE oi.bill_id = v_bill_id),
-        service_charge = ROUND((SELECT COALESCE(SUM(oi.line_total), 0) FROM public.order_items oi WHERE oi.bill_id = v_bill_id) * (SELECT COALESCE(service_charge_pct, 0) / 100 FROM public.venues v JOIN public.bills b2 ON b2.venue_id = v.id WHERE b2.id = v_bill_id), 2),
-        vat = ROUND((SELECT COALESCE(SUM(oi.line_total), 0) FROM public.order_items oi WHERE oi.bill_id = v_bill_id) * (SELECT COALESCE(vat_pct, 0) / 100 FROM public.venues v JOIN public.bills b2 ON b2.venue_id = v.id WHERE b2.id = v_bill_id), 2)
+        subtotal = v_subtotal,
+        service_charge = 0.00,
+        vat = v_vat,
+        total = v_total
     WHERE b.id = v_bill_id;
-    UPDATE public.bills b SET total = subtotal + service_charge + vat WHERE b.id = v_bill_id;
+
     RETURN COALESCE(NEW, OLD);
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
@@ -1035,13 +1073,18 @@ CREATE OR REPLACE FUNCTION public.platform_fee_for(p_amount numeric)
 RETURNS numeric
 LANGUAGE sql STABLE
 SET search_path = public AS $$
-    SELECT CASE
-        WHEN p_amount <= 50   THEN 1.00
-        WHEN p_amount <= 100  THEN 2.00
-        WHEN p_amount <= 150  THEN 3.00
-        WHEN p_amount <= 200  THEN 4.00
-        ELSE 5.00
-    END::numeric(10,2);
+    SELECT LEAST(
+        CASE
+            WHEN p_amount <= 50   THEN 1.00
+            WHEN p_amount <= 100  THEN 2.00
+            WHEN p_amount <= 150  THEN 3.00
+            WHEN p_amount <= 200  THEN 4.00
+            WHEN p_amount <= 500  THEN 7.00
+            WHEN p_amount <= 700  THEN 12.00
+            ELSE 15.00
+        END,
+        GREATEST(p_amount, 0)
+    )::numeric(10,2);
 $$;
 
 -- â”€â”€ B2. CASH SETTLEMENT (waiter confirms the cash) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
@@ -1534,10 +1577,12 @@ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
 DECLARE
     v_bill public.bills%ROWTYPE;
     v_venue public.venues%ROWTYPE;
+    v_gross_items numeric;
     v_subtotal numeric;
-    v_service numeric;
     v_vat numeric;
     v_total numeric;
+    v_vat_pct numeric;
+    v_tax_inclusive boolean;
 BEGIN
     SELECT * INTO v_bill FROM public.bills WHERE id = p_bill_id;
     IF NOT FOUND THEN
@@ -1545,20 +1590,37 @@ BEGIN
     END IF;
 
     SELECT * INTO v_venue FROM public.venues WHERE id = v_bill.venue_id;
+    v_vat_pct := COALESCE(v_venue.vat_pct, 0);
+    v_tax_inclusive := COALESCE(v_venue.tax_inclusive, true);
 
-    SELECT COALESCE(SUM(line_total), 0) INTO v_subtotal
+    SELECT COALESCE(SUM(line_total), 0) INTO v_gross_items
     FROM public.order_items WHERE bill_id = p_bill_id;
 
-    v_service := ROUND(v_subtotal * v_venue.service_charge_pct / 100, 2);
-    v_vat := ROUND(v_subtotal * v_venue.vat_pct / 100, 2);
-    v_total := v_subtotal + v_service + v_vat;
+    IF v_vat_pct > 0 THEN
+        IF v_tax_inclusive THEN
+            v_total := v_gross_items;
+            v_subtotal := ROUND(v_gross_items / (1 + (v_vat_pct / 100)), 2);
+            v_vat := v_total - v_subtotal;
+        ELSE
+            v_subtotal := v_gross_items;
+            v_vat := ROUND(v_subtotal * (v_vat_pct / 100), 2);
+            v_total := v_subtotal + v_vat;
+        END IF;
+    ELSE
+        v_subtotal := v_gross_items;
+        v_vat := 0.00;
+        v_total := v_gross_items;
+    END IF;
 
     UPDATE public.bills
-    SET subtotal = v_subtotal, service_charge = v_service,
-        vat = v_vat, total = v_total, updated_at = now()
+    SET subtotal = v_subtotal,
+        service_charge = 0.00,
+        vat = v_vat,
+        total = v_total,
+        updated_at = now()
     WHERE id = p_bill_id;
 
-    RETURN jsonb_build_object('ok', true, 'subtotal', v_subtotal, 'total', v_total);
+    RETURN jsonb_build_object('ok', true, 'subtotal', v_subtotal, 'vat', v_vat, 'total', v_total);
 END;
 $$;
 

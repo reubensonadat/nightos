@@ -263,11 +263,6 @@ export function ShiftReportScreen({ venueId, isModal = false, onClose }: Props) 
         [paidBills],
     );
 
-    const totalServiceCharge = useMemo(
-        () => paidBills.reduce((sum, b) => sum + Number(b.service_charge || 0), 0),
-        [paidBills],
-    );
-
     const totalPlatformFees = useMemo(
         () => successfulPayments.reduce((sum, p) => sum + Number(p.platform_fee || 0), 0),
         [successfulPayments],
@@ -458,7 +453,7 @@ export function ShiftReportScreen({ venueId, isModal = false, onClose }: Props) 
         // Discounts / bill differences (subtotal vs final total adjusted)
         let discSum = 0;
         for (const b of paidBills) {
-            const expectedSum = Number(b.subtotal || 0) + Number(b.service_charge || 0) + Number(b.vat || 0);
+            const expectedSum = Number(b.subtotal || 0) + Number(b.vat || 0);
             const actualTotal = Number(b.total || 0);
             if (expectedSum > actualTotal) {
                 discSum += expectedSum - actualTotal;
@@ -799,21 +794,17 @@ export function ShiftReportScreen({ venueId, isModal = false, onClose }: Props) 
                             </div>
 
                             {/* Secondary Metrics Row */}
-                            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
+                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 md:gap-4">
                                 <div className="rounded-2xl bg-white/70 p-3.5 ring-1 ring-licorice/5">
                                     <p className="text-[10px] font-bold uppercase tracking-wider text-feldgrau">Net Subtotal</p>
                                     <p className="text-sm font-bold text-licorice mt-0.5">{formatGHS(totalSubtotal)}</p>
                                 </div>
                                 <div className="rounded-2xl bg-white/70 p-3.5 ring-1 ring-licorice/5">
-                                    <p className="text-[10px] font-bold uppercase tracking-wider text-feldgrau">Service Charge Collected</p>
-                                    <p className="text-sm font-bold text-licorice mt-0.5">{formatGHS(totalServiceCharge)}</p>
-                                </div>
-                                <div className="rounded-2xl bg-white/70 p-3.5 ring-1 ring-licorice/5">
-                                    <p className="text-[10px] font-bold uppercase tracking-wider text-feldgrau">VAT Collected (15%)</p>
+                                    <p className="text-[10px] font-bold uppercase tracking-wider text-feldgrau">VAT Collected</p>
                                     <p className="text-sm font-bold text-licorice mt-0.5">{formatGHS(totalVat)}</p>
                                 </div>
                                 <div className="rounded-2xl bg-white/70 p-3.5 ring-1 ring-licorice/5">
-                                    <p className="text-[10px] font-bold uppercase tracking-wider text-feldgrau">Platform Fee (NightOS)</p>
+                                    <p className="text-[10px] font-bold uppercase tracking-wider text-feldgrau">Platform Fee (Bysen)</p>
                                     <p className="text-sm font-bold text-khaki mt-0.5">{formatGHS(totalPlatformFees)}</p>
                                 </div>
                             </div>

@@ -154,14 +154,13 @@ export function CheckoutScreen({ total, billId, venueId, sessionToken, onBack, o
     const isPrepay = venue?.payment_model === 'PREPAY' || bill?.payment_model === 'PREPAY';
 
     // Reconciled bill math: convenience fee is incorporated into displayed subtotal so Subtotal + VAT = Total
-    const { subtotal, serviceCharge, vat, billTotal, payAmount, totalPaid } = useMemo(() => {
+    const { subtotal, vat, billTotal, payAmount, totalPaid } = useMemo(() => {
         if (bill) {
             const fee = Number((bill as { convenience_fee?: number })?.convenience_fee || 0);
             const remainingAmount = Math.max(0, Math.round((bill.total - bill.amount_paid) * 100) / 100);
             const displayedSubtotal = Math.round(((bill.subtotal || 0) + fee) * 100) / 100;
             return {
                 subtotal: displayedSubtotal,
-                serviceCharge: bill.service_charge || 0,
                 vat: bill.vat || 0,
                 billTotal: bill.total,
                 payAmount: remainingAmount,
@@ -169,16 +168,27 @@ export function CheckoutScreen({ total, billId, venueId, sessionToken, onBack, o
             };
         }
         // Fallback while the bill loads
-        const sub = total / 1.225;
+        const vatRate = venue?.vat_pct ?? 12.5;
+        const isTaxIncl = venue?.tax_inclusive ?? true;
+        let sub = total;
+        let computedVat = 0;
+        if (vatRate > 0) {
+            if (isTaxIncl) {
+                sub = total / (1 + vatRate / 100);
+                computedVat = total - sub;
+            } else {
+                sub = total;
+                computedVat = (total * vatRate) / 100;
+            }
+        }
         return {
             subtotal: Math.round(sub * 100) / 100,
-            serviceCharge: Math.round(sub * 0.1 * 100) / 100,
-            vat: Math.round(sub * 0.125 * 100) / 100,
-            billTotal: total,
+            vat: Math.round(computedVat * 100) / 100,
+            billTotal: isTaxIncl ? total : Math.round((sub + computedVat) * 100) / 100,
             payAmount: total,
             totalPaid: total,
         };
-    }, [bill, total]);
+    }, [bill, total, venue]);
 
     // Cash never charges the customer directly — a waiter confirms the payment on their
     // own device. The customer-side CTA is a request for the waiter.
@@ -412,16 +422,6 @@ export function CheckoutScreen({ total, billId, venueId, sessionToken, onBack, o
                                 {formatGHS(subtotal)}
                             </span>
                         </div>
-                        {serviceCharge > 0 && (
-                            <div className="flex items-center justify-between text-[12px]">
-                                <span className="tracking-tight text-feldgrau">
-                                    Service Charge <span className="text-feldgrau/60">({venue?.service_charge_pct ?? 10}%)</span>
-                                </span>
-                                <span className="font-mono font-bold tabular-nums text-licorice">
-                                    {formatGHS(serviceCharge)}
-                                </span>
-                            </div>
-                        )}
                         {vat > 0 && (
                             <div className="flex items-center justify-between text-[12px]">
                                 <span className="tracking-tight text-feldgrau">

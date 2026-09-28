@@ -18,7 +18,9 @@ SET search_path = public AS $$
             WHEN p_amount <= 100  THEN 2.00
             WHEN p_amount <= 150  THEN 3.00
             WHEN p_amount <= 200  THEN 4.00
-            ELSE 5.00
+            WHEN p_amount <= 500  THEN 7.00
+            WHEN p_amount <= 700  THEN 12.00
+            ELSE 15.00
         END,
         GREATEST(p_amount, 0)
     )::numeric(10,2);
