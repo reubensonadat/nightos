@@ -5,6 +5,7 @@ import {
     MagnifyingGlassIcon,
     PaperAirplaneIcon,
     StarIcon,
+    UserGroupIcon,
     XMarkIcon,
 } from "@heroicons/react/24/outline";
 import toast from "react-hot-toast";
@@ -329,12 +330,22 @@ export function CrmScreen({ venueId }: { venueId?: string } = {}) {
                             ))}
                         </div>
 
-                        {filtered.length === 0 && (
+                        {customers.length === 0 ? (
+                            <div className="flex flex-col items-center justify-center px-6 py-16 text-center">
+                                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-isabelline text-feldgrau">
+                                    <UserGroupIcon className="h-6 w-6 text-feldgrau" strokeWidth={1.5} />
+                                </div>
+                                <h4 className="mt-4 text-[14px] font-bold tracking-tight text-licorice">You have no customer data yet</h4>
+                                <p className="mt-1 max-w-sm text-xs text-feldgrau">
+                                    Guest profiles will automatically build here as customers open tabs, book tables, or pay via mobile money.
+                                </p>
+                            </div>
+                        ) : filtered.length === 0 ? (
                             <div className="flex flex-col items-center justify-center px-6 py-12 text-center">
                                 <span className="h-1.5 w-1.5 rounded-full bg-licorice/20" />
                                 <p className="mt-3 text-[12px] font-bold tracking-tight text-licorice">No customers match your filters</p>
                             </div>
-                        )}
+                        ) : null}
 
                         <PaginationBar
                             page={page + 1}
@@ -462,15 +473,14 @@ function CustomerDetailDrawer({ customer, onClose, onToggleVip }: {
                                 type="button"
                                 onClick={() => {
                                     const numbers = [customer.phone!.replace(/[^\d+]/g, "")];
-                                    supabase
-                                        .functions.invoke("mnotify-sms", {
-                                            body: {
-                                                action: "broadcast",
-                                                recipients: numbers,
-                                                message: "Hi from Bysen! A special offer is waiting for you at the venue. Reply STOP to opt out.",
-                                            },
+                                    db.sendMarketingSms({
+                                        recipients: numbers,
+                                        message: "Hi from Bysen! A special offer is waiting for you at the venue. Reply STOP to opt out.",
+                                    })
+                                        .then(({ error }) => {
+                                            if (error) toast.error("SMS failed — is the edge function deployed?");
+                                            else toast.success("SMS sent.");
                                         })
-                                        .then(() => toast.success("SMS sent."))
                                         .catch(() => toast.error("SMS failed — is the edge function deployed?"));
                                 }}
                                 className="inline-flex items-center justify-center gap-1 rounded-full bg-isabelline px-3 py-2 text-xs font-bold tracking-tight text-licorice ring-1 ring-licorice/8 active:scale-95"
@@ -542,8 +552,9 @@ function CampaignModal({ venueId, vipCount, totalCount, onClose }: {
                 return;
             }
 
-            const res = await supabase.functions.invoke("mnotify-sms", {
-                body: { action: "broadcast", recipients: phones, message },
+            const res = await db.sendMarketingSms({
+                recipients: phones,
+                message,
             });
             if (res.error) throw res.error;
             setSentCount(phones.length);

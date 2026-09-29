@@ -24,21 +24,36 @@ export function expectedBillAmountPesewas(bill: BillForVerification): number {
   return Math.round(Math.max(remaining, 0) * 100)
 }
 
-// Platform fee schedule — MUST mirror public.platform_fee_for() in the
-// database (supabase/03-fee-guard.sql). Flat tiers, hard ₵15 cap, and the
-// fee can never exceed the bill amount (sub-₵1 protection).
-// Financial calculation lives server-side only (PRD §4) — edge functions
-// use this; the browser never computes fees.
-export function platformFeeFor(amountGhs: number): number {
+// 10% Platform Fee & Revenue Split Model:
+// - Total Fee / Service Cut: 10% of transaction amount
+// - Paystack Gateway Processing: 2% of transaction amount
+// - NightOS / Bysen Net Revenue: 8% of transaction amount
+// - Venue / Merchant Net Settlement: 90% of transaction amount
+export type FeeSplit = {
+  gross: number
+  totalFee: number        // 10%
+  paystackFee: number     // 2%
+  netPlatformFee: number  // 8%
+  venueSettlement: number // 90%
+}
+
+export function computeFeeSplit(
+  amountGhs: number,
+  feePct: number = 10,
+  paystackPct: number = 2
+): FeeSplit {
+  const gross = Math.max(amountGhs, 0)
+  const totalFee = Math.round(gross * (feePct / 100) * 100) / 100
+  const paystackFee = Math.round(gross * (paystackPct / 100) * 100) / 100
+  const netPlatformFee = Math.round((totalFee - paystackFee) * 100) / 100
+  const venueSettlement = Math.round((gross - totalFee) * 100) / 100
+
+  return { gross, totalFee, paystackFee, netPlatformFee, venueSettlement }
+}
+
+export function platformFeeFor(amountGhs: number, feePct: number = 10): number {
   const amount = Math.max(amountGhs, 0)
-  const tier =
-    amount <= 50 ? 1.0 :
-    amount <= 100 ? 2.0 :
-    amount <= 150 ? 3.0 :
-    amount <= 200 ? 4.0 :
-    amount <= 500 ? 7.0 :
-    amount <= 700 ? 12.0 : 15.0
-  return Math.round(Math.min(tier, amount) * 100) / 100
+  return Math.round(amount * (feePct / 100) * 100) / 100
 }
 
 // Paystack's `channel` values → our `payments.method` enum

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
     ArrowRightOnRectangleIcon,
+    CheckCircleIcon,
     CheckIcon,
     ClockIcon,
     ExclamationTriangleIcon,
@@ -8,14 +9,14 @@ import {
     PencilSquareIcon,
     PhoneIcon,
     PlusIcon,
-     
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    UserGroupIcon,
     ShieldCheckIcon,
     XMarkIcon,
 } from "@heroicons/react/24/outline";
 import toast from "react-hot-toast";
 import { db } from "../../lib/api";
 import { useVenue } from "../../hooks/useVenue";
+import { useAuth } from "../../context/AuthContext";
 import { normalizeGhanaPhone } from "../../lib/utils";
 import clsx from "clsx";
 import { ConfirmModal } from "../../components/ConfirmModal";
@@ -62,27 +63,63 @@ function roleLabel(role: string): string {
 
 export function StaffManagerScreen({ venueId }: { venueId?: string } = {}) {
     const { venue } = useVenue(venueId);
+    const { user, profile, role: userRole } = useAuth();
     const [staff, setStaff] = useState<StaffRow[]>([]);
     const [shiftStaffIds, setShiftStaffIds] = useState<Set<string>>(new Set());
     const [loading, setLoading] = useState(true);
     const [search, setSearch] = useState("");
     const [roleFilter, setRoleFilter] = useState<string>("all");
     const [creating, setCreating] = useState(false);
+    const [enrollingSelf, setEnrollingSelf] = useState(false);
     const [selectedStaff, setSelectedStaff] = useState<StaffRow | null>(null);
     const [editingStaff, setEditingStaff] = useState<StaffRow | null>(null);
     const [coverage, setCoverage] = useState<ShiftCoverageRow[] | null>(null);
     const [deactivateConfirmStaff, setDeactivateConfirmStaff] = useState<StaffRow | null>(null);
     const [endShiftConfirmStaff, setEndShiftConfirmStaff] = useState<ShiftCoverageRow | null>(null);
 
+    const managerPhone = profile?.phone_number || user?.phone || (user?.user_metadata?.phone as string) || (user?.user_metadata?.phone_number as string) || venue.phone || null;
+    const managerName = profile?.name || (user?.user_metadata?.name as string) || user?.email?.split('@')[0] || (venue.name ? `${venue.name} Manager` : 'Manager');
+    const isOwnerOrManager = userRole === 'owner' || userRole === 'manager' || Boolean(user?.id && venue.owner_id === user.id);
+
+    const isCurrentManagerEnrolled = useMemo(() => {
+        if (!managerPhone) return true;
+        const normTarget = managerPhone.replace(/\D/g, '').slice(-9);
+        return staff.some((s) => s.phone.replace(/\D/g, '').slice(-9) === normTarget);
+    }, [staff, managerPhone]);
+
     const load = useCallback(async () => {
         // Wait until we have a real venue UUID (not the default placeholder).
         if (!venue.id || venue.id === '00000000-0000-0000-0000-000000000000') return;
         setLoading(true);
-        const [{ data: rows }, { data: shifts }, { data: coverageRows }] = await Promise.all([
+        let [{ data: rows }, { data: shifts }, { data: coverageRows }] = await Promise.all([
             db.staffList(venue.id),
             db.activeShiftsByVenue(venue.id),
             db.shiftCoverage(venue.id),
         ]);
+
+        // Auto-enroll manager if venue currently has 0 staff and user is manager/owner
+        if ((!rows || rows.length === 0) && managerPhone && isOwnerOrManager) {
+            try {
+                const { data: enrolled } = await db.createStaff({
+                    venueId: venue.id,
+                    name: managerName,
+                    phone: managerPhone,
+                    role: 'manager',
+                    email: user?.email || null,
+                    hourlyRate: 0,
+                    maxTables: 10,
+                });
+                if (enrolled?.ok) {
+                    const { data: refreshedRows } = await db.staffList(venue.id);
+                    if (refreshedRows && refreshedRows.length > 0) {
+                        rows = refreshedRows;
+                    }
+                }
+            } catch (err) {
+                console.warn('[StaffManager] Auto-enrolling manager error:', err);
+            }
+        }
+
         const activeCoverageList = (coverageRows as ShiftCoverageRow[] | null)?.filter((c) => c.shift_id) ?? [];
         const activeIds = new Set<string>([
             ...(shifts ?? []).map((sh) => sh.staff_id),
@@ -92,7 +129,33 @@ export function StaffManagerScreen({ venueId }: { venueId?: string } = {}) {
         setShiftStaffIds(activeIds);
         setCoverage((coverageRows as ShiftCoverageRow[] | null) ?? null);
         setLoading(false);
-    }, [venue.id]);
+    }, [venue.id, venue.name, managerPhone, managerName, isOwnerOrManager, user?.email]);
+
+    const enrollMyself = async () => {
+        if (!managerPhone || enrollingSelf) return;
+        setEnrollingSelf(true);
+        try {
+            const { data, error } = await db.createStaff({
+                venueId: venue.id,
+                name: managerName,
+                phone: managerPhone,
+                role: 'manager',
+                email: user?.email || null,
+                hourlyRate: 0,
+                maxTables: 10,
+            });
+            if (error || !data?.ok) {
+                toast.error("Could not enroll manager.");
+            } else {
+                toast.success(`Enrolled ${managerName} as manager.`);
+                await load();
+            }
+        } catch {
+            toast.error("Could not enroll manager.");
+        } finally {
+            setEnrollingSelf(false);
+        }
+    };
 
     useEffect(() => {
         const init = async () => {
@@ -125,23 +188,7 @@ export function StaffManagerScreen({ venueId }: { venueId?: string } = {}) {
         [staff, roleFilter, search],
     );
 
-    const tableData = filtered.length > 0 ? filtered : [
-        {
-            id: "placeholder-1", staff_id: "p1", venue_id: venue.id, created_at: new Date().toISOString(), updated_at: new Date().toISOString(),
-            name: "Kojo Mensah", role: "waiter" as const, phone: "+233 54 123 4567", email: "kojo@example.com",
-            pin_hash: null, is_active: true
-        },
-        {
-            id: "placeholder-2", staff_id: "p2", venue_id: venue.id, created_at: new Date().toISOString(), updated_at: new Date().toISOString(),
-            name: "Ama Serwaa", role: "manager" as const, phone: "+233 55 987 6543", email: "ama@example.com",
-            pin_hash: null, is_active: true
-        },
-        {
-            id: "placeholder-3", staff_id: "p3", venue_id: venue.id, created_at: new Date().toISOString(), updated_at: new Date().toISOString(),
-            name: "Kwame Despite", role: "bartender" as const, phone: "+233 24 555 7777", email: "kwame@example.com",
-            pin_hash: null, is_active: false
-        }
-    ];
+    const tableData = filtered;
 
     const toggleActive = async (id: string, active: boolean) => {
         const prev = staff;
@@ -214,7 +261,7 @@ export function StaffManagerScreen({ venueId }: { venueId?: string } = {}) {
         payModel: "hourly" | "salary";
         salaryAmount: number | null;
         maxTables: number;
-    }) => {
+    }): Promise<{ ok: boolean; message?: string }> => {
         const { data, error } = await db.createStaff({
             venueId: venue.id,
             name: input.name,
@@ -227,19 +274,23 @@ export function StaffManagerScreen({ venueId }: { venueId?: string } = {}) {
             maxTables: input.maxTables,
         });
         if (error || !data?.ok) {
-            const reason =
-                data?.error === "phone_exists"
-                    ? "A staff member with this phone already exists."
-                    : data?.error === "not_owner"
-                      ? "Your account isn't linked to this venue as owner."
-                      : "Could not add staff.";
+            let reason = data?.message || "Could not add staff.";
+            if (data?.error === "other_venue" || data?.reason === "other_venue") {
+                reason = `This phone is already registered at "${data.venue_name || 'another venue'}". A staff member cannot work across multiple venues simultaneously.`;
+            } else if (data?.error === "same_venue" || data?.error === "phone_exists") {
+                reason = `This phone number is already enrolled on your roster${data.staff_name ? ` (${data.staff_name})` : ''}.`;
+            } else if (data?.error === "venue_owner") {
+                reason = `This phone number is registered as the owner of "${data.venue_name || 'another venue'}".`;
+            } else if (data?.error === "not_owner") {
+                reason = "Your account isn't linked to this venue as owner.";
+            }
             toast.error(reason);
-            return false;
+            return { ok: false, message: reason };
         }
         toast.success(`${input.name} added — they'll sign in with their phone.`);
         setCreating(false);
         await load();
-        return true;
+        return { ok: true };
     };
 
     const totalCount = staff.length;
@@ -254,6 +305,26 @@ export function StaffManagerScreen({ venueId }: { venueId?: string } = {}) {
 
     return (
         <div className="mx-auto w-full max-w-7xl space-y-5 sm:space-y-6">
+            {/* ── Notice: Manager Not on Roster ── */}
+            {!isCurrentManagerEnrolled && managerPhone && isOwnerOrManager && !loading && (
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-2xl bg-amber-500/10 border border-amber-500/25 p-3.5 sm:p-4 text-xs font-medium text-amber-900 shadow-sm">
+                    <div className="flex items-center gap-2.5">
+                        <span className="h-2.5 w-2.5 rounded-full bg-amber-500 shrink-0 animate-pulse" />
+                        <span>
+                            You are signed in as Manager (<strong>{managerName}</strong> · {managerPhone}), but not yet listed on this venue's staff roster.
+                        </span>
+                    </div>
+                    <button
+                        type="button"
+                        onClick={enrollMyself}
+                        disabled={enrollingSelf}
+                        className="inline-flex items-center justify-center rounded-full bg-licorice px-4 py-1.5 text-xs font-bold text-isabelline hover:bg-licorice/90 shadow-sm shrink-0 transition-all disabled:opacity-50"
+                    >
+                        {enrollingSelf ? "Enrolling..." : "Enroll Myself as Manager"}
+                    </button>
+                </div>
+            )}
+
             {/* ── Stats row (responsive) ── */}
             <div className="grid grid-cols-3 gap-2.5 sm:gap-4">
                 <div className="rounded-2xl sm:rounded-[1.5rem] bg-white p-3.5 sm:p-4 shadow-sm ring-1 ring-isabelline flex flex-col justify-between">
@@ -440,10 +511,34 @@ export function StaffManagerScreen({ venueId }: { venueId?: string } = {}) {
                     </div>
                 ) : tableData.length === 0 ? (
                     <div className="flex flex-col items-center justify-center px-6 py-16 text-center">
-                        <h3 className="text-[14px] font-bold tracking-tight text-licorice">No staff found</h3>
-                        <p className="mt-1 text-[12px] tracking-tight text-feldgrau">
-                            Add your first staff member — they'll sign in with their phone.
+                        <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-isabelline text-licorice">
+                            <UserGroupIcon className="h-7 w-7 stroke-[1.5]" />
+                        </div>
+                        <h3 className="text-base font-bold tracking-tight text-licorice">No staff members enrolled yet</h3>
+                        <p className="mt-1.5 max-w-sm text-xs leading-relaxed text-feldgrau">
+                            Add team members to assign roles, track live shifts, and grant waiter or bartender access.
                         </p>
+                        <div className="mt-5 flex flex-wrap items-center justify-center gap-3">
+                            {managerPhone && !isCurrentManagerEnrolled && (
+                                <button
+                                    type="button"
+                                    onClick={enrollMyself}
+                                    disabled={enrollingSelf}
+                                    className="inline-flex items-center gap-1.5 rounded-full bg-licorice px-4 py-2 text-xs font-bold text-isabelline shadow-sm hover:bg-licorice/90 transition-all"
+                                >
+                                    <PlusIcon className="h-4 w-4" />
+                                    {enrollingSelf ? "Enrolling..." : "Enroll Myself as Manager"}
+                                </button>
+                            )}
+                            <button
+                                type="button"
+                                onClick={() => setCreating(true)}
+                                className="inline-flex items-center gap-1.5 rounded-full border border-licorice/20 bg-white px-4 py-2 text-xs font-bold text-licorice shadow-sm hover:bg-isabelline/50 transition-all"
+                            >
+                                <PlusIcon className="h-4 w-4" />
+                                Add New Staff Member
+                            </button>
+                        </div>
                     </div>
                 ) : (
                     <>
@@ -598,7 +693,14 @@ export function StaffManagerScreen({ venueId }: { venueId?: string } = {}) {
             )}
 
             {/* ── Add Staff Modal ── */}
-            {creating && <AddStaffModal onAdd={addStaff} onClose={() => setCreating(false)} />}
+            {creating && (
+                <AddStaffModal
+                    venueId={venue.id}
+                    venueName={venue.name}
+                    onAdd={addStaff}
+                    onClose={() => setCreating(false)}
+                />
+            )}
 
             {/* ── Edit Staff Modal ── */}
             {editingStaff && (
@@ -868,8 +970,24 @@ function StaffDetailDrawer({
    ADD STAFF MODAL (writes to the staff table via the owner RPC)
    ═══════════════════════════════════════════════════════════════════════════ */
 
-function AddStaffModal({ onAdd, onClose }: {
-    onAdd: (input: { name: string; phone: string; role: string; email?: string; hourlyRate: number; payModel: "hourly" | "salary"; salaryAmount: number | null; maxTables: number }) => Promise<boolean>;
+function AddStaffModal({
+    venueId,
+    venueName,
+    onAdd,
+    onClose,
+}: {
+    venueId: string;
+    venueName: string;
+    onAdd: (input: {
+        name: string;
+        phone: string;
+        role: string;
+        email?: string;
+        hourlyRate: number;
+        payModel: "hourly" | "salary";
+        salaryAmount: number | null;
+        maxTables: number;
+    }) => Promise<{ ok: boolean; message?: string } | boolean>;
     onClose: () => void;
 }) {
     const [name, setName] = useState("");
@@ -883,7 +1001,58 @@ function AddStaffModal({ onAdd, onClose }: {
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
-    const phoneValid = !phone.trim() || !!normalizeGhanaPhone(phone);
+    // Real-time phone check state
+    const [phoneChecking, setPhoneChecking] = useState(false);
+    const [phoneStatus, setPhoneStatus] = useState<{
+        checkedPhone: string;
+        available: boolean;
+        reason?: string;
+        venueName?: string;
+        staffName?: string;
+        message?: string;
+    } | null>(null);
+
+    const normalizedPhone = useMemo(() => normalizeGhanaPhone(phone), [phone]);
+    const phoneValid = !phone.trim() || !!normalizedPhone;
+
+    // Debounced real-time cross-venue phone verification
+    useEffect(() => {
+        if (!normalizedPhone || normalizedPhone.length < 9) {
+            setPhoneStatus(null);
+            setPhoneChecking(false);
+            return;
+        }
+
+        let cancelled = false;
+        setPhoneChecking(true);
+
+        const timer = setTimeout(async () => {
+            try {
+                const { data } = await db.checkStaffPhoneAvailability(normalizedPhone, venueId);
+                if (!cancelled && data) {
+                    setPhoneStatus({
+                        checkedPhone: normalizedPhone,
+                        available: data.available,
+                        reason: data.reason,
+                        venueName: data.venue_name,
+                        staffName: data.staff_name,
+                        message: data.message,
+                    });
+                }
+            } catch (err) {
+                console.warn('[AddStaffModal] Phone check error:', err);
+            } finally {
+                if (!cancelled) setPhoneChecking(false);
+            }
+        }, 300);
+
+        return () => {
+            cancelled = true;
+            clearTimeout(timer);
+        };
+    }, [normalizedPhone, venueId]);
+
+    const isConflict = phoneStatus && phoneStatus.checkedPhone === normalizedPhone && !phoneStatus.available;
 
     const handleAdd = async () => {
         if (!name.trim()) return;
@@ -892,9 +1061,15 @@ function AddStaffModal({ onAdd, onClose }: {
             setError("Enter a valid Ghana phone number, e.g. 024 000 0000.");
             return;
         }
+
+        if (isConflict) {
+            setError(phoneStatus.message || "This phone number cannot be used.");
+            return;
+        }
+
         setError(null);
         setSaving(true);
-        const ok = await onAdd({
+        const res = await onAdd({
             name: name.trim(),
             phone: normalized,
             role,
@@ -905,7 +1080,12 @@ function AddStaffModal({ onAdd, onClose }: {
             maxTables,
         });
         setSaving(false);
-        if (!ok) setError("Could not add this staff member. They may already exist.");
+
+        if (typeof res === "object" && !res.ok) {
+            setError(res.message || "Could not add this staff member.");
+        } else if (res === false) {
+            setError("Could not add this staff member. They may already exist.");
+        }
     };
 
     return (
@@ -922,18 +1102,69 @@ function AddStaffModal({ onAdd, onClose }: {
                     </button>
                 </div>
 
-                <div className="space-y-3 px-5 py-4">
+                <div className="space-y-3 px-5 py-4 max-h-[80vh] overflow-y-auto">
                     <div>
                         <label className="text-xs font-bold uppercase text-feldgrau">Full Name</label>
                         <input type="text" autoFocus value={name} onChange={(e) => setName(e.target.value)} placeholder="Kojo Mensah"
                             className="mt-1 w-full rounded-lg bg-isabelline px-3 py-2 text-[12px] text-licorice placeholder:text-feldgrau/50 ring-1 ring-licorice/8 focus:outline-none focus:ring-2 focus:ring-licorice/20" />
                     </div>
                     <div>
-                        <label className="text-xs font-bold uppercase text-feldgrau">Phone *</label>
+                        <div className="flex items-center justify-between">
+                            <label className="text-xs font-bold uppercase text-feldgrau">Phone *</label>
+                            {phoneChecking && (
+                                <span className="inline-flex items-center gap-1 text-[11px] font-medium text-feldgrau">
+                                    <span className="h-2 w-2 animate-spin rounded-full border border-licorice/20 border-t-licorice" />
+                                    Verifying availability…
+                                </span>
+                            )}
+                        </div>
                         <input type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="024 000 0000"
-                            className="mt-1 w-full rounded-lg bg-isabelline px-3 py-2 text-[12px] text-licorice placeholder:text-feldgrau/50 ring-1 ring-licorice/8 focus:outline-none focus:ring-2 focus:ring-licorice/20" />
+                            className={clsx(
+                                "mt-1 w-full rounded-lg bg-isabelline px-3 py-2 text-[12px] text-licorice placeholder:text-feldgrau/50 ring-1 transition-all focus:outline-none focus:ring-2",
+                                isConflict
+                                    ? "ring-red-400 bg-red-50/30 focus:ring-red-500/30"
+                                    : phoneStatus?.available
+                                      ? "ring-emerald-400 bg-emerald-50/20 focus:ring-emerald-500/30"
+                                      : "ring-licorice/8 focus:ring-licorice/20"
+                            )} />
+
                         {!phoneValid && (
                             <p className="mt-1 text-xs font-semibold text-red-600">Enter a valid Ghana number (024…, 233… or +233…).</p>
+                        )}
+
+                        {/* Real-time feedback badges */}
+                        {phoneValid && phoneStatus && phoneStatus.checkedPhone === normalizedPhone && (
+                            <div className="mt-2">
+                                {phoneStatus.available ? (
+                                    <div className="flex items-center gap-1.5 rounded-lg bg-emerald-50 px-2.5 py-1.5 text-[11px] font-semibold text-emerald-800 ring-1 ring-emerald-200">
+                                        <CheckCircleIcon className="h-4 w-4 shrink-0 text-emerald-600" />
+                                        <span>Phone number is available for enrollment.</span>
+                                    </div>
+                                ) : phoneStatus.reason === "other_venue" ? (
+                                    <div className="rounded-lg bg-red-50 p-2.5 text-[11px] text-red-800 ring-1 ring-red-200 space-y-1">
+                                        <div className="flex items-center gap-1.5 font-bold text-red-900">
+                                            <ExclamationTriangleIcon className="h-4 w-4 shrink-0 text-red-600" />
+                                            <span>Cross-Venue Conflict</span>
+                                        </div>
+                                        <p className="leading-relaxed">
+                                            This phone is already registered at <strong className="font-semibold text-red-950">&ldquo;{phoneStatus.venueName}&rdquo;</strong>. A staff member cannot work across multiple venues simultaneously.
+                                        </p>
+                                        <p className="text-[10px] text-red-700/90 pt-0.5">
+                                            To reassign this staff member, their profile must first be removed or deactivated from &ldquo;{phoneStatus.venueName}&rdquo;.
+                                        </p>
+                                    </div>
+                                ) : phoneStatus.reason === "same_venue" ? (
+                                    <div className="flex items-center gap-1.5 rounded-lg bg-amber-50 px-2.5 py-1.5 text-[11px] font-semibold text-amber-900 ring-1 ring-amber-300">
+                                        <ExclamationTriangleIcon className="h-4 w-4 shrink-0 text-amber-600" />
+                                        <span>Already on your roster: {phoneStatus.staffName || "Team member"} is enrolled at {venueName}.</span>
+                                    </div>
+                                ) : phoneStatus.reason === "venue_owner" ? (
+                                    <div className="flex items-center gap-1.5 rounded-lg bg-red-50 px-2.5 py-1.5 text-[11px] font-semibold text-red-800 ring-1 ring-red-200">
+                                        <ExclamationTriangleIcon className="h-4 w-4 shrink-0 text-red-600" />
+                                        <span>Registered as owner of &ldquo;{phoneStatus.venueName}&rdquo;.</span>
+                                    </div>
+                                ) : null}
+                            </div>
                         )}
                     </div>
                     <div>
@@ -1010,7 +1241,7 @@ function AddStaffModal({ onAdd, onClose }: {
                     <button
                         type="button"
                         onClick={handleAdd}
-                        disabled={!name.trim() || !phone.trim() || !phoneValid || saving}
+                        disabled={!name.trim() || !phone.trim() || !phoneValid || saving || phoneChecking || Boolean(isConflict)}
                         className="inline-flex items-center gap-1 rounded-full bg-licorice px-4 py-2 text-xs font-bold tracking-tight text-isabelline shadow-sm disabled:opacity-40"
                     >
                         {saving ? "Adding…" : (

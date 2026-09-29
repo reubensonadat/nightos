@@ -48,7 +48,6 @@ export function BrandSettingsScreen({ venueId }: Props) {
   const [vatPct, setVatPct] = useState<number>(12.5);
   const [taxInclusive, setTaxInclusive] = useState(false);
   const [paymentModel, setPaymentModel] = useState<"PREPAY" | "POSTPAY">("POSTPAY");
-  const [fulfillmentMode, setFulfillmentMode] = useState<"bar" | "kitchen">("bar");
 
   // Brand colors
   const [primaryColor, setPrimaryColor] = useState("#1C130D");
@@ -69,8 +68,6 @@ export function BrandSettingsScreen({ venueId }: Props) {
 
     setTaxInclusive(data.tax_inclusive ?? false);
     setPaymentModel(data.payment_model ?? "POSTPAY");
-    const savedMode = (data.fulfillment_mode as "bar" | "kitchen") || (typeof window !== "undefined" ? localStorage.getItem(`bysen_venue_fulfillment_${data.id}`) as "bar" | "kitchen" : null) || "bar";
-    setFulfillmentMode(savedMode);
 
     setPrimaryColor(data.brand_primary || "#1C130D");
     setAccentColor(data.brand_accent || "#C5A880");
@@ -107,10 +104,6 @@ export function BrandSettingsScreen({ venueId }: Props) {
     try {
       const computedVat = vatEnabled ? Number(vatPct) || 0 : 0;
 
-      if (typeof window !== "undefined") {
-        localStorage.setItem(`bysen_venue_fulfillment_${effectiveVenueId}`, fulfillmentMode);
-      }
-
       const updates: Partial<DbVenue> = {
         name: name.trim(),
         description: description.trim() || null,
@@ -124,7 +117,6 @@ export function BrandSettingsScreen({ venueId }: Props) {
         payment_model: paymentModel,
         brand_primary: primaryColor,
         brand_accent: accentColor,
-        fulfillment_mode: fulfillmentMode,
       };
 
       const { data, error } = await db.updateVenue(effectiveVenueId, updates);
@@ -478,46 +470,7 @@ export function BrandSettingsScreen({ venueId }: Props) {
               </div>
             </div>
 
-            {/* 4. Fulfillment Station Display */}
-            <div className="py-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-              <div>
-                <div className="flex items-center gap-2">
-                  <h3 className="text-sm font-bold text-licorice">Fulfillment Station Screen</h3>
-                  <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold text-amber-800 uppercase tracking-wide">
-                    {fulfillmentMode === "bar" ? "Nightclub" : "Dining"}
-                  </span>
-                </div>
-                <p className="mt-0.5 text-xs text-feldgrau">
-                  Select whether order fulfillment routes through the dedicated Bar Station (drink tickets, bottle stock, poured dispense) or the multi-course Kitchen KDS.
-                </p>
-              </div>
-              <div className="inline-flex shrink-0 rounded-xl bg-isabelline/40 p-1 border border-licorice/10">
-                <button
-                  type="button"
-                  onClick={() => setFulfillmentMode("bar")}
-                  className={`rounded-lg px-3.5 py-1.5 text-xs font-bold transition-all flex items-center gap-1.5 ${
-                    fulfillmentMode === "bar"
-                      ? "bg-licorice text-isabelline shadow-sm"
-                      : "text-feldgrau hover:text-licorice"
-                  }`}
-                >
-                  <span>🍸</span> Bar Station (Nightclubs)
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setFulfillmentMode("kitchen")}
-                  className={`rounded-lg px-3.5 py-1.5 text-xs font-bold transition-all flex items-center gap-1.5 ${
-                    fulfillmentMode === "kitchen"
-                      ? "bg-licorice text-isabelline shadow-sm"
-                      : "text-feldgrau hover:text-licorice"
-                  }`}
-                >
-                  <span>🍳</span> Kitchen KDS (Restaurants)
-                </button>
-              </div>
-            </div>
-
-            {/* 5. Live Guest Receipt Math Preview */}
+            {/* 4. Live Guest Receipt Math Preview */}
             <div className="pt-6 space-y-4">
               <div className="flex items-center justify-between pb-2">
                 <div className="flex items-center gap-2">

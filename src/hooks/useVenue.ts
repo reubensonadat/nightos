@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { db, type DbVenue } from '../lib/api';
 import { useAuth } from '../context/AuthContext';
+import { applyBrandTheme } from '../lib/theme';
 
 export const DEFAULT_VENUE: DbVenue = {
   id: '00000000-0000-0000-0000-000000000000',
@@ -13,7 +14,7 @@ export const DEFAULT_VENUE: DbVenue = {
   phone: '',
   email: '',
   payment_model: 'POSTPAY',
-  service_charge_pct: 0,
+  service_charge_pct: 10,
   vat_pct: 0,
   tax_inclusive: true,
   currency: 'GHS',
@@ -54,6 +55,12 @@ export function useVenue(slugOrId?: string) {
   const [loading, setLoading] = useState<boolean>(!matchesAuth && Boolean(slugOrId));
   const [error, setError] = useState<string | null>(null);
   const [isNotFound, setIsNotFound] = useState<boolean>(false);
+
+  useEffect(() => {
+    if (venue?.brand_primary || venue?.brand_accent) {
+      applyBrandTheme(venue.brand_primary, venue.brand_accent, venue.brand_secondary);
+    }
+  }, [venue.brand_primary, venue.brand_accent, venue.brand_secondary]);
 
   useEffect(() => {
     // If matching active auth venue, update immediately

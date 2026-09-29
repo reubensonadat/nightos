@@ -801,7 +801,7 @@ function App() {
 function AppRoutes() {
   const location = useLocation();
   const [searchParams] = useSearchParams();
-  const { isAuthenticated, isInitializing, role } = useAuth();
+  const { isAuthenticated, isInitializing, role, venue } = useAuth();
 
   const match = location.pathname.match(/^\/v\/([^/]+)/);
   const venueSlug = match ? match[1] : null;
@@ -830,12 +830,26 @@ function AppRoutes() {
   if (isSwitcherRoute) return <AppShell />;
 
   if (isAuthRoute) {
-    if (isAuthenticated && !isInitializing) {
+    if (isAuthenticated) {
+      if (isInitializing) {
+        return (
+          <div className="flex min-h-svh items-center justify-center bg-isabelline font-sans">
+            <div className="h-8 w-8 animate-spin rounded-full border-4 border-licorice/20 border-t-licorice" />
+          </div>
+        );
+      }
       const redirectParam = searchParams.get("redirect") || (location.state as { from?: string } | undefined)?.from;
       if (redirectParam && isAllowedForTarget(role, redirectParam)) {
         return <Navigate to={redirectParam} replace />;
       }
-      return <Navigate to={role ? sectorPath(role) : "/setup"} replace />;
+      const targetRole = role || (venue ? "manager" : null);
+      if (targetRole) {
+        return <Navigate to={sectorPath(targetRole, venueSlug || venue?.slug)} replace />;
+      }
+      if (venue) {
+        return <Navigate to={`/v/${venue.slug}/manager/ops`} replace />;
+      }
+      return <Navigate to="/manager/ops" replace />;
     }
     return <CentralAuthScreen initialMode={strippedPath === "/signup" ? "signup" : "login"} venueSlug={venueSlug} />;
   }

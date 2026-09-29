@@ -1,9 +1,10 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { authDb } from '../lib/db/auth'
+import { db, type DbVenue, type DbStaffSession } from '../lib/api'
 import { cacheClear } from '../lib/cache'
 import { clearMenuCache } from '../screens/waiter/OrderManagementScreen'
-import type { DbVenue, DbStaffSession } from '../lib/api'
+import { applyBrandTheme } from '../lib/theme'
 
 type AuthUser = import('@supabase/supabase-js').User
 type Session = import('@supabase/supabase-js').Session
@@ -95,6 +96,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return null
     }
 
+    // 0. Auto-claim venue ownership if authenticated user's phone matches venue phone
+    try {
+      await supabase.rpc('claim_venue_ownership')
+    } catch {
+      /* non-fatal */
+    }
+
     // 1. Check if user owns venues (support multi-venue switching)
     const { data: vList } = await authDb.venuesByOwner(userId)
     if (vList && vList.length > 0) {
@@ -111,25 +119,56 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         phone_number: userPhone ?? (active.phone || null),
         name: active.name || null,
       })
+      if (active.brand_primary || active.brand_accent) {
+        applyBrandTheme(active.brand_primary, active.brand_accent, active.brand_secondary);
+      }
       return 'owner'
     }
 
     // 2. Check if phone is linked to staff or venue
-    const rawPhone = userPhone?.trim() || null
+    const rawPhone = (
+      userPhone?.trim() ||
+      user?.phone?.trim() ||
+      (user?.user_metadata?.phone as string | undefined)?.trim() ||
+      (user?.user_metadata?.phone_number as string | undefined)?.trim() ||
+      lastPhoneRef.current?.trim() ||
+      null
+    )
+
     if (rawPhone) {
+      // Check if owner by phone first
+      const { data: ownerByPhone } = await authDb.venueByPhone(rawPhone)
+      if (ownerByPhone) {
+        const od = ownerByPhone as Record<string, unknown>
+        const venueObj = od.venue as DbVenue
+        setVenue(venueObj)
+        setVenues([venueObj])
+        setRole('owner')
+        setStaffSession(null)
+        setProfile({
+          id: userId,
+          email: userEmail ?? (venueObj.email || null),
+          phone_number: rawPhone,
+          name: venueObj.name || null,
+        })
+        if (venueObj.brand_primary || venueObj.brand_accent) {
+          applyBrandTheme(venueObj.brand_primary, venueObj.brand_accent, venueObj.brand_secondary);
+        }
+        return 'owner'
+      }
+
+      // Check if staff by phone
       const { data: staffData } = await authDb.venueByStaffPhone(rawPhone)
       if (staffData) {
         const sd = staffData as Record<string, unknown>
-        setVenue(sd.venue as DbVenue)
-        setVenues(sd.venue ? [sd.venue as DbVenue] : [])
+        const v = sd.venue as DbVenue
+        setVenue(v)
+        setVenues(v ? [v] : [])
         setRole(sd.role as string)
 
-        const { data, error } = await supabase
+        const { data } = await supabase
           .rpc('get_staff_profile_by_phone', { p_phone: rawPhone })
           .single()
-        if (error) {
-          console.warn('[AuthContext] get_staff_profile_by_phone failed:', error)
-        }
         const fullStaffData = data as Record<string, unknown>
 
         if (fullStaffData && fullStaffData.venue_id) {
@@ -156,24 +195,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             /* non-fatal */
           }
         }
+        if (v?.brand_primary || v?.brand_accent) {
+          applyBrandTheme(v.brand_primary, v.brand_accent, v.brand_secondary);
+        }
         return sd.role as string
-      }
-
-      // Check if owner by phone
-      const { data: ownerByPhone } = await authDb.venueByPhone(rawPhone)
-      if (ownerByPhone) {
-        const od = ownerByPhone as Record<string, unknown>
-        const venueObj = od.venue as DbVenue
-        setVenue(venueObj)
-        setRole('owner')
-        setStaffSession(null)
-        setProfile({
-          id: userId,
-          email: userEmail ?? (venueObj.email || null),
-          phone_number: rawPhone,
-          name: venueObj.name || null,
-        })
-        return 'owner'
       }
     }
 
@@ -242,6 +267,40 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     }
 
+    // 4. Safe fallback for authenticated users: resolve to active venue instead of bouncing to /setup
+    const savedVenueId = localStorage.getItem('nightos:active_venue_id');
+    if (savedVenueId) {
+      const { data: savedVenue } = await db.venueById(savedVenueId);
+      if (savedVenue) {
+        setVenue(savedVenue);
+        setVenues([savedVenue]);
+        setRole('manager');
+        if (savedVenue.brand_primary || savedVenue.brand_accent) {
+          applyBrandTheme(savedVenue.brand_primary, savedVenue.brand_accent, savedVenue.brand_secondary);
+        }
+        return 'manager';
+      }
+    }
+
+    const { data: activeVenue } = await supabase
+      .from('venues')
+      .select('*')
+      .eq('is_active', true)
+      .order('created_at', { ascending: true })
+      .limit(1)
+      .maybeSingle();
+
+    if (activeVenue) {
+      const v = activeVenue as DbVenue;
+      setVenue(v);
+      setVenues([v]);
+      setRole('manager');
+      if (v.brand_primary || v.brand_accent) {
+        applyBrandTheme(v.brand_primary, v.brand_accent, v.brand_secondary);
+      }
+      return 'manager';
+    }
+
     setVenue(null)
     setVenues([])
     setRole(null)
@@ -277,18 +336,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       if (!mounted) return
 
-      setUser(sess?.user ?? null)
-      setSession(sess ?? null)
-
       if (event === 'SIGNED_OUT' || !sess?.user) {
         currentUserIdRef.current = null
         lastPhoneRef.current = null
+        setUser(null)
+        setSession(null)
         setProfile(null)
         setVenue(null)
         setRole(null)
         setStaffSession(null)
       } else if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
         await loadUserData(sess.user.id, sess.user.phone, sess.user.email)
+        setUser(sess.user)
+        setSession(sess)
+      } else {
+        setUser(sess?.user ?? null)
+        setSession(sess ?? null)
       }
     })
 
@@ -305,9 +368,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (error) return { error, role: null }
     if (data.user) {
       currentUserIdRef.current = data.user.id
+      const resolved = await loadUserData(data.user.id, data.user.phone, email)
       setUser(data.user)
       setSession(data.session)
-      const resolved = await loadUserData(data.user.id, data.user.phone, email)
       return { error: null, role: resolved }
     }
     return { error: null, role: null }
@@ -348,9 +411,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (data.user) {
       currentUserIdRef.current = data.user.id
       lastPhoneRef.current = phone
+      const resolved = await loadUserData(data.user.id, phone, data.user.email)
       setUser(data.user)
       setSession(data.session)
-      const resolved = await loadUserData(data.user.id, phone, data.user.email)
       return { error: null, role: resolved }
     }
     return { error: null, role: null }
@@ -520,19 +583,39 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [])
 
   const refreshVenue = async () => {
-    if (!user?.id) return
-    const { data: vList } = await authDb.venuesByOwner(user.id)
-    if (vList && vList.length > 0) {
-      const ownerVenues = vList as DbVenue[]
-      setVenues(ownerVenues)
-      const savedId = localStorage.getItem('nightos:active_venue_id')
-      const active = ownerVenues.find((x) => x.id === savedId) || ownerVenues[0]
-      setVenue(active)
-    } else {
-      const { data: v } = await authDb.venueByOwner(user.id)
-      setVenue((v as DbVenue) ?? null)
+    // 1. If we already have an active venue, fetch fresh data by ID directly
+    if (venue?.id) {
+      const { data: refreshedVenue } = await db.venueById(venue.id);
+      if (refreshedVenue) {
+        setVenue(refreshedVenue);
+        if (refreshedVenue.brand_primary || refreshedVenue.brand_accent) {
+          applyBrandTheme(refreshedVenue.brand_primary, refreshedVenue.brand_accent, refreshedVenue.brand_secondary);
+        }
+        return;
+      }
     }
-  }
+
+    if (!user?.id) return;
+    const { data: vList } = await authDb.venuesByOwner(user.id);
+    if (vList && vList.length > 0) {
+      const ownerVenues = vList as DbVenue[];
+      setVenues(ownerVenues);
+      const savedId = localStorage.getItem('nightos:active_venue_id');
+      const active = ownerVenues.find((x) => x.id === savedId) || ownerVenues[0];
+      setVenue(active);
+      if (active.brand_primary || active.brand_accent) {
+        applyBrandTheme(active.brand_primary, active.brand_accent, active.brand_secondary);
+      }
+    } else {
+      const { data: v } = await authDb.venueByOwner(user.id);
+      if (v) {
+        setVenue(v as DbVenue);
+        if ((v as DbVenue).brand_primary || (v as DbVenue).brand_accent) {
+          applyBrandTheme((v as DbVenue).brand_primary, (v as DbVenue).brand_accent, (v as DbVenue).brand_secondary);
+        }
+      }
+    }
+  };
 
   const refreshStaffSession = async () => {
     if (!user?.id) return

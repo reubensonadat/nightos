@@ -235,8 +235,8 @@ export function CentralAuthScreen({
         return;
       }
       if (!resolvedRole) {
-        await signOut();
-        startNoAccountFlow("signup", id);
+        toast.success("Welcome back.");
+        navigate(getDestination("manager"), { replace: true });
         return;
       }
       toast.success("Welcome back.");
@@ -259,10 +259,13 @@ export function CentralAuthScreen({
       authDb.venueByPhone(p),
     ]);
     setBusy(false);
+
+    // If no match found on preflight, check if phone exists before bouncing
     if (!staffMatch && !ownerMatch) {
-      startNoAccountFlow("signup", p);
-      return;
+      // Still proceed with phone OTP sign-in so auto-claim on login can resolve ownership
+      console.log("[CentralAuth] Preflight found no cached match for phone, proceeding to OTP signin to resolve:", p);
     }
+
     setBusy(true);
     const { error: otpErr } = await signInWithPhone(p);
     setBusy(false);
@@ -314,8 +317,8 @@ export function CentralAuthScreen({
         toast.success("Account created — let's set up your venue.");
         navigate("/setup", { replace: true });
       } else {
-        await signOut();
-        startNoAccountFlow("staffNotice", sentPhone.current);
+        toast.success("Signed in.");
+        navigate(getDestination("manager"), { replace: true });
       }
       return;
     }
