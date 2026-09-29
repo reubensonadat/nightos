@@ -63,3 +63,70 @@ export function platformFeeFor(amountGhs: number, serviceChargePct: number = 10)
   const amount = Math.max(amountGhs, 0);
   return Math.round(amount * (serviceChargePct / 100) * 100) / 100;
 }
+
+/**
+ * 10% Revenue & Settlement Split:
+ * - 10% Total Fee
+ * - 2% Paystack Processing
+ * - 8% NightOS / Bysen Net Platform Share
+ * - 90% Venue / Merchant Net Settlement
+ */
+export type FeeSplit = {
+  gross: number;
+  totalFee: number;        // 10%
+  paystackFee: number;     // 2%
+  netPlatformFee: number;  // 8%
+  venueSettlement: number; // 90%
+};
+
+export function computeFeeSplit(
+  amountGhs: number,
+  feePct: number = 10,
+  paystackPct: number = 2
+): FeeSplit {
+  const gross = Math.max(amountGhs, 0);
+  const totalFee = Math.round(gross * (feePct / 100) * 100) / 100;
+  const paystackFee = Math.round(gross * (paystackPct / 100) * 100) / 100;
+  const netPlatformFee = Math.round((totalFee - paystackFee) * 100) / 100;
+  const venueSettlement = Math.round((gross - totalFee) * 100) / 100;
+
+  return { gross, totalFee, paystackFee, netPlatformFee, venueSettlement };
+}
+
+/**
+ * Dynamic Paystack Fee Allocation with 90% Hard Cap:
+ * Recovers unpaid cash fee debts from subsequent online transactions.
+ * Total deduction on this transaction can never exceed 90% of gross.
+ */
+export type DynamicPaystackSplit = {
+  gross: number;
+  standardFee: number;       // 10% standard platform fee
+  outstandingDebt: number;   // previous fee debt owed by venue
+  debtClawback: number;      // recovered from this transaction
+  totalFee: number;          // standardFee + debtClawback (<= 90% of gross)
+  venueNet: number;          // at least 10% guaranteed to venue
+  transactionChargePesewas: number; // for Paystack Inline setup
+};
+
+export function calculateDynamicPaystackSplit(
+  amountGhs: number,
+  outstandingDebtGhs: number = 0
+): DynamicPaystackSplit {
+  const gross = Math.max(amountGhs, 0);
+  const standardFee = Math.round(gross * 0.10 * 100) / 100;
+  const maxTotalDeduction = Math.round(gross * 0.90 * 100) / 100;
+  const debtHeadroom = Math.max(0, maxTotalDeduction - standardFee); // 80% of gross
+  const debtClawback = Math.round(Math.min(Math.max(0, outstandingDebtGhs), debtHeadroom) * 100) / 100;
+  const totalFee = Math.round((standardFee + debtClawback) * 100) / 100;
+  const venueNet = Math.round((gross - totalFee) * 100) / 100;
+
+  return {
+    gross,
+    standardFee,
+    outstandingDebt: outstandingDebtGhs,
+    debtClawback,
+    totalFee,
+    venueNet,
+    transactionChargePesewas: Math.round(totalFee * 100),
+  };
+}

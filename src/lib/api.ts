@@ -1,5 +1,6 @@
 import { supabase } from './supabase';
 import { cached, cacheInvalidate, TTL } from './cache';
+import { calculateDynamicPaystackSplit, type DynamicPaystackSplit } from './fees';
 
 /**
  * Attaches the customer session token header (used by RLS policies) to a
@@ -1838,6 +1839,34 @@ export const db = {
       }
     }
     return res;
+  },
+
+  /* ── Paystack Dynamic Split & Fee Reconciliation ── */
+  getDynamicPaystackSplit: async (venueId: string, amount: number) => {
+    try {
+      const { data, error } = await supabase.rpc('calculate_dynamic_paystack_fee', {
+        p_venue_id: venueId,
+        p_amount: amount,
+      });
+      if (!error && data) {
+        return { data: data as DynamicPaystackSplit & { subaccount?: string; transaction_charge_pesewas: number }, error: null };
+      }
+      // Fallback calculation using frontend math
+      const { data: debt } = await supabase.rpc('outstanding_balance', { p_venue_id: venueId });
+      const split = calculateDynamicPaystackSplit(amount, Number(debt) || 0);
+      return { data: { ...split, transaction_charge_pesewas: split.transactionChargePesewas }, error: null };
+    } catch {
+      const split = calculateDynamicPaystackSplit(amount, 0);
+      return { data: { ...split, transaction_charge_pesewas: split.transactionChargePesewas }, error: null };
+    }
+  },
+
+  reconcileVenueFeeDebt: async (venueId: string, paymentId: string | null, debtCleared: number) => {
+    return supabase.rpc('reconcile_venue_fee_debt', {
+      p_venue_id: venueId,
+      p_payment_id: paymentId,
+      p_debt_cleared: debtCleared,
+    });
   },
 
   /* ── Realtime Waiter Assistance ── */
