@@ -16,6 +16,7 @@ import {
     LinkIcon,
     LockClosedIcon,
     MapIcon,
+    PrinterIcon,
     Squares2X2Icon,
     UserCircleIcon,
     UserIcon,
@@ -519,14 +520,25 @@ export function ManagerShell({ managerName, venueName, venueLogo, activePage, on
                         </div>
                     </div>
 
-                    <button
-                        type="button"
-                        onClick={handleCopyVenueLink}
-                        className="flex items-center gap-1.5 rounded-full bg-white px-3 py-1.5 text-[11.5px] font-semibold text-licorice shadow-sm ring-1 ring-licorice/10 hover:bg-licorice/5 transition-all active:scale-95"
-                    >
-                        <LinkIcon className="h-3.5 w-3.5 text-khaki" strokeWidth={2} />
-                        <span>Copy Venue Link</span>
-                    </button>
+                    {activePage === "shift-report" ? (
+                        <button
+                            type="button"
+                            onClick={() => window.print()}
+                            className="flex items-center gap-1.5 rounded-full bg-licorice text-isabelline px-3.5 py-1.5 text-[11.5px] font-bold shadow-sm hover:bg-licorice/90 transition-all active:scale-95 cursor-pointer"
+                        >
+                            <PrinterIcon className="h-3.5 w-3.5" strokeWidth={2} />
+                            <span>Print Report</span>
+                        </button>
+                    ) : (
+                        <button
+                            type="button"
+                            onClick={handleCopyVenueLink}
+                            className="flex items-center gap-1.5 rounded-full bg-white px-3 py-1.5 text-[11.5px] font-semibold text-licorice shadow-sm ring-1 ring-licorice/10 hover:bg-licorice/5 transition-all active:scale-95"
+                        >
+                            <LinkIcon className="h-3.5 w-3.5 text-khaki" strokeWidth={2} />
+                            <span>Copy Venue Link</span>
+                        </button>
+                    )}
                 </header>
 
                 {/* Page content */}

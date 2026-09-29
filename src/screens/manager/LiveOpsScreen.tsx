@@ -5,9 +5,7 @@ import {
     BanknotesIcon,
     CheckBadgeIcon,
     ChevronRightIcon,
-    DocumentChartBarIcon,
     ExclamationTriangleIcon,
-    PlusIcon,
     ShoppingCartIcon,
     TableCellsIcon,
     UserGroupIcon,
@@ -165,40 +163,12 @@ export function LiveOpsScreen({ venueId, onNavigate }: { venueId?: string; onNav
         <div className="mx-auto w-full max-w-7xl space-y-6 pb-12">
 
             {/* ═══════════════════════════════════════════════════════════
-               HEADER — Greeting + Quick Actions
+               HEADER — Greeting
                ═══════════════════════════════════════════════════════════ */}
-            <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
-                <div>
-                    <h1 className="font-display text-[26px] font-black tracking-[-0.03em] text-licorice">
-                        {greeting}, Manager
-                    </h1>
-                </div>
-
-                {/* Quick action buttons */}
-                <div className="flex items-center gap-2">
-                    <button
-                        type="button"
-                        className="inline-flex items-center gap-1.5 rounded-full bg-licorice text-isabelline px-4 py-2 text-sm font-semibold shadow-[0_4px_12px_rgba(35,20,12,0.18)] hover:bg-licorice/95 active:scale-[0.97] transition-all"
-                    >
-                        <PlusIcon className="h-4 w-4" strokeWidth={2} />
-                        New Order
-                    </button>
-                    <button
-                        type="button"
-                        onClick={() => setShowShiftModal(true)}
-                        className="inline-flex items-center gap-1.5 rounded-full bg-khaki/20 text-licorice px-4 py-2 text-sm font-semibold ring-1 ring-khaki/40 hover:bg-khaki/30 active:scale-[0.97] transition-all shadow-sm"
-                    >
-                        <DocumentChartBarIcon className="h-4 w-4 text-khaki" strokeWidth={2} />
-                        Shift Report
-                    </button>
-                    <button
-                        type="button"
-                        onClick={() => onNavigate?.("finance")}
-                        className="inline-flex items-center gap-1.5 rounded-full bg-white text-licorice px-4 py-2 text-sm font-semibold ring-1 ring-licorice/8 hover:bg-isabelline active:scale-[0.97] transition-all"
-                    >
-                        Finance
-                    </button>
-                </div>
+            <div>
+                <h1 className="font-display text-[26px] font-black tracking-[-0.03em] text-licorice">
+                    {greeting}, Manager
+                </h1>
             </div>
 
             {/* ═══════════════════════════════════════════════════════════

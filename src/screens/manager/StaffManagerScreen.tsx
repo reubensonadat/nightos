@@ -242,24 +242,6 @@ export function StaffManagerScreen({ venueId }: { venueId?: string } = {}) {
         return true;
     };
 
-    const [endAllShiftsConfirm, setEndAllShiftsConfirm] = useState(false);
-
-    const endAllShifts = async () => {
-        const activeShifts = coverage?.filter((c) => c.shift_id) ?? [];
-        if (activeShifts.length === 0) return;
-        
-        let closedCount = 0;
-        for (const c of activeShifts) {
-            if (c.shift_id) {
-                const { data: ok } = await db.approveShift(c.shift_id, false);
-                if (ok) closedCount++;
-            }
-        }
-        toast.success(`Ended ${closedCount} shift${closedCount !== 1 ? "s" : ""}.`);
-        setEndAllShiftsConfirm(false);
-        await load();
-    };
-
     const totalCount = staff.length;
     const onShift = coverage
         ? coverage.filter((c) => c.shift_id).length
@@ -279,10 +261,7 @@ export function StaffManagerScreen({ venueId }: { venueId?: string } = {}) {
                     <p className="text-2xl sm:text-4xl font-bold tabular-nums text-licorice mt-1">{loading ? "…" : totalCount}</p>
                 </div>
                 <div className="rounded-2xl sm:rounded-[1.5rem] bg-licorice p-3.5 sm:p-4 text-isabelline shadow-[0_8px_24px_rgba(35,20,12,0.15)] flex flex-col justify-between">
-                    <div className="flex items-center justify-between">
-                        <p className="text-[10px] sm:text-xs font-bold uppercase tracking-wider text-isabelline/70">On Shift</p>
-                        <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
-                    </div>
+                    <p className="text-[10px] sm:text-xs font-bold uppercase tracking-wider text-isabelline/70">On Shift</p>
                     <p className="text-2xl sm:text-4xl font-bold tabular-nums text-khaki mt-1">{loading ? "…" : onShift}</p>
                 </div>
                 <div className="rounded-2xl sm:rounded-[1.5rem] bg-white p-3.5 sm:p-4 shadow-sm ring-1 ring-isabelline flex flex-col justify-between">
@@ -302,8 +281,7 @@ export function StaffManagerScreen({ venueId }: { venueId?: string } = {}) {
                             </h2>
                         </div>
                         <div className="flex items-center gap-2 flex-wrap text-xs font-semibold">
-                            <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-0.5 text-[11px] font-bold text-emerald-700 ring-1 ring-emerald-600/20">
-                                <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                            <span className="inline-flex items-center rounded-full bg-licorice/5 px-2.5 py-0.5 text-[11px] font-bold text-licorice ring-1 ring-licorice/10">
                                 {coverage.filter((c) => c.supervisor_approved).length} active on shift
                             </span>
                             {coverage.filter((c) => c.shift_id && !c.supervisor_approved).length > 0 && (
@@ -311,13 +289,6 @@ export function StaffManagerScreen({ venueId }: { venueId?: string } = {}) {
                                     {coverage.filter((c) => c.shift_id && !c.supervisor_approved).length} awaiting approval
                                 </span>
                             )}
-                            <button
-                                type="button"
-                                onClick={() => setEndAllShiftsConfirm(true)}
-                                className="ml-1 text-[11px] font-bold text-rose-600 hover:text-rose-700 hover:underline px-2 py-1"
-                            >
-                                End All Shifts
-                            </button>
                         </div>
                     </div>
 
@@ -352,12 +323,7 @@ export function StaffManagerScreen({ venueId }: { venueId?: string } = {}) {
                                                     <span className="rounded-md bg-slate-200/80 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-slate-700">
                                                         {roleLabel(c.role)}
                                                     </span>
-                                                    {approved ? (
-                                                        <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-600">
-                                                            <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-                                                            On Duty
-                                                        </span>
-                                                    ) : (
+                                                    {!approved && (
                                                         <span className="inline-flex items-center gap-1 text-[11px] font-bold text-amber-600">
                                                             ⏳ Needs Approval
                                                         </span>
@@ -538,7 +504,7 @@ export function StaffManagerScreen({ venueId }: { venueId?: string } = {}) {
                                                 <div className="flex items-center gap-2">
                                                     <span className={clsx(
                                                         "inline-flex items-center gap-1 text-xs font-bold uppercase tracking-wider",
-                                                        shiftStaffIds.has(s.id) ? "text-emerald-600" : "text-feldgrau",
+                                                        shiftStaffIds.has(s.id) ? "text-licorice" : "text-feldgrau",
                                                     )}>
                                                         {shiftStaffIds.has(s.id) ? "On Shift" : "Off Duty"}
                                                     </span>
@@ -598,7 +564,7 @@ export function StaffManagerScreen({ venueId }: { venueId?: string } = {}) {
                                                 ) : (
                                                     <span className={clsx(
                                                         "inline-flex items-center gap-1",
-                                                        shiftStaffIds.has(s.id) ? "text-emerald-600" : "text-feldgrau",
+                                                        shiftStaffIds.has(s.id) ? "text-licorice font-bold" : "text-feldgrau",
                                                     )}>
                                                         {shiftStaffIds.has(s.id) ? "On Shift" : "Off Duty"}
                                                     </span>
@@ -700,18 +666,6 @@ export function StaffManagerScreen({ venueId }: { venueId?: string } = {}) {
                 }}
                 onClose={() => setEndShiftConfirmStaff(null)}
             />
-
-            {/* ── End All Shifts Confirmation Modal ── */}
-            <ConfirmModal
-                isOpen={endAllShiftsConfirm}
-                title="End all active shifts?"
-                body="This will clock out all staff members currently on duty and clear the active shift roster. Active table assignments will remain open."
-                confirmLabel="End All Shifts"
-                cancelLabel="Cancel"
-                isDanger
-                onConfirm={() => void endAllShifts()}
-                onClose={() => setEndAllShiftsConfirm(false)}
-            />
         </div>
     );
 }
@@ -777,10 +731,9 @@ function StaffDetailDrawer({
                                 <span
                                     className={clsx(
                                         "inline-flex items-center gap-1 text-xs font-semibold",
-                                        onShift ? "text-emerald-600" : "text-feldgrau",
+                                        onShift ? "text-licorice font-bold" : "text-feldgrau",
                                     )}
                                 >
-                                    <span className={clsx("h-1.5 w-1.5 rounded-full", onShift ? "bg-emerald-400 animate-pulse" : "bg-feldgrau/30")} />
                                     {onShift ? (isApproved ? "On Shift" : "Shift Awaiting Approval") : "Off Duty"}
                                 </span>
                             </div>
