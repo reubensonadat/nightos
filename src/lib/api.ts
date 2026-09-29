@@ -39,6 +39,7 @@ export type DbVenue = {
   brand_text_secondary: string | null;
   brand_danger: string | null;
   brand_light_blue: string | null;
+  fulfillment_mode?: 'bar' | 'kitchen';
 };
 
 export type DbTable = {

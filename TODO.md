@@ -20,13 +20,14 @@
     - [ ] Allow bar staff/waiters to log what was sold and record final count on hand at shift close.
 
 ## Barman Responsibilities & Stock Handover
-- [ ] **Expanded Barman Workflow**:
-  - [ ] **Drink Allocation & Order Logging**: Barman is assigned the day's/evening's drink stock and has permissions to log and process the day's bar orders.
-  - [ ] **Shift Close Count**: At the end of the shift, barman logs what they sold and records remaining stock on hand for accountability.
+- [x] **Expanded Barman Workflow**:
+  - [x] **Drink Allocation & Order Logging**: Barman is assigned the evening's drink stock with opening inventory gate, starting float input, and single priority drink queue to pour orders.
+  - [x] **Shift Close Count**: End-of-shift count-out with variance calculation (expected vs counted bottles) and till cash audit for complete accountability.
+  - [x] **Full Shift Report Access**: Bartenders can view the complete Manager Shift Report to audit waiters, track missing cash, and balance the drawer.
 
-## Kitchen View Toggle
-- [ ] **Kitchen Display Toggle**:
-  - [ ] Add a venue setting/toggle to enable or disable the Kitchen View (since nightclubs often focus purely on bar/bottle service and do not need a food kitchen display).
+## Kitchen & Bar Station Fulfillment Mode Toggle
+- [x] **Kitchen / Bar Display Mode Toggle**:
+  - [x] Added venue setting/toggle on Manager Brand Settings to switch between dedicated Bar Station (Nightclubs & Lounges) and Kitchen KDS (Dining & Restaurants), defaulting to Bar Station.
 
 
 ## Manager Dashboard: Evening Stock & Real-Time Order Deductions

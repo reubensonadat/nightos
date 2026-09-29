@@ -52,7 +52,7 @@ export const STAGES: Stage[] = [
     {
         id: "received",
         label: "Order Received",
-        description: "Sent to the kitchen — they have the ticket",
+        description: "Sent to station — they have your ticket",
         status: "confirmed",
     },
     {

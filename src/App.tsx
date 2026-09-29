@@ -32,6 +32,7 @@ import { ShiftPerformanceScreen } from "./screens/waiter/ShiftPerformanceScreen"
 import { TableLayout } from "./screens/waiter/TableLayout";
 
 import { KitchenDisplayScreen } from "./screens/kitchen/KitchenDisplayScreen";
+import { BarStationScreen } from "./screens/bar/BarStationScreen";
 
 import { ManagerShell, type ManagerPage } from "./screens/manager/ManagerShell";
 import { LiveOpsScreen } from "./screens/manager/LiveOpsScreen";
@@ -55,7 +56,7 @@ type NavTab = "menu" | "tab" | "orders";
 
 
 
-type Mode = "customer" | "waiter" | "kitchen" | "manager";
+type Mode = "customer" | "waiter" | "kitchen" | "bar" | "manager";
 
 /* ──────────────────── Customer Shell (bottom nav) ──────────────────── */
 
@@ -511,6 +512,7 @@ function AppShell() {
     const path = cleanPath.replace(/^\/+/, "").split("/")[0];
     if (path === "waiter") return "waiter";
     if (path === "kitchen") return "kitchen";
+    if (path === "bar") return "bar";
     if (path === "manager") return "manager";
     return "customer";
   };
@@ -523,6 +525,7 @@ function AppShell() {
       customer: slugPrefix ? `${slugPrefix}/menu` : "/menu",
       waiter: slugPrefix ? `${slugPrefix}/waiter` : "/waiter",
       kitchen: slugPrefix ? `${slugPrefix}/kitchen` : "/kitchen",
+      bar: slugPrefix ? `${slugPrefix}/bar` : "/bar",
       manager: slugPrefix ? `${slugPrefix}/manager/ops` : "/manager/ops",
     };
     navigate(paths[newMode]);
@@ -724,15 +727,25 @@ function AppShell() {
         </Routes>
       )}
 
-      {mode === "kitchen" && (
-        (staffSession || role === "owner" || role === "manager" || role === "kitchen") ? (
-          <KitchenDisplayScreen
-            venueId={staffSession?.venue_id || authVenue?.id || venueId || ""}
-            staffId={staffSession?.id || user?.id || ""}
-            staffName={staffSession?.name || profile?.name || "Manager"}
-            onExit={switchToCustomer}
-            onSignOut={handleSignOut}
-          />
+      {(mode === "kitchen" || mode === "bar") && (
+        (staffSession || role === "owner" || role === "manager" || role === "kitchen" || role === "bar") ? (
+          (mode === "kitchen" && currentVenue?.fulfillment_mode === "kitchen") ? (
+            <KitchenDisplayScreen
+              venueId={staffSession?.venue_id || authVenue?.id || venueId || ""}
+              staffId={staffSession?.id || user?.id || ""}
+              staffName={staffSession?.name || profile?.name || "Manager"}
+              onExit={switchToCustomer}
+              onSignOut={handleSignOut}
+            />
+          ) : (
+            <BarStationScreen
+              venueId={staffSession?.venue_id || authVenue?.id || venueId || ""}
+              staffId={staffSession?.id || user?.id || ""}
+              staffName={staffSession?.name || profile?.name || "Bartender"}
+              onExit={switchToCustomer}
+              onSignOut={handleSignOut}
+            />
+          )
         ) : (
           <Navigate to={`/login?redirect=${encodeURIComponent(location.pathname + location.search)}`} replace />
         )

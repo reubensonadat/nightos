@@ -48,14 +48,15 @@ const AuthContext = createContext<AuthContextValue>(null!)
 export function sectorPath(role: string | null, venueSlug?: string | null): string {
   const prefix = venueSlug ? `/v/${venueSlug}` : '';
   if (role === 'owner' || role === 'manager') return `${prefix}/manager/ops`;
-  if (role === 'kitchen' || role === 'bar') return `${prefix}/kitchen`;
+  if (role === 'bar') return `${prefix}/bar`;
+  if (role === 'kitchen') return `${prefix}/kitchen`;
   return `${prefix}/waiter`;
 }
 
 // eslint-disable-next-line react-refresh/only-export-components
 export function isAllowedForTarget(role: string | null, target: string): boolean {
   if (!role) return false
-  if (target.startsWith('/kitchen')) {
+  if (target.startsWith('/kitchen') || target.startsWith('/bar')) {
     return role === 'owner' || role === 'manager' || role === 'kitchen' || role === 'bar'
   }
   if (target.startsWith('/waiter')) {

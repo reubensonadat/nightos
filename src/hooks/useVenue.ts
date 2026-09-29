@@ -27,6 +27,7 @@ export const DEFAULT_VENUE: DbVenue = {
   brand_text_secondary: null,
   brand_danger: null,
   brand_light_blue: null,
+  fulfillment_mode: 'bar',
 };
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -92,7 +93,8 @@ export function useVenue(slugOrId?: string) {
         setLoading(false);
         return;
       }
-      setVenue(data);
+      const localMode = (typeof window !== 'undefined' ? localStorage.getItem(`bysen_venue_fulfillment_${data.id}`) : null) as 'bar' | 'kitchen' | null;
+      setVenue({ ...data, fulfillment_mode: data.fulfillment_mode || localMode || 'bar' });
       setError(null);
       setIsNotFound(false);
       setLoading(false);

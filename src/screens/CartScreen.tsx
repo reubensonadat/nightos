@@ -502,7 +502,7 @@ export function CartScreen({ venueId, tableLabel, tablePin, billId, customerSess
                                 Placed Session Items ({placedItems.length})
                             </span>
                             <span className="text-[9px] font-bold uppercase tracking-wider text-khaki">
-                                Sent to Kitchen
+                                Sent to Station
                             </span>
                         </div>
                         {placedItems.map((item) => (
