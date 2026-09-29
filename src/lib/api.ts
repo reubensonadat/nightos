@@ -1635,6 +1635,27 @@ export const db = {
     };
   },
 
+  /** Fetch all transaction dates (YYYY-MM-DD) for a venue across all time */
+  venueTransactionDates: async (venueId: string) => {
+    const [subsRes, paymentsRes, billsRes] = await Promise.all([
+      supabase.from('order_submissions').select('created_at').eq('venue_id', venueId),
+      supabase.from('payments').select('created_at').eq('venue_id', venueId),
+      supabase.from('bills').select('created_at').eq('venue_id', venueId),
+    ]);
+
+    const dates = new Set<string>();
+    (subsRes.data || []).forEach((item: { created_at?: string }) => {
+      if (item.created_at) dates.add(item.created_at.split('T')[0]);
+    });
+    (paymentsRes.data || []).forEach((item: { created_at?: string }) => {
+      if (item.created_at) dates.add(item.created_at.split('T')[0]);
+    });
+    (billsRes.data || []).forEach((item: { created_at?: string }) => {
+      if (item.created_at) dates.add(item.created_at.split('T')[0]);
+    });
+    return Array.from(dates);
+  },
+
   /* ── Reservations ── */
   createReservation: (
     venueId: string,

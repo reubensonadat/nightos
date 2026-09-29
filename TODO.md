@@ -1,7 +1,7 @@
 # Project TODOs
 
 ## Shift Report: Day's Detailed Transaction History & Audit
-- [ ] **Dedicated Daily Transaction History Hub**:
+- [x] **Dedicated Daily Transaction History Hub**:
   - Make the Shift Report page the primary interface for inspecting the day's complete, detailed transaction history.
   - **Who Handled What & How Much**:
     - **Who**: Track and display the exact waiter/bartender/staff member who handled each order and payment.
@@ -10,14 +10,10 @@
   - **Filtering & Audit Controls**:
     - Filter/sort by waiter to audit individual staff shifts (orders taken, items delivered, total cash held, digital payments collected).
     - Search by order/bill reference, table number, or customer name.
-- [ ] **Tab Restructuring & Revamp**:
-  - [ ] **Rename "Overview & KPIs" to "Transaction History"**: Set this dedicated transaction ledger as the default landing view.
-  - [ ] **Consolidate Payment & Waiter Breakdowns**: Merge payment method summaries and staff attribution directly into the Transaction History view.
-  - [ ] **Remove Redundant Overview Widgets**:
-    - [ ] Remove "Payment Methods" card preview from overview
-    - [ ] Remove "Top Floor Staff" leaderboard preview card
-    - [ ] Remove secondary metrics pills row ("Net Subtotal", "VAT Collected", "Platform Fee", "Service Charge")
-  - [ ] **Evening Cash Flow Summary**: Render a comprehensive bottom summary section showing total cash flow, digital payments, floats, and net cash drawer balancing for the evening/shift.
+- [x] **Tab Restructuring & Revamp**:
+  - [x] **Set Detailed Transaction History as Default Landing View**: Dedicated transaction ledger with search, waiter, and payment filters.
+  - [x] **Consolidate Payment & Waiter Breakdowns**: Merge payment method summaries and staff attribution directly into the Transaction History & Waiter Audit view.
+  - [x] **Evening Cash Flow Summary & Balancing**: Render a comprehensive section showing total cash flow, digital payments, floats, and net cash drawer balancing for the shift.
   - [ ] **Shift Inventory Logging & Reconciliation**: Reintroduce evening inventory logging where managers/bar staff log starting drink stock at the beginning of the shift (e.g., 20 bottles), track sold quantities from POS orders, and reconcile remaining stock on the end-of-shift report.
   - [ ] **Staff "End Shift" Summary Flow**:
     - [ ] When a waiter/staff member clicks "End Shift", show them their individual shift report screen (orders handled, sales, cash collected, and audit metrics) before completing sign-out.
