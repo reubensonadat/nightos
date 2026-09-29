@@ -21,7 +21,7 @@ export function ProtectedRoute({ children }: { children: React.ReactNode }) {
 }
 
 export function VenueRequired({ children }: { children: React.ReactNode }) {
-  const { hasVenue, isInitializing } = useAuth()
+  const { hasVenue, venue, isInitializing } = useAuth()
 
   if (isInitializing) {
     return (
@@ -31,7 +31,7 @@ export function VenueRequired({ children }: { children: React.ReactNode }) {
     )
   }
 
-  if (!hasVenue) {
+  if (!hasVenue && !venue && !localStorage.getItem('nightos:active_venue_id')) {
     return <Navigate to="/setup" replace />
   }
 

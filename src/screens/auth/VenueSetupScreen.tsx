@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
 import { authDb } from '../../lib/db/auth'
+import { db } from '../../lib/api'
 
 export function VenueSetupScreen() {
   const navigate = useNavigate()
@@ -16,7 +17,7 @@ export function VenueSetupScreen() {
   const [createError, setCreateError] = useState<string | null>(null)
 
   useEffect(() => {
-    if (venue) navigate('/manager', { replace: true })
+    if (venue) navigate(venue.slug ? `/v/${venue.slug}/manager/ops` : '/manager/ops', { replace: true })
   }, [venue, navigate])
 
   useEffect(() => {
@@ -56,8 +57,28 @@ export function VenueSetupScreen() {
         : `Could not create venue: ${error?.message || 'Unknown error'}`)
       return
     }
+
+    // Auto-create owner staff row so they are immediately on the roster
+    const userPhone = user.phone || (user.user_metadata?.phone as string) || (user.user_metadata?.phone_number as string) || '';
+    const userName = (user.user_metadata?.name as string) || user.email?.split('@')[0] || `${name.trim()} Manager`;
+    if (data?.id && userPhone) {
+      try {
+        await db.createStaff({
+          venueId: data.id,
+          name: userName,
+          phone: userPhone,
+          role: 'manager',
+          email: user.email || null,
+          hourlyRate: 0,
+          maxTables: 10,
+        });
+      } catch (err) {
+        console.warn('Auto-create owner staff on venue setup failed:', err);
+      }
+    }
+
     await refreshVenue()
-    navigate('/manager', { replace: true })
+    navigate(`/v/${slug}/manager/ops`, { replace: true })
   }
 
   return (

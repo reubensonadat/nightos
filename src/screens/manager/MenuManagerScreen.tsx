@@ -16,6 +16,7 @@ import {
     TagIcon,
     ChartBarIcon,
     FunnelIcon,
+    ArrowUpTrayIcon,
 } from "@heroicons/react/24/outline";
 import toast from "react-hot-toast";
 import { formatGHS } from "../../data/menu";
@@ -24,6 +25,7 @@ import { supabase } from "../../lib/supabase";
 import { useVenue } from "../../hooks/useVenue";
 import clsx from "clsx";
 import { ConfirmModal } from "../../components/ConfirmModal";
+import { BulkMenuUploadModal } from "../../components/BulkMenuUploadModal";
 import { uploadToR2 } from "../../lib/r2";
 
 /* ────────────────────────── Preset Food & Drink Images ────────────────────────── */
@@ -82,6 +84,7 @@ export function MenuManagerScreen({ venueId }: { venueId?: string } = {}) {
     // Category modal
     const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
     const [newCategoryName, setNewCategoryName] = useState("");
+    const [isBulkUploadOpen, setIsBulkUploadOpen] = useState(false);
 
     // ── Pricing & Tax (venue-level; drives bill math + inclusive display) ──
     const [vatPct, setVatPct] = useState("12.5");
@@ -424,6 +427,15 @@ export function MenuManagerScreen({ venueId }: { venueId?: string } = {}) {
                         >
                             <TagIcon className="h-4 w-4 shrink-0 text-feldgrau" strokeWidth={2} />
                             Add Category
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => setIsBulkUploadOpen(true)}
+                            className="inline-flex items-center gap-1.5 rounded-xl bg-isabelline px-4 py-2.5 text-xs font-bold text-licorice ring-1 ring-licorice/8 hover:bg-licorice/5 active:scale-95 transition-all"
+                            title="Upload items via CSV or spreadsheet"
+                        >
+                            <ArrowUpTrayIcon className="h-4 w-4 shrink-0 text-feldgrau" strokeWidth={2} />
+                            Bulk Upload
                         </button>
                         <button
                             type="button"
@@ -1141,6 +1153,15 @@ export function MenuManagerScreen({ venueId }: { venueId?: string } = {}) {
                     onClose={() => setPendingDeleteProduct(null)}
                 />
             )}
+
+            {/* Bulk Menu Upload (CSV / Excel) */}
+            <BulkMenuUploadModal
+                isOpen={isBulkUploadOpen}
+                onClose={() => setIsBulkUploadOpen(false)}
+                venueId={venue.id}
+                existingCategories={categories}
+                onSuccess={fetchMenuData}
+            />
         </div>
     );
 }

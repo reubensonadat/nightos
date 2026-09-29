@@ -1,25 +1,37 @@
 export function computeBillTotal(
   subtotal: number,
   vatPct: number = 0,
-  taxInclusive: boolean = true
+  taxInclusive: boolean = true,
+  serviceChargePct: number = 10
 ): {
   subtotal: number;
   serviceCharge: number;
   vat: number;
   total: number;
 } {
-  const serviceCharge = 0;
+  const serviceCharge = Math.round(subtotal * (Math.max(serviceChargePct, 0) / 100) * 100) / 100;
+
   if (vatPct <= 0) {
-    return { subtotal, serviceCharge, vat: 0, total: subtotal };
+    return {
+      subtotal,
+      serviceCharge,
+      vat: 0,
+      total: Math.round((subtotal + serviceCharge) * 100) / 100,
+    };
   }
 
   if (taxInclusive) {
     const net = Math.round((subtotal / (1 + vatPct / 100)) * 100) / 100;
     const vat = Math.round((subtotal - net) * 100) / 100;
-    return { subtotal: net, serviceCharge, vat, total: subtotal };
+    return {
+      subtotal: net,
+      serviceCharge,
+      vat,
+      total: Math.round((subtotal + serviceCharge) * 100) / 100,
+    };
   } else {
     const vat = Math.round(subtotal * (vatPct / 100) * 100) / 100;
-    const total = Math.round((subtotal + vat) * 100) / 100;
+    const total = Math.round((subtotal + serviceCharge + vat) * 100) / 100;
     return { subtotal, serviceCharge, vat, total };
   }
 }
@@ -44,24 +56,10 @@ export function displayPrice(base: number, taxPct: number): number {
 }
 
 /**
- * Bysen Platform Fee Schedule:
- * - 0 to 50 GHS: 1.00 GHS
- * - 51 to 100 GHS: 2.00 GHS
- * - 101 to 150 GHS: 3.00 GHS
- * - 151 to 200 GHS: 4.00 GHS
- * - 200 to 500 GHS: 7.00 GHS
- * - 501 to 700 GHS: 12.00 GHS
- * - 701+ GHS: 15.00 GHS
- * Capped so fee never exceeds the bill amount.
+ * 10% Service Charge / Platform Fee:
+ * Replaced the 1, 2, 3, 4, 5+ tiered fee schedule with a flat 10% charge.
  */
-export function platformFeeFor(amountGhs: number): number {
+export function platformFeeFor(amountGhs: number, serviceChargePct: number = 10): number {
   const amount = Math.max(amountGhs, 0);
-  const tier =
-    amount <= 50 ? 1.0 :
-    amount <= 100 ? 2.0 :
-    amount <= 150 ? 3.0 :
-    amount <= 200 ? 4.0 :
-    amount <= 500 ? 7.0 :
-    amount <= 700 ? 12.0 : 15.0;
-  return Math.round(Math.min(tier, amount) * 100) / 100;
+  return Math.round(amount * (serviceChargePct / 100) * 100) / 100;
 }

@@ -1148,6 +1148,62 @@ export const db = {
   /* ── Staff management (owner) ── */
   staffList: (venueId: string) => supabase.rpc('staff_list', { p_venue_id: venueId }),
 
+  checkStaffPhoneAvailability: async (phone: string, venueId: string) => {
+    try {
+      const { data, error } = await supabase.rpc('check_staff_phone_availability', {
+        p_phone: phone,
+        p_venue_id: venueId,
+      });
+
+      if (!error && data) {
+        return {
+          data: data as {
+            available: boolean;
+            reason?: 'same_venue' | 'other_venue' | 'venue_owner' | 'invalid_phone';
+            venue_name?: string;
+            staff_name?: string;
+            message?: string;
+          },
+          error: null,
+        };
+      }
+
+      // Fallback query if RPC 08 is not yet executed in Supabase:
+      const norm = phone.replace(/\D/g, '').slice(-9);
+      if (!norm || norm.length < 9) {
+        return { data: { available: false, reason: 'invalid_phone', message: 'Enter a valid 9 or 10-digit Ghana number.' }, error: null };
+      }
+
+      const { data: existingStaff } = await supabase
+        .from('staff')
+        .select('id, venue_id, name, venues(name)')
+        .eq('is_active', true)
+        .ilike('phone', `%${norm}`);
+
+      if (existingStaff && existingStaff.length > 0) {
+        const match = existingStaff[0];
+        const isSame = match.venue_id === venueId;
+        const vName = (match.venues as { name?: string } | null)?.name || (isSame ? 'this venue' : 'another venue');
+        return {
+          data: {
+            available: false,
+            reason: isSame ? 'same_venue' : 'other_venue',
+            venue_name: vName,
+            staff_name: match.name,
+            message: isSame
+              ? `This phone is already enrolled on your roster (${match.name}).`
+              : `This phone is already registered at "${vName}". A staff member cannot work across multiple venues simultaneously.`,
+          },
+          error: null,
+        };
+      }
+
+      return { data: { available: true, message: 'Phone number is available.' }, error: null };
+    } catch {
+      return { data: { available: true }, error: null };
+    }
+  },
+
   createStaff: async (args: {
     venueId: string;
     name: string;
@@ -1173,7 +1229,18 @@ export const db = {
       p_pay_model: args.payModel ?? 'hourly',
       p_salary_amount: args.salaryAmount ?? null,
     });
-    return { data: (data ?? { ok: false, error: 'unknown' }) as { ok: boolean; error?: string; id?: string }, error };
+    return {
+      data: (data ?? { ok: false, error: 'unknown' }) as {
+        ok: boolean;
+        error?: string;
+        reason?: string;
+        id?: string;
+        message?: string;
+        venue_name?: string;
+        staff_name?: string;
+      },
+      error,
+    };
   },
 
   updateStaff: async (args: {
@@ -1351,6 +1418,29 @@ export const db = {
       return { data: Number.isFinite(raw) ? raw : fallback, error: null };
     } catch {
       return { data: fallback, error: null };
+    }
+  },
+
+  setVenueSetting: async (venueId: string, key: string, value: number) => {
+    try {
+      const { data, error } = await supabase.rpc('set_venue_setting', {
+        p_venue_id: venueId,
+        p_key: key,
+        p_value: value,
+      });
+      if (error) {
+        // Fallback direct upsert into venue_settings if table exists
+        const { error: upsertErr } = await supabase.from('venue_settings').upsert({
+          venue_id: venueId,
+          key,
+          value,
+          updated_at: new Date().toISOString(),
+        }, { onConflict: 'venue_id,key' });
+        return { data: !upsertErr, error: upsertErr };
+      }
+      return { data: Boolean(data), error: null };
+    } catch (e) {
+      return { data: false, error: e };
     }
   },
 
@@ -1621,20 +1711,30 @@ export const db = {
   customersByVenue: async (venueId: string, page = 0, pageSize = 20) => {
     const from = page * pageSize;
     const to = from + pageSize - 1;
-    const { count, error: countErr } = await supabase
-      .from('customer_profiles')
-      .select('id', { count: 'exact', head: true })
-      .eq('venue_id', venueId);
-    if (countErr) return { data: null, error: countErr, total: 0 };
-    const { data, error } = await supabase
-      .from('customer_profiles')
-      .select(
-        'id, venue_id, name, phone, email, total_visits, total_spend, loyalty_tier, is_vip, notes, created_at, updated_at',
-      )
-      .eq('venue_id', venueId)
-      .order('total_spend', { ascending: false })
-      .range(from, to);
-    return { data, error, total: count ?? 0 };
+    try {
+      const { count, error: countErr } = await supabase
+        .from('customer_profiles')
+        .select('id', { count: 'exact', head: true })
+        .eq('venue_id', venueId);
+      if (countErr) {
+        // Table not created yet or 404; gracefully return empty set without throwing
+        return { data: [], error: null, total: 0 };
+      }
+      const { data, error } = await supabase
+        .from('customer_profiles')
+        .select(
+          'id, venue_id, name, phone, email, total_visits, total_spend, loyalty_tier, is_vip, notes, created_at, updated_at',
+        )
+        .eq('venue_id', venueId)
+        .order('total_spend', { ascending: false })
+        .range(from, to);
+      if (error) {
+        return { data: [], error: null, total: 0 };
+      }
+      return { data: data ?? [], error: null, total: count ?? (data?.length || 0) };
+    } catch {
+      return { data: [], error: null, total: 0 };
+    }
   },
 
   /* ── Staff shift summary (real waiter performance) ── */
@@ -1700,6 +1800,24 @@ export const db = {
     supabase.functions.invoke('assign-waiter', {
       body: { bill_id: billId },
     }),
+
+  sendMarketingSms: async (args: { recipients: string[]; message: string }) => {
+    // 1. Try dedicated crm-marketing-sms edge function first
+    let res = await supabase.functions.invoke('crm-marketing-sms', {
+      body: { recipients: args.recipients, message: args.message },
+    });
+
+    // 2. If crm-marketing-sms is not deployed, fallback seamlessly to mnotify-sms
+    if (res.error || (res.data && res.data.status === 'noop')) {
+      const fallback = await supabase.functions.invoke('mnotify-sms', {
+        body: { action: 'broadcast', recipients: args.recipients, message: args.message },
+      });
+      if (!fallback.error) {
+        res = fallback;
+      }
+    }
+    return res;
+  },
 
   /* ── Realtime Waiter Assistance ── */
   requestWaiterAssistance: (billId: string, type: 'call_waiter' | 'cash_settlement', sessionToken?: string | null) =>
