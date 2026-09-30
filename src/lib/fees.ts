@@ -2,7 +2,7 @@ export function computeBillTotal(
   subtotal: number,
   vatPct: number = 0,
   taxInclusive: boolean = true,
-  serviceChargePct: number = 10
+  serviceChargePct: number = 0
 ): {
   subtotal: number;
   serviceCharge: number;
@@ -43,16 +43,14 @@ export type VenueTaxConfig = {
   service_charge_pct?: number | null;
 };
 
-/** VAT gross-up rate in percent (0 when taxes don't apply). */
-export function venueDisplayTaxPct(venue: VenueTaxConfig | null | undefined): number {
-  if (!venue || !venue.tax_inclusive) return 0;
-  return Math.max(venue.vat_pct ?? 0, 0);
+/** VAT gross-up rate in percent (0 when taxes don't apply). In modern architecture, menu prices in DB are authoritative and never artificially marked up. */
+export function venueDisplayTaxPct(_venue: VenueTaxConfig | null | undefined): number {
+  return 0;
 }
 
-/** Price a customer should SEE for a base-priced item (gross when inclusive). */
-export function displayPrice(base: number, taxPct: number): number {
-  if (taxPct <= 0) return base;
-  return Math.round(base * (1 + taxPct / 100) * 100) / 100;
+/** Price a customer should SEE for a base-priced item (returns base price without artificial markup). */
+export function displayPrice(base: number, _taxPct?: number): number {
+  return base;
 }
 
 /**
@@ -157,7 +155,7 @@ export function computeBillWithDeposit(
   depositPaid: boolean = false,
   vatPct: number = 0,
   taxInclusive: boolean = true,
-  serviceChargePct: number = 10
+  serviceChargePct: number = 0
 ): BillDepositBreakdown {
   const serviceCharge = Math.round(grossItems * (Math.max(serviceChargePct, 0) / 100) * 100) / 100;
   let subtotal = grossItems;

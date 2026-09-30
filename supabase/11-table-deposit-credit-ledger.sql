@@ -52,7 +52,7 @@ BEGIN
     END IF;
 
     SELECT * INTO v_venue FROM public.venues WHERE id = v_bill.venue_id;
-    v_svc_pct := COALESCE(v_venue.service_charge_pct, 10.00);
+    v_svc_pct := COALESCE(v_venue.service_charge_pct, 0.00);
     v_vat_pct := COALESCE(v_venue.vat_pct, 0.00);
     v_tax_inclusive := COALESCE(v_venue.tax_inclusive, true);
 

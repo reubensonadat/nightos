@@ -14,7 +14,7 @@ export const DEFAULT_VENUE: DbVenue = {
   phone: '',
   email: '',
   payment_model: 'POSTPAY',
-  service_charge_pct: 10,
+  service_charge_pct: 0,
   vat_pct: 0,
   tax_inclusive: true,
   currency: 'GHS',

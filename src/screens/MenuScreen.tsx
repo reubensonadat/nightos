@@ -391,7 +391,7 @@ export function MenuScreen({ venueId, venueName, tableLabel, waiterName, tablePi
                         {/* ═══════════════════════════════════════════════════════════
                     GRID — square image cards
                   ═══════════════════════════════════════════════════════════ */}
-                        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 md:gap-5">
+                        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 md:gap-5 items-start">
                             {gridItems.map((item, idx) => {
                                 const fav = isFavorite(item.id);
                                 return (
@@ -435,10 +435,10 @@ export function MenuScreen({ venueId, venueName, tableLabel, waiterName, tablePi
                             </span>
                             <div className="flex flex-col items-start leading-tight">
                                 <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-khaki">
-                                    Your tab{taxPct > 0 ? " · incl. taxes" : ""}
+                                    Your tab
                                 </span>
                                 <span className="text-[15px] font-bold tracking-tight text-isabelline">
-                                    {formatGHS(displayPrice(subtotal, taxPct))}
+                                    {formatGHS(subtotal)}
                                 </span>
                             </div>
                         </div>

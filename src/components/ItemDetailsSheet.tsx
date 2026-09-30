@@ -505,14 +505,9 @@ export function ItemDetailsSheet({ item, taxRatePct = 0, onClose }: Props) {
                                 <span className="text-[13px] font-semibold tracking-tight text-isabelline">
                                     {submitting ? "Adding…" : `Add to Cart`}
                                 </span>
-                                {taxRatePct > 0 && (
-                                    <span className="text-[9px] font-semibold uppercase tracking-[0.08em] text-isabelline/60">
-                                        incl. {taxRatePct}% svc & VAT
-                                    </span>
-                                )}
                             </span>
                             <span className="font-mono text-[14px] font-bold tabular-nums text-isabelline">
-                                {formatGHS(displayPrice(totalPrice, taxRatePct))}
+                                {formatGHS(totalPrice)}
                             </span>
                         </button>
                     </div>

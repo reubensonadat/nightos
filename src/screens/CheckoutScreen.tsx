@@ -417,7 +417,9 @@ export function CheckoutScreen({ total, billId, venueId, sessionToken, onBack, o
                     {/* Rows */}
                     <div className="space-y-2 px-4 py-3">
                         <div className="flex items-center justify-between text-[12px]">
-                            <span className="tracking-tight text-feldgrau">Orders Subtotal</span>
+                            <span className="tracking-tight text-feldgrau">
+                                Orders Subtotal{venue?.tax_inclusive && (venue?.vat_pct ?? 0) > 0 ? " (excl. VAT)" : ""}
+                            </span>
                             <span className="font-mono font-bold tabular-nums text-licorice">
                                 {formatGHS(subtotal)}
                             </span>
@@ -425,7 +427,7 @@ export function CheckoutScreen({ total, billId, venueId, sessionToken, onBack, o
                         {bill && bill.service_charge > 0 && (
                             <div className="flex items-center justify-between text-[12px]">
                                 <span className="tracking-tight text-feldgrau">
-                                    Service Charge <span className="text-feldgrau/60">(10%)</span>
+                                    Service Charge <span className="text-feldgrau/60">({venue?.service_charge_pct ?? 0}%)</span>
                                 </span>
                                 <span className="font-mono font-bold tabular-nums text-licorice">
                                     {formatGHS(bill.service_charge)}

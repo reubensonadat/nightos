@@ -747,7 +747,7 @@ export function OrderManagementScreen() {
                                 </p>
                             </div>
                         ) : (
-                        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 md:gap-5">
+                        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 md:gap-5 items-start">
                             {filteredMenu.map((item, idx) => (
                                 <MenuItemCard
                                     key={item.id}

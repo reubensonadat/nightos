@@ -649,7 +649,7 @@ export function MenuManagerScreen({ venueId }: { venueId?: string } = {}) {
                             </div>
                         </div>
                     ) : (
-                        <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                        <div className="mt-6 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-6 items-start">
                             {filteredProducts.map((prod) => {
                                 const catName = prod.category_id ? catNameById.get(prod.category_id) : "Uncategorized";
                                 const marginPct =
@@ -658,29 +658,38 @@ export function MenuManagerScreen({ venueId }: { venueId?: string } = {}) {
                                         : null;
 
                                 return (
-                                    <div
+                                    <article
                                         key={prod.id}
                                         className={clsx(
-                                            "group flex flex-col overflow-hidden rounded-2xl bg-white shadow-sm ring-1 transition-all duration-150 hover:shadow-md hover:ring-licorice/20",
-                                            prod.is_active ? "ring-licorice/8" : "bg-isabelline/60 ring-licorice/5 opacity-75"
+                                            "group relative flex flex-col items-stretch transition-all",
+                                            !prod.is_active && "opacity-75"
                                         )}
                                     >
-                                        {/* Image Frame */}
-                                        <div className="relative h-44 w-full overflow-hidden bg-isabelline">
+                                        {/* Standalone White Image Card (Matching Customer View) */}
+                                        <div className="relative aspect-square w-full shrink-0 overflow-hidden rounded-2xl bg-white shadow-xs ring-1 ring-licorice/5 p-3 flex items-center justify-center">
+                                            <button
+                                                type="button"
+                                                onClick={() => handleOpenEditModal(prod)}
+                                                aria-label={`Edit ${prod.name}`}
+                                                className="absolute inset-0 z-10 block cursor-pointer"
+                                            />
                                             {prod.images?.[0] ? (
                                                 <img
                                                     src={prod.images[0]}
                                                     alt={prod.name}
-                                                    className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+                                                    loading="lazy"
+                                                    className="h-full w-full object-contain transition-transform duration-500 ease-out group-hover:scale-105"
                                                 />
                                             ) : (
-                                                <div className="flex h-full w-full items-center justify-center text-feldgrau/30">
-                                                    <PhotoIcon className="h-10 w-10" strokeWidth={1.5} />
+                                                <div className="flex h-full w-full items-center justify-center rounded-xl bg-gradient-to-br from-licorice/85 to-licorice">
+                                                    <span className="font-serif text-[40px] font-bold text-isabelline/80">
+                                                        {prod.name.charAt(0)}
+                                                    </span>
                                                 </div>
                                             )}
 
-                                            {/* Category Badge (Left) */}
-                                            <div className="absolute left-3 top-3 flex items-center gap-1.5 z-10">
+                                            {/* Badges on Top of Card: Category (Left) and Out of Stock */}
+                                            <div className="absolute left-2.5 top-2.5 flex items-center gap-1.5 z-20">
                                                 <span className="inline-flex h-6 items-center rounded-full bg-licorice/90 px-2.5 text-[10px] font-bold text-isabelline shadow-xs backdrop-blur-xs">
                                                     {catName}
                                                 </span>
@@ -700,35 +709,52 @@ export function MenuManagerScreen({ venueId }: { venueId?: string } = {}) {
                                                 )}
                                             </div>
 
-                                            {/* Allotted Station Badge (Right) */}
-                                            <div className="absolute right-3 top-3 z-10">
-                                                <span className="inline-flex h-6 items-center rounded-full bg-white/95 px-2.5 text-[10px] font-bold uppercase tracking-wider text-licorice shadow-xs ring-1 ring-licorice/10 backdrop-blur-xs">
+                                            {/* Badge on Top of Card: Station (Right) */}
+                                            <div className="absolute right-2.5 top-2.5 z-20">
+                                                <span className="inline-flex h-6 items-center rounded-full bg-white/95 px-2 text-[9.5px] font-bold uppercase tracking-wider text-licorice shadow-xs ring-1 ring-licorice/10 backdrop-blur-xs">
                                                     {prod.station || "kitchen"}
                                                 </span>
                                             </div>
                                         </div>
 
-                                        {/* Content */}
-                                        <div className="flex flex-1 flex-col justify-between p-4">
-                                            <div>
-                                                <div className="flex items-start justify-between gap-2">
-                                                    <h4 className="text-[15px] font-bold tracking-tight text-licorice line-clamp-1">
-                                                        {prod.name}
-                                                    </h4>
-                                                    <span className="font-mono text-base font-black text-licorice shrink-0">
-                                                        {formatGHS(prod.price)}
-                                                    </span>
-                                                </div>
-
-                                                {prod.description && (
-                                                    <p className="mt-1 text-xs leading-relaxed text-feldgrau line-clamp-2">
-                                                        {prod.description}
-                                                    </p>
-                                                )}
+                                        {/* Information Section Below Image (Directly on Page Background, Exactly Like Customer View) */}
+                                        <div className="mt-3 flex flex-1 flex-col px-1">
+                                            {/* Row 1: Price (left) and Round Circular Action Button (right) */}
+                                            <div className="flex items-center justify-between">
+                                                <span className="font-mono text-[16px] font-bold text-licorice">
+                                                    {formatGHS(prod.price)}
+                                                </span>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => handleOpenEditModal(prod)}
+                                                    aria-label={`Edit ${prod.name}`}
+                                                    className="relative z-20 flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-900 shadow-xs transition-colors hover:border-slate-300 hover:bg-slate-50 active:scale-95 cursor-pointer"
+                                                    title="Edit item"
+                                                >
+                                                    <PencilSquareIcon className="h-4 w-4" strokeWidth={2} />
+                                                </button>
                                             </div>
 
-                                            {/* Footer Actions & Cost */}
-                                            <div className="mt-4 flex items-center justify-between border-t border-licorice/8 pt-3">
+                                            {/* Row 2: Name - Full height, never clamped */}
+                                            <button
+                                                type="button"
+                                                onClick={() => handleOpenEditModal(prod)}
+                                                className="mt-1 text-left cursor-pointer"
+                                            >
+                                                <h3 className="text-[14px] font-bold leading-snug tracking-tight text-licorice hover:text-licorice/80 transition-colors">
+                                                    {prod.name}
+                                                </h3>
+                                            </button>
+
+                                            {/* Row 3: Description - Full height, never clamped */}
+                                            {prod.description && (
+                                                <p className="mt-1 text-[11.5px] leading-[1.45] text-feldgrau">
+                                                    {prod.description}
+                                                </p>
+                                            )}
+
+                                            {/* Row 4: Manager Controls (Cost, In/Out Stock status toggle, Delete) */}
+                                            <div className="mt-2.5 flex items-center justify-between pt-1">
                                                 <div className="text-[11px] text-feldgrau">
                                                     {prod.cost_price ? (
                                                         <span>
@@ -738,7 +764,7 @@ export function MenuManagerScreen({ venueId }: { venueId?: string } = {}) {
                                                             )}
                                                         </span>
                                                     ) : (
-                                                        <span className="italic text-feldgrau/50">No cost set</span>
+                                                        <span className="italic text-feldgrau/40 text-[10px]">No cost</span>
                                                     )}
                                                 </div>
 
@@ -747,7 +773,7 @@ export function MenuManagerScreen({ venueId }: { venueId?: string } = {}) {
                                                         type="button"
                                                         onClick={() => handleToggleActive(prod)}
                                                         className={clsx(
-                                                            "inline-flex items-center gap-1 rounded-lg px-2 py-1 text-[11px] font-bold transition-all",
+                                                            "inline-flex items-center gap-1 rounded-lg px-2 py-0.5 text-[10px] font-bold transition-all cursor-pointer",
                                                             prod.is_active
                                                                 ? "bg-emerald-50 text-emerald-700 hover:bg-emerald-100 ring-1 ring-emerald-600/20"
                                                                 : "bg-red-50 text-red-700 hover:bg-red-100 ring-1 ring-red-600/20"
@@ -759,24 +785,16 @@ export function MenuManagerScreen({ venueId }: { venueId?: string } = {}) {
                                                     </button>
                                                     <button
                                                         type="button"
-                                                        onClick={() => handleOpenEditModal(prod)}
-                                                        className="flex h-8 w-8 items-center justify-center rounded-lg bg-isabelline text-licorice hover:bg-licorice hover:text-isabelline transition-colors"
-                                                        title="Edit menu item"
-                                                    >
-                                                        <PencilSquareIcon className="h-4 w-4" strokeWidth={2} />
-                                                    </button>
-                                                    <button
-                                                        type="button"
                                                         onClick={() => setPendingDeleteProduct(prod)}
-                                                        className="flex h-8 w-8 items-center justify-center rounded-lg bg-red-50 text-red-600 hover:bg-red-600 hover:text-white transition-colors"
+                                                        className="flex h-6 w-6 items-center justify-center rounded-lg bg-red-50 text-red-600 hover:bg-red-600 hover:text-white transition-colors cursor-pointer"
                                                         title="Delete item"
                                                     >
-                                                        <TrashIcon className="h-4 w-4" strokeWidth={2} />
+                                                        <TrashIcon className="h-3 w-3" strokeWidth={2} />
                                                     </button>
                                                 </div>
                                             </div>
                                         </div>
-                                    </div>
+                                    </article>
                                 );
                             })}
                         </div>

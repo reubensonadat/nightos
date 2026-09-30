@@ -92,9 +92,10 @@ export function CartScreen({ venueId, tableLabel, tablePin, billId, customerSess
     });
 
     // Venue-driven bill math (falls back to 12.5% only until the venue loads)
-    const [venueTax, setVenueTax] = useState<{ vatPct: number; taxInclusive: boolean }>({
+    const [venueTax, setVenueTax] = useState<{ vatPct: number; taxInclusive: boolean; serviceChargePct: number }>({
         vatPct: 12.5,
         taxInclusive: true,
+        serviceChargePct: 0,
     });
 
     useEffect(() => {
@@ -104,6 +105,7 @@ export function CartScreen({ venueId, tableLabel, tablePin, billId, customerSess
             setVenueTax({
                 vatPct: data.vat_pct ?? 12.5,
                 taxInclusive: data.tax_inclusive ?? true,
+                serviceChargePct: data.service_charge_pct ?? 0,
             });
         });
         return () => {
@@ -147,7 +149,7 @@ export function CartScreen({ venueId, tableLabel, tablePin, billId, customerSess
             depositPaid,
             venueTax.vatPct,
             venueTax.taxInclusive,
-            10
+            venueTax.serviceChargePct
         );
     }, [combinedSubtotal, depositAmount, depositPaid, venueTax]);
 
@@ -631,19 +633,23 @@ export function CartScreen({ venueId, tableLabel, tablePin, billId, customerSess
                     {/* Rows */}
                     <div className="space-y-2 px-4 py-3">
                         <div className="flex items-center justify-between text-[12px]">
-                            <span className="tracking-tight text-isabelline/70">Orders Subtotal</span>
-                            <span className="font-mono font-bold tabular-nums text-isabelline">
-                                {formatGHS(combinedSubtotal)}
-                            </span>
-                        </div>
-                        <div className="flex items-center justify-between text-[12px]">
                             <span className="tracking-tight text-isabelline/70">
-                                Service Charge <span className="text-isabelline/40">(10%)</span>
+                                Orders Subtotal{venueTax.taxInclusive && venueTax.vatPct > 0 ? " (excl. VAT)" : ""}
                             </span>
                             <span className="font-mono font-bold tabular-nums text-isabelline">
-                                {formatGHS(billBreakdown.serviceCharge)}
+                                {formatGHS(billBreakdown.subtotal)}
                             </span>
                         </div>
+                        {billBreakdown.serviceCharge > 0 && (
+                            <div className="flex items-center justify-between text-[12px]">
+                                <span className="tracking-tight text-isabelline/70">
+                                    Service Charge <span className="text-isabelline/40">({venueTax.serviceChargePct}%)</span>
+                                </span>
+                                <span className="font-mono font-bold tabular-nums text-isabelline">
+                                    {formatGHS(billBreakdown.serviceCharge)}
+                                </span>
+                            </div>
+                        )}
                         {venueTax.vatPct > 0 && (
                             <div className="flex items-center justify-between text-[12px]">
                                 <span className="tracking-tight text-isabelline/70">
