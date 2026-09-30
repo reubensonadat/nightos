@@ -63,11 +63,13 @@ function orderStatus(s: string): OrderStatus {
     return "pending";
 }
 
-function rowToOrder(row: DbKitchenOrderRow, waiterNames: Record<string, string>): KitchenOrder {
+function rowToOrder(row: DbKitchenOrderRow, waiterNames: Record<string, string>, activeStaffIds: Set<string>): KitchenOrder {
     const bill = Array.isArray(row.bills) ? row.bills[0] : row.bills;
     const table = Array.isArray(bill?.tables) ? bill?.tables[0] : bill?.tables;
     // Map the parent bill's status to isCancelled
     const isCancelled = (bill as { status?: string } | null)?.status === "cancelled";
+    const billWaiterId = bill?.waiter_id || null;
+    const isWaiterOnDuty = billWaiterId ? activeStaffIds.has(billWaiterId) : false;
 
     return {
         id: row.id,
@@ -75,8 +77,8 @@ function rowToOrder(row: DbKitchenOrderRow, waiterNames: Record<string, string>)
         station: mapStation(row.station),
         status: orderStatus(row.status),
         placedAt: row.created_at,
-        server: bill?.waiter_id
-            ? waiterNames[bill.waiter_id] ?? "—"
+        server: isWaiterOnDuty && billWaiterId
+            ? waiterNames[billWaiterId] ?? "—"
             : "—",
         items: (row.order_items ?? []).map((oi) => ({
             name: oi.product_name,
@@ -121,13 +123,19 @@ export function KitchenDisplayScreen({ venueId, staffId, staffName, onExit, onSi
 
     /* ── Load real orders ── */
     const load = useCallback(async () => {
-        const { data: rows, error: dbError } = await db.kitchenOrders(venueId);
-        if (dbError || !rows) {
+        const [ordersRes, shiftsRes] = await Promise.all([
+            db.kitchenOrders(venueId),
+            db.activeShiftsByVenue(venueId),
+        ]);
+        const rows = ordersRes.data;
+        if (ordersRes.error || !rows) {
             setError("Couldn't load orders — check your connection.");
             setLoading(false);
             return;
         }
         setError(null);
+
+        const activeStaffIds = new Set((shiftsRes.data ?? []).map((s: any) => s.staff_id));
 
         // waiter names for the cards
         const waiterIds = Array.from(
@@ -138,7 +146,7 @@ export function KitchenDisplayScreen({ venueId, staffId, staffName, onExit, onSi
         const waiterNames: Record<string, string> = {};
         for (const s of staffRows ?? []) waiterNames[s.id] = s.name;
 
-        setOrders(rows.map((r) => rowToOrder(r, waiterNames)));
+        setOrders(rows.map((r) => rowToOrder(r, waiterNames, activeStaffIds)));
         setLoading(false);
     }, [venueId]);
 

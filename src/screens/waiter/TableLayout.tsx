@@ -4,6 +4,7 @@ import { db } from "../../lib/api";
 import type { Table } from "./TablesDashboard";
 import { useAuth } from "../../context/AuthContext";
 import { ExclamationTriangleIcon } from "@heroicons/react/24/outline";
+import { LoadingScreen } from "../../components/LoadingScreen";
 
 export function TableLayout() {
     const { tableId } = useParams<{ tableId: string }>();
@@ -50,11 +51,7 @@ export function TableLayout() {
     }, [tableId]);
 
     if (loading) {
-        return (
-            <div className="min-h-svh bg-isabelline flex items-center justify-center">
-                <div className="w-8 h-8 border-2 border-licorice/20 border-t-licorice rounded-full animate-spin" />
-            </div>
-        );
+        return <LoadingScreen />;
     }
 
     if (!table) {

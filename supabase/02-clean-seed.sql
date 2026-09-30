@@ -55,15 +55,13 @@ BEGIN
     VALUES
         (v_staff_owner, v_venue_id, 'Kofi Mensah (Owner)', '+233501234567', 'kofi@thevelvetroom.com', 'owner', true, 10, 'All', 50.00),
         (v_staff_manager, v_venue_id, 'Ama Serwaa (Manager)', '+233507654321', 'ama@thevelvetroom.com', 'manager', true, 10, 'All', 35.00),
-        (v_staff_waiter1, v_venue_id, 'Kwame Boateng (Waiter)', '+233241112233', 'kwame@thevelvetroom.com', 'waiter', true, 6, 'Main Hall', 20.00),
         (v_staff_kitchen, v_venue_id, 'Chef Akwasi (Kitchen)', '+233242223344', 'chef@thevelvetroom.com', 'kitchen', true, 0, 'Kitchen', 30.00),
         (v_staff_bar, v_venue_id, 'Barista Esi (Bar)', '+233243334455', 'esi@thevelvetroom.com', 'bar', true, 0, 'Bar', 25.00)
     ON CONFLICT (id) DO NOTHING;
 
-    -- Active Shift for waiter & kitchen
+    -- Active Shift for kitchen & bar (waiters clock in when on duty)
     INSERT INTO public.staff_shifts (venue_id, staff_id, status, supervisor_approved)
     VALUES
-        (v_venue_id, v_staff_waiter1, 'active', true),
         (v_venue_id, v_staff_kitchen, 'active', true),
         (v_venue_id, v_staff_bar, 'active', true);
 

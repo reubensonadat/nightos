@@ -684,6 +684,11 @@ export function ShiftReportScreen({ venueId, isModal = false, onClose }: Props) 
         return map;
     }, [staffList]);
 
+    // Set of active staff IDs on shift
+    const activeStaffIds = useMemo(() => {
+        return new Set((shifts || []).map((s: any) => s.staff_id));
+    }, [shifts]);
+
     // Build List of Flat Order Transactions linked to Waiters & Table Payment Status
     const rawTransactions = useMemo<ShiftOrderTransaction[]>(() => {
         const paymentByBillMap = new Map<string, any[]>();
@@ -701,8 +706,8 @@ export function ShiftReportScreen({ venueId, isModal = false, onClose }: Props) 
             const bill = sub.bill_id ? billMap.get(sub.bill_id) || sub.bills : sub.bills;
             const waiterId = bill?.waiter_id || null;
             const staffObj = waiterId ? staffMap.get(waiterId) : null;
-            const waiterName = staffObj ? staffObj.name : "House / Direct Bar";
-            const waiterRole = staffObj ? staffObj.role : "Staff";
+            const waiterName = staffObj ? staffObj.name : "Unassigned";
+            const waiterRole = staffObj ? staffObj.role : "Unassigned";
 
             // Extract table label
             const tablesObj = Array.isArray(bill?.tables) ? bill?.tables[0] : bill?.tables;
@@ -804,11 +809,11 @@ export function ShiftReportScreen({ venueId, isModal = false, onClose }: Props) 
             });
         });
 
-        // Add "House / Direct Bar" bucket if needed
+        // Add "Unassigned" bucket if needed
         summariesMap.set("HOUSE", {
             staffId: "HOUSE",
-            name: "House / Direct Bar",
-            role: "Station",
+            name: "Unassigned",
+            role: "Unassigned",
             isActive: true,
             ordersCount: 0,
             itemsCount: 0,

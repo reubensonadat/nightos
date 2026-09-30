@@ -82,10 +82,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const currentUserIdRef = useRef<string | null>(null)
   const lastPhoneRef = useRef<string | null>(null)
 
+  const extractUserName = (u?: AuthUser | null, email?: string | null): string => {
+    const meta = u?.user_metadata
+    if (meta?.full_name && typeof meta.full_name === 'string' && meta.full_name.trim()) return meta.full_name.trim()
+    if (meta?.name && typeof meta.name === 'string' && meta.name.trim()) return meta.name.trim()
+    if (meta?.first_name && typeof meta.first_name === 'string' && meta.first_name.trim()) {
+      return `${meta.first_name} ${meta.last_name || ''}`.trim()
+    }
+    if (email && email.includes('@')) {
+      const username = email.split('@')[0]
+      return username.charAt(0).toUpperCase() + username.slice(1)
+    }
+    return 'Manager'
+  }
+
   const loadUserData = async (
     userId: string,
     userPhone: string | null = null,
     userEmail: string | null = null,
+    authUser?: AuthUser | null,
   ): Promise<string | null> => {
     if (!userId) {
       setProfile(null)
@@ -95,6 +110,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setStaffSession(null)
       return null
     }
+
+    const currentAuthUser = authUser || user
+    const resolvedPersonName = extractUserName(currentAuthUser, userEmail)
 
     // 0. Auto-claim venue ownership if authenticated user's phone matches venue phone
     try {
@@ -117,7 +135,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         id: userId,
         email: userEmail ?? (active.email || null),
         phone_number: userPhone ?? (active.phone || null),
-        name: active.name || null,
+        name: resolvedPersonName,
       })
       if (active.brand_primary || active.brand_accent) {
         applyBrandTheme(active.brand_primary, active.brand_accent, active.brand_secondary);
@@ -149,7 +167,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           id: userId,
           email: userEmail ?? (venueObj.email || null),
           phone_number: rawPhone,
-          name: venueObj.name || null,
+          name: resolvedPersonName,
         })
         if (venueObj.brand_primary || venueObj.brand_accent) {
           applyBrandTheme(venueObj.brand_primary, venueObj.brand_accent, venueObj.brand_secondary);
@@ -186,7 +204,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             id: userId,
             email: (fullStaffData.email as string) || userEmail,
             phone_number: (fullStaffData.phone as string) || rawPhone,
-            name: fullStaffData.name as string,
+            name: (fullStaffData.name as string) || resolvedPersonName,
           })
 
           try {
@@ -231,7 +249,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           id: userId,
           email: rawEmail,
           phone_number: staffByEmail.phone,
-          name: staffByEmail.name,
+          name: staffByEmail.name || resolvedPersonName,
         })
 
         try {
@@ -261,7 +279,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           id: userId,
           email: rawEmail,
           phone_number: venueObj.phone || null,
-          name: venueObj.name || null,
+          name: resolvedPersonName,
         })
         return 'owner'
       }

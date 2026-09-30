@@ -17,6 +17,7 @@ import { sounds } from "../../lib/sound";
 import toast from "react-hot-toast";
 import type { Table } from "./TablesDashboard";
 import { ConfirmModal } from "../../components/ConfirmModal";
+import { LoadingScreen } from "../../components/LoadingScreen";
 
 /* ────────────────────────── Payment methods ────────────────────────── */
 
@@ -330,11 +331,7 @@ export function InvoiceSettlementScreen() {
 
     /* ── Loading / no bill state ── */
     if (loading) {
-        return (
-            <main className="relative min-h-svh w-full overflow-x-hidden bg-isabelline font-sans text-licorice antialiased flex items-center justify-center">
-                <div className="h-8 w-8 animate-spin rounded-full border-2 border-licorice/20 border-t-licorice" />
-            </main>
-        );
+        return <LoadingScreen />;
     }
 
     if (!bill) {
