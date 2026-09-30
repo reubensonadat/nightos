@@ -130,3 +130,66 @@ export function calculateDynamicPaystackSplit(
     transactionChargePesewas: Math.round(totalFee * 100),
   };
 }
+
+/**
+ * Table Deposit & Consumable Credit Ledger:
+ * - Upfront Minimum Spend Deposit paid (e.g. GH₵ 2,000 via Paystack).
+ * - Drinks, food, and active orders deduct from this deposit credit balance.
+ * - Remaining Credit is shown to guest while balance > 0 (bill due = 0).
+ * - When credit is exhausted, subsequent orders accumulate as excess payable bill.
+ * - Cancelled orders are strictly excluded.
+ */
+export type BillDepositBreakdown = {
+  subtotal: number;
+  serviceCharge: number;
+  vat: number;
+  grossConsumed: number;
+  depositAmount: number;
+  depositPaid: boolean;
+  remainingCredit: number;
+  amountDue: number;
+  isExhausted: boolean;
+};
+
+export function computeBillWithDeposit(
+  grossItems: number,
+  depositAmount: number = 0,
+  depositPaid: boolean = false,
+  vatPct: number = 0,
+  taxInclusive: boolean = true,
+  serviceChargePct: number = 10
+): BillDepositBreakdown {
+  const serviceCharge = Math.round(grossItems * (Math.max(serviceChargePct, 0) / 100) * 100) / 100;
+  let subtotal = grossItems;
+  let vat = 0;
+
+  if (vatPct > 0) {
+    if (taxInclusive) {
+      subtotal = Math.round((grossItems / (1 + vatPct / 100)) * 100) / 100;
+      vat = Math.round((grossItems - subtotal) * 100) / 100;
+    } else {
+      vat = Math.round(grossItems * (vatPct / 100) * 100) / 100;
+    }
+  }
+
+  const grossConsumed = taxInclusive
+    ? Math.round((grossItems + serviceCharge) * 100) / 100
+    : Math.round((subtotal + serviceCharge + vat) * 100) / 100;
+
+  const validDeposit = depositPaid ? Math.max(depositAmount, 0) : 0;
+  const remainingCredit = Math.max(0, Math.round((validDeposit - grossConsumed) * 100) / 100);
+  const amountDue = Math.max(0, Math.round((grossConsumed - validDeposit) * 100) / 100);
+  const isExhausted = validDeposit > 0 && remainingCredit === 0;
+
+  return {
+    subtotal,
+    serviceCharge,
+    vat,
+    grossConsumed,
+    depositAmount: validDeposit,
+    depositPaid,
+    remainingCredit,
+    amountDue,
+    isExhausted,
+  };
+}

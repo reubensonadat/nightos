@@ -12,8 +12,9 @@ import toast from "react-hot-toast";
 import { formatGHS } from "../data/menu";
 import { getLineUnitPrice, useCart } from "../context/CartContext";
 import type { OrderSummary } from "./OrderTrackingScreen";
-import { db, type DbOrderItem } from "../lib/api";
+import { db, type DbOrderItem, type DbBill } from "../lib/api";
 import { useRealtime } from "../hooks/useRealtime";
+import { computeBillWithDeposit } from "../lib/fees";
 
 import { TablePinBanner } from "../components/TablePinBanner";
 import { LoadingScreen } from "../components/LoadingScreen";
@@ -110,29 +111,52 @@ export function CartScreen({ venueId, tableLabel, tablePin, billId, customerSess
         };
     }, [venueId]);
 
+    // Active Bill and table deposit credit status
+    const [bill, setBill] = useState<DbBill | null>(null);
+
+    useEffect(() => {
+        if (!billId) return;
+        let active = true;
+        db.billById(billId).then(({ data }) => {
+            if (active && data) setBill(data as DbBill);
+        });
+        return () => {
+            active = false;
+        };
+    }, [billId]);
+
+    useRealtime({
+        table: 'bills',
+        filter: billId ? `id=eq.${billId}` : undefined,
+        onUpdate: (updatedRow: Record<string, unknown>) => {
+            setBill((prev) => (prev ? ({ ...prev, ...updatedRow } as DbBill) : null));
+        },
+    });
+
     const draftSubtotal = subtotal;
     const placedSubtotal = placedItems.reduce((acc, i) => acc + Number(i.line_total || 0), 0);
     const combinedSubtotal = draftSubtotal + placedSubtotal;
 
+    const depositAmount = Number(bill?.deposit_amount || 0);
+    const depositPaid = Boolean(bill?.deposit_paid);
+
+    const billBreakdown = useMemo(() => {
+        return computeBillWithDeposit(
+            combinedSubtotal,
+            depositAmount,
+            depositPaid,
+            venueTax.vatPct,
+            venueTax.taxInclusive,
+            10
+        );
+    }, [combinedSubtotal, depositAmount, depositPaid, venueTax]);
+
     const { vat, total } = useMemo(() => {
-        if (venueTax.vatPct <= 0) {
-            return { vat: 0, total: combinedSubtotal };
-        }
-        if (venueTax.taxInclusive) {
-            const net = combinedSubtotal / (1 + venueTax.vatPct / 100);
-            const tax = combinedSubtotal - net;
-            return {
-                vat: Math.round(tax * 100) / 100,
-                total: combinedSubtotal,
-            };
-        } else {
-            const tax = Math.round(combinedSubtotal * (venueTax.vatPct / 100) * 100) / 100;
-            return {
-                vat: tax,
-                total: Math.round((combinedSubtotal + tax) * 100) / 100,
-            };
-        }
-    }, [combinedSubtotal, venueTax]);
+        return {
+            vat: billBreakdown.vat,
+            total: depositAmount > 0 && depositPaid ? billBreakdown.amountDue : billBreakdown.grossConsumed,
+        };
+    }, [billBreakdown, depositAmount, depositPaid]);
 
     const handleSendToKitchen = async () => {
         if (!billId || !customerSessionId) {
@@ -597,7 +621,7 @@ export function CartScreen({ venueId, tableLabel, tablePin, billId, customerSess
                     {/* Header */}
                     <div className="flex items-center justify-between border-b border-isabelline/10 px-4 py-3">
                         <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-khaki">
-                            Bill Summary
+                            {depositAmount > 0 && depositPaid ? "Bill & Deposit Ledger" : "Bill Summary"}
                         </span>
                         <span className="text-[10px] font-bold uppercase tracking-wider text-isabelline/50">
                             Table {tableLabel ?? "—"}
@@ -607,29 +631,70 @@ export function CartScreen({ venueId, tableLabel, tablePin, billId, customerSess
                     {/* Rows */}
                     <div className="space-y-2 px-4 py-3">
                         <div className="flex items-center justify-between text-[12px]">
-                            <span className="tracking-tight text-isabelline/70">Subtotal</span>
+                            <span className="tracking-tight text-isabelline/70">Orders Subtotal</span>
                             <span className="font-mono font-bold tabular-nums text-isabelline">
                                 {formatGHS(combinedSubtotal)}
                             </span>
                         </div>
                         <div className="flex items-center justify-between text-[12px]">
                             <span className="tracking-tight text-isabelline/70">
-                                VAT <span className="text-isabelline/40">({venueTax.vatPct}%)</span>
+                                Service Charge <span className="text-isabelline/40">(10%)</span>
                             </span>
                             <span className="font-mono font-bold tabular-nums text-isabelline">
-                                {formatGHS(vat)}
+                                {formatGHS(billBreakdown.serviceCharge)}
                             </span>
                         </div>
+                        {venueTax.vatPct > 0 && (
+                            <div className="flex items-center justify-between text-[12px]">
+                                <span className="tracking-tight text-isabelline/70">
+                                    VAT <span className="text-isabelline/40">({venueTax.vatPct}%)</span>
+                                </span>
+                                <span className="font-mono font-bold tabular-nums text-isabelline">
+                                    {formatGHS(billBreakdown.vat)}
+                                </span>
+                            </div>
+                        )}
+                        <div className="flex items-center justify-between text-[12px] pt-1 border-t border-isabelline/10">
+                            <span className="tracking-tight text-isabelline/80 font-medium">Gross Consumed Spend</span>
+                            <span className="font-mono font-bold tabular-nums text-isabelline">
+                                {formatGHS(billBreakdown.grossConsumed)}
+                            </span>
+                        </div>
+
+                        {depositAmount > 0 && depositPaid && (
+                            <>
+                                <div className="flex items-center justify-between text-[12px] text-khaki">
+                                    <span className="tracking-tight font-medium">Prepaid Table Deposit</span>
+                                    <span className="font-mono font-bold tabular-nums">
+                                        -{formatGHS(depositAmount)}
+                                    </span>
+                                </div>
+                                {billBreakdown.remainingCredit > 0 && (
+                                    <div className="flex items-center justify-between text-[12px] rounded-lg bg-emerald-500/10 px-2.5 py-1.5 ring-1 ring-emerald-500/20">
+                                        <span className="text-emerald-400 font-bold text-[11px] uppercase tracking-wider">
+                                            Remaining Table Credit
+                                        </span>
+                                        <span className="font-mono font-bold tabular-nums text-emerald-300">
+                                            {formatGHS(billBreakdown.remainingCredit)}
+                                        </span>
+                                    </div>
+                                )}
+                            </>
+                        )}
                     </div>
 
                     {/* Grand total */}
                     <div className="flex items-end justify-between border-t border-isabelline/10 px-4 py-4">
                         <div>
                             <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-khaki">
-                                Grand Total
+                                {depositAmount > 0 && depositPaid
+                                    ? (billBreakdown.amountDue > 0 ? "Excess Amount Due" : "Amount Due Now")
+                                    : "Grand Total"}
                             </p>
                             <p className="text-[10px] font-medium tracking-tight text-isabelline/50">
-                                Pay after your meal
+                                {depositAmount > 0 && depositPaid
+                                    ? (billBreakdown.amountDue > 0 ? "Deposit exhausted · pay excess" : "Fully covered by upfront deposit")
+                                    : "Pay after your meal"}
                             </p>
                         </div>
                         <span className="font-mono text-[22px] font-black tabular-nums text-isabelline">
@@ -699,37 +764,53 @@ export function CartScreen({ venueId, tableLabel, tablePin, billId, customerSess
                 </div>
             ) : hasPlaced && onPayBill ? (
                 <div className="fixed inset-x-0 bottom-[calc(60px+env(safe-area-inset-bottom))] z-40 flex justify-center px-5 pb-[max(env(safe-area-inset-bottom),18px)] pt-3 bg-gradient-to-t from-isabelline via-isabelline/95 to-transparent">
-                    <button
-                        type="button"
-                        onClick={onPayBill}
-                        className="
-                            group flex w-full max-w-md md:max-w-2xl items-center justify-between
-                            gap-3 rounded-full bg-licorice px-6 py-4
-                            shadow-[0_20px_50px_rgba(35,20,12,0.25)]
-                            ring-1 ring-licorice/80
-                            transition-all duration-200 ease-out
-                            hover:bg-licorice/95 hover:shadow-[0_24px_60px_rgba(35,20,12,0.30)]
-                            active:scale-[0.985]
-                            focus:outline-none focus-visible:ring-2 focus-visible:ring-khaki
-                        "
-                    >
-                        <span className="flex flex-col items-start leading-tight">
-                            <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-khaki">
-                                Table Balance Due
+                    {depositAmount > 0 && depositPaid && billBreakdown.amountDue === 0 ? (
+                        <div className="flex w-full max-w-md md:max-w-2xl items-center justify-between gap-3 rounded-full bg-licorice px-6 py-4 shadow-[0_20px_50px_rgba(35,20,12,0.25)] ring-1 ring-emerald-500/40">
+                            <span className="flex flex-col items-start leading-tight">
+                                <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-emerald-400">
+                                    Prepaid Deposit Active
+                                </span>
+                                <span className="text-[15px] font-bold tracking-tight text-isabelline">
+                                    {formatGHS(billBreakdown.remainingCredit)} Credit Remaining
+                                </span>
                             </span>
-                            <span className="text-[15px] font-bold tracking-tight text-isabelline">
-                                Pay Bill Now
-                            </span>
-                        </span>
-                        <div className="flex items-center gap-3">
-                            <span className="font-mono text-[16px] font-bold text-khaki">
-                                {formatGHS(total)}
-                            </span>
-                            <span className="flex h-9 w-9 items-center justify-center rounded-full bg-khaki text-licorice transition-transform duration-200 group-hover:translate-x-0.5">
-                                <ArrowRightIcon className="h-4 w-4" strokeWidth={2.5} />
+                            <span className="rounded-full bg-emerald-500/20 px-3.5 py-1.5 text-[11px] font-bold text-emerald-300 ring-1 ring-emerald-500/30">
+                                Covered
                             </span>
                         </div>
-                    </button>
+                    ) : (
+                        <button
+                            type="button"
+                            onClick={onPayBill}
+                            className="
+                                group flex w-full max-w-md md:max-w-2xl items-center justify-between
+                                gap-3 rounded-full bg-licorice px-6 py-4
+                                shadow-[0_20px_50px_rgba(35,20,12,0.25)]
+                                ring-1 ring-licorice/80
+                                transition-all duration-200 ease-out
+                                hover:bg-licorice/95 hover:shadow-[0_24px_60px_rgba(35,20,12,0.30)]
+                                active:scale-[0.985]
+                                focus:outline-none focus-visible:ring-2 focus-visible:ring-khaki
+                            "
+                        >
+                            <span className="flex flex-col items-start leading-tight">
+                                <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-khaki">
+                                    {depositAmount > 0 && depositPaid ? "Deposit Exhausted" : "Table Balance Due"}
+                                </span>
+                                <span className="text-[15px] font-bold tracking-tight text-isabelline">
+                                    {depositAmount > 0 && depositPaid ? "Pay Excess Bill" : "Pay Bill Now"}
+                                </span>
+                            </span>
+                            <div className="flex items-center gap-3">
+                                <span className="font-mono text-[16px] font-bold text-khaki">
+                                    {formatGHS(total)}
+                                </span>
+                                <span className="flex h-9 w-9 items-center justify-center rounded-full bg-khaki text-licorice transition-transform duration-200 group-hover:translate-x-0.5">
+                                    <ArrowRightIcon className="h-4 w-4" strokeWidth={2.5} />
+                                </span>
+                            </div>
+                        </button>
+                    )}
                 </div>
             ) : null}
         </main>

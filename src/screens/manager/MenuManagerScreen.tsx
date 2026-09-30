@@ -75,6 +75,7 @@ export function MenuManagerScreen({ venueId }: { venueId?: string } = {}) {
     const [loading, setLoading] = useState(true);
     const [search, setSearch] = useState("");
     const [selectedCategory, setSelectedCategory] = useState<string>("All");
+    const [availabilityFilter, setAvailabilityFilter] = useState<"all" | "active" | "inactive">("all");
 
     // Modals & Drawers
     const [editingProduct, setEditingProduct] = useState<Partial<DbProduct> | null>(null);
@@ -131,7 +132,7 @@ export function MenuManagerScreen({ venueId }: { venueId?: string } = {}) {
         setLoading(true);
         try {
             const [prodRes, catRes] = await Promise.all([
-                db.products(venue.id),
+                db.products(venue.id, true),
                 db.menuCategories(venue.id),
             ]);
 
@@ -214,9 +215,16 @@ export function MenuManagerScreen({ venueId }: { venueId?: string } = {}) {
         return map;
     }, [categories]);
 
+    // ────────────────────────── Stock Counts ──────────────────────────
+    const activeCount = useMemo(() => products.filter((p) => p.is_active).length, [products]);
+    const inactiveCount = useMemo(() => products.filter((p) => !p.is_active).length, [products]);
+
     // ────────────────────────── Filtered Products ──────────────────────────
     const filteredProducts = useMemo(() => {
         return products.filter((p) => {
+            if (availabilityFilter === "active" && !p.is_active) return false;
+            if (availabilityFilter === "inactive" && p.is_active) return false;
+
             const matchesSearch =
                 p.name.toLowerCase().includes(search.toLowerCase()) ||
                 (p.description && p.description.toLowerCase().includes(search.toLowerCase()));
@@ -227,7 +235,7 @@ export function MenuManagerScreen({ venueId }: { venueId?: string } = {}) {
             const catName = p.category_id ? catNameById.get(p.category_id) : "Uncategorized";
             return catName?.toLowerCase() === selectedCategory.toLowerCase();
         });
-    }, [products, search, selectedCategory, catNameById]);
+    }, [products, search, selectedCategory, availabilityFilter, catNameById]);
 
     // ────────────────────────── Save / Edit Product ──────────────────────────
     const handleOpenCreateModal = () => {
@@ -303,7 +311,8 @@ export function MenuManagerScreen({ venueId }: { venueId?: string } = {}) {
         setProducts((prev) => prev.map((p) => (p.id === product.id ? { ...p, is_active: nextState } : p)));
         try {
             await db.updateProduct(product.id, venue.id, { is_active: nextState });
-            toast.success(`${product.name} is now ${nextState ? "Available" : "Out of Stock"}`);
+            toast.success(`${product.name} is now ${nextState ? "Available (In Stock)" : "Out of Stock"}`);
+            fetchMenuData();
         } catch {
             fetchMenuData();
             toast.error("Failed to update status.");
@@ -400,7 +409,7 @@ export function MenuManagerScreen({ venueId }: { venueId?: string } = {}) {
                             <span className="text-xs font-bold uppercase tracking-wider text-khaki">
                                 POS Menu Catalog
                             </span>
-                            <span className="text-xs font-semibold text-feldgrau/60">• {products.length} Active Products</span>
+                            <span className="text-xs font-semibold text-feldgrau/60">• {products.length} Products ({activeCount} in stock, {inactiveCount} out of stock)</span>
                         </div>
                         <h1 className="mt-0.5 text-2xl font-black tracking-tight text-licorice">
                             Menu & Catalog Management
@@ -511,17 +520,61 @@ export function MenuManagerScreen({ venueId }: { venueId?: string } = {}) {
             {activeTab === "menu" && (
                 <main className="mx-auto max-w-7xl pt-6">
                     {/* Search & Category Filter Bar */}
-                    <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-                        {/* Search input */}
-                        <div className="relative flex-1 max-w-md">
-                            <MagnifyingGlassIcon className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-feldgrau" strokeWidth={2} />
-                            <input
-                                type="text"
-                                value={search}
-                                onChange={(e) => setSearch(e.target.value)}
-                                placeholder="Search menu items, ingredients, descriptions…"
-                                className="w-full rounded-xl bg-white pl-10 pr-4 py-2.5 text-xs font-medium text-licorice ring-1 ring-licorice/8 focus:outline-none focus:ring-2 focus:ring-licorice/20 shadow-xs placeholder:text-feldgrau/50 transition-all"
-                            />
+                    <div className="flex flex-col gap-3">
+                        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                            {/* Search input */}
+                            <div className="relative flex-1 max-w-md">
+                                <MagnifyingGlassIcon className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-feldgrau" strokeWidth={2} />
+                                <input
+                                    type="text"
+                                    value={search}
+                                    onChange={(e) => setSearch(e.target.value)}
+                                    placeholder="Search menu items, ingredients, descriptions…"
+                                    className="w-full rounded-xl bg-white pl-10 pr-4 py-2.5 text-xs font-medium text-licorice ring-1 ring-licorice/8 focus:outline-none focus:ring-2 focus:ring-licorice/20 shadow-xs placeholder:text-feldgrau/50 transition-all"
+                                />
+                            </div>
+
+                            {/* Stock Availability Filter Chips */}
+                            <div className="flex items-center gap-1 rounded-xl bg-white p-1 ring-1 ring-licorice/8 shrink-0 self-start sm:self-auto shadow-xs">
+                                <button
+                                    type="button"
+                                    onClick={() => setAvailabilityFilter("all")}
+                                    className={clsx(
+                                        "rounded-lg px-3 py-1.5 text-[11px] font-bold transition-all",
+                                        availabilityFilter === "all"
+                                            ? "bg-licorice text-isabelline shadow-xs"
+                                            : "text-feldgrau hover:text-licorice"
+                                    )}
+                                >
+                                    All ({products.length})
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => setAvailabilityFilter("active")}
+                                    className={clsx(
+                                        "inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[11px] font-bold transition-all",
+                                        availabilityFilter === "active"
+                                            ? "bg-emerald-600 text-white shadow-xs"
+                                            : "text-feldgrau hover:text-emerald-700"
+                                    )}
+                                >
+                                    <span className={clsx("h-1.5 w-1.5 rounded-full", availabilityFilter === "active" ? "bg-white" : "bg-emerald-500")} />
+                                    In Stock ({activeCount})
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => setAvailabilityFilter("inactive")}
+                                    className={clsx(
+                                        "inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[11px] font-bold transition-all",
+                                        availabilityFilter === "inactive"
+                                            ? "bg-red-600 text-white shadow-xs"
+                                            : "text-feldgrau hover:text-red-700"
+                                    )}
+                                >
+                                    <span className={clsx("h-1.5 w-1.5 rounded-full", availabilityFilter === "inactive" ? "bg-white" : "bg-red-500")} />
+                                    Out of Stock ({inactiveCount})
+                                </button>
+                            </div>
                         </div>
 
                         {/* Category Filter Chips */}
@@ -536,7 +589,7 @@ export function MenuManagerScreen({ venueId }: { venueId?: string } = {}) {
                                         : "bg-white text-feldgrau ring-1 ring-licorice/8 hover:text-licorice hover:bg-isabelline"
                                 )}
                             >
-                                All Items ({products.length})
+                                All Categories ({products.length})
                             </button>
                             {categories.map((c) => {
                                 const count = products.filter((p) => p.category_id === c.id).length;
@@ -632,9 +685,18 @@ export function MenuManagerScreen({ venueId }: { venueId?: string } = {}) {
                                                     {catName}
                                                 </span>
                                                 {!prod.is_active && (
-                                                    <span className="inline-flex h-6 items-center rounded-full bg-red-600 px-2.5 text-[10px] font-bold text-white shadow-xs backdrop-blur-xs">
-                                                        Out of Stock
-                                                    </span>
+                                                    <button
+                                                        type="button"
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            handleToggleActive(prod);
+                                                        }}
+                                                        className="inline-flex h-6 items-center gap-1 rounded-full bg-red-600 hover:bg-red-700 px-2.5 text-[10px] font-bold text-white shadow-xs backdrop-blur-xs transition-colors cursor-pointer"
+                                                        title="Click to reactivate this item"
+                                                    >
+                                                        <span>Out of Stock</span>
+                                                        <span className="text-[9px] opacity-80 underline">Activate</span>
+                                                    </button>
                                                 )}
                                             </div>
 
@@ -680,7 +742,21 @@ export function MenuManagerScreen({ venueId }: { venueId?: string } = {}) {
                                                     )}
                                                 </div>
 
-                                                <div className="flex items-center gap-1">
+                                                <div className="flex items-center gap-1.5">
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => handleToggleActive(prod)}
+                                                        className={clsx(
+                                                            "inline-flex items-center gap-1 rounded-lg px-2 py-1 text-[11px] font-bold transition-all",
+                                                            prod.is_active
+                                                                ? "bg-emerald-50 text-emerald-700 hover:bg-emerald-100 ring-1 ring-emerald-600/20"
+                                                                : "bg-red-50 text-red-700 hover:bg-red-100 ring-1 ring-red-600/20"
+                                                        )}
+                                                        title={prod.is_active ? "Item is active. Click to mark Out of Stock" : "Item is inactive. Click to mark In Stock"}
+                                                    >
+                                                        <span className={clsx("h-1.5 w-1.5 rounded-full shrink-0", prod.is_active ? "bg-emerald-500" : "bg-red-500")} />
+                                                        {prod.is_active ? "In Stock" : "Out of Stock"}
+                                                    </button>
                                                     <button
                                                         type="button"
                                                         onClick={() => handleOpenEditModal(prod)}

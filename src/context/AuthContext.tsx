@@ -29,13 +29,13 @@ type AuthContextValue = {
   isInitializing: boolean
   isAuthenticated: boolean
   hasVenue: boolean
-  signIn: (email: string, password: string) => Promise<{ error: AuthError | null; role: string | null }>
+  signIn: (email: string, password: string, targetVenueSlug?: string | null) => Promise<{ error: AuthError | null; role: string | null; venueSlug: string | null }>
   signUp: (email: string, password: string) => Promise<{ error: AuthError | null }>
   signInWithPhone: (phone: string) => Promise<{ error: AuthError | null }>
   signUpWithPhone: (phone: string) => Promise<{ error: AuthError | null }>
   signInWithOAuth: (provider: 'google' | 'apple') => Promise<{ error: AuthError | null }>
   resetPassword: (email: string) => Promise<{ error: AuthError | null }>
-  verifyPhoneOtp: (phone: string, token: string) => Promise<{ error: AuthError | null; role: string | null }>
+  verifyPhoneOtp: (phone: string, token: string, targetVenueSlug?: string | null) => Promise<{ error: AuthError | null; role: string | null; venueSlug: string | null }>
   signOut: () => Promise<void>
   refreshVenue: () => Promise<void>
   refreshStaffSession: () => Promise<void>
@@ -101,14 +101,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     userPhone: string | null = null,
     userEmail: string | null = null,
     authUser?: AuthUser | null,
-  ): Promise<string | null> => {
+    targetVenueSlugOrId?: string | null,
+  ): Promise<{ role: string | null; venueSlug: string | null }> => {
     if (!userId) {
       setProfile(null)
       setVenue(null)
       setVenues([])
       setRole(null)
       setStaffSession(null)
-      return null
+      return { role: null, venueSlug: null }
     }
 
     const currentAuthUser = authUser || user
@@ -121,13 +122,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       /* non-fatal */
     }
 
+    // Determine preferred venue from argument, URL, or local storage
+    const pathMatch = window.location.pathname.match(/\/v\/([^/]+)/)
+    const effectiveTarget = targetVenueSlugOrId || (pathMatch ? pathMatch[1] : null)
+
     // 1. Check if user owns venues (support multi-venue switching)
     const { data: vList } = await authDb.venuesByOwner(userId)
     if (vList && vList.length > 0) {
       const ownerVenues = vList as DbVenue[]
       setVenues(ownerVenues)
       const savedId = localStorage.getItem('nightos:active_venue_id')
-      const active = ownerVenues.find((x) => x.id === savedId) || ownerVenues[0]
+      const active = (effectiveTarget && ownerVenues.find((x) => x.slug === effectiveTarget || x.id === effectiveTarget))
+        || ownerVenues.find((x) => x.id === savedId)
+        || ownerVenues[0]
       setVenue(active)
       setRole('owner')
       setStaffSession(null)
@@ -140,7 +147,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (active.brand_primary || active.brand_accent) {
         applyBrandTheme(active.brand_primary, active.brand_accent, active.brand_secondary);
       }
-      return 'owner'
+      return { role: 'owner', venueSlug: active.slug }
     }
 
     // 2. Check if phone is linked to staff or venue
@@ -155,7 +162,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     if (rawPhone) {
       // Check if owner by phone first
-      const { data: ownerByPhone } = await authDb.venueByPhone(rawPhone)
+      const { data: ownerByPhone } = await authDb.venueByPhone(rawPhone, effectiveTarget)
       if (ownerByPhone) {
         const od = ownerByPhone as Record<string, unknown>
         const venueObj = od.venue as DbVenue
@@ -172,11 +179,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (venueObj.brand_primary || venueObj.brand_accent) {
           applyBrandTheme(venueObj.brand_primary, venueObj.brand_accent, venueObj.brand_secondary);
         }
-        return 'owner'
+        return { role: 'owner', venueSlug: venueObj.slug }
       }
 
       // Check if staff by phone
-      const { data: staffData } = await authDb.venueByStaffPhone(rawPhone)
+      const { data: staffData } = await authDb.venueByStaffPhone(rawPhone, effectiveTarget)
       if (staffData) {
         const sd = staffData as Record<string, unknown>
         const v = sd.venue as DbVenue
@@ -185,9 +192,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setRole(sd.role as string)
 
         const { data } = await supabase
-          .rpc('get_staff_profile_by_phone', { p_phone: rawPhone })
+          .rpc('get_staff_profile_by_phone', {
+            p_phone: rawPhone,
+            ...(effectiveTarget ? { p_venue_slug: effectiveTarget } : {}),
+          })
           .single()
         const fullStaffData = data as Record<string, unknown>
+        const resolvedSlug = (fullStaffData?.venue_slug as string) || v?.slug || null
 
         if (fullStaffData && fullStaffData.venue_id) {
           setStaffSession({
@@ -216,19 +227,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (v?.brand_primary || v?.brand_accent) {
           applyBrandTheme(v.brand_primary, v.brand_accent, v.brand_secondary);
         }
-        return sd.role as string
+        return { role: sd.role as string, venueSlug: resolvedSlug }
       }
     }
 
     // 3. Check if user matches a staff row by email
     const rawEmail = userEmail?.trim() || null
     if (rawEmail) {
-      const { data: staffByEmail } = await supabase
+      let staffQuery = supabase
         .from('staff')
         .select('id, name, phone, email, role, venue_id, is_active, area_assignment, max_tables, venues!inner(*)')
         .ilike('email', rawEmail)
         .eq('is_active', true)
-        .maybeSingle()
+
+      if (effectiveTarget) {
+        staffQuery = staffQuery.or(`slug.eq.${effectiveTarget},id.eq.${effectiveTarget}`, { referencedTable: 'venues' })
+      }
+
+      const { data: staffByEmail } = await staffQuery.maybeSingle()
 
       if (staffByEmail && staffByEmail.venue_id) {
         const venueObj = staffByEmail.venues as unknown as DbVenue
@@ -258,7 +274,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           /* non-fatal */
         }
 
-        return staffByEmail.role
+        return { role: staffByEmail.role, venueSlug: venueObj.slug }
       }
 
       // Check if venue matches email
@@ -281,49 +297,70 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           phone_number: venueObj.phone || null,
           name: resolvedPersonName,
         })
-        return 'owner'
+        return { role: 'owner', venueSlug: venueObj.slug }
       }
     }
 
-    // 4. Safe fallback for authenticated users: resolve to active venue instead of bouncing to /setup
-    const savedVenueId = localStorage.getItem('nightos:active_venue_id');
-    if (savedVenueId) {
-      const { data: savedVenue } = await db.venueById(savedVenueId);
-      if (savedVenue) {
-        setVenue(savedVenue);
-        setVenues([savedVenue]);
-        setRole('manager');
-        if (savedVenue.brand_primary || savedVenue.brand_accent) {
-          applyBrandTheme(savedVenue.brand_primary, savedVenue.brand_accent, savedVenue.brand_secondary);
+    // 4. Safe fallback for authenticated users: resolve to target or active venue
+    if (effectiveTarget) {
+      const { data: targetVenue } = await supabase
+        .from('venues')
+        .select('*')
+        .or(`slug.eq.${effectiveTarget},id.eq.${effectiveTarget}`)
+        .eq('is_active', true)
+        .maybeSingle()
+      if (targetVenue) {
+        const v = targetVenue as DbVenue
+        setVenue(v)
+        setVenues([v])
+        setRole('manager')
+        if (v.brand_primary || v.brand_accent) {
+          applyBrandTheme(v.brand_primary, v.brand_accent, v.brand_secondary)
         }
-        return 'manager';
+        return { role: 'manager', venueSlug: v.slug }
       }
     }
 
+    const savedVenueId = localStorage.getItem('nightos:active_venue_id')
+    if (savedVenueId) {
+      const { data: savedVenue } = await db.venueById(savedVenueId)
+      if (savedVenue && savedVenue.slug !== 'velvet-lounge') {
+        setVenue(savedVenue)
+        setVenues([savedVenue])
+        setRole('manager')
+        if (savedVenue.brand_primary || savedVenue.brand_accent) {
+          applyBrandTheme(savedVenue.brand_primary, savedVenue.brand_accent, savedVenue.brand_secondary)
+        }
+        return { role: 'manager', venueSlug: savedVenue.slug }
+      }
+    }
+
+    // Pick newest non-demo venue as fallback
     const { data: activeVenue } = await supabase
       .from('venues')
       .select('*')
       .eq('is_active', true)
-      .order('created_at', { ascending: true })
+      .neq('slug', 'velvet-lounge')
+      .order('created_at', { ascending: false })
       .limit(1)
-      .maybeSingle();
+      .maybeSingle()
 
     if (activeVenue) {
-      const v = activeVenue as DbVenue;
-      setVenue(v);
-      setVenues([v]);
-      setRole('manager');
+      const v = activeVenue as DbVenue
+      setVenue(v)
+      setVenues([v])
+      setRole('manager')
       if (v.brand_primary || v.brand_accent) {
-        applyBrandTheme(v.brand_primary, v.brand_accent, v.brand_secondary);
+        applyBrandTheme(v.brand_primary, v.brand_accent, v.brand_secondary)
       }
-      return 'manager';
+      return { role: 'manager', venueSlug: v.slug }
     }
 
     setVenue(null)
     setVenues([])
     setRole(null)
     setStaffSession(null)
-    return null
+    return { role: null, venueSlug: null }
   }
 
   useEffect(() => {
@@ -379,19 +416,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, [])
 
-  const signIn = async (email: string, password: string) => {
+  const signIn = async (email: string, password: string, targetVenueSlug?: string | null) => {
     cacheClear()
     clearMenuCache()
     const { data, error } = await supabase.auth.signInWithPassword({ email, password })
-    if (error) return { error, role: null }
+    if (error) return { error, role: null, venueSlug: null }
     if (data.user) {
       currentUserIdRef.current = data.user.id
-      const resolved = await loadUserData(data.user.id, data.user.phone, email)
+      const resolved = await loadUserData(data.user.id, data.user.phone, email, undefined, targetVenueSlug)
       setUser(data.user)
       setSession(data.session)
-      return { error: null, role: resolved }
+      return { error: null, role: resolved.role, venueSlug: resolved.venueSlug }
     }
-    return { error: null, role: null }
+    return { error: null, role: null, venueSlug: null }
   }
 
   const signInWithPhone = async (phone: string) => {
@@ -421,20 +458,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return { error }
   }
 
-  const verifyPhoneOtp = async (phone: string, token: string) => {
+  const verifyPhoneOtp = async (phone: string, token: string, targetVenueSlug?: string | null) => {
     cacheClear()
     clearMenuCache()
     const { data, error } = await supabase.auth.verifyOtp({ phone, token, type: 'sms' })
-    if (error) return { error, role: null }
+    if (error) return { error, role: null, venueSlug: null }
     if (data.user) {
       currentUserIdRef.current = data.user.id
       lastPhoneRef.current = phone
-      const resolved = await loadUserData(data.user.id, phone, data.user.email)
+      const resolved = await loadUserData(data.user.id, phone, data.user.email, undefined, targetVenueSlug)
       setUser(data.user)
       setSession(data.session)
-      return { error: null, role: resolved }
+      return { error: null, role: resolved.role, venueSlug: resolved.venueSlug }
     }
-    return { error: null, role: null }
+    return { error: null, role: null, venueSlug: null }
   }
 
   const signUp = async (email: string, password: string) => {
