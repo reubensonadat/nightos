@@ -1,5 +1,5 @@
 import { supabase } from './supabase';
-import { cached, cacheInvalidate, TTL } from './cache';
+import { cached, cacheInvalidate, cacheClear, TTL } from './cache';
 import { calculateDynamicPaystackSplit, type DynamicPaystackSplit } from './fees';
 
 /**
@@ -883,32 +883,51 @@ export const db = {
   /** Closes a settled or finished bill, archives it, closes customer sessions, and frees the table. */
   closeBillAndFreeTable: async (billId: string, tableId: string, _staffId?: string | null) => {
     void _staffId;
-    cacheInvalidate('bills:');
-    cacheInvalidate('customer_sessions:');
-    cacheInvalidate('orders:');
+    cacheClear();
 
-    // 1. Mark bill closed
-    const { error: billErr } = await supabase
-      .from('bills')
-      .update({
-        closed_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      })
-      .eq('id', billId);
+    const now = new Date().toISOString();
 
-    // 2. Close any active customer sessions for this table
-    await supabase
-      .from('customer_sessions')
-      .update({
-        status: 'closed',
-        last_active_at: new Date().toISOString(),
-      })
-      .eq('table_id', tableId)
-      .eq('status', 'active');
+    // 1. Mark specific bill closed if provided
+    let billErr = null;
+    if (billId) {
+      const res = await supabase
+        .from('bills')
+        .update({
+          status: 'closed',
+          closed_at: now,
+          updated_at: now,
+        })
+        .eq('id', billId);
+      billErr = res.error;
+    }
 
-    // 3. Clean up client local storage for this table/bill
+    // 2. Also close any remaining open/settling bills for this table
+    if (tableId) {
+      await supabase
+        .from('bills')
+        .update({
+          status: 'closed',
+          closed_at: now,
+          updated_at: now,
+        })
+        .eq('table_id', tableId)
+        .in('status', ['open', 'settling', 'paid'])
+        .is('closed_at', null);
+
+      // 3. Close any active customer sessions for this table
+      await supabase
+        .from('customer_sessions')
+        .update({
+          status: 'closed',
+          last_active_at: now,
+        })
+        .eq('table_id', tableId)
+        .eq('status', 'active');
+    }
+
+    // 4. Clean up client local storage for this table/bill
     try {
-      localStorage.removeItem(`nightos:table_pin:${billId}`);
+      if (billId) localStorage.removeItem(`nightos:table_pin:${billId}`);
       localStorage.removeItem('nightos:cart');
       sessionStorage.removeItem('nightos:current_session_id');
       const toRemove: string[] = [];

@@ -188,9 +188,9 @@ export function TableOperationsScreen() {
     };
 
     const handleCloseTable = async () => {
-        if (!bill) return;
         setWorking("close");
-        const { ok, error } = await db.closeBillAndFreeTable(bill.id, table.id, staffId);
+        const billIdToClose = bill?.id || "";
+        const { ok, error } = await db.closeBillAndFreeTable(billIdToClose, table.id, staffId);
         setWorking(null);
         setConfirmClose(false);
         if (!ok) {
@@ -634,22 +634,22 @@ export function TableOperationsScreen() {
             )}
 
             {/* ── MODALS ── */}
-            {confirmClose && bill && (
-                <div className="fixed inset-0 z-50 flex items-end justify-center bg-ink/40 p-6" onClick={() => setConfirmClose(false)}>
+            {confirmClose && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in" onClick={() => setConfirmClose(false)}>
                     <div
-                        className="w-full max-w-sm rounded-lg bg-white p-5 shadow-xl"
+                        className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-2xl border border-licorice/10"
                         onClick={(e) => e.stopPropagation()}
                     >
-                        <p className="text-[14px] font-bold text-licorice">Close this table?</p>
-                        <p className="mt-1 text-[12px] leading-relaxed text-feldgrau">
+                        <p className="text-base font-bold text-licorice">Close this table?</p>
+                        <p className="mt-2 text-xs leading-relaxed text-feldgrau">
                             The bill will be cancelled and this table's session will end. Guests can re-scan
                             the QR to start fresh.
                         </p>
-                        <div className="mt-4 flex gap-2">
+                        <div className="mt-5 flex gap-3">
                             <button
                                 type="button"
                                 onClick={() => setConfirmClose(false)}
-                                className="flex-1 rounded-full py-2.5 text-[12px] font-bold text-feldgrau ring-1 ring-licorice/10"
+                                className="flex-1 rounded-full py-2.5 text-xs font-bold text-feldgrau ring-1 ring-licorice/15 hover:bg-slate-50 transition-colors"
                             >
                                 Keep open
                             </button>
@@ -657,9 +657,9 @@ export function TableOperationsScreen() {
                                 type="button"
                                 onClick={handleCloseTable}
                                 disabled={working === "close"}
-                                className="flex-1 rounded-full py-2.5 text-[12px] font-bold text-white bg-red-700 disabled:opacity-50"
+                                className="flex-1 rounded-full py-2.5 text-xs font-bold text-white bg-red-600 hover:bg-red-700 transition-colors disabled:opacity-50 shadow-md shadow-red-600/20"
                             >
-                                {working === "close" ? "…" : "Close table"}
+                                {working === "close" ? "Closing…" : "Close table"}
                             </button>
                         </div>
                     </div>

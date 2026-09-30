@@ -106,3 +106,29 @@ END;
 $$;
 
 GRANT EXECUTE ON FUNCTION public.is_bar_station_active(uuid) TO anon, authenticated, service_role;
+
+-- 4. DB Trigger: Automatically close active customer sessions & open bills when Bar Station shift ends
+CREATE OR REPLACE FUNCTION public.handle_bar_station_shift_end()
+RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER AS $$
+BEGIN
+    IF NEW.status = 'ended' AND (OLD.status IS NULL OR OLD.status != 'ended') THEN
+        -- Close all active customer sessions
+        UPDATE public.customer_sessions
+        SET status = 'closed', updated_at = now()
+        WHERE venue_id = NEW.venue_id AND status = 'active';
+
+        -- Close all open / settling bills
+        UPDATE public.bills
+        SET status = 'closed', closed_at = now(), updated_at = now()
+        WHERE venue_id = NEW.venue_id AND status IN ('open', 'settling') AND closed_at IS NULL;
+    END IF;
+    RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS trg_bar_station_shift_end ON public.bar_station_shifts;
+CREATE TRIGGER trg_bar_station_shift_end
+    AFTER UPDATE ON public.bar_station_shifts
+    FOR EACH ROW
+    EXECUTE FUNCTION public.handle_bar_station_shift_end();
+
