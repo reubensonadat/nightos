@@ -128,7 +128,7 @@ const FALLBACK_DRINKS: { id: string; name: string; category: string; price: numb
    ═══════════════════════════════════════════════════════════════════════════ */
 
 export function BarStationScreen({ venueId, staffId, staffName, onExit, onSignOut }: Props) {
-    const { venue } = useAuth();
+    const { signOut, venue } = useAuth();
     const [activeTab, setActiveTab] = useState<"QUEUE" | "STOCK" | "REPORT">("QUEUE");
 
     // Products & Categories loaded from venue
@@ -801,13 +801,21 @@ export function BarStationScreen({ venueId, staffId, staffName, onExit, onSignOu
             }
         }
 
-        // Close all active customer sessions on tables for this venue
+        // Close all active customer sessions and open bills on tables for this venue
         try {
-            await supabase
-                .from('customer_sessions')
-                .update({ status: 'closed' })
-                .eq('venue_id', venueId)
-                .eq('status', 'active');
+            await Promise.all([
+                supabase
+                    .from('customer_sessions')
+                    .update({ status: 'closed' })
+                    .eq('venue_id', venueId)
+                    .eq('status', 'active'),
+                supabase
+                    .from('bills')
+                    .update({ status: 'closed', closed_at: new Date().toISOString() })
+                    .eq('venue_id', venueId)
+                    .in('status', ['open', 'settling'])
+                    .is('closed_at', null)
+            ]);
         } catch { /* noop */ }
 
         try {
@@ -819,6 +827,17 @@ export function BarStationScreen({ venueId, staffId, staffName, onExit, onSignOu
 
         persistShift(null);
         toast.success("Station Shift closed & table ordering locked. Handover complete!", { icon: "✅" });
+
+        // Destroy session entirely and redirect to login screen
+        if (onSignOut) {
+            onSignOut();
+        } else {
+            try {
+                await signOut();
+            } finally {
+                window.location.href = "/login";
+            }
+        }
     };
 
     /* ═══════════════════════════════════════════════════════════════════════════
