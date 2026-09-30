@@ -118,16 +118,19 @@ export function CentralAuthScreen({
     verifyPhoneOtp,
     resetPassword,
     role,
+    venue,
+    staffSession,
     signOut,
   } = useAuth();
 
-  const getDestination = useCallback((userRole: string | null): string => {
+  const getDestination = useCallback((userRole: string | null, venueSlugOverride?: string | null): string => {
     const fromParam = searchParams.get("redirect") || (location.state as { from?: string } | undefined)?.from;
     if (fromParam && isAllowedForTarget(userRole, fromParam)) {
       return fromParam;
     }
-    return sectorPath(userRole, activeVenueSlug);
-  }, [searchParams, location.state, activeVenueSlug]);
+    const slug = venueSlugOverride || activeVenueSlug || staffSession?.venue_slug || venue?.slug;
+    return sectorPath(userRole, slug);
+  }, [searchParams, location.state, activeVenueSlug, staffSession?.venue_slug, venue?.slug]);
 
   const [step, setStep] = useState<Step>(initialMode === "signup" ? "signup" : "login");
   const [shellMode, setShellMode] = useState<ShellMode>(initialMode === "signup" ? "signup" : "login");
@@ -224,7 +227,7 @@ export function CentralAuthScreen({
 
     if (emailMode) {
       setBusy(true);
-      const { error: signInErr, role: resolvedRole } = await signIn(id, password);
+      const { error: signInErr, role: resolvedRole, venueSlug: resolvedVenueSlug } = await signIn(id, password, activeVenueSlug);
       setBusy(false);
       if (signInErr) {
         if (/invalid login credentials/i.test(signInErr.message)) {
@@ -234,13 +237,9 @@ export function CentralAuthScreen({
         }
         return;
       }
-      if (!resolvedRole) {
-        toast.success("Welcome back.");
-        navigate(getDestination("manager"), { replace: true });
-        return;
-      }
+      const targetSlug = activeVenueSlug || resolvedVenueSlug;
       toast.success("Welcome back.");
-      navigate(getDestination(resolvedRole), { replace: true });
+      navigate(getDestination(resolvedRole || "manager", targetSlug), { replace: true });
       return;
     }
 
@@ -305,25 +304,26 @@ export function CentralAuthScreen({
     if (busy || isAuthenticated || !sentPhone.current) return;
     setBusy(true);
     setError(null);
-    const { error: verifyErr, role: resolvedRole } = await verifyPhoneOtp(sentPhone.current, token);
+    const { error: verifyErr, role: resolvedRole, venueSlug: resolvedVenueSlug } = await verifyPhoneOtp(sentPhone.current, token, activeVenueSlug);
     setBusy(false);
     if (verifyErr) {
       setError(verifyErr.message);
       return;
     }
     sessionStorage.removeItem(OTP_STORAGE_KEY);
+    const targetSlug = activeVenueSlug || resolvedVenueSlug;
     if (!resolvedRole) {
       if (isPhoneSignup.current) {
         toast.success("Account created — let's set up your venue.");
         navigate("/setup", { replace: true });
       } else {
         toast.success("Signed in.");
-        navigate(getDestination("manager"), { replace: true });
+        navigate(getDestination("manager", targetSlug), { replace: true });
       }
       return;
     }
     toast.success("Signed in.");
-    navigate(getDestination(resolvedRole), { replace: true });
+    navigate(getDestination(resolvedRole, targetSlug), { replace: true });
   };
 
   const handleResend = async () => {

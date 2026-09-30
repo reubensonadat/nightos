@@ -672,7 +672,7 @@ function AppShell() {
                 (staffSession || role === "owner" || role === "manager" || role === "waiter") ? (
                   <TablesDashboard
                     venueId={staffSession?.venue_id || authVenue?.id || venueId || ""}
-                    venueName={currentVenue?.name || authVenue?.name || "Velvet Lounge"}
+                    venueName={currentVenue?.name || authVenue?.name || "Your Venue"}
                     staffName={staffSession?.name || profile?.name || user?.user_metadata?.full_name || user?.user_metadata?.name || "Manager"}
                     staffId={staffSession?.id || user?.id || ""}
                     role={staffSession?.role || role || "manager"}

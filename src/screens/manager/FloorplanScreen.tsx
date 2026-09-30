@@ -751,6 +751,7 @@ function EditTableModal({
         defaultAreas.includes(table.area) ? "" : table.area
     );
     const [capacity, setCapacity] = useState<number>(table.capacity);
+    const [minDeposit, setMinDeposit] = useState<number>(table.min_deposit ?? 0);
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
@@ -779,6 +780,7 @@ function EditTableModal({
             tableNumber,
             capacity,
             area: areaToUse,
+            minDeposit,
         });
         setSaving(false);
 
@@ -827,6 +829,22 @@ function EditTableModal({
                                 className="mt-1 w-full rounded-lg bg-isabelline px-3 py-2 font-mono text-[13px] font-bold tabular-nums text-licorice ring-1 ring-licorice/8 focus:outline-none focus:ring-2 focus:ring-licorice/20"
                             />
                         </div>
+                    </div>
+
+                    <div>
+                        <div className="flex items-center justify-between">
+                            <label className="text-xs font-bold uppercase text-feldgrau">Minimum Upfront Deposit (GH₵)</label>
+                            <span className="text-[10px] text-feldgrau/70">0 for standard walk-in</span>
+                        </div>
+                        <input
+                            type="number"
+                            min={0}
+                            step={50}
+                            value={minDeposit === 0 ? "" : minDeposit}
+                            placeholder="0.00 (e.g. 500, 1000, 2000 for VIP)"
+                            onChange={(e) => setMinDeposit(Math.max(0, parseFloat(e.target.value) || 0))}
+                            className="mt-1 w-full rounded-lg bg-isabelline px-3 py-2 font-mono text-[13px] font-bold tabular-nums text-licorice ring-1 ring-licorice/8 focus:outline-none focus:ring-2 focus:ring-licorice/20"
+                        />
                     </div>
 
                     <div>
@@ -934,6 +952,7 @@ function AddTableModal({
     const [selectedArea, setSelectedArea] = useState<string>(defaultAreas[0]);
     const [customArea, setCustomArea] = useState<string>("");
     const [capacity, setCapacity] = useState<number>(4);
+    const [minDeposit, setMinDeposit] = useState<number>(0);
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
@@ -964,6 +983,7 @@ function AddTableModal({
             capacity,
             area: areaToUse,
             tableLabel: `Table ${String(tableNumber).padStart(2, "0")}`,
+            minDeposit,
         });
         setSaving(false);
 
@@ -1012,6 +1032,22 @@ function AddTableModal({
                                 className="mt-1 w-full rounded-lg bg-isabelline px-3 py-2 font-mono text-[13px] font-bold tabular-nums text-licorice ring-1 ring-licorice/8 focus:outline-none focus:ring-2 focus:ring-licorice/20"
                             />
                         </div>
+                    </div>
+
+                    <div>
+                        <div className="flex items-center justify-between">
+                            <label className="text-xs font-bold uppercase text-feldgrau">Minimum Upfront Deposit (GH₵)</label>
+                            <span className="text-[10px] text-feldgrau/70">0 for standard walk-in</span>
+                        </div>
+                        <input
+                            type="number"
+                            min={0}
+                            step={50}
+                            value={minDeposit === 0 ? "" : minDeposit}
+                            placeholder="0.00 (e.g. 500, 1000, 2000 for VIP)"
+                            onChange={(e) => setMinDeposit(Math.max(0, parseFloat(e.target.value) || 0))}
+                            className="mt-1 w-full rounded-lg bg-isabelline px-3 py-2 font-mono text-[13px] font-bold tabular-nums text-licorice ring-1 ring-licorice/8 focus:outline-none focus:ring-2 focus:ring-licorice/20"
+                        />
                     </div>
 
                     <div>

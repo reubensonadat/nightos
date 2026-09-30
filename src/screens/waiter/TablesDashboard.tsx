@@ -312,12 +312,12 @@ export function TablesDashboard({ venueId, venueName, staffName, staffId, onSign
                     <div className="flex items-center gap-2.5">
                         <div className="flex h-9 w-9 items-center justify-center rounded-full bg-licorice text-isabelline shadow-[0_4px_14px_rgba(35,20,12,0.25)]">
                             <span className="font-serif text-[15px] font-bold leading-none tracking-tight">
-                                {venueName ? venueName.charAt(0).toUpperCase() : (venue?.name ? venue.name.charAt(0).toUpperCase() : "V")}
+                                {venueName ? venueName.charAt(0).toUpperCase() : (venue?.name ? venue.name.charAt(0).toUpperCase() : "Y")}
                             </span>
                         </div>
                         <div className="flex flex-col leading-tight">
                             <span className="text-[13px] font-bold tracking-tight text-licorice">
-                                {venueName || venue?.name || "Velvet Lounge"}
+                                {venueName || venue?.name || "Your Venue"}
                             </span>
                             <span className="text-[11px] font-semibold text-licorice/60">
                                 {staffName || "Staff"}

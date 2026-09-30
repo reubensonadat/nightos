@@ -10,7 +10,8 @@ import {
 import { useNavigate } from "react-router-dom";
 import { CheckCircleIcon } from "@heroicons/react/24/solid";
 import { formatGHS } from "../data/menu";
-import { db, type DbOrderItem } from "../lib/api";
+import { db, type DbOrderItem, type DbBill } from "../lib/api";
+import { useRealtime } from "../hooks/useRealtime";
 import { ReceiptDownloader } from "../components/ReceiptDownloader";
 import { STAGES, statusStage, type OrderSummary } from "./OrderTrackingScreen";
 import { ProfessionalReceipt } from "../components/ProfessionalReceipt";
@@ -341,16 +342,47 @@ function HistoryCard({
 /* ────────────────────────── Main Screen ────────────────────────── */
 
 export function OrdersScreen({ activeOrders, history, tableLabel, tablePin, billId: _billId, sessionToken, venueName, onPayBill, onReorder: _onReorder, onBack, onCallWaiter, callingWaiter, waiterCalled }: Props & { venueName?: string | null; onBack?: () => void }) {
-  void _billId;
   void _onReorder;
   const navigate = useNavigate();
   const hasActive = activeOrders.length > 0;
   const hasHistory = history.length > 0;
 
-  const billTotal = useMemo(
+  const [bill, setBill] = useState<DbBill | null>(null);
+
+  useEffect(() => {
+    if (!_billId) return;
+    let active = true;
+    db.billById(_billId).then(({ data }) => {
+      if (active && data) setBill(data as DbBill);
+    });
+    return () => {
+      active = false;
+    };
+  }, [_billId]);
+
+  useRealtime({
+    table: 'bills',
+    filter: _billId ? `id=eq.${_billId}` : undefined,
+    onUpdate: (updatedRow: Record<string, unknown>) => {
+      setBill((prev) => (prev ? ({ ...prev, ...updatedRow } as DbBill) : null));
+    },
+  });
+
+  const depositAmount = Number(bill?.deposit_amount || 0);
+  const depositPaid = Boolean(bill?.deposit_paid);
+
+  const activeSpend = useMemo(
     () => [...activeOrders, ...history].filter((o) => !o.cancelled).reduce((sum, o) => sum + o.total, 0),
     [activeOrders, history]
   );
+
+  const remainingCredit = depositPaid && depositAmount > 0
+    ? Math.max(0, Math.round((depositAmount - activeSpend) * 100) / 100)
+    : 0;
+
+  const excessDue = depositPaid && depositAmount > 0
+    ? Math.max(0, Math.round((activeSpend - depositAmount) * 100) / 100)
+    : activeSpend;
 
   const payableOrder = useMemo(
     () =>
@@ -451,39 +483,63 @@ export function OrdersScreen({ activeOrders, history, tableLabel, tablePin, bill
       )}
 
       {/* ── Fixed Bottom Payment Banner ── */}
-      {billTotal > 0 && (
+      {activeSpend > 0 && (
         <div className="fixed bottom-[calc(70px+env(safe-area-inset-bottom))] left-0 right-0 z-40 px-5 max-w-7xl mx-auto">
-          <div className="rounded-2xl bg-licorice p-4 shadow-[0_12px_32px_rgba(35,20,12,0.35)] ring-1 ring-white/10 flex items-center justify-between gap-4">
-            <div>
-              <p className="text-[10px] font-bold uppercase tracking-wider text-khaki">
-                Total Tab Balance
-              </p>
-              <p className="font-mono text-lg font-black tracking-tight text-isabelline">
-                {formatGHS(billTotal)}
-              </p>
+          {depositPaid && depositAmount > 0 && excessDue === 0 ? (
+            <div className="rounded-2xl bg-licorice p-4 shadow-[0_12px_32px_rgba(35,20,12,0.35)] ring-1 ring-emerald-500/40 flex items-center justify-between gap-4">
+              <div>
+                <p className="text-[10px] font-bold uppercase tracking-wider text-emerald-400">
+                  Prepaid Table Credit Active
+                </p>
+                <p className="font-mono text-lg font-black tracking-tight text-emerald-300">
+                  {formatGHS(remainingCredit)} remaining
+                </p>
+                <p className="text-[11px] text-isabelline/60">
+                  Consumed: {formatGHS(activeSpend)} (Covered by Deposit)
+                </p>
+              </div>
+              <span className="rounded-full bg-emerald-500/20 px-3.5 py-1.5 text-[11px] font-bold text-emerald-300 ring-1 ring-emerald-500/30">
+                Deposit Covered
+              </span>
             </div>
-            <button
-              type="button"
-              onClick={() => {
-                if (payableOrder) {
-                  onPayBill(payableOrder);
-                } else {
-                  onPayBill({
-                    orderNumber: _billId ? _billId.slice(0, 8).toUpperCase() : "BILL",
-                    total: billTotal,
-                    itemCount: 1,
-                    items: [],
-                    sentAt: Date.now(),
-                    billId: _billId ?? undefined,
-                  });
-                }
-              }}
-              className="inline-flex items-center gap-2 rounded-full bg-khaki px-5 py-2.5 text-[12px] font-extrabold tracking-tight text-licorice transition-all hover:bg-khaki/90 active:scale-95 shadow-sm"
-            >
-              <span>Pay Bill Now</span>
-              <ArrowRightIcon className="h-4 w-4" strokeWidth={2.5} />
-            </button>
-          </div>
+          ) : (
+            <div className="rounded-2xl bg-licorice p-4 shadow-[0_12px_32px_rgba(35,20,12,0.35)] ring-1 ring-white/10 flex items-center justify-between gap-4">
+              <div>
+                <p className="text-[10px] font-bold uppercase tracking-wider text-khaki">
+                  {depositPaid && depositAmount > 0 ? "Deposit Exhausted · Excess Due" : "Total Tab Balance"}
+                </p>
+                <p className="font-mono text-lg font-black tracking-tight text-isabelline">
+                  {formatGHS(excessDue)}
+                </p>
+                {depositPaid && depositAmount > 0 && (
+                  <p className="text-[11px] text-isabelline/60">
+                    Gross Consumed: {formatGHS(activeSpend)} - Deposit: {formatGHS(depositAmount)}
+                  </p>
+                )}
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  if (payableOrder) {
+                    onPayBill(payableOrder);
+                  } else {
+                    onPayBill({
+                      orderNumber: _billId ? _billId.slice(0, 8).toUpperCase() : "BILL",
+                      total: excessDue,
+                      itemCount: 1,
+                      items: [],
+                      sentAt: Date.now(),
+                      billId: _billId ?? undefined,
+                    });
+                  }
+                }}
+                className="inline-flex items-center gap-2 rounded-full bg-khaki px-5 py-2.5 text-[12px] font-extrabold tracking-tight text-licorice transition-all hover:bg-khaki/90 active:scale-95 shadow-sm"
+              >
+                <span>{depositPaid && depositAmount > 0 ? "Pay Excess Bill" : "Pay Bill Now"}</span>
+                <ArrowRightIcon className="h-4 w-4" strokeWidth={2.5} />
+              </button>
+            </div>
+          )}
         </div>
       )}
     </main>

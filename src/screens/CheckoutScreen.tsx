@@ -417,11 +417,21 @@ export function CheckoutScreen({ total, billId, venueId, sessionToken, onBack, o
                     {/* Rows */}
                     <div className="space-y-2 px-4 py-3">
                         <div className="flex items-center justify-between text-[12px]">
-                            <span className="tracking-tight text-feldgrau">Subtotal</span>
+                            <span className="tracking-tight text-feldgrau">Orders Subtotal</span>
                             <span className="font-mono font-bold tabular-nums text-licorice">
                                 {formatGHS(subtotal)}
                             </span>
                         </div>
+                        {bill && bill.service_charge > 0 && (
+                            <div className="flex items-center justify-between text-[12px]">
+                                <span className="tracking-tight text-feldgrau">
+                                    Service Charge <span className="text-feldgrau/60">(10%)</span>
+                                </span>
+                                <span className="font-mono font-bold tabular-nums text-licorice">
+                                    {formatGHS(bill.service_charge)}
+                                </span>
+                            </div>
+                        )}
                         {vat > 0 && (
                             <div className="flex items-center justify-between text-[12px]">
                                 <span className="tracking-tight text-feldgrau">
@@ -432,15 +442,35 @@ export function CheckoutScreen({ total, billId, venueId, sessionToken, onBack, o
                                 </span>
                             </div>
                         )}
+                        {bill && bill.deposit_paid && Number(bill.deposit_amount || 0) > 0 && (
+                            <>
+                                <div className="flex items-center justify-between text-[12px] text-khaki pt-1 border-t border-isabelline">
+                                    <span className="font-bold">Prepaid Table Deposit</span>
+                                    <span className="font-mono font-bold tabular-nums">
+                                        -{formatGHS(Number(bill.deposit_amount))}
+                                    </span>
+                                </div>
+                                {Number(bill.remaining_credit || 0) > 0 && (
+                                    <div className="flex items-center justify-between text-[11.5px] rounded-lg bg-emerald-50 px-2.5 py-1 text-emerald-800 ring-1 ring-emerald-200">
+                                        <span className="font-bold">Remaining Credit</span>
+                                        <span className="font-mono font-bold tabular-nums">
+                                            {formatGHS(Number(bill.remaining_credit))}
+                                        </span>
+                                    </div>
+                                )}
+                            </>
+                        )}
                     </div>
 
                     {/* Bill Total */}
                     <div className="flex items-end justify-between border-t border-isabelline px-4 py-3">
                         <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-feldgrau">
-                            {bill && bill.amount_paid > 0 ? "Amount Due" : "Bill Total"}
+                            {bill && bill.deposit_paid && Number(bill.deposit_amount || 0) > 0
+                                ? (payAmount > 0 ? "Excess Amount Due" : "Amount Due Now")
+                                : (bill && bill.amount_paid > 0 ? "Amount Due" : "Bill Total")}
                         </span>
                         <span className="font-mono text-[18px] font-bold tabular-nums text-licorice">
-                            {formatGHS(bill ? billTotal : total)}
+                            {formatGHS(payAmount)}
                         </span>
                     </div>
                 </div>

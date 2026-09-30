@@ -21,17 +21,26 @@ export const authDb = {
       .eq('owner_id', userId)
       .order('created_at', { ascending: true }),
 
-  venueByStaffPhone: (phone: string) =>
-    supabase.rpc('get_venue_by_staff_phone', { p_phone: phone }).maybeSingle(),
+  venueByStaffPhone: (phone: string, venueSlug?: string | null) =>
+    supabase.rpc('get_venue_by_staff_phone', {
+      p_phone: phone,
+      ...(venueSlug ? { p_venue_slug: venueSlug } : {}),
+    }).maybeSingle(),
 
-  venueByPhone: (phone: string) =>
-    supabase.rpc('venue_by_phone', { p_phone: phone }).maybeSingle(),
+  venueByPhone: (phone: string, venueSlug?: string | null) =>
+    supabase.rpc('venue_by_phone', {
+      p_phone: phone,
+      ...(venueSlug ? { p_venue_slug: venueSlug } : {}),
+    }).maybeSingle(),
 
   checkPhoneExists: (phone: string) =>
     supabase.rpc('check_phone_exists', { p_phone: phone }),
 
-  resolveLogin: (identifier: string) =>
-    supabase.rpc('resolve_login', { identifier }).maybeSingle(),
+  resolveLogin: (identifier: string, venueSlug?: string | null) =>
+    supabase.rpc('resolve_login', {
+      identifier,
+      ...(venueSlug ? { target_venue_slug: venueSlug } : {}),
+    }).maybeSingle(),
 
   createVenue: (ownerId: string, name: string, slug: string) =>
     supabase.from('venues').insert({
