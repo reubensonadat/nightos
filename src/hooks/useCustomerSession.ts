@@ -27,6 +27,7 @@ type SessionState = {
   loading: boolean
   error: string | null
   isNewTab: boolean
+  isBarClosed: boolean
 }
 
 export function useCustomerSession(venueId: string | null, tableId: string | null) {
@@ -37,6 +38,7 @@ export function useCustomerSession(venueId: string | null, tableId: string | nul
     loading: false,
     error: null,
     isNewTab: false,
+    isBarClosed: false,
   })
 
   const assignWaiter = useCallback(async (billId: string, token: string) => {
@@ -109,6 +111,25 @@ export function useCustomerSession(venueId: string | null, tableId: string | nul
     if (!venueId || !tableId) return
 
     setState((s) => ({ ...s, loading: true, error: null }))
+
+    // 0. Verify Bar Station is active
+    try {
+      const { data: activeBar } = await db.activeBarShift(venueId)
+      if (!activeBar || activeBar.status !== 'active') {
+        setState((s) => ({
+          ...s,
+          session: null,
+          bill: null,
+          waiter: null,
+          loading: false,
+          error: null,
+          isBarClosed: true,
+        }))
+        return
+      }
+    } catch {
+      // If check fails, allow continuing
+    }
 
     // 1. Try to find existing active session for this table
     const { data: existingSession, error: sessionErr } = await supabase
@@ -296,19 +317,37 @@ export function useCustomerSession(venueId: string | null, tableId: string | nul
       } catch { /* noop */ }
     }
 
-    setState((s) => ({ ...s, session, bill, isNewTab: createdFreshBill, loading: false, error: null }))
+    setState((s) => ({ ...s, session, bill, isNewTab: createdFreshBill, isBarClosed: false, loading: false, error: null }))
 
     // 4. Make sure the bill has a waiter (idempotent, people-weighted once headcount confirmed)
     if (bill && !createdFreshBill) assignWaiter(bill.id, token)
   }, [venueId, tableId, assignWaiter, reviveSession, reviveIfBillOpen])
 
   useEffect(() => {
-     
     const init = async () => {
       await ensureSession()
     }
     init()
   }, [ensureSession])
+
+  // Realtime listener for bar station open/close
+  useEffect(() => {
+    if (!venueId) return
+    const channel = supabase
+      .channel(`customer_bar_shift_${venueId}`)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'bar_station_shifts', filter: `venue_id=eq.${venueId}` },
+        () => {
+          void ensureSession()
+        },
+      )
+      .subscribe()
+
+    return () => {
+      void supabase.removeChannel(channel)
+    }
+  }, [venueId, ensureSession])
 
   /**
    * Customer confirms their party size before ordering. Updates the

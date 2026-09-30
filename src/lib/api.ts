@@ -279,7 +279,7 @@ export type DbKitchenOrderRow = {
   priority: string | null;
   notes: string | null;
   created_at: string;
-  order_items: Pick<DbOrderItem, 'product_name' | 'quantity' | 'notes'>[];
+  order_items: Pick<DbOrderItem, 'product_id' | 'product_name' | 'quantity' | 'unit_price' | 'line_total' | 'notes'>[];
   bills:
     | { id: string; waiter_id: string | null; status: string; tables: { table_number: number; table_label: string } | null }
     | { id: string; waiter_id: string | null; status: string; tables: { table_number: number; table_label: string }[] }[]
@@ -1335,7 +1335,7 @@ export const db = {
       .from('order_submissions')
       .select(
         `id, bill_id, guest_name, status, station, priority, notes, created_at,
-         order_items(product_name, quantity, notes),
+         order_items(product_id, product_name, quantity, unit_price, line_total, notes),
          bills!inner(id, waiter_id, status, tables!inner(table_number, table_label))`,
       )
       .eq('venue_id', venueId)
@@ -1598,6 +1598,109 @@ export const db = {
   clockOutStaff: async (staffId: string) => {
     const { data, error } = await supabase.rpc('clock_out_staff', { p_staff_id: staffId });
     return { data: (data as boolean) ?? false, error };
+  },
+
+  /* ── Bar Station Shifts ── */
+  activeBarShift: async (venueId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('bar_station_shifts')
+        .select('*')
+        .eq('venue_id', venueId)
+        .eq('status', 'active')
+        .order('started_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (!data) {
+        // Fallback to local storage cache if table is not yet migrated
+        const localKey = `nightos:bar_station_shift:${venueId}`;
+        const raw = localStorage.getItem(localKey);
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (parsed && parsed.status === 'active') {
+            return { data: parsed, error: null };
+          }
+        }
+      }
+      return { data, error: error && error.code !== 'PGRST116' ? error : null };
+    } catch {
+      const localKey = `nightos:bar_station_shift:${venueId}`;
+      const raw = localStorage.getItem(localKey);
+      if (raw) {
+        try {
+          const parsed = JSON.parse(raw);
+          if (parsed && parsed.status === 'active') {
+            return { data: parsed, error: null };
+          }
+        } catch { /* noop */ }
+      }
+      return { data: null, error: null };
+    }
+  },
+
+  startBarShift: async (venueId: string, shift: any) => {
+    try {
+      const { data, error } = await supabase
+        .from('bar_station_shifts')
+        .insert({
+          venue_id: venueId,
+          started_at: shift.startedAt,
+          started_by_staff_id: shift.startedByStaffId || null,
+          started_by_staff_name: shift.startedByStaffName,
+          starting_float: shift.startingFloat,
+          opening_stock: shift.openingStock,
+          restocks: shift.restocks || [],
+          drawn_stock: shift.drawnStock || {},
+          direct_adjustments: shift.directAdjustments || {},
+          status: 'active',
+        })
+        .select()
+        .single();
+      return { data, error };
+    } catch (e) {
+      return { data: null, error: e };
+    }
+  },
+
+  updateBarShift: async (shiftId: string, update: any) => {
+    try {
+      const { data, error } = await supabase
+        .from('bar_station_shifts')
+        .update({
+          ...update,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', shiftId)
+        .select()
+        .single();
+      return { data, error };
+    } catch (e) {
+      return { data: null, error: e };
+    }
+  },
+
+  endBarShift: async (shiftId: string, closingData: any) => {
+    try {
+      const { data, error } = await supabase
+        .from('bar_station_shifts')
+        .update({
+          status: 'ended',
+          ended_at: new Date().toISOString(),
+          ended_by_staff_name: closingData.endedByStaffName,
+          closing_stock: closingData.closingStock,
+          closing_cash_counted: closingData.closingCashCounted,
+          summary_totals: closingData.summaryTotals,
+          handover_notes: closingData.handoverNotes,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', shiftId)
+        .select()
+        .single();
+      return { data, error };
+    } catch (e) {
+      return { data: null, error: e };
+    }
   },
 
   /** Approve a staff shift (owner/manager/supervisor only). approve=false = take off duty. */

@@ -85,7 +85,7 @@ function CustomerShell({ venueId, tableId, tableLabel }: { venueId: string; tabl
   const [venueName, setVenueName] = useState<string | null>(null);
   const { itemCount } = useCart();
 
-  const { session, bill, waiter, isNewTab, loading: sessionLoading, error: sessionError, updateParty } = useCustomerSession(venueId, tableId);
+  const { session, bill, waiter, isNewTab, isBarClosed, loading: sessionLoading, error: sessionError, updateParty } = useCustomerSession(venueId, tableId);
 
   const [callingWaiter, setCallingWaiter] = useState(false);
   const [waiterCalled, setWaiterCalled] = useState(false);
@@ -281,6 +281,31 @@ function CustomerShell({ venueId, tableId, tableLabel }: { venueId: string; tabl
         }}
         onPaid={handlePaid}
       />
+    );
+  }
+
+  if (tableId && isBarClosed) {
+    return (
+      <div className="min-h-svh bg-isabelline font-sans text-licorice flex items-center justify-center px-8">
+        <div className="text-center max-w-sm">
+          <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-full bg-licorice/5 text-licorice">
+            <ClockIcon className="h-8 w-8 text-licorice/70" />
+          </div>
+          <span className="inline-block rounded-full bg-rose-100 px-3 py-1 text-[11px] font-bold uppercase tracking-wider text-rose-800 mb-2">
+            Service Closed
+          </span>
+          <h1 className="text-[22px] font-black tracking-tight text-licorice">Bar Service is Closed</h1>
+          <p className="text-[13px] text-licorice/70 mt-2 leading-relaxed">
+            {venueName ?? "The bar"} is not currently taking drink orders. Table ordering will unlock automatically as soon as the bar opens for service.
+          </p>
+          <button
+            onClick={() => window.location.reload()}
+            className="mt-8 px-8 py-3.5 bg-licorice text-[14px] text-isabelline font-bold rounded-full transition-transform active:scale-95 cursor-pointer shadow-md"
+          >
+            Check Again
+          </button>
+        </div>
+      </div>
     );
   }
 
