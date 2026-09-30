@@ -44,6 +44,11 @@ export function useCustomerSession(venueId: string | null, tableId: string | nul
       .rpc('assign_waiter_to_bill', { p_bill_id: billId })
       .setHeader('x-session-token', token)
     if (!waiterId) {
+      await supabase
+        .from('bills')
+        .update({ waiter_id: null })
+        .setHeader('x-session-token', token)
+        .eq('id', billId)
       setState((s) => ({ ...s, waiter: null }))
       return
     }
@@ -57,6 +62,11 @@ export function useCustomerSession(venueId: string | null, tableId: string | nul
       .maybeSingle()
 
     if (!activeShift) {
+      await supabase
+        .from('bills')
+        .update({ waiter_id: null })
+        .setHeader('x-session-token', token)
+        .eq('id', billId)
       setState((s) => ({ ...s, waiter: null }))
       return
     }

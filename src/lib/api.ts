@@ -701,20 +701,68 @@ export const db = {
   /** Server-side open/claim for the waiter flow: reuses the newest open bill,
    *  claims it if it has no waiter, otherwise creates a new bill owned by the
    *  waiter. Never steals a bill that already has a waiter. */
-  openBillForWaiter: async (tableId: string, staffId: string) => {
+  openBillForWaiter: async (tableId: string, staffId?: string | null, venueId?: string | null) => {
     cacheInvalidate('bills:');
-    const { data: billId, error: rpcErr } = await supabase.rpc('open_bill_for_waiter', {
-      p_table_id: tableId,
-      p_staff_id: staffId,
-    });
-    if (rpcErr || !billId) return { data: null, error: rpcErr };
-    return supabase
+
+    // 1. Check if an active bill already exists for this table
+    const { data: existingBill } = await supabase
       .from('bills')
       .select(
         'id, venue_id, table_id, waiter_id, guest_count, status, payment_model, subtotal, convenience_fee, service_charge, vat, total, amount_paid, is_merged, merged_into_bill_id, table_pin, created_at, updated_at, closed_at, last_activity_at, assistance_type, assistance_requested_at',
       )
-      .eq('id', billId)
+      .eq('table_id', tableId)
+      .in('status', ['open', 'settling'])
+      .is('closed_at', null)
+      .order('created_at', { ascending: false })
+      .limit(1)
       .maybeSingle();
+
+    if (existingBill) {
+      if (staffId && !existingBill.waiter_id) {
+        const { data: updatedBill } = await supabase
+          .from('bills')
+          .update({ waiter_id: staffId, updated_at: new Date().toISOString() })
+          .eq('id', existingBill.id)
+          .select(
+            'id, venue_id, table_id, waiter_id, guest_count, status, payment_model, subtotal, convenience_fee, service_charge, vat, total, amount_paid, is_merged, merged_into_bill_id, table_pin, created_at, updated_at, closed_at, last_activity_at, assistance_type, assistance_requested_at',
+          )
+          .maybeSingle();
+        return { data: updatedBill ?? existingBill, error: null };
+      }
+      return { data: existingBill, error: null };
+    }
+
+    // 2. Resolve venue_id if not supplied
+    let vId = venueId;
+    if (!vId) {
+      const { data: tbl } = await supabase
+        .from('tables')
+        .select('venue_id')
+        .eq('id', tableId)
+        .maybeSingle();
+      vId = tbl?.venue_id;
+    }
+
+    if (!vId) {
+      return { data: null, error: new Error('Table venue could not be determined.') };
+    }
+
+    // 3. Create the new bill owned by this waiter
+    const { data: newBill, error: insertErr } = await supabase
+      .from('bills')
+      .insert({
+        venue_id: vId,
+        table_id: tableId,
+        waiter_id: staffId || null,
+        guest_count: 1,
+        status: 'open',
+      })
+      .select(
+        'id, venue_id, table_id, waiter_id, guest_count, status, payment_model, subtotal, convenience_fee, service_charge, vat, total, amount_paid, is_merged, merged_into_bill_id, table_pin, created_at, updated_at, closed_at, last_activity_at, assistance_type, assistance_requested_at',
+      )
+      .maybeSingle();
+
+    return { data: newBill, error: insertErr };
   },
 
   billById: (id: string) =>

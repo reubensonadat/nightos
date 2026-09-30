@@ -6,16 +6,15 @@ import {
     CheckCircleIcon,
     ChevronDownIcon,
     ClipboardDocumentListIcon,
-    ClockIcon,
     ExclamationTriangleIcon,
     MagnifyingGlassIcon,
     MinusIcon,
     PlusIcon,
-    SparklesIcon,
     UserIcon,
     XMarkIcon,
     ArchiveBoxIcon,
     DocumentChartBarIcon,
+    SparklesIcon,
 } from "@heroicons/react/24/outline";
 import toast from "react-hot-toast";
 import { formatGHS } from "../../data/menu";
@@ -23,6 +22,7 @@ import { db, type DbProduct, type DbMenuCategory } from "../../lib/api";
 import { useAuth } from "../../context/AuthContext";
 import { useRealtime } from "../../hooks/useRealtime";
 import { ShiftReportScreen } from "../manager/ShiftReportScreen";
+import { BysenIcon } from "../../components/BysenLogo";
 
 /* ═══════════════════════════════════════════════════════════════════════════
    TYPES
@@ -71,13 +71,13 @@ type BarTicket = {
     waiterId: string | null;
     waiterName: string;
     guestName: string;
-    status: "pending" | "preparing" | "ready" | "served" | "cancelled";
+    status: "pending" | "confirmed" | "preparing" | "ready" | "served" | "cancelled";
     placedAt: string;
     notes: string | null;
     items: TicketItem[];
 };
 
-type Props = {
+    type Props = {
     venueId: string;
     staffId: string;
     staffName: string;
@@ -276,14 +276,19 @@ export function BarStationScreen({ venueId, staffId, staffName, onExit, onSignOu
     const [rawTickets, setRawTickets] = useState<BarTicket[]>([]);
     const [loadingTickets, setLoadingTickets] = useState(false);
     const [recentlyPoured, setRecentlyPoured] = useState<BarTicket[]>([]);
-    const [batchMode, setBatchMode] = useState(false);
 
     const loadTickets = useCallback(async () => {
         if (!venueId) return;
         setLoadingTickets(true);
         try {
-            const { data: rows, error: dbError } = await db.kitchenOrders(venueId);
-            if (dbError || !rows) return;
+            const [ordersRes, shiftsRes] = await Promise.all([
+                db.kitchenOrders(venueId),
+                db.activeShiftsByVenue(venueId),
+            ]);
+            const rows = ordersRes.data;
+            if (ordersRes.error || !rows) return;
+
+            const activeStaffIds = new Set((shiftsRes.data ?? []).map((s: any) => s.staff_id));
 
             // Waiter names map
             const waiterIds = Array.from(
@@ -308,14 +313,18 @@ export function BarStationScreen({ venueId, staffId, staffName, onExit, onSignOu
                         notes: it.notes || null,
                     }));
 
+                    const billWaiterId = bill?.waiter_id || null;
+                    const isWaiterOnDuty = billWaiterId ? activeStaffIds.has(billWaiterId) : false;
+                    const waiterName = isWaiterOnDuty && billWaiterId ? (waiterMap[billWaiterId] || "Staff") : "Unassigned";
+
                     return {
                         id: r.id,
                         submissionId: r.id,
                         billId: r.bill_id,
                         tableNumber: table?.table_number ?? 0,
                         tableLabel: table?.table_label || `Table ${table?.table_number || "?"}`,
-                        waiterId: bill?.waiter_id || null,
-                        waiterName: bill?.waiter_id ? (waiterMap[bill.waiter_id] || "Staff") : "Direct",
+                        waiterId: billWaiterId,
+                        waiterName,
                         guestName: r.guest_name || "Guest",
                         status: r.status,
                         placedAt: r.created_at,
@@ -349,7 +358,11 @@ export function BarStationScreen({ venueId, staffId, staffName, onExit, onSignOu
     const activeTickets = useMemo(() => {
         return rawTickets
             .filter(t => t.status === "pending" || t.status === "confirmed" || t.status === "preparing")
-            .sort((a, b) => new Date(a.placedAt).getTime() - new Date(b.placedAt).getTime());
+            .sort((a, b) => {
+                const timeA = Date.parse(a.placedAt) || 0;
+                const timeB = Date.parse(b.placedAt) || 0;
+                return timeA - timeB;
+            });
     }, [rawTickets]);
 
     // Dispense action: "POURED ✓"
@@ -382,16 +395,6 @@ export function BarStationScreen({ venueId, staffId, staffName, onExit, onSignOu
         }
     };
 
-    // Batch Pouring summary across all open tickets
-    const batchSummary = useMemo(() => {
-        const counts = new Map<string, number>();
-        activeTickets.forEach(t => {
-            t.items.forEach(i => {
-                counts.set(i.name, (counts.get(i.name) || 0) + i.quantity);
-            });
-        });
-        return Array.from(counts.entries()).map(([name, qty]) => ({ name, qty }));
-    }, [activeTickets]);
 
     // ──────────────────────────────────────────────────────────────────────────
     // MID-SHIFT RESTOCK MODAL (Scene 2 - Tab 2)
@@ -755,10 +758,6 @@ export function BarStationScreen({ venueId, staffId, staffName, onExit, onSignOu
     /* ═══════════════════════════════════════════════════════════════════════════
        RENDER SCENE 2: ACTIVE BAR STATION SHELL
        ═══════════════════════════════════════════════════════════════════════════ */
-    const shiftElapsedMins = Math.floor((Date.now() - new Date(activeShift.startedAt).getTime()) / 60000);
-    const shiftHours = Math.floor(shiftElapsedMins / 60);
-    const shiftMins = shiftElapsedMins % 60;
-
     return (
         <div className="min-h-screen bg-[#F4F3E8] text-[#1A110B] font-sans antialiased flex flex-col">
             {/* ═══════════════════════════════════════════════════════════
@@ -766,35 +765,32 @@ export function BarStationScreen({ venueId, staffId, staffName, onExit, onSignOu
                ═══════════════════════════════════════════════════════════ */}
             <header className="sticky top-0 z-30 bg-[#1A110B] text-white shadow-md border-b border-white/10 px-4 sm:px-6 py-3">
                 <div className="max-w-7xl mx-auto flex flex-col md:flex-row md:items-center justify-between gap-3">
-                    {/* Station Brand & Status */}
+                    {/* Station Brand */}
                     <div className="flex items-center justify-between md:justify-start gap-4">
                         <div className="flex items-center gap-3">
-                            <div className="h-9 w-9 rounded-xl bg-amber-500/20 border border-amber-500/30 flex items-center justify-center font-bold text-amber-400 text-sm">
-                                🍸
-                            </div>
+                            <BysenIcon size="sm" />
                             <div>
-                                <div className="flex items-center gap-2">
-                                    <h1 className="font-black text-sm tracking-tight">Main Bar Station</h1>
-                                    <span className="rounded-md bg-emerald-500/20 text-emerald-400 px-2 py-0.5 text-[10px] font-bold">
-                                        Shift Active
-                                    </span>
-                                </div>
-                                <div className="flex items-center gap-2 text-[10px] text-white/60">
-                                    <span>{staffName || "Bartender"}</span>
-                                    <span>·</span>
-                                    <span>Active {shiftHours > 0 ? `${shiftHours}h ` : ""}{shiftMins}m</span>
-                                    <span>·</span>
-                                    <span>Float: {formatGHS(activeShift.startingFloat)}</span>
-                                </div>
+                                <h1 className="font-black text-sm tracking-tight text-white">Main Bar Station</h1>
+                                {staffName && (
+                                    <p className="text-[10px] text-white/60 font-medium leading-none mt-0.5">{staffName}</p>
+                                )}
                             </div>
                         </div>
 
-                        {/* Top End Shift & Sign Out Buttons (Mobile view) */}
+                        {/* Top Refresh & End Shift Buttons (Mobile view) */}
                         <div className="flex md:hidden items-center gap-1.5">
                             <button
                                 type="button"
+                                onClick={() => void loadTickets()}
+                                className="rounded-md border border-white/20 p-1.5 text-white hover:bg-white/10 transition cursor-pointer"
+                                title="Refresh Tickets"
+                            >
+                                <ArrowPathIcon className={`h-4 w-4 ${loadingTickets ? "animate-spin" : ""}`} />
+                            </button>
+                            <button
+                                type="button"
                                 onClick={handleOpenEndShift}
-                                className="rounded-md bg-rose-600/20 border border-rose-500/40 text-rose-300 px-2.5 py-1 text-xs font-bold"
+                                className="rounded-md bg-rose-600/20 border border-rose-500/40 text-rose-300 px-2.5 py-1 text-xs font-bold cursor-pointer"
                             >
                                 End Shift
                             </button>
@@ -852,13 +848,13 @@ export function BarStationScreen({ venueId, staffId, staffName, onExit, onSignOu
                     <div className="hidden md:flex items-center gap-2">
                         <button
                             type="button"
-                            onClick={() => setIsRestockOpen(true)}
-                            className="inline-flex items-center gap-1.5 rounded-md bg-white/10 hover:bg-white/15 px-3 py-1.5 text-xs font-bold text-white transition cursor-pointer"
+                            onClick={() => void loadTickets()}
+                            className="inline-flex items-center gap-1.5 rounded-md border border-white/20 hover:bg-white/10 px-3 py-1.5 text-xs font-bold text-white transition cursor-pointer"
+                            title="Refresh Tickets"
                         >
-                            <PlusIcon className="h-3.5 w-3.5 text-white" />
-                            <span>+ Restock Bottles</span>
+                            <ArrowPathIcon className={`h-3.5 w-3.5 ${loadingTickets ? "animate-spin" : ""}`} />
+                            <span>Refresh</span>
                         </button>
-
                         <button
                             type="button"
                             onClick={handleOpenEndShift}
@@ -875,68 +871,6 @@ export function BarStationScreen({ venueId, staffId, staffName, onExit, onSignOu
                ═══════════════════════════════════════════════════════════ */}
             {activeTab === "QUEUE" && (
                 <main className="flex-1 max-w-5xl mx-auto w-full p-4 sm:p-6 space-y-5">
-                    {/* Header Controls */}
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white p-3.5 rounded-lg border border-[#1A110B]/10 shadow-xs">
-                        <div className="flex items-center gap-2">
-                            <ClockIcon className="h-5 w-5 text-[#1A110B] shrink-0" />
-                            <div>
-                                <h2 className="text-sm font-black text-[#1A110B]">
-                                    Live Table Drink Tickets ({activeTickets.length} Pending)
-                                </h2>
-                                <p className="text-[11px] text-[#606F69]">
-                                    Tap "POURED ✓" as soon as bottles/glasses are placed on the bar counter.
-                                </p>
-                            </div>
-                        </div>
-
-                        <div className="flex items-center gap-2">
-                            <button
-                                type="button"
-                                onClick={() => setBatchMode(!batchMode)}
-                                className={`rounded-md px-3 py-1.5 text-xs font-bold transition cursor-pointer border ${
-                                    batchMode
-                                        ? "bg-[#1A110B] text-white border-[#1A110B]"
-                                        : "bg-[#F4F3E8] text-[#1A110B] border-[#1A110B]/15 hover:bg-[#1A110B]/10"
-                                }`}
-                            >
-                                {batchMode ? "Hide Batch View" : "⚡ Batch Pouring Overview"}
-                            </button>
-
-                            <button
-                                type="button"
-                                onClick={() => void loadTickets()}
-                                className="rounded-md border border-[#1A110B]/15 p-2 text-[#1A110B] hover:bg-[#1A110B]/5 transition"
-                                title="Refresh Tickets"
-                            >
-                                <ArrowPathIcon className={`h-4 w-4 ${loadingTickets ? "animate-spin" : ""}`} />
-                            </button>
-                        </div>
-                    </div>
-
-                    {/* Peak-Hour Batch Pouring Mode Banner */}
-                    {batchMode && batchSummary.length > 0 && (
-                        <div className="rounded-lg bg-[#1A110B] text-white p-4 shadow-md animate-in fade-in">
-                            <div className="flex items-center justify-between mb-2">
-                                <span className="text-[10px] font-black uppercase tracking-wider text-white flex items-center gap-1.5">
-                                    <SparklesIcon className="h-4 w-4" />
-                                    Aggregated Drinks to Pour Right Now
-                                </span>
-                                <span className="text-[10px] text-white/60">Across all open table tickets</span>
-                            </div>
-                            <div className="flex flex-wrap gap-2">
-                                {batchSummary.map((b, idx) => (
-                                    <span
-                                        key={idx}
-                                        className="inline-flex items-center gap-1.5 rounded-md bg-white/10 px-2.5 py-1 text-xs font-bold text-white border border-white/15"
-                                    >
-                                        <span className="text-emerald-400 font-mono">×{b.qty}</span>
-                                        <span>{b.name}</span>
-                                    </span>
-                                ))}
-                            </div>
-                        </div>
-                    )}
-
                     {/* Orders Queue List */}
                     {activeTickets.length === 0 ? (
                         <div className="rounded-lg bg-white p-12 border border-[#1A110B]/10 text-center space-y-2">

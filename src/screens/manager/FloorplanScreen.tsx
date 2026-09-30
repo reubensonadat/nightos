@@ -75,10 +75,41 @@ function TableActiveOrders({ billId, waiterName }: { billId: string; waiterName?
 
     const fetchData = useCallback(() => {
         let mounted = true;
-        // Skip setting loading to true synchronously to avoid cascading renders
-        db.orderItemsByBill(billId).then((res) => {
-            if (mounted && res.data) setItems(res.data);
-            if (mounted) setLoading(false);
+        // Query direct order_items and fallback to order_submissions items
+        db.orderItemsByBill(billId).then(async (res) => {
+            if (!mounted) return;
+            if (res.data && res.data.length > 0) {
+                setItems(res.data);
+                setLoading(false);
+                return;
+            }
+
+            // Fallback: fetch from order_submissions if direct order_items is empty
+            try {
+                const { data: subs } = await db.submissionsByBill(billId);
+                if (mounted && subs && subs.length > 0) {
+                    const fallbackItems: any[] = [];
+                    subs.forEach((s: any) => {
+                        (s.order_items || []).forEach((it: any) => {
+                            fallbackItems.push({
+                                id: it.id || `sub_item_${Math.random()}`,
+                                product_name: it.product_name,
+                                quantity: Number(it.quantity || 1),
+                                unit_price: Number(it.unit_price || 0),
+                                line_total: Number(it.line_total || (it.unit_price || 0) * (it.quantity || 1)),
+                                status: s.status || "pending",
+                                created_at: s.created_at,
+                                notes: it.notes || null,
+                            });
+                        });
+                    });
+                    setItems(fallbackItems);
+                }
+            } catch {
+                // Ignore fallback error
+            } finally {
+                if (mounted) setLoading(false);
+            }
         });
         return () => { mounted = false; };
     }, [billId]);
@@ -89,6 +120,14 @@ function TableActiveOrders({ billId, waiterName }: { billId: string; waiterName?
 
     useRealtime({
         table: "order_items",
+        filter: `bill_id=eq.${billId}`,
+        onInsert: fetchData,
+        onUpdate: fetchData,
+        onDelete: fetchData,
+    });
+
+    useRealtime({
+        table: "order_submissions",
         filter: `bill_id=eq.${billId}`,
         onInsert: fetchData,
         onUpdate: fetchData,

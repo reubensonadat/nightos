@@ -14,6 +14,7 @@ import { CheckCircleIcon } from "@heroicons/react/24/solid";
 import toast from "react-hot-toast";
 import { formatGHS, formatGHSString } from "../../data/menu";
 import { db, type DbBill, type DbOrderSubmission, type DbOrderItem, type DbProduct, type DbMenuCategory } from "../../lib/api";
+import { supabase } from "../../lib/supabase";
 import type { Table } from "./TablesDashboard";
 import { MenuItemCard } from "../../components/MenuItemCard";
 import { ConfirmModal } from "../../components/ConfirmModal";
@@ -157,7 +158,7 @@ export function OrderManagementScreen() {
                 const billId =
                     bill.waiter_id
                         ? bill.id
-                        : ((await db.openBillForWaiter(table.id, staffId)).data?.id ?? bill.id);
+                        : ((await db.openBillForWaiter(table.id, staffId, venueId)).data?.id ?? bill.id);
                 setBillId(billId);
                 const { data: subs } = await db.submissionsByBill(bill.id);
                 const list = subs ?? [];
@@ -326,8 +327,9 @@ export function OrderManagementScreen() {
         try {
             // Ensure there is an open bill for the table first (server claims or
             // creates one, owned by this waiter — no more waiterless bills).
-            const { data: bill } = await db.openBillForWaiter(table.id, staffId);
+            const { data: bill, error: billErr } = await db.openBillForWaiter(table.id, staffId, venueId);
             if (!bill) {
+                console.error("Failed to open bill for table:", billErr);
                 toast.error("Could not open a bill for this table");
                 return;
             }
@@ -381,6 +383,31 @@ export function OrderManagementScreen() {
             toast.error("Failed to cancel order");
         } finally {
             setCancellingId(null);
+        }
+    };
+
+    const [servingId, setServingId] = useState<string | null>(null);
+
+    const markServedSubmission = async (submissionId: string, targetBillId?: string | null) => {
+        if (servingId) return;
+        setServingId(submissionId);
+        try {
+            const { data: ok, error } = await db.setOrderStatus(submissionId, "served", staffId);
+            if (error || !ok) {
+                toast.error(error ? String((error as { message?: string }).message ?? error) : "Could not mark as served");
+                return;
+            }
+            // Assign/credit waiter on the bill if staffId is available
+            const actualBillId = targetBillId || billId;
+            if (actualBillId && staffId) {
+                await supabase.from('bills').update({ waiter_id: staffId }).eq('id', actualBillId);
+            }
+            toast.success("Order marked as served! Sales credited.", { icon: "✅" });
+            await load();
+        } catch {
+            toast.error("Failed to mark order as served");
+        } finally {
+            setServingId(null);
         }
     };
 
@@ -627,17 +654,31 @@ export function OrderManagementScreen() {
                                                 ))}
                                             </div>
 
-                                            {canCancel(sub.status) && (
-                                                <div className="flex items-center justify-end border-t border-isabelline px-3.5 py-2">
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => setCancelConfirmId(sub.id)}
-                                                        disabled={cancellingId !== null}
-                                                        className="inline-flex items-center gap-1 rounded-full bg-dark-red/10 px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-dark-red ring-1 ring-dark-red/20 transition-all hover:bg-dark-red/20 active:scale-95 disabled:opacity-50"
-                                                    >
-                                                        <XMarkIcon className="h-3 w-3" strokeWidth={2.5} />
-                                                        {cancellingId === sub.id ? "Cancelling…" : "Cancel Order"}
-                                                    </button>
+                                            {(canCancel(sub.status) || sub.status === "ready") && (
+                                                <div className="flex items-center justify-end gap-2 border-t border-isabelline px-3.5 py-2">
+                                                    {sub.status === "ready" && (
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => void markServedSubmission(sub.id, sub.bill_id)}
+                                                            disabled={servingId !== null}
+                                                            className="inline-flex items-center gap-1 rounded-full bg-emerald-600/10 px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-emerald-700 ring-1 ring-emerald-600/20 transition-all hover:bg-emerald-600/20 active:scale-95 disabled:opacity-50 cursor-pointer"
+                                                        >
+                                                            <CheckIcon className="h-3 w-3" strokeWidth={2.5} />
+                                                            {servingId === sub.id ? "Serving…" : "Mark Served"}
+                                                        </button>
+                                                    )}
+
+                                                    {canCancel(sub.status) && (
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => setCancelConfirmId(sub.id)}
+                                                            disabled={cancellingId !== null}
+                                                            className="inline-flex items-center gap-1 rounded-full bg-dark-red/10 px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-dark-red ring-1 ring-dark-red/20 transition-all hover:bg-dark-red/20 active:scale-95 disabled:opacity-50 cursor-pointer"
+                                                        >
+                                                            <XMarkIcon className="h-3 w-3" strokeWidth={2.5} />
+                                                            {cancellingId === sub.id ? "Cancelling…" : "Cancel Order"}
+                                                        </button>
+                                                    )}
                                                 </div>
                                             )}
                                         </div>

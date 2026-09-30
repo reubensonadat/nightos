@@ -16,6 +16,7 @@ import { db, type DbOrderItem } from "../lib/api";
 import { useRealtime } from "../hooks/useRealtime";
 
 import { TablePinBanner } from "../components/TablePinBanner";
+import { LoadingScreen } from "../components/LoadingScreen";
 
 type Props = {
     venueId: string;
@@ -217,11 +218,7 @@ export function CartScreen({ venueId, tableLabel, tablePin, billId, customerSess
     const hasPlaced = placedItems.length > 0;
 
     if (loadingPlaced && !hasDraft) {
-        return (
-            <main className="relative min-h-svh w-full bg-isabelline font-sans text-licorice antialiased flex items-center justify-center">
-                <div className="h-8 w-8 animate-spin rounded-full border-2 border-licorice/20 border-t-licorice" />
-            </main>
-        );
+        return <LoadingScreen message="LOADING TAB..." />;
     }
 
     // ── Empty state ── (only show if NO draft items AND NO placed session items exist)

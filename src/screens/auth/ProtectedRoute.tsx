@@ -1,16 +1,13 @@
 import { Navigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
+import { LoadingScreen } from '../../components/LoadingScreen'
 
 export function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, isInitializing } = useAuth()
   const location = useLocation()
 
   if (isInitializing) {
-    return (
-      <div className="flex min-h-svh items-center justify-center bg-isabelline">
-        <div className="h-8 w-8 animate-spin rounded-full border-4 border-licorice/20 border-t-licorice" />
-      </div>
-    )
+    return <LoadingScreen />
   }
 
   if (!isAuthenticated) {
@@ -24,11 +21,7 @@ export function VenueRequired({ children }: { children: React.ReactNode }) {
   const { hasVenue, isInitializing } = useAuth()
 
   if (isInitializing) {
-    return (
-      <div className="flex min-h-svh items-center justify-center bg-isabelline">
-        <div className="h-8 w-8 animate-spin rounded-full border-4 border-licorice/20 border-t-licorice" />
-      </div>
-    )
+    return <LoadingScreen />
   }
 
   if (!hasVenue) {

@@ -23,6 +23,7 @@ import { PartyPrompt } from "./components/PartyPrompt";
 import { TablePinModal } from "./components/TablePinModal";
  
 import { ClockIcon, BuildingStorefrontIcon } from "@heroicons/react/24/outline";
+import { LoadingScreen } from "./components/LoadingScreen";
 
 import { TablesDashboard } from "./screens/waiter/TablesDashboard";
 import { OrderManagementScreen } from "./screens/waiter/OrderManagementScreen";
@@ -326,11 +327,7 @@ function CustomerShell({ venueId, tableId, tableLabel }: { venueId: string; tabl
         </div>
       );
     }
-    return (
-      <div className="min-h-svh bg-isabelline flex items-center justify-center">
-        <div className="w-8 h-8 border-2 border-licorice/20 border-t-licorice rounded-full animate-spin" />
-      </div>
-    );
+    return <LoadingScreen />;
   }
 
   return (
@@ -429,11 +426,7 @@ function CustomerFlow({ onSwitchMode, venueId, qrTable, qrLoading, qrError }: Cu
   const cleanPath = location.pathname.replace(/^\/v\/[^/]+/, "");
 
   if (qrLoading) {
-    return (
-      <div className="min-h-svh bg-isabelline flex items-center justify-center">
-        <div className="w-8 h-8 border-2 border-licorice/20 border-t-licorice rounded-full animate-spin" />
-      </div>
-    );
+    return <LoadingScreen />;
   }
 
   if (qrError) {
@@ -609,14 +602,7 @@ function AppShell() {
   };
 
   if (venueLoading && urlVenueSlug && loadedVenue?.slug !== urlVenueSlug) {
-    return (
-      <div className="min-h-svh bg-isabelline flex items-center justify-center font-sans">
-        <div className="flex flex-col items-center gap-3">
-          <div className="h-9 w-9 animate-spin rounded-full border-3 border-licorice/20 border-t-licorice" />
-          <span className="text-xs font-semibold uppercase tracking-wider text-feldgrau">Loading venue...</span>
-        </div>
-      </div>
-    );
+    return <LoadingScreen message="LOADING VENUE..." />;
   }
 
   if (isVenueNotFound) {
@@ -686,10 +672,10 @@ function AppShell() {
                 (staffSession || role === "owner" || role === "manager" || role === "waiter") ? (
                   <TablesDashboard
                     venueId={staffSession?.venue_id || authVenue?.id || venueId || ""}
-                    venueName={currentVenue?.name}
-                    staffName={staffSession?.name || profile?.name || "Manager"}
+                    venueName={currentVenue?.name || authVenue?.name || "Velvet Lounge"}
+                    staffName={staffSession?.name || profile?.name || user?.user_metadata?.full_name || user?.user_metadata?.name || "Manager"}
                     staffId={staffSession?.id || user?.id || ""}
-                    role={staffSession?.role || "manager"}
+                    role={staffSession?.role || role || "manager"}
                     onSignOut={handleSignOut}
                   />
                 ) : (
@@ -709,7 +695,7 @@ function AppShell() {
                 (staffSession || role === "owner" || role === "manager" || role === "waiter") ? (
                   <ShiftPerformanceScreen
                     staffId={staffSession?.id || user?.id || ""}
-                    staffName={staffSession?.name || profile?.name || "Manager"}
+                    staffName={staffSession?.name || profile?.name || user?.user_metadata?.full_name || user?.user_metadata?.name || "Manager"}
                   />
                 ) : (
                   <Navigate to={`/login?redirect=${encodeURIComponent(location.pathname + location.search)}`} replace />
