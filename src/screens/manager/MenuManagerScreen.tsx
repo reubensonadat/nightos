@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import {
     ArrowPathIcon,
@@ -9,7 +9,6 @@ import {
     MagnifyingGlassIcon,
     PencilSquareIcon,
     PlusIcon,
-    SparklesIcon,
     TrashIcon,
     XMarkIcon,
     PhotoIcon,
@@ -27,31 +26,131 @@ import clsx from "clsx";
 import { ConfirmModal } from "../../components/ConfirmModal";
 import { BulkMenuUploadModal } from "../../components/BulkMenuUploadModal";
 import { uploadToR2 } from "../../lib/r2";
+import { cacheGet, cacheSet, TTL } from "../../lib/cache";
 
-/* ────────────────────────── Preset Food & Drink Images ────────────────────────── */
-const PRESET_IMAGES = [
-    { label: "Chicken Wings", url: "https://images.unsplash.com/photo-1567620832903-9fc6debc209f?auto=format&fit=crop&w=600&q=80" },
-    { label: "Steak / Grill", url: "https://images.unsplash.com/photo-1544025162-d76694265947?auto=format&fit=crop&w=600&q=80" },
-    { label: "Burger", url: "https://images.unsplash.com/photo-1568901346375-23c9450c58cd?auto=format&fit=crop&w=600&q=80" },
-    { label: "Fries", url: "https://images.unsplash.com/photo-1573080496219-bb080dd4f877?auto=format&fit=crop&w=600&q=80" },
-    { label: "Cocktail", url: "https://images.unsplash.com/photo-1514362545857-3bc16c4c7d1b?auto=format&fit=crop&w=600&q=80" },
-    { label: "Beer Draft", url: "https://images.unsplash.com/photo-1608270586620-248524c67de9?auto=format&fit=crop&w=600&q=80" },
-    { label: "Red Wine", url: "https://images.unsplash.com/photo-1510812431401-41d2bd2722f3?auto=format&fit=crop&w=600&q=80" },
-    { label: "Dessert", url: "https://images.unsplash.com/photo-1551024709-8f23befc6f87?auto=format&fit=crop&w=600&q=80" },
-];
+interface InventoryProductCardProps {
+    prod: DbProduct;
+    catName: string;
+    marginPct: number | null;
+    onEdit: (prod: DbProduct) => void;
+    onToggleActive: (prod: DbProduct) => void;
+}
 
-/* ────────────────────────── Seed Menu Items Fallback ────────────────────────── */
-const DEFAULT_SEED_CATEGORIES = ["Starters", "Mains", "Cocktails", "Beer & Wine", "Desserts"];
+const InventoryProductCard = memo(function InventoryProductCard({
+    prod,
+    catName,
+    marginPct,
+    onEdit,
+    onToggleActive,
+}: InventoryProductCardProps) {
+    return (
+        <article
+            onClick={() => onEdit(prod)}
+            className={clsx(
+                "group relative flex flex-col justify-between overflow-hidden rounded-2xl bg-white shadow-xs ring-1 ring-licorice/8 hover:shadow-md hover:ring-licorice/20 hover:-translate-y-0.5 transition-all duration-200 cursor-pointer",
+                !prod.is_active && "opacity-75"
+            )}
+        >
+            {/* A. Top: Media & Badges */}
+            <div className="relative aspect-square w-full shrink-0 overflow-hidden bg-white p-2.5 sm:p-3 flex items-center justify-center border-b border-licorice/5">
+                {prod.images?.[0] ? (
+                    <img
+                        src={prod.images[0]}
+                        alt={prod.name}
+                        loading="lazy"
+                        decoding="async"
+                        className="h-full w-full object-contain transition-transform duration-500 ease-out group-hover:scale-105"
+                    />
+                ) : (
+                    <div className="flex h-full w-full items-center justify-center rounded-xl bg-gradient-to-br from-licorice/85 to-licorice">
+                        <span className="font-serif text-3xl font-bold text-isabelline/80">
+                            {prod.name.charAt(0)}
+                        </span>
+                    </div>
+                )}
 
-const DEFAULT_SEED_PRODUCTS = [
-    { name: "Crispy Honey Wings", category: "Starters", price: 85, costPrice: 32, station: "kitchen", description: "Honey glazed wings served with garlic ranch dip", image: PRESET_IMAGES[0].url },
-    { name: "Prime Ribeye Steak", category: "Mains", price: 280, costPrice: 110, station: "kitchen", description: "400g grilled ribeye with truffle herb butter", image: PRESET_IMAGES[1].url },
-    { name: "Signature House Burger", category: "Mains", price: 140, costPrice: 48, station: "kitchen", description: "Double wagyu patty, smoked cheddar, brioche bun", image: PRESET_IMAGES[2].url },
-    { name: "Truffle Parmesan Fries", category: "Starters", price: 65, costPrice: 18, station: "kitchen", description: "Hand-cut fries tossed in truffle oil and parmesan", image: PRESET_IMAGES[3].url },
-    { name: "Passion Fruit Mojito", category: "Cocktails", price: 95, costPrice: 22, station: "bar", description: "White rum, fresh passion fruit, mint, lime, soda", image: PRESET_IMAGES[4].url },
-    { name: "Craft IPA Draft", category: "Beer & Wine", price: 55, costPrice: 18, station: "bar", description: "Local cold brewed IPA on tap", image: PRESET_IMAGES[5].url },
-    { name: "Chocolate Lava Cake", category: "Desserts", price: 75, costPrice: 25, station: "kitchen", description: "Warm molten chocolate cake with vanilla bean ice cream", image: PRESET_IMAGES[7].url },
-];
+                {/* Floating Badge: Category (Top-Left) */}
+                <div className="absolute left-2.5 top-2.5 z-10">
+                    <span className="inline-flex h-5.5 items-center rounded-full bg-licorice/90 px-2.5 text-[10px] font-bold text-isabelline shadow-xs backdrop-blur-xs">
+                        {catName}
+                    </span>
+                </div>
+
+                {/* Floating Badge: Station (Top-Right) */}
+                <div className="absolute right-2.5 top-2.5 z-10">
+                    <span className="inline-flex h-5.5 items-center rounded-full bg-white/95 px-2 text-[9.5px] font-bold uppercase tracking-wider text-licorice shadow-xs ring-1 ring-licorice/10 backdrop-blur-xs">
+                        {prod.station || "kitchen"}
+                    </span>
+                </div>
+            </div>
+
+            {/* Card Body */}
+            <div className="flex flex-1 flex-col justify-between p-3.5">
+                {/* B. Upper Info Row: Name & Selling Price */}
+                <div>
+                    <div className="flex items-baseline justify-between gap-2">
+                        <h3 className="text-sm font-bold leading-snug tracking-tight text-licorice group-hover:text-licorice/90 transition-colors line-clamp-1">
+                            {prod.name}
+                        </h3>
+                        <span className="font-mono text-sm font-bold text-licorice shrink-0">
+                            {formatGHS(prod.price)}
+                        </span>
+                    </div>
+
+                    {/* Optional Description */}
+                    {prod.description && (
+                        <p className="mt-1 text-[11.5px] leading-snug text-feldgrau line-clamp-1">
+                            {prod.description}
+                        </p>
+                    )}
+                </div>
+
+                {/* C. Subtle Divider */}
+                <div className="my-2.5 border-t border-licorice/6" />
+
+                {/* D. Bottom Info Row: Cost / Margin (Left) & Stock Pill (Right) */}
+                <div className="flex items-center justify-between gap-2">
+                    <div className="text-[11px] text-feldgrau">
+                        {prod.cost_price ? (
+                            <span>
+                                Cost: <span className="font-mono font-semibold text-licorice">{formatGHS(prod.cost_price)}</span>
+                                {marginPct !== null && (
+                                    <span className="ml-1 font-bold text-emerald-700">({marginPct}%)</span>
+                                )}
+                            </span>
+                        ) : (
+                            <span className="italic text-feldgrau/40 text-[10.5px]">No cost set</span>
+                        )}
+                    </div>
+
+                    {/* Stock Badge / Quick Toggle */}
+                    <button
+                        type="button"
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            onToggleActive(prod);
+                        }}
+                        className={clsx(
+                            "inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[10px] font-bold transition-all cursor-pointer",
+                            prod.is_active
+                                ? "bg-emerald-50 text-emerald-700 hover:bg-emerald-100 ring-1 ring-emerald-600/20"
+                                : "bg-red-50 text-red-700 hover:bg-red-100 ring-1 ring-red-600/20"
+                        )}
+                        title={prod.is_active ? "In Stock. Click to mark Out of Stock" : "Out of Stock. Click to mark In Stock"}
+                    >
+                        <span
+                            className={clsx(
+                                "h-1.5 w-1.5 rounded-full shrink-0",
+                                prod.is_active ? "bg-emerald-500" : "bg-red-500"
+                            )}
+                        />
+                        {prod.is_active ? "In Stock" : "Out of Stock"}
+                    </button>
+                </div>
+            </div>
+        </article>
+    );
+});
 
 export function MenuManagerScreen({ venueId }: { venueId?: string } = {}) {
     const { venue } = useVenue(venueId);
@@ -69,10 +168,17 @@ export function MenuManagerScreen({ venueId }: { venueId?: string } = {}) {
         });
     };
 
-    // State
-    const [products, setProducts] = useState<DbProduct[]>([]);
-    const [categories, setCategories] = useState<DbMenuCategory[]>([]);
-    const [loading, setLoading] = useState(true);
+    // State (Hydrated synchronously from instant cache with 0ms delay)
+    const initialProds = venue.id && venue.id !== "00000000-0000-0000-0000-000000000000"
+        ? cacheGet<DbProduct[]>(`products:${venue.id}:all`) || []
+        : [];
+    const initialCats = venue.id && venue.id !== "00000000-0000-0000-0000-000000000000"
+        ? cacheGet<DbMenuCategory[]>(`menu_cats:${venue.id}`) || []
+        : [];
+
+    const [products, setProducts] = useState<DbProduct[]>(initialProds);
+    const [categories, setCategories] = useState<DbMenuCategory[]>(initialCats);
+    const [loading, setLoading] = useState<boolean>(initialProds.length === 0);
     const [search, setSearch] = useState("");
     const [selectedCategory, setSelectedCategory] = useState<string>("All");
     const [availabilityFilter, setAvailabilityFilter] = useState<"all" | "active" | "inactive">("all");
@@ -81,6 +187,8 @@ export function MenuManagerScreen({ venueId }: { venueId?: string } = {}) {
     const [editingProduct, setEditingProduct] = useState<Partial<DbProduct> | null>(null);
     const [isCreatingProduct, setIsCreatingProduct] = useState(false);
     const [pendingDeleteProduct, setPendingDeleteProduct] = useState<DbProduct | null>(null);
+    const [pendingDeleteCategory, setPendingDeleteCategory] = useState<DbMenuCategory | null>(null);
+    const [isDeletingCategory, setIsDeletingCategory] = useState(false);
 
     // Category modal
     const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
@@ -127,28 +235,49 @@ export function MenuManagerScreen({ venueId }: { venueId?: string } = {}) {
     const [rawOrderItems, setRawOrderItems] = useState<Array<{ product_name: string; quantity: number; line_total: number }>>([]);
 
     // ────────────────────────── Fetch Menu Data ──────────────────────────
-    const fetchMenuData = useCallback(async () => {
+    const fetchMenuData = useCallback(async (silent = false) => {
         if (!venue.id || venue.id === "00000000-0000-0000-0000-000000000000") return;
-        setLoading(true);
+        if (!silent) setLoading(true);
         try {
             const [prodRes, catRes] = await Promise.all([
                 db.products(venue.id, true),
                 db.menuCategories(venue.id),
             ]);
 
-            setProducts(prodRes.data ?? []);
-            setCategories(catRes.data ?? []);
+            const prods = prodRes.data ?? [];
+            const cats = catRes.data ?? [];
+
+            setProducts(prods);
+            setCategories(cats);
+
+            // Commit to instant cache
+            cacheSet(`products:${venue.id}:all`, prods, TTL.MENU);
+            cacheSet(`menu_cats:${venue.id}`, cats, TTL.MENU);
         } catch (err) {
             console.error(err);
             toast.error("Failed to load menu items.");
         } finally {
-            setLoading(false);
+            if (!silent) setLoading(false);
         }
     }, [venue.id]);
 
     useEffect(() => {
-        fetchMenuData();
-    }, [fetchMenuData]);
+        if (!venue.id || venue.id === "00000000-0000-0000-0000-000000000000") return;
+        const cachedProds = cacheGet<DbProduct[]>(`products:${venue.id}:all`);
+        const cachedCats = cacheGet<DbMenuCategory[]>(`menu_cats:${venue.id}`);
+        const hasCache = Boolean(cachedProds && cachedProds.length > 0);
+
+        if (hasCache) {
+            setProducts(cachedProds!);
+            setLoading(false);
+        }
+        if (cachedCats && cachedCats.length > 0) {
+            setCategories(cachedCats);
+        }
+
+        // Silent background fetch if cache was available, otherwise show loading
+        fetchMenuData(hasCache);
+    }, [venue.id, fetchMenuData]);
 
     // Fetch order history for top sellers tab
     useEffect(() => {
@@ -167,47 +296,6 @@ export function MenuManagerScreen({ venueId }: { venueId?: string } = {}) {
         fetchOrders();
     }, [activeTab, venue.id]);
 
-    // ────────────────────────── Seed Menu Action ──────────────────────────
-    const handleSeedDefaultMenu = async () => {
-        if (!venue.id) return;
-        setLoading(true);
-        try {
-            // 1. Create categories
-            const catMap = new Map<string, string>();
-            for (const catName of DEFAULT_SEED_CATEGORIES) {
-                const existing = categories.find((c) => c.name.toLowerCase() === catName.toLowerCase());
-                if (existing) {
-                    catMap.set(catName, existing.id);
-                } else {
-                    const { data } = await db.createMenuCategory(venue.id, catName);
-                    if (data) catMap.set(catName, data.id);
-                }
-            }
-
-            // 2. Create products
-            for (const item of DEFAULT_SEED_PRODUCTS) {
-                const catId = catMap.get(item.category) || null;
-                await db.createProduct({
-                    venueId: venue.id,
-                    categoryId: catId,
-                    name: item.name,
-                    description: item.description,
-                    price: item.price,
-                    costPrice: item.costPrice,
-                    images: [item.image],
-                    station: item.station as "kitchen" | "bar",
-                });
-            }
-
-            toast.success("Default menu items seeded successfully!");
-            await fetchMenuData();
-        } catch {
-            toast.error("Could not seed menu.");
-        } finally {
-            setLoading(false);
-        }
-    };
-
     // ────────────────────────── Categories Map ──────────────────────────
     const catNameById = useMemo(() => {
         const map = new Map<string, string>();
@@ -215,9 +303,13 @@ export function MenuManagerScreen({ venueId }: { venueId?: string } = {}) {
         return map;
     }, [categories]);
 
-    // ────────────────────────── Stock Counts ──────────────────────────
+    // ────────────────────────── Stock & Category Counts ──────────────────────────
     const activeCount = useMemo(() => products.filter((p) => p.is_active).length, [products]);
     const inactiveCount = useMemo(() => products.filter((p) => !p.is_active).length, [products]);
+    const unassignedCount = useMemo(
+        () => products.filter((p) => !p.category_id || !catNameById.has(p.category_id)).length,
+        [products, catNameById]
+    );
 
     // ────────────────────────── Filtered Products ──────────────────────────
     const filteredProducts = useMemo(() => {
@@ -231,8 +323,11 @@ export function MenuManagerScreen({ venueId }: { venueId?: string } = {}) {
 
             if (!matchesSearch) return false;
             if (selectedCategory === "All") return true;
+            if (selectedCategory === "Unassigned") {
+                return !p.category_id || !catNameById.has(p.category_id);
+            }
 
-            const catName = p.category_id ? catNameById.get(p.category_id) : "Uncategorized";
+            const catName = p.category_id ? catNameById.get(p.category_id) : "Unassigned";
             return catName?.toLowerCase() === selectedCategory.toLowerCase();
         });
     }, [products, search, selectedCategory, availabilityFilter, catNameById]);
@@ -253,11 +348,11 @@ export function MenuManagerScreen({ venueId }: { venueId?: string } = {}) {
         setIsCreatingProduct(true);
     };
 
-    const handleOpenEditModal = (prod: DbProduct) => {
+    const handleOpenEditModal = useCallback((prod: DbProduct) => {
         setEditingProduct({ ...prod });
         setImagePreview(prod.images?.[0] || "");
         setIsCreatingProduct(false);
-    };
+    }, []);
 
     const handleSaveProduct = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -299,35 +394,46 @@ export function MenuManagerScreen({ venueId }: { venueId?: string } = {}) {
 
             setEditingProduct(null);
             setIsCreatingProduct(false);
-            fetchMenuData();
+            fetchMenuData(true);
         } catch {
             toast.error("Failed to save menu item.");
         }
     };
 
     // Toggle Product Availability
-    const handleToggleActive = async (product: DbProduct) => {
+    const handleToggleActive = useCallback(async (product: DbProduct) => {
         const nextState = !product.is_active;
-        setProducts((prev) => prev.map((p) => (p.id === product.id ? { ...p, is_active: nextState } : p)));
+        setProducts((prev) => {
+            const next = prev.map((p) => (p.id === product.id ? { ...p, is_active: nextState } : p));
+            if (venue.id) cacheSet(`products:${venue.id}:all`, next, TTL.MENU);
+            return next;
+        });
         try {
             await db.updateProduct(product.id, venue.id, { is_active: nextState });
             toast.success(`${product.name} is now ${nextState ? "Available (In Stock)" : "Out of Stock"}`);
-            fetchMenuData();
+            fetchMenuData(true);
         } catch {
-            fetchMenuData();
+            fetchMenuData(true);
             toast.error("Failed to update status.");
         }
-    };
+    }, [venue.id, fetchMenuData]);
 
     // Delete Product
     const handleDeleteProduct = async () => {
         if (!pendingDeleteProduct || !venue.id) return;
+        const toDelete = pendingDeleteProduct;
+        setPendingDeleteProduct(null);
+        setProducts((prev) => {
+            const next = prev.filter((p) => p.id !== toDelete.id);
+            if (venue.id) cacheSet(`products:${venue.id}:all`, next, TTL.MENU);
+            return next;
+        });
         try {
-            await db.deleteProduct(pendingDeleteProduct.id, venue.id);
-            toast.success(`Deleted ${pendingDeleteProduct.name}`);
-            setPendingDeleteProduct(null);
-            fetchMenuData();
+            await db.deleteProduct(toDelete.id, venue.id);
+            toast.success(`Deleted ${toDelete.name}`);
+            fetchMenuData(true);
         } catch {
+            fetchMenuData(true);
             toast.error("Could not delete product.");
         }
     };
@@ -342,9 +448,25 @@ export function MenuManagerScreen({ venueId }: { venueId?: string } = {}) {
             toast.success(`Created category "${newCategoryName}"`);
             setNewCategoryName("");
             setIsCategoryModalOpen(false);
-            fetchMenuData();
+            fetchMenuData(true);
         } catch {
             toast.error("Failed to create category.");
+        }
+    };
+
+    // Category Deletion
+    const handleDeleteCategory = async () => {
+        if (!pendingDeleteCategory || !venue.id) return;
+        setIsDeletingCategory(true);
+        try {
+            await db.deleteMenuCategory(pendingDeleteCategory.id, venue.id);
+            toast.success(`Category "${pendingDeleteCategory.name}" deleted. Existing items reassigned to Unassigned.`);
+            setPendingDeleteCategory(null);
+            fetchMenuData();
+        } catch {
+            toast.error("Could not delete category.");
+        } finally {
+            setIsDeletingCategory(false);
         }
     };
 
@@ -412,25 +534,6 @@ export function MenuManagerScreen({ venueId }: { venueId?: string } = {}) {
 
                     {/* Action Buttons */}
                     <div className="flex flex-wrap items-center gap-2.5">
-                        {products.length === 0 && (
-                            <button
-                                type="button"
-                                onClick={handleSeedDefaultMenu}
-                                disabled={loading}
-                                className="inline-flex items-center gap-1.5 rounded-xl bg-khaki/20 px-4 py-2.5 text-xs font-bold text-licorice ring-1 ring-khaki/40 hover:bg-khaki/30 active:scale-95 transition-all"
-                            >
-                                <SparklesIcon className="h-4 w-4 text-khaki" strokeWidth={2} />
-                                Seed Default Menu
-                            </button>
-                        )}
-                        <button
-                            type="button"
-                            onClick={() => setIsCategoryModalOpen(true)}
-                            className="inline-flex items-center gap-1.5 rounded-xl bg-isabelline px-4 py-2.5 text-xs font-bold text-licorice ring-1 ring-licorice/8 hover:bg-licorice/5 active:scale-95 transition-all"
-                        >
-                            <TagIcon className="h-4 w-4 shrink-0 text-feldgrau" strokeWidth={2} />
-                            Add Category
-                        </button>
                         <button
                             type="button"
                             onClick={handleOpenCreateModal}
@@ -594,6 +697,20 @@ export function MenuManagerScreen({ venueId }: { venueId?: string } = {}) {
                                     </button>
                                 );
                             })}
+                            {unassignedCount > 0 && (
+                                <button
+                                    type="button"
+                                    onClick={() => setSelectedCategory("Unassigned")}
+                                    className={clsx(
+                                        "rounded-lg px-3.5 py-2 text-[11px] font-bold tracking-tight transition-all shrink-0",
+                                        selectedCategory === "Unassigned"
+                                            ? "bg-licorice text-isabelline shadow-xs"
+                                            : "bg-amber-50 text-amber-800 ring-1 ring-amber-200 hover:bg-amber-100"
+                                    )}
+                                >
+                                    Unassigned ({unassignedCount})
+                                </button>
+                            )}
                         </div>
                     </div>
 
@@ -611,19 +728,10 @@ export function MenuManagerScreen({ venueId }: { venueId?: string } = {}) {
                             <h3 className="mt-4 text-sm font-bold tracking-tight text-licorice">No menu items found</h3>
                             <p className="mt-1 max-w-sm text-xs leading-relaxed text-feldgrau">
                                 {products.length === 0
-                                    ? "Your venue menu is currently empty. Add your first dish/drink or seed the default menu items."
+                                    ? "Your venue menu is currently empty. Add your first dish or drink."
                                     : "No items match your search or category filter."}
                             </p>
                             <div className="mt-6 flex items-center gap-2.5">
-                                {products.length === 0 && (
-                                    <button
-                                        type="button"
-                                        onClick={handleSeedDefaultMenu}
-                                        className="rounded-xl bg-khaki/20 px-4 py-2.5 text-xs font-bold text-licorice ring-1 ring-khaki/40 hover:bg-khaki/30 active:scale-95 transition-all"
-                                    >
-                                        Seed Default Menu
-                                    </button>
-                                )}
                                 <button
                                     type="button"
                                     onClick={handleOpenCreateModal}
@@ -636,150 +744,21 @@ export function MenuManagerScreen({ venueId }: { venueId?: string } = {}) {
                     ) : (
                         <div className="mt-6 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-6 items-start">
                             {filteredProducts.map((prod) => {
-                                const catName = prod.category_id ? catNameById.get(prod.category_id) : "Uncategorized";
+                                const catName = prod.category_id ? (catNameById.get(prod.category_id) || "Unassigned") : "Unassigned";
                                 const marginPct =
                                     prod.cost_price && prod.cost_price > 0
                                         ? Math.round(((prod.price - prod.cost_price) / prod.price) * 100)
                                         : null;
 
                                 return (
-                                    <article
+                                    <InventoryProductCard
                                         key={prod.id}
-                                        className={clsx(
-                                            "group relative flex flex-col items-stretch transition-all",
-                                            !prod.is_active && "opacity-75"
-                                        )}
-                                    >
-                                        {/* Standalone White Image Card (Matching Customer View) */}
-                                        <div className="relative aspect-square w-full shrink-0 overflow-hidden rounded-2xl bg-white shadow-xs ring-1 ring-licorice/5 p-3 flex items-center justify-center">
-                                            <button
-                                                type="button"
-                                                onClick={() => handleOpenEditModal(prod)}
-                                                aria-label={`Edit ${prod.name}`}
-                                                className="absolute inset-0 z-10 block cursor-pointer"
-                                            />
-                                            {prod.images?.[0] ? (
-                                                <img
-                                                    src={prod.images[0]}
-                                                    alt={prod.name}
-                                                    loading="lazy"
-                                                    className="h-full w-full object-contain transition-transform duration-500 ease-out group-hover:scale-105"
-                                                />
-                                            ) : (
-                                                <div className="flex h-full w-full items-center justify-center rounded-xl bg-gradient-to-br from-licorice/85 to-licorice">
-                                                    <span className="font-serif text-[40px] font-bold text-isabelline/80">
-                                                        {prod.name.charAt(0)}
-                                                    </span>
-                                                </div>
-                                            )}
-
-                                            {/* Badges on Top of Card: Category (Left) and Out of Stock */}
-                                            <div className="absolute left-2.5 top-2.5 flex items-center gap-1.5 z-20">
-                                                <span className="inline-flex h-6 items-center rounded-full bg-licorice/90 px-2.5 text-[10px] font-bold text-isabelline shadow-xs backdrop-blur-xs">
-                                                    {catName}
-                                                </span>
-                                                {!prod.is_active && (
-                                                    <button
-                                                        type="button"
-                                                        onClick={(e) => {
-                                                            e.stopPropagation();
-                                                            handleToggleActive(prod);
-                                                        }}
-                                                        className="inline-flex h-6 items-center gap-1 rounded-full bg-red-600 hover:bg-red-700 px-2.5 text-[10px] font-bold text-white shadow-xs backdrop-blur-xs transition-colors cursor-pointer"
-                                                        title="Click to reactivate this item"
-                                                    >
-                                                        <span>Out of Stock</span>
-                                                        <span className="text-[9px] opacity-80 underline">Activate</span>
-                                                    </button>
-                                                )}
-                                            </div>
-
-                                            {/* Badge on Top of Card: Station (Right) */}
-                                            <div className="absolute right-2.5 top-2.5 z-20">
-                                                <span className="inline-flex h-6 items-center rounded-full bg-white/95 px-2 text-[9.5px] font-bold uppercase tracking-wider text-licorice shadow-xs ring-1 ring-licorice/10 backdrop-blur-xs">
-                                                    {prod.station || "kitchen"}
-                                                </span>
-                                            </div>
-                                        </div>
-
-                                        {/* Information Section Below Image (Directly on Page Background, Exactly Like Customer View) */}
-                                        <div className="mt-3 flex flex-1 flex-col px-1">
-                                            {/* Row 1: Price (left) and Round Circular Action Button (right) */}
-                                            <div className="flex items-center justify-between">
-                                                <span className="font-mono text-[16px] font-bold text-licorice">
-                                                    {formatGHS(prod.price)}
-                                                </span>
-                                                <button
-                                                    type="button"
-                                                    onClick={() => handleOpenEditModal(prod)}
-                                                    aria-label={`Edit ${prod.name}`}
-                                                    className="relative z-20 flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-900 shadow-xs transition-colors hover:border-slate-300 hover:bg-slate-50 active:scale-95 cursor-pointer"
-                                                    title="Edit item"
-                                                >
-                                                    <PencilSquareIcon className="h-4 w-4" strokeWidth={2} />
-                                                </button>
-                                            </div>
-
-                                            {/* Row 2: Name - Full height, never clamped */}
-                                            <button
-                                                type="button"
-                                                onClick={() => handleOpenEditModal(prod)}
-                                                className="mt-1 text-left cursor-pointer"
-                                            >
-                                                <h3 className="text-[14px] font-bold leading-snug tracking-tight text-licorice hover:text-licorice/80 transition-colors">
-                                                    {prod.name}
-                                                </h3>
-                                            </button>
-
-                                            {/* Row 3: Description - Full height, never clamped */}
-                                            {prod.description && (
-                                                <p className="mt-1 text-[11.5px] leading-[1.45] text-feldgrau">
-                                                    {prod.description}
-                                                </p>
-                                            )}
-
-                                            {/* Row 4: Manager Controls (Cost, In/Out Stock status toggle, Delete) */}
-                                            <div className="mt-2.5 flex items-center justify-between pt-1">
-                                                <div className="text-[11px] text-feldgrau">
-                                                    {prod.cost_price ? (
-                                                        <span>
-                                                            Cost: <span className="font-mono font-semibold">{formatGHS(prod.cost_price)}</span>
-                                                            {marginPct !== null && (
-                                                                <span className="ml-1 font-bold text-emerald-700">({marginPct}%)</span>
-                                                            )}
-                                                        </span>
-                                                    ) : (
-                                                        <span className="italic text-feldgrau/40 text-[10px]">No cost</span>
-                                                    )}
-                                                </div>
-
-                                                <div className="flex items-center gap-1.5">
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => handleToggleActive(prod)}
-                                                        className={clsx(
-                                                            "inline-flex items-center gap-1 rounded-lg px-2 py-0.5 text-[10px] font-bold transition-all cursor-pointer",
-                                                            prod.is_active
-                                                                ? "bg-emerald-50 text-emerald-700 hover:bg-emerald-100 ring-1 ring-emerald-600/20"
-                                                                : "bg-red-50 text-red-700 hover:bg-red-100 ring-1 ring-red-600/20"
-                                                        )}
-                                                        title={prod.is_active ? "Item is active. Click to mark Out of Stock" : "Item is inactive. Click to mark In Stock"}
-                                                    >
-                                                        <span className={clsx("h-1.5 w-1.5 rounded-full shrink-0", prod.is_active ? "bg-emerald-500" : "bg-red-500")} />
-                                                        {prod.is_active ? "In Stock" : "Out of Stock"}
-                                                    </button>
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => setPendingDeleteProduct(prod)}
-                                                        className="flex h-6 w-6 items-center justify-center rounded-lg bg-red-50 text-red-600 hover:bg-red-600 hover:text-white transition-colors cursor-pointer"
-                                                        title="Delete item"
-                                                    >
-                                                        <TrashIcon className="h-3 w-3" strokeWidth={2} />
-                                                    </button>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </article>
+                                        prod={prod}
+                                        catName={catName || "Uncategorized"}
+                                        marginPct={marginPct}
+                                        onEdit={handleOpenEditModal}
+                                        onToggleActive={handleToggleActive}
+                                    />
                                 );
                             })}
                         </div>
@@ -825,14 +804,9 @@ export function MenuManagerScreen({ venueId }: { venueId?: string } = {}) {
 
                                         <button
                                             type="button"
-                                            onClick={async () => {
-                                                if (confirm(`Are you sure you want to delete category "${cat.name}"?`)) {
-                                                    await db.deleteMenuCategory(cat.id, venue.id);
-                                                    toast.success("Category deleted.");
-                                                    fetchMenuData();
-                                                }
-                                            }}
-                                            className="flex h-8 w-8 items-center justify-center rounded-lg bg-red-50 text-red-600 hover:bg-red-600 hover:text-white transition-colors"
+                                            onClick={() => setPendingDeleteCategory(cat)}
+                                            className="flex h-8 w-8 items-center justify-center rounded-lg bg-red-50 text-red-600 hover:bg-red-600 hover:text-white transition-colors cursor-pointer"
+                                            title={`Delete category "${cat.name}"`}
                                         >
                                             <TrashIcon className="h-4 w-4" strokeWidth={2} />
                                         </button>
@@ -1009,9 +983,10 @@ export function MenuManagerScreen({ venueId }: { venueId?: string } = {}) {
                                     </label>
                                     <select
                                         value={editingProduct.category_id || ""}
-                                        onChange={(e) => setEditingProduct({ ...editingProduct, category_id: e.target.value })}
+                                        onChange={(e) => setEditingProduct({ ...editingProduct, category_id: e.target.value || null })}
                                         className="w-full rounded-xl border border-licorice/10 bg-white px-3 py-2.5 text-xs font-bold text-licorice focus:border-licorice focus:outline-none"
                                     >
+                                        <option value="">None / Unassigned</option>
                                         {categories.map((c) => (
                                             <option key={c.id} value={c.id}>
                                                 {c.name}
@@ -1168,21 +1143,39 @@ export function MenuManagerScreen({ venueId }: { venueId?: string } = {}) {
                                 </button>
                             </div>
 
-                            {/* Submit */}
-                            <div className="pt-3 flex items-center justify-end gap-2 border-t border-licorice/8">
-                                <button
-                                    type="button"
-                                    onClick={() => setEditingProduct(null)}
-                                    className="rounded-xl px-4 py-2.5 text-xs font-bold text-feldgrau hover:text-licorice"
-                                >
-                                    Cancel
-                                </button>
-                                <button
-                                    type="submit"
-                                    className="rounded-xl bg-licorice px-5 py-2.5 text-xs font-bold text-isabelline shadow-sm hover:bg-licorice/95 active:scale-95 transition-all"
-                                >
-                                    Save Menu Item
-                                </button>
+                            {/* Submit & Actions */}
+                            <div className="pt-3 flex items-center justify-between border-t border-licorice/8">
+                                {editingProduct.id ? (
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            const toDelete = editingProduct as DbProduct;
+                                            setEditingProduct(null);
+                                            setPendingDeleteProduct(toDelete);
+                                        }}
+                                        className="inline-flex items-center gap-1.5 rounded-xl px-3 py-2 text-xs font-bold text-red-600 hover:bg-red-50 hover:text-red-700 transition-colors cursor-pointer"
+                                    >
+                                        <TrashIcon className="h-4 w-4" strokeWidth={2} />
+                                        Delete Product
+                                    </button>
+                                ) : (
+                                    <div />
+                                )}
+                                <div className="flex items-center gap-2">
+                                    <button
+                                        type="button"
+                                        onClick={() => setEditingProduct(null)}
+                                        className="rounded-xl px-4 py-2.5 text-xs font-bold text-feldgrau hover:text-licorice cursor-pointer"
+                                    >
+                                        Cancel
+                                    </button>
+                                    <button
+                                        type="submit"
+                                        className="rounded-xl bg-licorice px-5 py-2.5 text-xs font-bold text-isabelline shadow-sm hover:bg-licorice/95 active:scale-95 transition-all cursor-pointer"
+                                    >
+                                        Save Menu Item
+                                    </button>
+                                </div>
                             </div>
                         </form>
                     </div>
@@ -1231,7 +1224,7 @@ export function MenuManagerScreen({ venueId }: { venueId?: string } = {}) {
                 </div>
             )}
 
-            {/* Delete Confirmation */}
+            {/* Delete Product Confirmation */}
             {pendingDeleteProduct && (
                 <ConfirmModal
                     isOpen={Boolean(pendingDeleteProduct)}
@@ -1241,6 +1234,36 @@ export function MenuManagerScreen({ venueId }: { venueId?: string } = {}) {
                     isDanger={true}
                     onConfirm={handleDeleteProduct}
                     onClose={() => setPendingDeleteProduct(null)}
+                />
+            )}
+
+            {/* Delete Category Confirmation */}
+            {pendingDeleteCategory && (
+                <ConfirmModal
+                    isOpen={Boolean(pendingDeleteCategory)}
+                    title={`Delete "${pendingDeleteCategory.name}" Category?`}
+                    body={
+                        <div className="space-y-2.5">
+                            <p className="text-licorice font-medium">
+                                Are you sure you want to delete the <strong className="font-bold text-licorice">"{pendingDeleteCategory.name}"</strong> category?
+                            </p>
+                            {products.filter((p) => p.category_id === pendingDeleteCategory.id).length > 0 ? (
+                                <p className="rounded-xl bg-amber-500/10 p-3 text-xs font-medium text-amber-900 ring-1 ring-amber-500/20">
+                                    <strong>Safe Reassignment:</strong> {products.filter((p) => p.category_id === pendingDeleteCategory.id).length}{" "}
+                                    {products.filter((p) => p.category_id === pendingDeleteCategory.id).length === 1 ? "menu item" : "menu items"} currently in this category will <strong>not</strong> be deleted. They will remain in your catalog and be safely reassigned to <strong>Unassigned</strong>.
+                                </p>
+                            ) : (
+                                <p className="text-xs text-feldgrau">
+                                    There are currently no menu items in this category.
+                                </p>
+                            )}
+                        </div>
+                    }
+                    confirmLabel="Delete Category"
+                    isDanger={true}
+                    loading={isDeletingCategory}
+                    onConfirm={handleDeleteCategory}
+                    onClose={() => setPendingDeleteCategory(null)}
                 />
             )}
 

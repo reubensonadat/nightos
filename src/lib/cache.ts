@@ -67,12 +67,12 @@ export function cacheClear(): void {
 }
 
 export const TTL = {
-  VENUE: 5 * 60 * 1000,
-  MENU: 2 * 60 * 1000,
-  PRODUCT: 60 * 1000,
+  VENUE: 30 * 60 * 1000,
+  MENU: 30 * 60 * 1000,
+  PRODUCT: 30 * 60 * 1000,
   BILL: 30 * 1000,
   ORDERS: 30 * 1000,
-  STAFF: 2 * 60 * 1000,
+  STAFF: 5 * 60 * 1000,
   DASHBOARD: 30 * 1000,
 } as const;
 
