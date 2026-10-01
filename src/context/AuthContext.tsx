@@ -81,6 +81,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const currentUserIdRef = useRef<string | null>(null)
   const lastPhoneRef = useRef<string | null>(null)
+  /** In-flight loadUserData dedupe — see the loadUserData wrapper below. */
+  const loadInflightRef = useRef<{ userId: string; p: Promise<{ role: string | null; venueSlug: string | null }> } | null>(null)
 
   const extractUserName = (u?: AuthUser | null, email?: string | null): string => {
     const meta = u?.user_metadata
@@ -96,7 +98,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return 'Manager'
   }
 
-  const loadUserData = async (
+  const performLoadUserData = async (
     userId: string,
     userPhone: string | null = null,
     userEmail: string | null = null,
@@ -307,11 +309,31 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // 4. No match: an authenticated user who owns no venue and sits on no
     //    staff roster gets NO role — never a silent manager grant over
     //    someone's venue. The auth screen surfaces this and signs them out.
-    setVenue(null)
-    setVenues([])
-    setRole(null)
-    setStaffSession(null)
+    //    Do NOT wipe previously resolved state here: a transient resolution
+    //    miss must not revoke an already-committed session (sign-out clears
+    //    state explicitly).
     return { role: null, venueSlug: null }
+  }
+
+  /** Serialises concurrent resolutions for the same user: the SIGNED_IN
+   *  auth event races the login handler's own loadUserData call, and two
+   *  interleaved runs could wipe just-committed role/staffSession state
+   *  (the "bounced back to login" race). Same-user calls share one flight. */
+  const loadUserData = (
+    userId: string,
+    userPhone: string | null = null,
+    userEmail: string | null = null,
+    authUser?: AuthUser | null,
+    targetVenueSlugOrId?: string | null,
+  ): Promise<{ role: string | null; venueSlug: string | null }> => {
+    if (loadInflightRef.current && loadInflightRef.current.userId === userId) {
+      return loadInflightRef.current.p
+    }
+    const p = performLoadUserData(userId, userPhone, userEmail, authUser, targetVenueSlugOrId).finally(() => {
+      if (loadInflightRef.current?.p === p) loadInflightRef.current = null
+    })
+    loadInflightRef.current = { userId, p }
+    return p
   }
 
   useEffect(() => {

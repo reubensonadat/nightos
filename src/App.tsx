@@ -587,6 +587,13 @@ function AppShell() {
     : (authVenue || loadedVenue || DEFAULT_VENUE);
   const venueId = currentVenue.id;
 
+  // Primitive identities for effect deps — the object identity of
+  // currentVenue/qrTable changes on every fetch/auth event and was
+  // re-triggering the URL rewrite effects below (remount churn).
+  // Depend on the slug/id strings instead.
+  const currentVenueSlug = currentVenue?.slug ?? null;
+  const qrTableId = qrTable?.id ?? null;
+
   // Dynamic document title matching the active venue
   useEffect(() => {
     if (currentVenue?.name) {
@@ -631,24 +638,24 @@ function AppShell() {
 
   // Auto-rewrite table scan URL to include venue slug if missing
   useEffect(() => {
-    if (qrTable && currentVenue && currentVenue.slug) {
-      if (!urlVenueSlug || urlVenueSlug !== currentVenue.slug) {
+    if (currentVenueSlug && qrTableId) {
+      if (!urlVenueSlug || urlVenueSlug !== currentVenueSlug) {
         const cleanPath = location.pathname.replace(/^\/v\/[^/]+/, "") || "/menu";
         const targetPath = cleanPath === "/" ? "/menu" : cleanPath;
-        navigate(`/v/${currentVenue.slug}${targetPath}${location.search}`, { replace: true });
+        navigate(`/v/${currentVenueSlug}${targetPath}${location.search}`, { replace: true });
       }
     }
-  }, [qrTable, currentVenue, urlVenueSlug, location.pathname, location.search, navigate]);
+  }, [currentVenueSlug, qrTableId, urlVenueSlug, location.pathname, location.search, navigate]);
 
   // Auto-prefix URL with active venue slug if missing for app routes
   useEffect(() => {
     const isLegalPath = ["/privacy", "/privacypolicy", "/privacy-policy", "/terms", "/termsofservice", "/terms-of-service"].includes(location.pathname);
-    if (!urlVenueSlug && currentVenue && currentVenue.slug && !isLegalPath) {
+    if (!urlVenueSlug && currentVenueSlug && !isLegalPath) {
       if (location.pathname !== "/" && location.pathname !== "/switcher") {
-        navigate(`/v/${currentVenue.slug}${location.pathname}${location.search}`, { replace: true });
+        navigate(`/v/${currentVenueSlug}${location.pathname}${location.search}`, { replace: true });
       }
     }
-  }, [urlVenueSlug, currentVenue, location.pathname, location.search, navigate]);
+  }, [urlVenueSlug, currentVenueSlug, location.pathname, location.search, navigate]);
 
   // Manager page is URL-driven: /manager/ops, /manager/shift-report, /manager/floorplan, ...
   const managerPage = useMemo<ManagerPage>(() => {
@@ -695,7 +702,11 @@ function AppShell() {
     }
   };
 
-  if (venueLoading && urlVenueSlug && loadedVenue?.slug !== urlVenueSlug) {
+  // Only hard-gate on a COLD load of an explicit /v/<slug> URL we can't
+  // render yet (anonymous visit, nothing fetched). In-app slug
+  // re-resolution keeps the current tree mounted (currentVenue falls back
+  // to the auth venue) instead of unmounting the entire app.
+  if (venueLoading && urlVenueSlug && !authVenue && loadedVenue?.slug !== urlVenueSlug) {
     return <LoadingScreen />;
   }
 
@@ -922,10 +933,11 @@ function AppRoutes() {
       if (targetRole) {
         return <Navigate to={sectorPath(targetRole, venueSlug || venue?.slug)} replace />;
       }
-      if (venue) {
-        return <Navigate to={`/v/${venue.slug}/manager/ops`} replace />;
-      }
-      return <Navigate to="/manager/ops" replace />;
+      // Role still resolving (login race: SIGNED_IN fired but loadUserData
+      // hasn't committed role yet). Hold here — navigating to /manager with a
+      // null role makes the roles-gate bounce back to /login, ping-ponging
+      // until the browser throttles navigation.
+      return <LoadingScreen venueName={venue?.name} />;
     }
     return <CentralAuthScreen initialMode={strippedPath === "/signup" ? "signup" : "login"} venueSlug={venueSlug} />;
   }
