@@ -627,7 +627,7 @@ function AppShell() {
   };
 
   if (venueLoading && urlVenueSlug && loadedVenue?.slug !== urlVenueSlug) {
-    return <LoadingScreen message="LOADING VENUE..." />;
+    return <LoadingScreen />;
   }
 
   if (isVenueNotFound) {
@@ -843,11 +843,7 @@ function AppRoutes() {
   if (isAuthRoute) {
     if (isAuthenticated) {
       if (isInitializing) {
-        return (
-          <div className="flex min-h-svh items-center justify-center bg-isabelline font-sans">
-            <div className="h-8 w-8 animate-spin rounded-full border-4 border-licorice/20 border-t-licorice" />
-          </div>
-        );
+        return <LoadingScreen venueName={venue?.name} />;
       }
       const redirectParam = searchParams.get("redirect") || (location.state as { from?: string } | undefined)?.from;
       if (redirectParam && isAllowedForTarget(role, redirectParam)) {

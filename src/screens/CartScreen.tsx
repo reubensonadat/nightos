@@ -244,7 +244,36 @@ export function CartScreen({ venueId, tableLabel, tablePin, billId, customerSess
     const hasPlaced = placedItems.length > 0;
 
     if (loadingPlaced && !hasDraft) {
-        return <LoadingScreen message="LOADING TAB..." />;
+        return (
+            <main className="relative min-h-svh w-full bg-isabelline font-sans text-licorice antialiased">
+                <header className="sticky top-0 z-50 bg-licorice">
+                    {tablePin && (
+                        <div className="pt-[max(env(safe-area-inset-top),0px)] pb-2">
+                            <TablePinBanner pin={tablePin} tableLabel={tableLabel} onCallWaiter={onCallWaiter} callingWaiter={callingWaiter} waiterCalled={waiterCalled} />
+                        </div>
+                    )}
+                    <div className={`relative z-10 mx-auto flex w-full max-w-7xl items-center justify-between px-5 md:px-8 ${!tablePin ? 'pt-[max(env(safe-area-inset-top),14px)]' : 'pt-0'} pb-3`}>
+                        <button
+                            type="button"
+                            onClick={onBack}
+                            aria-label="Back"
+                            className="flex h-9 w-9 items-center justify-center rounded-full border border-isabelline/15 bg-isabelline/5 text-isabelline transition-colors hover:bg-isabelline/10 active:scale-95"
+                        >
+                            <ArrowLeftIcon className="h-4 w-4" strokeWidth={2.25} />
+                        </button>
+                        
+                        <h1 className="text-[16px] font-bold tracking-tight text-isabelline absolute left-1/2 -translate-x-1/2">
+                            Your Tab
+                        </h1>
+                        <div className="w-9" />
+                    </div>
+                </header>
+                <div className="flex flex-col items-center justify-center pt-24 px-6 text-center text-feldgrau">
+                    <span className="h-7 w-7 animate-spin rounded-full border-2 border-licorice/20 border-t-licorice" />
+                    <p className="mt-3 text-xs font-bold tracking-wider uppercase">Loading tab…</p>
+                </div>
+            </main>
+        );
     }
 
     // ── Empty state ── (only show if NO draft items AND NO placed session items exist)

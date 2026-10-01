@@ -25,6 +25,7 @@ import { displayPrice, venueDisplayTaxPct } from "../lib/fees";
 import { TablePinBanner } from "../components/TablePinBanner";
 import bellRingingIcon from "../assets/bell-ringing.svg";
 import toast from "react-hot-toast";
+import { cacheGet, cacheSet, TTL } from "../lib/cache";
 
 type Props = {
     venueId?: string;
@@ -81,7 +82,7 @@ async function fetchProducts(venueId: string): Promise<MenuItem[]> {
         groupOptions.get(opt.group_id)!.push(opt);
     }
 
-    return data.map((p: DbProduct) => {
+    const mapped = data.map((p: DbProduct) => {
         const gids = productGroupIds.get(p.id) ?? [];
         return {
             id: p.id,
@@ -118,14 +119,25 @@ async function fetchProducts(venueId: string): Promise<MenuItem[]> {
         };
     });
 
+    if (mapped.length > 0) {
+        cacheSet(`menu_items_mapped:${venueId}`, mapped, TTL.MENU);
+    }
+    return mapped;
 }
 
 export function MenuScreen({ venueId, venueName, tableLabel, waiterName, tablePin, partySize, billId, sessionToken, onEditParty, onBack, onViewCart }: Props) {
     const [active, setActive] = useState<MenuCategory>("Signatures");
     const [query, setQuery] = useState("");
     const [activeItemId, setActiveItemId] = useState<string | null>(null);
-    const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
-    const [loading, setLoading] = useState(true);
+    const [menuItems, setMenuItems] = useState<MenuItem[]>(() => {
+        if (!venueId) return [];
+        return cacheGet<MenuItem[]>(`menu_items_mapped:${venueId}`) || [];
+    });
+    const [loading, setLoading] = useState<boolean>(() => {
+        if (!venueId) return false;
+        const cached = cacheGet<MenuItem[]>(`menu_items_mapped:${venueId}`);
+        return !cached || cached.length === 0;
+    });
     // Combined svc+VAT % applied to customer-facing prices (0 = show base).
     const [taxPct, setTaxPct] = useState(0);
     const [callingWaiter, setCallingWaiter] = useState(false);
@@ -154,7 +166,11 @@ export function MenuScreen({ venueId, venueName, tableLabel, waiterName, tablePi
             setLoading(false);
             return;
         }
-        setLoading(true);
+        // Only trigger loading spinner if no cached items exist
+        const cached = cacheGet<MenuItem[]>(`menu_items_mapped:${venueId}`);
+        if (!cached || cached.length === 0) {
+            setLoading(true);
+        }
         fetchProducts(venueId).then(items => {
             setMenuItems(items);
             setLoading(false);

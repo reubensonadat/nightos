@@ -51,7 +51,14 @@ export function TableLayout() {
     }, [tableId]);
 
     if (loading) {
-        return <LoadingScreen />;
+        return (
+            <main className="relative min-h-svh w-full overflow-x-hidden bg-isabelline font-sans text-licorice flex flex-col items-center justify-center px-8 text-center">
+                <div className="flex flex-col items-center gap-3 text-feldgrau">
+                    <span className="h-7 w-7 animate-spin rounded-full border-2 border-licorice/20 border-t-licorice" />
+                    <p className="text-xs font-bold tracking-wider uppercase">Loading table…</p>
+                </div>
+            </main>
+        );
     }
 
     if (!table) {
