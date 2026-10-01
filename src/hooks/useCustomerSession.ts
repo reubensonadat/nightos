@@ -48,10 +48,13 @@ export function useCustomerSession(venueId: string | null, tableId: string | nul
       .rpc('assign_waiter_to_bill', { p_bill_id: billId })
       .setHeader('x-session-token', token)
     if (!waiterId) {
+      // Only clear an existing assignment — a no-op write still emits a
+      // realtime UPDATE (new tuple version) and feeds event loops.
       await supabase
         .from('bills')
         .update({ waiter_id: null })
         .setHeader('x-session-token', token)
+        .not('waiter_id', 'is', null)
         .eq('id', billId)
       setState((s) => ({ ...s, waiter: null }))
       return
@@ -70,6 +73,7 @@ export function useCustomerSession(venueId: string | null, tableId: string | nul
         .from('bills')
         .update({ waiter_id: null })
         .setHeader('x-session-token', token)
+        .not('waiter_id', 'is', null)
         .eq('id', billId)
       setState((s) => ({ ...s, waiter: null }))
       return
@@ -112,7 +116,10 @@ export function useCustomerSession(venueId: string | null, tableId: string | nul
   const ensureSession = useCallback(async () => {
     if (!venueId || !tableId) return
 
-    setState((s) => ({ ...s, loading: true, error: null }))
+    // First load shows the LoadingScreen; refreshes keep the mounted UI
+    // (flipping loading here unmounts the entire customer shell on every
+    // realtime refetch).
+    setState((s) => ({ ...s, loading: !s.session, error: null }))
 
     // 0. Verify Bar Station is active
     try {

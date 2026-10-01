@@ -281,7 +281,16 @@ function CustomerShell({
     filter: bill?.id ? `id=eq.${bill.id}` : undefined,
     enabled: Boolean(bill?.id),
     onUpdate: (updatedRow: Record<string, unknown>) => {
-      if (updatedRow.deposit_paid || updatedRow.table_pin || updatedRow.status) {
+      // UPDATE payloads carry the full new row (status is always truthy), so
+      // presence checks fire on every write. Compare against the current bill
+      // instead and refetch only when a watched field actually changed —
+      // otherwise no-op writes (e.g. waiter_id already null) re-trigger
+      // ensureSession and remount the whole shell in a loop.
+      const changed =
+        updatedRow.deposit_paid !== bill?.deposit_paid ||
+        updatedRow.table_pin !== bill?.table_pin ||
+        updatedRow.status !== bill?.status;
+      if (changed) {
         refetchSession();
       }
     },
