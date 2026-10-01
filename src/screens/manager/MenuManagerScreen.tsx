@@ -81,6 +81,8 @@ export function MenuManagerScreen({ venueId }: { venueId?: string } = {}) {
     const [editingProduct, setEditingProduct] = useState<Partial<DbProduct> | null>(null);
     const [isCreatingProduct, setIsCreatingProduct] = useState(false);
     const [pendingDeleteProduct, setPendingDeleteProduct] = useState<DbProduct | null>(null);
+    const [pendingDeleteCategory, setPendingDeleteCategory] = useState<DbMenuCategory | null>(null);
+    const [isDeletingCategory, setIsDeletingCategory] = useState(false);
 
     // Category modal
     const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
@@ -215,9 +217,13 @@ export function MenuManagerScreen({ venueId }: { venueId?: string } = {}) {
         return map;
     }, [categories]);
 
-    // ────────────────────────── Stock Counts ──────────────────────────
+    // ────────────────────────── Stock & Category Counts ──────────────────────────
     const activeCount = useMemo(() => products.filter((p) => p.is_active).length, [products]);
     const inactiveCount = useMemo(() => products.filter((p) => !p.is_active).length, [products]);
+    const unassignedCount = useMemo(
+        () => products.filter((p) => !p.category_id || !catNameById.has(p.category_id)).length,
+        [products, catNameById]
+    );
 
     // ────────────────────────── Filtered Products ──────────────────────────
     const filteredProducts = useMemo(() => {
@@ -231,8 +237,11 @@ export function MenuManagerScreen({ venueId }: { venueId?: string } = {}) {
 
             if (!matchesSearch) return false;
             if (selectedCategory === "All") return true;
+            if (selectedCategory === "Unassigned") {
+                return !p.category_id || !catNameById.has(p.category_id);
+            }
 
-            const catName = p.category_id ? catNameById.get(p.category_id) : "Uncategorized";
+            const catName = p.category_id ? catNameById.get(p.category_id) : "Unassigned";
             return catName?.toLowerCase() === selectedCategory.toLowerCase();
         });
     }, [products, search, selectedCategory, availabilityFilter, catNameById]);
@@ -348,6 +357,22 @@ export function MenuManagerScreen({ venueId }: { venueId?: string } = {}) {
         }
     };
 
+    // Category Deletion
+    const handleDeleteCategory = async () => {
+        if (!pendingDeleteCategory || !venue.id) return;
+        setIsDeletingCategory(true);
+        try {
+            await db.deleteMenuCategory(pendingDeleteCategory.id, venue.id);
+            toast.success(`Category "${pendingDeleteCategory.name}" deleted. Existing items reassigned to Unassigned.`);
+            setPendingDeleteCategory(null);
+            fetchMenuData();
+        } catch {
+            toast.error("Could not delete category.");
+        } finally {
+            setIsDeletingCategory(false);
+        }
+    };
+
     // Image File Selection
     const handleImageFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
@@ -423,14 +448,6 @@ export function MenuManagerScreen({ venueId }: { venueId?: string } = {}) {
                                 Seed Default Menu
                             </button>
                         )}
-                        <button
-                            type="button"
-                            onClick={() => setIsCategoryModalOpen(true)}
-                            className="inline-flex items-center gap-1.5 rounded-xl bg-isabelline px-4 py-2.5 text-xs font-bold text-licorice ring-1 ring-licorice/8 hover:bg-licorice/5 active:scale-95 transition-all"
-                        >
-                            <TagIcon className="h-4 w-4 shrink-0 text-feldgrau" strokeWidth={2} />
-                            Add Category
-                        </button>
                         <button
                             type="button"
                             onClick={handleOpenCreateModal}
@@ -594,6 +611,20 @@ export function MenuManagerScreen({ venueId }: { venueId?: string } = {}) {
                                     </button>
                                 );
                             })}
+                            {unassignedCount > 0 && (
+                                <button
+                                    type="button"
+                                    onClick={() => setSelectedCategory("Unassigned")}
+                                    className={clsx(
+                                        "rounded-lg px-3.5 py-2 text-[11px] font-bold tracking-tight transition-all shrink-0",
+                                        selectedCategory === "Unassigned"
+                                            ? "bg-licorice text-isabelline shadow-xs"
+                                            : "bg-amber-50 text-amber-800 ring-1 ring-amber-200 hover:bg-amber-100"
+                                    )}
+                                >
+                                    Unassigned ({unassignedCount})
+                                </button>
+                            )}
                         </div>
                     </div>
 
@@ -636,7 +667,7 @@ export function MenuManagerScreen({ venueId }: { venueId?: string } = {}) {
                     ) : (
                         <div className="mt-6 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-6 items-start">
                             {filteredProducts.map((prod) => {
-                                const catName = prod.category_id ? catNameById.get(prod.category_id) : "Uncategorized";
+                                const catName = prod.category_id ? (catNameById.get(prod.category_id) || "Unassigned") : "Unassigned";
                                 const marginPct =
                                     prod.cost_price && prod.cost_price > 0
                                         ? Math.round(((prod.price - prod.cost_price) / prod.price) * 100)
@@ -825,14 +856,9 @@ export function MenuManagerScreen({ venueId }: { venueId?: string } = {}) {
 
                                         <button
                                             type="button"
-                                            onClick={async () => {
-                                                if (confirm(`Are you sure you want to delete category "${cat.name}"?`)) {
-                                                    await db.deleteMenuCategory(cat.id, venue.id);
-                                                    toast.success("Category deleted.");
-                                                    fetchMenuData();
-                                                }
-                                            }}
-                                            className="flex h-8 w-8 items-center justify-center rounded-lg bg-red-50 text-red-600 hover:bg-red-600 hover:text-white transition-colors"
+                                            onClick={() => setPendingDeleteCategory(cat)}
+                                            className="flex h-8 w-8 items-center justify-center rounded-lg bg-red-50 text-red-600 hover:bg-red-600 hover:text-white transition-colors cursor-pointer"
+                                            title={`Delete category "${cat.name}"`}
                                         >
                                             <TrashIcon className="h-4 w-4" strokeWidth={2} />
                                         </button>
@@ -1009,9 +1035,10 @@ export function MenuManagerScreen({ venueId }: { venueId?: string } = {}) {
                                     </label>
                                     <select
                                         value={editingProduct.category_id || ""}
-                                        onChange={(e) => setEditingProduct({ ...editingProduct, category_id: e.target.value })}
+                                        onChange={(e) => setEditingProduct({ ...editingProduct, category_id: e.target.value || null })}
                                         className="w-full rounded-xl border border-licorice/10 bg-white px-3 py-2.5 text-xs font-bold text-licorice focus:border-licorice focus:outline-none"
                                     >
+                                        <option value="">None / Unassigned</option>
                                         {categories.map((c) => (
                                             <option key={c.id} value={c.id}>
                                                 {c.name}
@@ -1231,7 +1258,7 @@ export function MenuManagerScreen({ venueId }: { venueId?: string } = {}) {
                 </div>
             )}
 
-            {/* Delete Confirmation */}
+            {/* Delete Product Confirmation */}
             {pendingDeleteProduct && (
                 <ConfirmModal
                     isOpen={Boolean(pendingDeleteProduct)}
@@ -1241,6 +1268,36 @@ export function MenuManagerScreen({ venueId }: { venueId?: string } = {}) {
                     isDanger={true}
                     onConfirm={handleDeleteProduct}
                     onClose={() => setPendingDeleteProduct(null)}
+                />
+            )}
+
+            {/* Delete Category Confirmation */}
+            {pendingDeleteCategory && (
+                <ConfirmModal
+                    isOpen={Boolean(pendingDeleteCategory)}
+                    title={`Delete "${pendingDeleteCategory.name}" Category?`}
+                    body={
+                        <div className="space-y-2.5">
+                            <p className="text-licorice font-medium">
+                                Are you sure you want to delete the <strong className="font-bold text-licorice">"{pendingDeleteCategory.name}"</strong> category?
+                            </p>
+                            {products.filter((p) => p.category_id === pendingDeleteCategory.id).length > 0 ? (
+                                <p className="rounded-xl bg-amber-500/10 p-3 text-xs font-medium text-amber-900 ring-1 ring-amber-500/20">
+                                    <strong>Safe Reassignment:</strong> {products.filter((p) => p.category_id === pendingDeleteCategory.id).length}{" "}
+                                    {products.filter((p) => p.category_id === pendingDeleteCategory.id).length === 1 ? "menu item" : "menu items"} currently in this category will <strong>not</strong> be deleted. They will remain in your catalog and be safely reassigned to <strong>Unassigned</strong>.
+                                </p>
+                            ) : (
+                                <p className="text-xs text-feldgrau">
+                                    There are currently no menu items in this category.
+                                </p>
+                            )}
+                        </div>
+                    }
+                    confirmLabel="Delete Category"
+                    isDanger={true}
+                    loading={isDeletingCategory}
+                    onConfirm={handleDeleteCategory}
+                    onClose={() => setPendingDeleteCategory(null)}
                 />
             )}
 

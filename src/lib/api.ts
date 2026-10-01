@@ -637,6 +637,16 @@ export const db = {
 
   deleteMenuCategory: async (id: string, venueId: string) => {
     cacheInvalidate(`menu_cats:${venueId}`);
+    cacheInvalidate(`products:${venueId}:all`);
+    cacheInvalidate(`products:${venueId}:active`);
+
+    // Ensure menu items in this category are not deleted and are reassigned to null (Unassigned)
+    await supabase
+      .from('products')
+      .update({ category_id: null })
+      .eq('venue_id', venueId)
+      .eq('category_id', id);
+
     const { error } = await supabase
       .from('menu_categories')
       .update({ is_active: false })
