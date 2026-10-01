@@ -51,10 +51,13 @@ export function useCustomerSession(venueId: string | null, tableId: string | nul
         .rpc('assign_waiter_to_bill', { p_bill_id: billId })
         .setHeader('x-session-token', token)
       if (!waiterId) {
+        // Only clear an existing assignment — a no-op write still emits a
+        // realtime UPDATE (new tuple version) and feeds event loops.
         await supabase
           .from('bills')
           .update({ waiter_id: null })
           .setHeader('x-session-token', token)
+          .not('waiter_id', 'is', null)
           .eq('id', billId)
         setState((s) => ({ ...s, waiter: null }))
         return
@@ -73,6 +76,7 @@ export function useCustomerSession(venueId: string | null, tableId: string | nul
           .from('bills')
           .update({ waiter_id: null })
           .setHeader('x-session-token', token)
+          .not('waiter_id', 'is', null)
           .eq('id', billId)
         setState((s) => ({ ...s, waiter: null }))
         return
@@ -129,7 +133,9 @@ export function useCustomerSession(venueId: string | null, tableId: string | nul
     inFlightRef.current = true
 
     try {
-      setState((s) => ({ ...s, loading: true, error: null }))
+      // First load shows the LoadingScreen; refreshes keep the mounted UI
+      // to avoid unmounting the customer shell on realtime refetches.
+      setState((s) => ({ ...s, loading: !s.session, error: null }))
 
       // 0. Verify Bar Station is active (Strict: Require active bar shift for service)
       try {

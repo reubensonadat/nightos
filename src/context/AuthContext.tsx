@@ -81,6 +81,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const currentUserIdRef = useRef<string | null>(null)
   const lastPhoneRef = useRef<string | null>(null)
+  /** In-flight loadUserData dedupe — see the loadUserData wrapper below. */
+  const loadInflightRef = useRef<{ userId: string; p: Promise<{ role: string | null; venueSlug: string | null }> } | null>(null)
 
   const extractUserName = (u?: AuthUser | null, email?: string | null): string => {
     const meta = u?.user_metadata
@@ -96,7 +98,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return 'Manager'
   }
 
-  const loadUserData = async (
+  const performLoadUserData = async (
     userId: string,
     userPhone: string | null = null,
     userEmail: string | null = null,
@@ -126,7 +128,136 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const pathMatch = window.location.pathname.match(/\/v\/([^/]+)/)
     const effectiveTarget = targetVenueSlugOrId || (pathMatch ? pathMatch[1] : null)
 
-    // 1. Check if user owns venues (support multi-venue switching)
+    const rawPhone = (
+      userPhone?.trim() ||
+      user?.phone?.trim() ||
+      (user?.user_metadata?.phone as string | undefined)?.trim() ||
+      (user?.user_metadata?.phone_number as string | undefined)?.trim() ||
+      lastPhoneRef.current?.trim() ||
+      null
+    )
+    const rawEmail = userEmail?.trim() || null
+
+    /** Resolve an active staff membership by phone (optionally venue-scoped).
+     *  STAFF is the stronger signal: a phone on both a staff row and a venue
+     *  row belongs to staff — waiters, bartenders and kitchen must never
+     *  resolve as owner. Commits role/venue/staffSession state, clocks in,
+     *  and returns the resolution, or null when no staff row matches. */
+    const resolveStaffByPhone = async (
+      phone: string,
+      scope: string | null,
+    ): Promise<{ role: string | null; venueSlug: string | null } | null> => {
+      const { data: staffData } = await authDb.venueByStaffPhone(phone, scope)
+      if (!staffData) return null
+      const sd = staffData as Record<string, unknown>
+      const v = sd.venue as DbVenue
+      setVenue(v)
+      setVenues(v ? [v] : [])
+      setRole(sd.role as string)
+
+      const { data } = await supabase
+        .rpc('get_staff_profile_by_phone', {
+          p_phone: phone,
+          ...(scope ? { p_venue_slug: scope } : {}),
+        })
+        .single()
+      const fullStaffData = data as Record<string, unknown>
+      const resolvedSlug = (fullStaffData?.venue_slug as string) || v?.slug || null
+
+      if (fullStaffData && fullStaffData.venue_id) {
+        setStaffSession({
+          id: fullStaffData.id as string,
+          name: fullStaffData.name as string,
+          role: fullStaffData.role as DbStaffSession['role'],
+          venue_id: fullStaffData.venue_id as string,
+          venue_name: fullStaffData.venue_name as string,
+          venue_slug: fullStaffData.venue_slug as string,
+          area_assignment: fullStaffData.area_assignment as string | null,
+          max_tables: fullStaffData.max_tables as number,
+        })
+        setProfile({
+          id: userId,
+          email: (fullStaffData.email as string) || userEmail,
+          phone_number: (fullStaffData.phone as string) || phone,
+          name: (fullStaffData.name as string) || resolvedPersonName,
+        })
+
+        try {
+          await supabase.rpc('clock_in_staff', { p_staff_id: fullStaffData.id })
+        } catch {
+          /* non-fatal */
+        }
+      }
+      if (v?.brand_primary || v?.brand_accent) {
+        applyBrandTheme(v.brand_primary, v.brand_accent, v.brand_secondary);
+      }
+      return { role: sd.role as string, venueSlug: resolvedSlug }
+    }
+
+    /** Resolve an active staff membership by email (optionally venue-scoped). */
+    const resolveStaffByEmail = async (
+      email: string,
+      scope: string | null,
+    ): Promise<{ role: string | null; venueSlug: string | null } | null> => {
+      let staffQuery = supabase
+        .from('staff')
+        .select('id, name, phone, email, role, venue_id, is_active, area_assignment, max_tables, venues!inner(*)')
+        .ilike('email', email)
+        .eq('is_active', true)
+
+      if (scope) {
+        staffQuery = staffQuery.or(`slug.eq.${scope},id.eq.${scope}`, { referencedTable: 'venues' })
+      }
+
+      const { data: staffByEmail } = await staffQuery.maybeSingle()
+      if (!staffByEmail || !staffByEmail.venue_id) return null
+
+      const venueObj = staffByEmail.venues as unknown as DbVenue
+      setVenue(venueObj)
+      setVenues(venueObj ? [venueObj] : [])
+      setRole(staffByEmail.role)
+      setStaffSession({
+        id: staffByEmail.id,
+        name: staffByEmail.name,
+        role: staffByEmail.role as DbStaffSession['role'],
+        venue_id: staffByEmail.venue_id,
+        venue_name: venueObj.name,
+        venue_slug: venueObj.slug,
+        area_assignment: staffByEmail.area_assignment,
+        max_tables: staffByEmail.max_tables,
+      })
+      setProfile({
+        id: userId,
+        email: email,
+        phone_number: staffByEmail.phone,
+        name: staffByEmail.name || resolvedPersonName,
+      })
+
+      try {
+        await supabase.rpc('clock_in_staff', { p_staff_id: staffByEmail.id })
+      } catch {
+        /* non-fatal */
+      }
+
+      return { role: staffByEmail.role, venueSlug: venueObj.slug }
+    }
+
+    // 1. Venue-scoped intent (/v/<slug>/login or an explicit target): a
+    //    staff row at THAT venue outranks the user's own venues. Without
+    //    this, an owner doing waiter duty at another venue is always
+    //    hijacked back to the venue they own (the velvet-lounge incident).
+    if (effectiveTarget) {
+      if (rawPhone) {
+        const scoped = await resolveStaffByPhone(rawPhone, effectiveTarget)
+        if (scoped) return scoped
+      }
+      if (rawEmail) {
+        const scoped = await resolveStaffByEmail(rawEmail, effectiveTarget)
+        if (scoped) return scoped
+      }
+    }
+
+    // 2. Check if user owns venues (support multi-venue switching)
     const { data: vList } = await authDb.venuesByOwner(userId)
     if (vList && vList.length > 0) {
       const ownerVenues = vList as DbVenue[]
@@ -150,18 +281,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return { role: 'owner', venueSlug: active.slug }
     }
 
-    // 2. Check if phone is linked to staff or venue
-    const rawPhone = (
-      userPhone?.trim() ||
-      user?.phone?.trim() ||
-      (user?.user_metadata?.phone as string | undefined)?.trim() ||
-      (user?.user_metadata?.phone_number as string | undefined)?.trim() ||
-      lastPhoneRef.current?.trim() ||
-      null
-    )
-
+    // 3. Check if phone is linked to staff or venue
     if (rawPhone) {
-      // Check if owner by phone first
+      const staffResolved = await resolveStaffByPhone(rawPhone, effectiveTarget)
+      if (staffResolved) return staffResolved
+
+      // Owner by venue phone (weaker signal — only reached when the number
+      // is on no staff row of this venue)
       const { data: ownerByPhone } = await authDb.venueByPhone(rawPhone, effectiveTarget)
       if (ownerByPhone) {
         const od = ownerByPhone as Record<string, unknown>
@@ -181,101 +307,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
         return { role: 'owner', venueSlug: venueObj.slug }
       }
-
-      // Check if staff by phone
-      const { data: staffData } = await authDb.venueByStaffPhone(rawPhone, effectiveTarget)
-      if (staffData) {
-        const sd = staffData as Record<string, unknown>
-        const v = sd.venue as DbVenue
-        setVenue(v)
-        setVenues(v ? [v] : [])
-        setRole(sd.role as string)
-
-        const { data } = await supabase
-          .rpc('get_staff_profile_by_phone', {
-            p_phone: rawPhone,
-            ...(effectiveTarget ? { p_venue_slug: effectiveTarget } : {}),
-          })
-          .single()
-        const fullStaffData = data as Record<string, unknown>
-        const resolvedSlug = (fullStaffData?.venue_slug as string) || v?.slug || null
-
-        if (fullStaffData && fullStaffData.venue_id) {
-          setStaffSession({
-            id: fullStaffData.id as string,
-            name: fullStaffData.name as string,
-            role: fullStaffData.role as DbStaffSession['role'],
-            venue_id: fullStaffData.venue_id as string,
-            venue_name: fullStaffData.venue_name as string,
-            venue_slug: fullStaffData.venue_slug as string,
-            area_assignment: fullStaffData.area_assignment as string | null,
-            max_tables: fullStaffData.max_tables as number,
-          })
-          setProfile({
-            id: userId,
-            email: (fullStaffData.email as string) || userEmail,
-            phone_number: (fullStaffData.phone as string) || rawPhone,
-            name: (fullStaffData.name as string) || resolvedPersonName,
-          })
-
-          try {
-            await supabase.rpc('clock_in_staff', { p_staff_id: fullStaffData.id })
-          } catch {
-            /* non-fatal */
-          }
-        }
-        if (v?.brand_primary || v?.brand_accent) {
-          applyBrandTheme(v.brand_primary, v.brand_accent, v.brand_secondary);
-        }
-        return { role: sd.role as string, venueSlug: resolvedSlug }
-      }
     }
 
-    // 3. Check if user matches a staff row by email
-    const rawEmail = userEmail?.trim() || null
+    // 4. Check if user matches a staff row by email
     if (rawEmail) {
-      let staffQuery = supabase
-        .from('staff')
-        .select('id, name, phone, email, role, venue_id, is_active, area_assignment, max_tables, venues!inner(*)')
-        .ilike('email', rawEmail)
-        .eq('is_active', true)
-
-      if (effectiveTarget) {
-        staffQuery = staffQuery.or(`slug.eq.${effectiveTarget},id.eq.${effectiveTarget}`, { referencedTable: 'venues' })
-      }
-
-      const { data: staffByEmail } = await staffQuery.maybeSingle()
-
-      if (staffByEmail && staffByEmail.venue_id) {
-        const venueObj = staffByEmail.venues as unknown as DbVenue
-        setVenue(venueObj)
-        setVenues(venueObj ? [venueObj] : [])
-        setRole(staffByEmail.role)
-        setStaffSession({
-          id: staffByEmail.id,
-          name: staffByEmail.name,
-          role: staffByEmail.role as DbStaffSession['role'],
-          venue_id: staffByEmail.venue_id,
-          venue_name: venueObj.name,
-          venue_slug: venueObj.slug,
-          area_assignment: staffByEmail.area_assignment,
-          max_tables: staffByEmail.max_tables,
-        })
-        setProfile({
-          id: userId,
-          email: rawEmail,
-          phone_number: staffByEmail.phone,
-          name: staffByEmail.name || resolvedPersonName,
-        })
-
-        try {
-          await supabase.rpc('clock_in_staff', { p_staff_id: staffByEmail.id })
-        } catch {
-          /* non-fatal */
-        }
-
-        return { role: staffByEmail.role, venueSlug: venueObj.slug }
-      }
+      const staffByEmailResolved = await resolveStaffByEmail(rawEmail, effectiveTarget)
+      if (staffByEmailResolved) return staffByEmailResolved
 
       // Check if venue matches email
       const { data: venueByEmail } = await supabase
@@ -301,66 +338,34 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     }
 
-    // 4. Safe fallback for authenticated users: resolve to target or active venue
-    if (effectiveTarget) {
-      const { data: targetVenue } = await supabase
-        .from('venues')
-        .select('*')
-        .or(`slug.eq.${effectiveTarget},id.eq.${effectiveTarget}`)
-        .eq('is_active', true)
-        .maybeSingle()
-      if (targetVenue) {
-        const v = targetVenue as DbVenue
-        setVenue(v)
-        setVenues([v])
-        setRole('manager')
-        if (v.brand_primary || v.brand_accent) {
-          applyBrandTheme(v.brand_primary, v.brand_accent, v.brand_secondary)
-        }
-        return { role: 'manager', venueSlug: v.slug }
-      }
-    }
-
-    const savedVenueId = localStorage.getItem('nightos:active_venue_id')
-    if (savedVenueId) {
-      const { data: savedVenue } = await db.venueById(savedVenueId)
-      if (savedVenue && savedVenue.slug !== 'velvet-lounge') {
-        setVenue(savedVenue)
-        setVenues([savedVenue])
-        setRole('manager')
-        if (savedVenue.brand_primary || savedVenue.brand_accent) {
-          applyBrandTheme(savedVenue.brand_primary, savedVenue.brand_accent, savedVenue.brand_secondary)
-        }
-        return { role: 'manager', venueSlug: savedVenue.slug }
-      }
-    }
-
-    // Pick newest non-demo venue as fallback
-    const { data: activeVenue } = await supabase
-      .from('venues')
-      .select('*')
-      .eq('is_active', true)
-      .neq('slug', 'velvet-lounge')
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .maybeSingle()
-
-    if (activeVenue) {
-      const v = activeVenue as DbVenue
-      setVenue(v)
-      setVenues([v])
-      setRole('manager')
-      if (v.brand_primary || v.brand_accent) {
-        applyBrandTheme(v.brand_primary, v.brand_accent, v.brand_secondary)
-      }
-      return { role: 'manager', venueSlug: v.slug }
-    }
-
-    setVenue(null)
-    setVenues([])
-    setRole(null)
-    setStaffSession(null)
+    // 5. No match: an authenticated user who owns no venue and sits on no
+    //    staff roster gets NO role — never a silent manager grant over
+    //    someone's venue. The auth screen surfaces this and signs them out.
+    //    Do NOT wipe previously resolved state here: a transient resolution
+    //    miss must not revoke an already-committed session (sign-out clears
+    //    state explicitly).
     return { role: null, venueSlug: null }
+  }
+
+  /** Serialises concurrent resolutions for the same user: the SIGNED_IN
+   *  auth event races the login handler's own loadUserData call, and two
+   *  interleaved runs could wipe just-committed role/staffSession state
+   *  (the "bounced back to login" race). Same-user calls share one flight. */
+  const loadUserData = (
+    userId: string,
+    userPhone: string | null = null,
+    userEmail: string | null = null,
+    authUser?: AuthUser | null,
+    targetVenueSlugOrId?: string | null,
+  ): Promise<{ role: string | null; venueSlug: string | null }> => {
+    if (loadInflightRef.current && loadInflightRef.current.userId === userId) {
+      return loadInflightRef.current.p
+    }
+    const p = performLoadUserData(userId, userPhone, userEmail, authUser, targetVenueSlugOrId).finally(() => {
+      if (loadInflightRef.current?.p === p) loadInflightRef.current = null
+    })
+    loadInflightRef.current = { userId, p }
+    return p
   }
 
   useEffect(() => {

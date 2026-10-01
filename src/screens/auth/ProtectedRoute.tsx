@@ -1,9 +1,16 @@
 import { Navigate, useLocation } from 'react-router-dom'
-import { useAuth } from '../../context/AuthContext'
+import { useAuth, sectorPath } from '../../context/AuthContext'
 import { LoadingScreen } from '../../components/LoadingScreen'
 
-export function ProtectedRoute({ children }: { children: React.ReactNode }) {
-  const { isAuthenticated, isInitializing } = useAuth()
+export function ProtectedRoute({
+  roles,
+  children,
+}: {
+  /** When set, only these roles may load this subtree (e.g. manager app). */
+  roles?: string[];
+  children: React.ReactNode;
+}) {
+  const { isAuthenticated, isInitializing, role, staffSession } = useAuth()
   const location = useLocation()
 
   if (isInitializing) {
@@ -12,6 +19,15 @@ export function ProtectedRoute({ children }: { children: React.ReactNode }) {
 
   if (!isAuthenticated) {
     return <Navigate to="/login" replace state={{ from: location.pathname }} />
+  }
+
+  // Role gate: staff who escalate the URL into another sector are bounced
+  // straight back to their own designated screen.
+  if (roles && roles.length > 0) {
+    const r = staffSession?.role || role
+    if (!r || !roles.includes(r)) {
+      return <Navigate to={r ? sectorPath(r) : '/login'} replace />
+    }
   }
 
   return <>{children}</>
