@@ -237,9 +237,14 @@ export function CentralAuthScreen({
         }
         return;
       }
+      if (!resolvedRole) {
+        await signOut();
+        setError("No account found for that email — ask your manager to add you as staff, or sign up to create a venue.");
+        return;
+      }
       const targetSlug = activeVenueSlug || resolvedVenueSlug;
       toast.success("Welcome back.");
-      navigate(getDestination(resolvedRole || "manager", targetSlug), { replace: true });
+      navigate(getDestination(resolvedRole, targetSlug), { replace: true });
       return;
     }
 
@@ -317,8 +322,8 @@ export function CentralAuthScreen({
         toast.success("Account created — let's set up your venue.");
         navigate("/setup", { replace: true });
       } else {
-        toast.success("Signed in.");
-        navigate(getDestination("manager", targetSlug), { replace: true });
+        await signOut();
+        setError("No account found for this number — ask your manager to add you as staff, or sign up to create a venue.");
       }
       return;
     }

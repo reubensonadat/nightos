@@ -161,28 +161,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     )
 
     if (rawPhone) {
-      // Check if owner by phone first
-      const { data: ownerByPhone } = await authDb.venueByPhone(rawPhone, effectiveTarget)
-      if (ownerByPhone) {
-        const od = ownerByPhone as Record<string, unknown>
-        const venueObj = od.venue as DbVenue
-        setVenue(venueObj)
-        setVenues([venueObj])
-        setRole('owner')
-        setStaffSession(null)
-        setProfile({
-          id: userId,
-          email: userEmail ?? (venueObj.email || null),
-          phone_number: rawPhone,
-          name: resolvedPersonName,
-        })
-        if (venueObj.brand_primary || venueObj.brand_accent) {
-          applyBrandTheme(venueObj.brand_primary, venueObj.brand_accent, venueObj.brand_secondary);
-        }
-        return { role: 'owner', venueSlug: venueObj.slug }
-      }
-
-      // Check if staff by phone
+      // Check STAFF membership first — it is the stronger signal. A phone
+      // that sits on both a staff row and the venue row belongs to staff:
+      // waiters, bartenders and kitchen must never resolve as owner.
       const { data: staffData } = await authDb.venueByStaffPhone(rawPhone, effectiveTarget)
       if (staffData) {
         const sd = staffData as Record<string, unknown>
@@ -228,6 +209,28 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           applyBrandTheme(v.brand_primary, v.brand_accent, v.brand_secondary);
         }
         return { role: sd.role as string, venueSlug: resolvedSlug }
+      }
+
+      // Owner by venue phone (weaker signal — only reached when the number
+      // is on no staff row of this venue)
+      const { data: ownerByPhone } = await authDb.venueByPhone(rawPhone, effectiveTarget)
+      if (ownerByPhone) {
+        const od = ownerByPhone as Record<string, unknown>
+        const venueObj = od.venue as DbVenue
+        setVenue(venueObj)
+        setVenues([venueObj])
+        setRole('owner')
+        setStaffSession(null)
+        setProfile({
+          id: userId,
+          email: userEmail ?? (venueObj.email || null),
+          phone_number: rawPhone,
+          name: resolvedPersonName,
+        })
+        if (venueObj.brand_primary || venueObj.brand_accent) {
+          applyBrandTheme(venueObj.brand_primary, venueObj.brand_accent, venueObj.brand_secondary);
+        }
+        return { role: 'owner', venueSlug: venueObj.slug }
       }
     }
 
@@ -301,61 +304,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     }
 
-    // 4. Safe fallback for authenticated users: resolve to target or active venue
-    if (effectiveTarget) {
-      const { data: targetVenue } = await supabase
-        .from('venues')
-        .select('*')
-        .or(`slug.eq.${effectiveTarget},id.eq.${effectiveTarget}`)
-        .eq('is_active', true)
-        .maybeSingle()
-      if (targetVenue) {
-        const v = targetVenue as DbVenue
-        setVenue(v)
-        setVenues([v])
-        setRole('manager')
-        if (v.brand_primary || v.brand_accent) {
-          applyBrandTheme(v.brand_primary, v.brand_accent, v.brand_secondary)
-        }
-        return { role: 'manager', venueSlug: v.slug }
-      }
-    }
-
-    const savedVenueId = localStorage.getItem('nightos:active_venue_id')
-    if (savedVenueId) {
-      const { data: savedVenue } = await db.venueById(savedVenueId)
-      if (savedVenue && savedVenue.slug !== 'velvet-lounge') {
-        setVenue(savedVenue)
-        setVenues([savedVenue])
-        setRole('manager')
-        if (savedVenue.brand_primary || savedVenue.brand_accent) {
-          applyBrandTheme(savedVenue.brand_primary, savedVenue.brand_accent, savedVenue.brand_secondary)
-        }
-        return { role: 'manager', venueSlug: savedVenue.slug }
-      }
-    }
-
-    // Pick newest non-demo venue as fallback
-    const { data: activeVenue } = await supabase
-      .from('venues')
-      .select('*')
-      .eq('is_active', true)
-      .neq('slug', 'velvet-lounge')
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .maybeSingle()
-
-    if (activeVenue) {
-      const v = activeVenue as DbVenue
-      setVenue(v)
-      setVenues([v])
-      setRole('manager')
-      if (v.brand_primary || v.brand_accent) {
-        applyBrandTheme(v.brand_primary, v.brand_accent, v.brand_secondary)
-      }
-      return { role: 'manager', venueSlug: v.slug }
-    }
-
+    // 4. No match: an authenticated user who owns no venue and sits on no
+    //    staff roster gets NO role — never a silent manager grant over
+    //    someone's venue. The auth screen surfaces this and signs them out.
     setVenue(null)
     setVenues([])
     setRole(null)

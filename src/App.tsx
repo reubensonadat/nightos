@@ -45,7 +45,7 @@ import { ShiftReportScreen } from "./screens/manager/ShiftReportScreen";
 import { FinancialReportsScreen } from "./screens/manager/FinancialReportsScreen";
 import { CrmScreen } from "./screens/manager/CrmScreen";
 import { BrandSettingsScreen } from "./screens/manager/BrandSettingsScreen";
- 
+
 import { ReservationsScreen } from "./screens/ReservationsScreen";
 import { useVenue, DEFAULT_VENUE } from "./hooks/useVenue";
 import { useQrTable } from "./hooks/useQrTable";
@@ -132,9 +132,9 @@ function CustomerShell({
   }, [bill, callingWaiter, session]);
 
   // Table PIN Security State
-   
+
   const [pinInputVerified, setPinInputVerified] = useState<boolean>(false);
-   
+
   const pinUnlocked = useMemo(() => {
     if (!bill?.table_pin) return true;
     if (pinInputVerified) return true;
@@ -145,7 +145,7 @@ function CustomerShell({
     }
   }, [bill, pinInputVerified]);
 
-   
+
   // "How many of you?" prompt ONLY when initializing a fresh new tab
   // (no existing open bill or PIN already present on the table before this scan).
   // If an open bill already existed on the table, joining guests skip the prompt.
@@ -172,11 +172,11 @@ function CustomerShell({
     async (partySize: number, guestName?: string) => {
       const { error } = await updateParty(partySize, guestName);
       if (error) {
-         
+
         toast.error(String(error));
         return;
       }
-       
+
       try { localStorage.setItem(`nightos:party:${session?.id ?? ''}`, "1"); } catch { /* ignore */ }
       setPartyPromptOpen(false);
       setTab("menu");
@@ -190,18 +190,18 @@ function CustomerShell({
       .then(
         ({ data }) => {
           if (!cancelled && data) setVenueName(data.name);
-           
+
         },
         () => { },
       );
-     
+
     return () => {
       cancelled = true;
     };
   }, [venueId]);
 
   // ── Load live orders for this table's open bill from the database ──
-   
+
   const [ordersRevision, setOrdersRevision] = useState(0);
   const triggerReload = useCallback(() => setOrdersRevision((r) => r + 1), []);
 
@@ -244,7 +244,7 @@ function CustomerShell({
               })),
             };
           }),
-           
+
         );
 
         if (cancelled) return;
@@ -429,10 +429,10 @@ function CustomerShell({
           depositCredit={
             bill?.deposit_paid && Number(bill?.deposit_amount || 0) > 0
               ? {
-                  amount: Number(bill.deposit_amount),
-                  remaining: Number(bill.remaining_credit ?? bill.deposit_amount),
-                  paid: Boolean(bill.deposit_paid),
-                }
+                amount: Number(bill.deposit_amount),
+                remaining: Number(bill.remaining_credit ?? bill.deposit_amount),
+                paid: Boolean(bill.deposit_paid),
+              }
               : null
           }
           onEditParty={tableId ? () => setPartyPromptOpen(true) : undefined}
@@ -832,7 +832,7 @@ function AppShell() {
       )}
 
       {mode === "manager" && (
-        <ProtectedRoute>
+        <ProtectedRoute roles={["owner", "manager"]}>
           <VenueRequired>
             <ManagerShell
               venueName={currentVenue?.name}

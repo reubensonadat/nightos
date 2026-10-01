@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate, useOutletContext } from "react-router-dom";
 import {
     ArrowLeftIcon,
@@ -18,6 +18,7 @@ import toast from "react-hot-toast";
 import type { Table } from "./TablesDashboard";
 import { ConfirmModal } from "../../components/ConfirmModal";
 import { LoadingScreen } from "../../components/LoadingScreen";
+import { PaystackButton } from "../../components/PaystackButton";
 
 /* ────────────────────────── Payment methods ────────────────────────── */
 
@@ -30,6 +31,14 @@ const PAYMENT_METHODS: { id: PaymentMethod; label: string; icon: typeof Banknote
 ];
 
 const QUICK_CASH = [50, 100, 200, 500];
+
+const sleep = (ms: number) => new Promise<void>((resolve) => window.setTimeout(resolve, ms));
+
+const SETTLED_LABEL: Record<PaymentMethod, string> = {
+    cash: "Cash",
+    card: "Card",
+    momo: "Mobile Money",
+};
 
 type BillItem = {
     id: string;
@@ -48,6 +57,11 @@ export function InvoiceSettlementScreen() {
     const [method, setMethod] = useState<PaymentMethod>("cash");
     const [cashReceived, setCashReceived] = useState<string>("");
     const [settled, setSettled] = useState(false);
+    const [settledMethod, setSettledMethod] = useState<PaymentMethod | null>(null);
+    const [verifying, setVerifying] = useState(false);
+    /** Dedupes the confirmation (sound + toast) between the verify-payment
+     *  path and the realtime bills listener so it only fires once. */
+    const confirmedRef = useRef(false);
     const [settling, setSettling] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [fee, setFee] = useState<number | null>(null);
@@ -104,7 +118,7 @@ export function InvoiceSettlementScreen() {
             if (cancelled) return;
             db.venueById(venueId).then(
                 ({ data }) => { if (!cancelled && data) setVenueName(data.name); },
-                () => {},
+                () => { },
             );
             if (!billRow || (billRow.status !== 'open' && billRow.status !== 'settling' && billRow.status !== 'paid')) {
                 setBill(null);
@@ -113,7 +127,7 @@ export function InvoiceSettlementScreen() {
             }
             db.venueById(billRow.venue_id).then(
                 ({ data }) => { if (!cancelled && data) setVenueName(data.name); },
-                () => {},
+                () => { },
             );
             const { data: itemRows } = await db.billItems(billRow.id);
             if (cancelled) return;
@@ -127,7 +141,7 @@ export function InvoiceSettlementScreen() {
             };
             setBill(loadedBill);
             setCompletedBill(loadedBill);
-             
+
             if (billRow.status === 'paid' || (Number(billRow.amount_paid || 0) >= Number(billRow.total || 0) && Number(billRow.total || 0) > 0)) {
                 setSettled(true);
             }
@@ -151,8 +165,11 @@ export function InvoiceSettlementScreen() {
         onUpdate: (payload: { new?: Record<string, unknown> }) => {
             const updated = payload?.new;
             if (updated && (updated.status === 'paid' || (Number(updated.amount_paid || 0) >= Number(updated.total || 0) && Number(updated.total || 0) > 0))) {
-                sounds.playPaymentSuccess();
-                toast.success("💳 Bill has been paid by guest!", { duration: 6000, icon: '🛎️' });
+                if (!confirmedRef.current) {
+                    confirmedRef.current = true;
+                    sounds.playPaymentSuccess();
+                    toast.success("💳 Payment confirmed — bill settled!", { duration: 6000, icon: '🛎️' });
+                }
                 setSettled(true);
             }
             triggerReload();
@@ -179,7 +196,41 @@ export function InvoiceSettlementScreen() {
             return;
         }
         setFee(data.fee ?? null);
+        setSettledMethod("cash");
         setSettled(true);
+    };
+
+    /* ── Waiter-charged digital payment: verify with Paystack server-side.
+         If verification lags (network), the realtime bills listener above
+         remains the safety net and settles this screen automatically. ── */
+    const handleDigitalPayment = async (reference: string) => {
+        if (!bill) return;
+        setVerifying(true);
+        for (const delay of [1500, 3000]) {
+            await sleep(delay);
+            if (confirmedRef.current) {
+                setVerifying(false);
+                return;
+            }
+            try {
+                const { data, error } = await db.verifyPayment(reference, bill.id);
+                if (!error && data && (data as { success?: boolean }).success === true) {
+                    confirmedRef.current = true;
+                    sounds.playPaymentSuccess();
+                    toast.success("💳 Payment confirmed — bill settled!", { duration: 6000, icon: '🛎️' });
+                    setSettledMethod(method);
+                    setVerifying(false);
+                    setSettled(true);
+                    return;
+                }
+            } catch {
+                // network hiccup — retry on the next tick; realtime still watches the bill
+            }
+        }
+        setVerifying(false);
+        if (!confirmedRef.current) {
+            toast.error("Still confirming with Paystack — this screen updates automatically the moment the payment lands.", { duration: 8000 });
+        }
     };
 
     const activeBill = bill || completedBill;
@@ -203,7 +254,7 @@ export function InvoiceSettlementScreen() {
                                 Payment collected
                             </span>
                             <span className="text-[9px] font-semibold uppercase tracking-[0.18em] text-feldgrau">
-                                Cash
+                                {settledMethod ? SETTLED_LABEL[settledMethod] : "Digital Payment"}
                             </span>
                         </div>
                         <div className="w-9" />
@@ -221,7 +272,7 @@ export function InvoiceSettlementScreen() {
                             <span className="italic font-serif font-bold text-khaki">settled</span>
                         </h1>
                         <p className="mt-2 text-[12px] leading-[1.5] tracking-tight text-feldgrau">
-                            Cash confirmed for Table {String(table.number).padStart(2, "0")}.
+                            {settledMethod ? SETTLED_LABEL[settledMethod] : "Digital payment"} confirmed for Table {String(table.number).padStart(2, "0")}.
                         </p>
                     </div>
 
@@ -289,7 +340,7 @@ export function InvoiceSettlementScreen() {
                             </div>
 
                             <div className="mt-3 rounded-lg bg-khaki/12 px-3 py-2 text-[10px] font-bold uppercase tracking-wider text-khaki">
-                                Paid via Cash
+                                Paid via {settledMethod ? SETTLED_LABEL[settledMethod] : "Digital Payment"}
                             </div>
 
                             {fee !== null && (
@@ -587,11 +638,11 @@ export function InvoiceSettlementScreen() {
                     <div className="mt-5 animate-velvet-fade rounded-2xl bg-white p-5 text-center shadow-sm ring-1 ring-isabelline">
                         <CreditCardIcon className="mx-auto h-8 w-8 text-feldgrau" strokeWidth={1.5} />
                         <p className="mt-2 text-[12px] font-bold tracking-tight text-licorice">
-                            Online payment
+                            Charge card
                         </p>
                         <p className="mt-1 text-[11px] leading-[1.5] tracking-tight text-feldgrau">
-                            Card & MoMo are paid on the customer's phone — the platform takes its fee
-                            automatically at checkout. Cash is recorded here.
+                            Tap below to open the secure Paystack checkout and charge the customer's card.
+                            The bill confirms here automatically the moment payment lands.
                         </p>
                     </div>
                 )}
@@ -604,7 +655,8 @@ export function InvoiceSettlementScreen() {
                             Mobile Money
                         </p>
                         <p className="mt-1 text-[11px] leading-[1.5] tracking-tight text-feldgrau">
-                            The customer pays from their own phone after checkout. Cash is recorded here.
+                            Tap below, enter the customer's MoMo number, and they approve the charge on
+                            their phone. The bill confirms here automatically the moment payment lands.
                         </p>
                     </div>
                 )}
@@ -630,40 +682,73 @@ export function InvoiceSettlementScreen() {
                         </span>
                     </div>
 
-                    <button
-                        type="button"
-                        onClick={() => {
-                            if (method === "cash") {
-                                setSettleConfirmOpen(true);
-                            } else {
-                                void handleSettle();
-                            }
-                        }}
-                        disabled={!canSettle || settling}
-                        className="
-                            inline-flex shrink-0 items-center justify-center gap-1.5
-                            rounded-full bg-licorice px-5 py-3
-                            text-[12px] font-bold tracking-tight text-isabelline
-                            shadow-[0_12px_28px_rgba(35,20,12,0.20)]
-                            ring-1 ring-licorice/80
-                            transition-all duration-200
-                            hover:bg-licorice/95
-                            active:scale-[0.985]
-                            disabled:opacity-40 disabled:shadow-none
-                        "
-                    >
-                        {settling ? (
-                            <>
-                                <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none">
-                                    <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" strokeOpacity="0.25" />
-                                    <path d="M22 12a10 10 0 0 1-10 10" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
-                                </svg>
-                                Recording…
-                            </>
-                        ) : method === "cash"
-                            ? "Confirm Cash"
-                            : "Paid on customer's phone"}
-                    </button>
+                    {method === "cash" ? (
+                        <button
+                            type="button"
+                            onClick={() => setSettleConfirmOpen(true)}
+                            disabled={!canSettle || settling}
+                            className="
+                                inline-flex shrink-0 items-center justify-center gap-1.5
+                                rounded-full bg-licorice px-5 py-3
+                                text-[12px] font-bold tracking-tight text-isabelline
+                                shadow-[0_12px_28px_rgba(35,20,12,0.20)]
+                                ring-1 ring-licorice/80
+                                transition-all duration-200
+                                hover:bg-licorice/95
+                                active:scale-[0.985]
+                                disabled:opacity-40 disabled:shadow-none
+                            "
+                        >
+                            {settling ? (
+                                <>
+                                    <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none">
+                                        <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" strokeOpacity="0.25" />
+                                        <path d="M22 12a10 10 0 0 1-10 10" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
+                                    </svg>
+                                    Recording…
+                                </>
+                            ) : "Confirm Cash"}
+                        </button>
+                    ) : verifying ? (
+                        <button
+                            type="button"
+                            disabled
+                            className="
+                                inline-flex shrink-0 items-center justify-center gap-1.5
+                                rounded-full bg-licorice px-5 py-3
+                                text-[12px] font-bold tracking-tight text-isabelline
+                                ring-1 ring-licorice/80
+                                opacity-70
+                            "
+                        >
+                            <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none">
+                                <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" strokeOpacity="0.25" />
+                                <path d="M22 12a10 10 0 0 1-10 10" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
+                            </svg>
+                            Confirming…
+                        </button>
+                    ) : (
+                        <PaystackButton
+                            amount={total}
+                            billId={bill.id}
+                            venueId={venueId}
+                            channels={method === "momo" ? ["mobile_money"] : ["card"]}
+                            onSuccess={(reference) => void handleDigitalPayment(reference)}
+                            className="
+                                inline-flex shrink-0 items-center justify-center gap-1.5
+                                rounded-full bg-licorice px-5 py-3
+                                text-[12px] font-bold tracking-tight text-isabelline
+                                shadow-[0_12px_28px_rgba(35,20,12,0.20)]
+                                ring-1 ring-licorice/80
+                                transition-all duration-200
+                                hover:bg-licorice/95
+                                active:scale-[0.985]
+                                disabled:opacity-40 disabled:shadow-none
+                            "
+                        >
+                            Charge {formatGHS(total)}
+                        </PaystackButton>
+                    )}
                 </div>
             </div>
             {/* W7 — Settle bill confirm */}
