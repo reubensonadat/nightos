@@ -424,10 +424,13 @@ export function BarStationScreen({ venueId, staffId, staffName, onExit, onSignOu
         void loadTickets();
     }, [loadTickets]);
 
-    // Realtime listener for incoming orders
+    // Realtime listener for incoming orders — disabled until the venue id is
+    // resolved so we never subscribe to the whole table across all venues.
+    const venueReady = Boolean(venueId && venueId !== "00000000-0000-0000-0000-000000000000");
     useRealtime({
         table: "order_submissions",
-        filter: venueId ? `venue_id=eq.${venueId}` : undefined,
+        filter: `venue_id=eq.${venueId}`,
+        enabled: venueReady,
         onInsert: loadTickets,
         onUpdate: loadTickets,
         onDelete: loadTickets,
@@ -592,13 +595,15 @@ export function BarStationScreen({ venueId, staffId, staffName, onExit, onSignOu
 
     useRealtime({
         table: "payments",
-        filter: venueId ? `venue_id=eq.${venueId}` : undefined,
+        filter: `venue_id=eq.${venueId}`,
+        enabled: venueReady,
         onInsert: () => { if (activeTab === "REPORT") void loadShiftAuditData(); },
         onUpdate: () => { if (activeTab === "REPORT") void loadShiftAuditData(); },
     });
     useRealtime({
         table: "bills",
-        filter: venueId ? `venue_id=eq.${venueId}` : undefined,
+        filter: `venue_id=eq.${venueId}`,
+        enabled: venueReady,
         onInsert: () => { if (activeTab === "REPORT") void loadShiftAuditData(); },
         onUpdate: () => { if (activeTab === "REPORT") void loadShiftAuditData(); },
     });

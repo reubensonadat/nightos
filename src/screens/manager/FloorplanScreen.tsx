@@ -329,9 +329,11 @@ export function FloorplanScreen({ venueId }: { venueId?: string } = {}) {
     }, [fetchData]);
 
     // Live: bills change whenever a tab opens or closes.
+    // Disabled until the real venue id resolves — never subscribe table-wide.
     useRealtime({
         table: "bills",
-        filter: venue.id === "00000000-0000-0000-0000-000000000000" ? undefined : `venue_id=eq.${venue.id}`,
+        filter: `venue_id=eq.${venue.id}`,
+        enabled: venue.id !== "00000000-0000-0000-0000-000000000000",
         onInsert: () => {
             if (reloadTimer.current) window.clearTimeout(reloadTimer.current);
             reloadTimer.current = window.setTimeout(() => fetchDataRef.current(), 500);

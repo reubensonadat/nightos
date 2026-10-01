@@ -57,7 +57,6 @@ function formatDwell(mins: number): string {
 export function LiveOpsScreen({ venueId, onNavigate }: { venueId?: string; onNavigate?: (page: string) => void }) {
     const { venue } = useVenue(venueId);
     const [range, setRange] = useState<7 | 30>(7);
-    const s = useManagerDashboard(venue.id, range);
 
     const [outstanding, setOutstanding] = useState(0);
     const [landed, setLanded] = useState<Awaited<ReturnType<typeof db.landedWithoutOrders>>["data"]>([]);
@@ -107,7 +106,10 @@ export function LiveOpsScreen({ venueId, onNavigate }: { venueId?: string; onNav
         init();
     }, [loadLive]);
 
-    // Live refresh — customer sessions, bills and payments drive this screen; no polling.
+    // Live refresh — customer sessions drive the live panel directly; bills
+    // and payments events arrive through useManagerDashboard's shared
+    // subscription below, so this screen owns exactly ONE realtime channel.
+    // No polling.
     const liveTimer = useRef<number | null>(null);
     const scheduleLive = useCallback(() => {
         if (liveTimer.current !== null) window.clearTimeout(liveTimer.current);
@@ -117,14 +119,28 @@ export function LiveOpsScreen({ venueId, onNavigate }: { venueId?: string; onNav
         }, 500);
     }, [loadLive]);
 
+    // Debounce timer must never fire after unmount (e.g. manager tab switches).
+    useEffect(() => {
+        return () => {
+            if (liveTimer.current !== null) {
+                window.clearTimeout(liveTimer.current);
+                liveTimer.current = null;
+            }
+        };
+    }, []);
+
+    const isVenueReady = Boolean(venue.id && venue.id !== "00000000-0000-0000-0000-000000000000");
+
     useRealtime({
         table: 'customer_sessions',
-        filter: venue.id === "00000000-0000-0000-0000-000000000000" ? undefined : `venue_id=eq.${venue.id}`,
+        filter: `venue_id=eq.${venue.id}`,
+        enabled: isVenueReady,
         onInsert: scheduleLive,
         onUpdate: scheduleLive,
     });
-    useRealtime({ table: 'bills', filter: venue.id === "00000000-0000-0000-0000-000000000000" ? undefined : `venue_id=eq.${venue.id}`, onInsert: scheduleLive, onUpdate: scheduleLive });
-    useRealtime({ table: 'payments', filter: venue.id === "00000000-0000-0000-0000-000000000000" ? undefined : `venue_id=eq.${venue.id}`, onInsert: scheduleLive, onUpdate: scheduleLive });
+
+    // loadLive piggybacks on the dashboard's bills/payments/submissions channels.
+    const s = useManagerDashboard(venue.id, range, loadLive);
 
     const hour = new Date().getHours();
     const greeting = hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening";

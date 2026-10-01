@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState, useCallback, useRef } from "react";
 import { useRealtime } from "../../hooks/useRealtime";
 import { useAuth } from "../../context/AuthContext";
- 
+
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 import { ArrowPathIcon, SpeakerWaveIcon } from "@heroicons/react/24/outline";
 import { OrderCard, type KitchenOrder, type OrderStatus } from "../../components/OrderCard";
@@ -93,10 +93,10 @@ function rowToOrder(row: DbKitchenOrderRow, waiterNames: Record<string, string>,
 
 type Props = {
     venueId: string;
-     
+
     staffId: string;
     staffName: string;
-     
+
     onExit?: () => void;
     onSignOut?: () => void;
     role?: string;
@@ -155,7 +155,7 @@ export function KitchenDisplayScreen({ venueId, staffId, staffName, onExit, onSi
             await load();
         };
         init();
-        }, [load]);
+    }, [load]);
 
     // Live updates — no polling. A new/updated submission (or its items)
     // reloads the board; the debounce covers the submission+items pair.
@@ -168,15 +168,29 @@ export function KitchenDisplayScreen({ venueId, staffId, staffName, onExit, onSi
         }, 500);
     }, [load]);
 
+    // Debounce timer must never fire after unmount.
+    useEffect(() => {
+        return () => {
+            if (reloadTimer.current !== null) {
+                window.clearTimeout(reloadTimer.current);
+                reloadTimer.current = null;
+            }
+        };
+    }, []);
+
+    const venueReady = Boolean(venueId && venueId !== "00000000-0000-0000-0000-000000000000");
+
     useRealtime({
         table: 'order_submissions',
         filter: `venue_id=eq.${venueId}`,
+        enabled: venueReady,
         onInsert: scheduleReload,
         onUpdate: scheduleReload,
         onDelete: scheduleReload,
     });
     useRealtime({
         table: 'order_items',
+        enabled: venueReady,
         onInsert: scheduleReload,
     });
 
@@ -401,7 +415,7 @@ export function KitchenDisplayScreen({ venueId, staffId, staffName, onExit, onSi
                 isOpen={showSignOutModal}
                 pendingTicketsCount={pendingCount + preparingCount}
                 onClose={() => setShowSignOutModal(false)}
-                onSignOut={onSignOut || onExit || (() => {})}
+                onSignOut={onSignOut || onExit || (() => { })}
             />
 
             {/* K4 — Mark Served confirm */}

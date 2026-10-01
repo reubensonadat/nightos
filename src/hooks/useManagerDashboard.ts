@@ -85,7 +85,14 @@ const STATUS_ORDER: Record<string, number> = {
   cancelled: 5,
 };
 
-export function useManagerDashboard(venueId: string | null, days: 7 | 30 = 7) {
+export function useManagerDashboard(
+  venueId: string | null,
+  days: 7 | 30 = 7,
+  /** Optional callback piggybacking on this hook's realtime subscription —
+   *  lets callers (e.g. LiveOpsScreen) react to the same bills/payments/
+   *  submissions events without opening duplicate channels. */
+  onRealtimeChange?: () => void,
+) {
   const [stats, setStats] = useState<DashboardStats>({
     todayRevenue: 0,
     yesterdayRevenue: 0,
@@ -118,6 +125,8 @@ export function useManagerDashboard(venueId: string | null, days: 7 | 30 = 7) {
   const fetchAll = useCallback(async () => {
     if (!venueId || venueId === '00000000-0000-0000-0000-000000000000') return;
     abortRef.current?.abort();
+    const ctrl = new AbortController();
+    abortRef.current = ctrl;
 
     const now = new Date();
     const since = new Date(now.getTime() - days * 24 * 60 * 60 * 1000).toISOString();
@@ -137,7 +146,7 @@ export function useManagerDashboard(venueId: string | null, days: 7 | 30 = 7) {
         db.shiftCoverage(venueId),
       ]);
 
-    if (abortRef.current?.signal.aborted) return;
+    if (ctrl.signal.aborted) return;
 
     const payments = (paymentsRes.data ?? []) as DbPayment[];
     const submissions = (submissionsRes.data ?? []) as DbOrderSubmissionWithItems[];
@@ -150,7 +159,7 @@ export function useManagerDashboard(venueId: string | null, days: 7 | 30 = 7) {
 
     const error =
       paymentsRes.error || submissionsRes.error || billsRes.error || tablesRes.error ||
-      inventoryRes.error || staffRes.error || shiftsRes.error
+        inventoryRes.error || staffRes.error || shiftsRes.error
         ? 'Some dashboard data could not be loaded'
         : null;
 
@@ -304,28 +313,47 @@ export function useManagerDashboard(venueId: string | null, days: 7 | 30 = 7) {
 
   useEffect(() => {
     const init = async () => {
-        await fetchAll();
+      await fetchAll();
     };
     init();
-    }, [fetchAll]);
+  }, [fetchAll]);
 
   // Live refresh: any change to bills / payments / submissions in this
   // venue reloads the numbers (debounced so bursts collapse into one).
   const reloadTimer = useRef<number | null>(null);
+  const onRealtimeChangeRef = useRef(onRealtimeChange);
+  useEffect(() => {
+    onRealtimeChangeRef.current = onRealtimeChange;
+  });
+
   const scheduleReload = useCallback(() => {
     if (reloadTimer.current !== null) window.clearTimeout(reloadTimer.current);
     reloadTimer.current = window.setTimeout(() => {
       reloadTimer.current = null;
       fetchAll();
+      onRealtimeChangeRef.current?.();
     }, 600);
   }, [fetchAll]);
 
+  // Never fire the debounce or apply fetch results after unmount.
+  useEffect(() => {
+    return () => {
+      if (reloadTimer.current !== null) {
+        window.clearTimeout(reloadTimer.current);
+        reloadTimer.current = null;
+      }
+      abortRef.current?.abort();
+    };
+  }, []);
+
   const vId = venueId ?? 'none';
-  useRealtime({ table: 'bills', filter: `venue_id=eq.${vId}`, onInsert: scheduleReload, onUpdate: scheduleReload });
-  useRealtime({ table: 'payments', filter: `venue_id=eq.${vId}`, onInsert: scheduleReload, onUpdate: scheduleReload });
+  const venueReady = Boolean(venueId && venueId !== '00000000-0000-0000-0000-000000000000');
+  useRealtime({ table: 'bills', filter: `venue_id=eq.${vId}`, enabled: venueReady, onInsert: scheduleReload, onUpdate: scheduleReload });
+  useRealtime({ table: 'payments', filter: `venue_id=eq.${vId}`, enabled: venueReady, onInsert: scheduleReload, onUpdate: scheduleReload });
   useRealtime({
     table: 'order_submissions',
     filter: `venue_id=eq.${vId}`,
+    enabled: venueReady,
     onInsert: scheduleReload,
     onUpdate: scheduleReload,
     onDelete: scheduleReload,

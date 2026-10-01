@@ -21,7 +21,7 @@ import { OrdersScreen } from "./screens/OrdersScreen";
 import { CustomerBottomNav } from "./components/CustomerBottomNav";
 import { PartyPrompt } from "./components/PartyPrompt";
 import { TablePinModal } from "./components/TablePinModal";
- 
+import { VipTableDepositScreen } from "./screens/VipTableDepositScreen";
 import { ClockIcon, BuildingStorefrontIcon } from "@heroicons/react/24/outline";
 import { LoadingScreen } from "./components/LoadingScreen";
 
@@ -61,7 +61,17 @@ type Mode = "customer" | "waiter" | "kitchen" | "bar" | "manager";
 
 /* ──────────────────── Customer Shell (bottom nav) ──────────────────── */
 
-function CustomerShell({ venueId, tableId, tableLabel }: { venueId: string; tableId: string | null; tableLabel?: string | null }) {
+function CustomerShell({
+  venueId,
+  tableId,
+  tableLabel,
+  table: propTable,
+}: {
+  venueId: string;
+  tableId: string | null;
+  tableLabel?: string | null;
+  table?: DbTable | null;
+}) {
   const location = useLocation();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -85,7 +95,23 @@ function CustomerShell({ venueId, tableId, tableLabel }: { venueId: string; tabl
   const [venueName, setVenueName] = useState<string | null>(null);
   const { itemCount } = useCart();
 
-  const { session, bill, waiter, isNewTab, isBarClosed, loading: sessionLoading, error: sessionError, updateParty } = useCustomerSession(venueId, tableId);
+  const {
+    session,
+    bill,
+    table: sessionTable,
+    waiter,
+    isNewTab,
+    isBarClosed,
+    loading: sessionLoading,
+    error: sessionError,
+    updateParty,
+    refresh: refetchSession,
+  } = useCustomerSession(venueId, tableId);
+
+  const currentTable = propTable || sessionTable;
+  const minDeposit = Number(currentTable?.min_deposit || 0);
+  const isDepositPaid = Boolean(bill?.deposit_paid && Number(bill?.deposit_amount || 0) >= minDeposit);
+  const isVipLocked = Boolean(tableId && currentTable && minDeposit > 0 && !isDepositPaid);
 
   const [callingWaiter, setCallingWaiter] = useState(false);
   const [waiterCalled, setWaiterCalled] = useState(false);
@@ -239,12 +265,26 @@ function CustomerShell({ venueId, tableId, tableLabel }: { venueId: string; tabl
   }, [bill, session, ordersRevision]);
 
   // Live refresh: kitchen order updates stream in realtime
+  // (disabled until the bill resolves — never subscribe table-wide)
   useRealtime({
     table: 'order_submissions',
     filter: bill?.id ? `bill_id=eq.${bill.id}` : undefined,
+    enabled: Boolean(bill?.id),
     onInsert: triggerReload,
     onUpdate: triggerReload,
     onDelete: triggerReload,
+  });
+
+  // Live refresh: bill deposit or PIN updates stream in realtime
+  useRealtime({
+    table: 'bills',
+    filter: bill?.id ? `id=eq.${bill.id}` : undefined,
+    enabled: Boolean(bill?.id),
+    onUpdate: (updatedRow: Record<string, unknown>) => {
+      if (updatedRow.deposit_paid || updatedRow.table_pin || updatedRow.status) {
+        refetchSession();
+      }
+    },
   });
 
   const handleOrderSent = useCallback((order: OrderSummary) => {
@@ -355,6 +395,25 @@ function CustomerShell({ venueId, tableId, tableLabel }: { venueId: string; tabl
     return <LoadingScreen />;
   }
 
+  // ── VIP Table Minimum Spend Deposit Lock ──
+  // If the table requires an upfront minimum deposit fee and it is not yet confirmed paid:
+  if (tableId && isVipLocked && bill && currentTable) {
+    return (
+      <VipTableDepositScreen
+        venueId={venueId}
+        venueName={venueName}
+        table={currentTable}
+        billId={bill.id}
+        sessionToken={session?.session_token}
+        tablePin={bill.table_pin}
+        minDeposit={minDeposit}
+        onDepositPaid={() => {
+          refetchSession();
+        }}
+      />
+    );
+  }
+
   return (
     <div className="min-h-svh bg-isabelline pb-20">
       {tab === "menu" && (
@@ -367,6 +426,15 @@ function CustomerShell({ venueId, tableId, tableLabel }: { venueId: string; tabl
           partySize={bill?.guest_count || session?.party_size}
           billId={bill?.id}
           sessionToken={session?.session_token}
+          depositCredit={
+            bill?.deposit_paid && Number(bill?.deposit_amount || 0) > 0
+              ? {
+                  amount: Number(bill.deposit_amount),
+                  remaining: Number(bill.remaining_credit ?? bill.deposit_amount),
+                  paid: Boolean(bill.deposit_paid),
+                }
+              : null
+          }
           onEditParty={tableId ? () => setPartyPromptOpen(true) : undefined}
           onViewCart={() => setTab("tab")}
         />
@@ -480,6 +548,7 @@ function CustomerFlow({ onSwitchMode, venueId, qrTable, qrLoading, qrError }: Cu
         venueId={qrTable.venue_id}
         tableId={qrTable.id}
         tableLabel={qrTable.table_label}
+        table={qrTable}
       />
     );
   }

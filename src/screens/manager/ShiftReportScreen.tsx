@@ -654,21 +654,25 @@ export function ShiftReportScreen({ venueId, isModal = false, onClose }: Props) 
         fetchHistoricalTxDates();
     }, [loadShiftData, fetchHistoricalTxDates]);
 
+    const venueReady = Boolean(venue.id && venue.id !== "00000000-0000-0000-0000-000000000000");
     useRealtime({
         table: "payments",
-        filter: venue.id ? `venue_id=eq.${venue.id}` : undefined,
+        filter: `venue_id=eq.${venue.id}`,
+        enabled: venueReady,
         onInsert: handleRealtimeUpdate,
         onUpdate: handleRealtimeUpdate,
     });
     useRealtime({
         table: "bills",
-        filter: venue.id ? `venue_id=eq.${venue.id}` : undefined,
+        filter: `venue_id=eq.${venue.id}`,
+        enabled: venueReady,
         onInsert: handleRealtimeUpdate,
         onUpdate: handleRealtimeUpdate,
     });
     useRealtime({
         table: "order_submissions",
-        filter: venue.id ? `venue_id=eq.${venue.id}` : undefined,
+        filter: `venue_id=eq.${venue.id}`,
+        enabled: venueReady,
         onInsert: handleRealtimeUpdate,
         onUpdate: handleRealtimeUpdate,
     });

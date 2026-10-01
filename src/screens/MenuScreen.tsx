@@ -35,6 +35,11 @@ type Props = {
     partySize?: number;
     billId?: string | null;
     sessionToken?: string | null;
+    depositCredit?: {
+        amount: number;
+        remaining: number;
+        paid: boolean;
+    } | null;
     onEditParty?: () => void;
     onBack?: () => void;
     onViewCart?: () => void;
@@ -120,7 +125,20 @@ async function fetchProducts(venueId: string): Promise<MenuItem[]> {
 
 }
 
-export function MenuScreen({ venueId, venueName, tableLabel, waiterName, tablePin, partySize, billId, sessionToken, onEditParty, onBack, onViewCart }: Props) {
+export function MenuScreen({
+    venueId,
+    venueName,
+    tableLabel,
+    waiterName,
+    tablePin,
+    partySize,
+    billId,
+    sessionToken,
+    depositCredit,
+    onEditParty,
+    onBack,
+    onViewCart,
+}: Props) {
     const [active, setActive] = useState<MenuCategory>("Signatures");
     const [query, setQuery] = useState("");
     const [activeItemId, setActiveItemId] = useState<string | null>(null);
@@ -213,6 +231,32 @@ export function MenuScreen({ venueId, venueName, tableLabel, waiterName, tablePi
                             callingWaiter={callingWaiter}
                             waiterCalled={waiterCalled}
                         />
+                    </div>
+                )}
+
+                {/* ── VIP Deposit Credit Banner ── */}
+                {depositCredit && depositCredit.paid && depositCredit.amount > 0 && (
+                    <div
+                        onClick={onViewCart}
+                        role="button"
+                        tabIndex={0}
+                        className="bg-licorice text-isabelline px-5 md:px-8 py-2 border-b border-khaki/20 flex items-center justify-between shadow-xs cursor-pointer hover:bg-licorice/95 transition-colors"
+                        title="Click to view tab and credit breakdown"
+                    >
+                        <div className="flex items-center gap-2">
+                            <span className="flex h-5 w-5 items-center justify-center rounded-full bg-khaki/20 text-[11px]">👑</span>
+                            <span className="text-[11px] font-bold text-khaki uppercase tracking-wider">
+                                VIP Table Credit
+                            </span>
+                        </div>
+                        <div className="flex items-center gap-1.5 font-mono text-[12px]">
+                            <span className="font-bold text-emerald-400">
+                                {formatGHS(depositCredit.remaining)}
+                            </span>
+                            <span className="text-[10px] text-isabelline/60">
+                                remaining of {formatGHS(depositCredit.amount)}
+                            </span>
+                        </div>
                     </div>
                 )}
 

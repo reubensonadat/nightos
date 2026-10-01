@@ -496,7 +496,7 @@ export const db = {
         supabase
           .from('tables')
           .select(
-            'id, venue_id, table_number, table_label, capacity, area, pos_x, pos_y, qr_code_url, qr_code_token, is_active, created_at',
+            'id, venue_id, table_number, table_label, capacity, area, min_deposit, pos_x, pos_y, qr_code_url, qr_code_token, is_active, created_at',
           )
           .eq('id', id)
           .eq('is_active', true)
@@ -511,7 +511,7 @@ export const db = {
         supabase
           .from('tables')
           .select(
-            'id, venue_id, table_number, table_label, capacity, area, pos_x, pos_y, qr_code_url, qr_code_token, is_active, created_at',
+            'id, venue_id, table_number, table_label, capacity, area, min_deposit, pos_x, pos_y, qr_code_url, qr_code_token, is_active, created_at',
           )
           .eq('qr_code_token', qrCodeToken)
           .eq('is_active', true)
@@ -788,12 +788,27 @@ export const db = {
       .eq('id', id)
       .maybeSingle(),
 
-  createBill: (venueId: string, tableId: string, guestCount = 1, sessionToken?: string | null, tablePin?: string | null) => {
+  createBill: (
+    venueId: string,
+    tableId: string,
+    guestCount = 1,
+    sessionToken?: string | null,
+    tablePin?: string | null,
+    depositAmount = 0,
+    depositPaid = false,
+  ) => {
     cacheInvalidate('bills:');
     return withSession(
       supabase
         .from('bills')
-        .insert({ venue_id: venueId, table_id: tableId, guest_count: guestCount, table_pin: tablePin || null }),
+        .insert({
+          venue_id: venueId,
+          table_id: tableId,
+          guest_count: guestCount,
+          table_pin: tablePin || null,
+          deposit_amount: depositAmount,
+          deposit_paid: depositPaid,
+        }),
       sessionToken,
     )
       .select()
@@ -812,6 +827,40 @@ export const db = {
       p_deposit_amount: depositAmount,
       p_deposit_paid: depositPaid,
     });
+  },
+
+  recordDepositPayment: async (args: {
+    billId: string;
+    venueId: string;
+    amount: number;
+    reference: string;
+    method?: string;
+  }) => {
+    cacheInvalidate('bills:');
+    // 1. Set the bill deposit
+    await supabase.rpc('set_bill_deposit', {
+      p_bill_id: args.billId,
+      p_deposit_amount: args.amount,
+      p_deposit_paid: true,
+    });
+
+    // 2. Record payment row for audit & accounting
+    const { data, error } = await supabase
+      .from('payments')
+      .upsert(
+        {
+          bill_id: args.billId,
+          venue_id: args.venueId,
+          amount: args.amount,
+          method: args.method || 'paystack',
+          reference: args.reference,
+          status: 'success',
+          payer_name: 'VIP Table Deposit',
+        },
+        { onConflict: 'reference', ignoreDuplicates: true },
+      );
+
+    return { data, error };
   },
 
   /**

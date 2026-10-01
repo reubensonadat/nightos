@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
-import { db, type DbBill } from '../lib/api'
+import { db, type DbBill, type DbTable } from '../lib/api'
 
 export type CustomerSession = {
   id: string
@@ -23,6 +23,7 @@ export type AssignedWaiter = {
 type SessionState = {
   session: CustomerSession | null
   bill: DbBill | null
+  table: DbTable | null
   waiter: AssignedWaiter | null
   loading: boolean
   error: string | null
@@ -34,6 +35,7 @@ export function useCustomerSession(venueId: string | null, tableId: string | nul
   const [state, setState] = useState<SessionState>({
     session: null,
     bill: null,
+    table: null,
     waiter: null,
     loading: false,
     error: null,
@@ -186,7 +188,7 @@ export function useCustomerSession(venueId: string | null, tableId: string | nul
         } else {
           let wasMySession = false
           try { wasMySession = sessionStorage.getItem('nightos:current_session_id') === latestSession.id } catch { /* noop */ }
-          
+
           if (wasMySession) {
             setState((s) => ({ ...s, session: latestSession as CustomerSession, bill: null, loading: false, error: null }))
             return
@@ -226,7 +228,7 @@ export function useCustomerSession(venueId: string | null, tableId: string | nul
     if (!session) {
       const { data: newSession, error: createErr } = await supabase
         .from('customer_sessions')
-         
+
         .insert({
           venue_id: venueId,
           table_id: tableId,
@@ -273,8 +275,15 @@ export function useCustomerSession(venueId: string | null, tableId: string | nul
         return
       }
 
+      // Fetch table details to check minimum spend deposit
+      const { data: currentTable } = await db.tableById(tableId);
+      const minDeposit = Number(currentTable?.min_deposit || 0);
+
       if (existingBill) {
         bill = existingBill
+        if (minDeposit > 0 && !existingBill.deposit_paid && Number(existingBill.deposit_amount || 0) === 0) {
+          bill.deposit_amount = minDeposit;
+        }
         if (session.bill_id !== existingBill.id) {
           await supabase
             .from('customer_sessions')
@@ -291,9 +300,11 @@ export function useCustomerSession(venueId: string | null, tableId: string | nul
           session.party_size || 1,
           token,
           autoPin,
+          minDeposit,
+          false,
         )
         if (createBillErr || !newBill) {
-          setState((s) => ({ ...s, session, bill: null, isNewTab: false, loading: false, error: 'Failed to create bill' }))
+          setState((s) => ({ ...s, session, bill: null, table: currentTable ?? null, isNewTab: false, loading: false, error: 'Failed to create bill' }))
           return
         }
         bill = newBill
@@ -308,6 +319,9 @@ export function useCustomerSession(venueId: string | null, tableId: string | nul
       }
     }
 
+    // Resolve table if bill already existed before step 3b
+    const resolvedTable = (state.table) || (tableId ? (await db.tableById(tableId)).data : null);
+
     if (bill?.table_pin) {
       // If the bill already had a PIN and we own the session, save to local storage
       try {
@@ -317,7 +331,7 @@ export function useCustomerSession(venueId: string | null, tableId: string | nul
       } catch { /* noop */ }
     }
 
-    setState((s) => ({ ...s, session, bill, isNewTab: createdFreshBill, isBarClosed: false, loading: false, error: null }))
+    setState((s) => ({ ...s, session, bill, table: resolvedTable ?? null, isNewTab: createdFreshBill, isBarClosed: false, loading: false, error: null }))
 
     // 4. Make sure the bill has a waiter (idempotent, people-weighted once headcount confirmed)
     if (bill && !createdFreshBill) assignWaiter(bill.id, token)

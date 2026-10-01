@@ -97,6 +97,7 @@ export function CartScreen({ venueId, tableLabel, tablePin, billId, customerSess
         taxInclusive: true,
         serviceChargePct: 0,
     });
+    const [venueModel, setVenueModel] = useState<'PREPAY' | 'POSTPAY'>('POSTPAY');
 
     useEffect(() => {
         let active = true;
@@ -107,6 +108,9 @@ export function CartScreen({ venueId, tableLabel, tablePin, billId, customerSess
                 taxInclusive: data.tax_inclusive ?? true,
                 serviceChargePct: data.service_charge_pct ?? 0,
             });
+            if (data.payment_model) {
+                setVenueModel(data.payment_model);
+            }
         });
         return () => {
             active = false;
@@ -167,6 +171,16 @@ export function CartScreen({ venueId, tableLabel, tablePin, billId, customerSess
         }
         if (lines.length === 0) {
             toast.error("Your cart is empty.");
+            return;
+        }
+
+        const isPrepay = venueModel === 'PREPAY' || bill?.payment_model === 'PREPAY';
+        const isCoveredByDeposit = depositAmount > 0 && depositPaid && billBreakdown.amountDue === 0;
+
+        // If PREPAY is required and the order is NOT covered by the upfront deposit:
+        if (isPrepay && !isCoveredByDeposit && billBreakdown.amountDue > 0 && onPayBill) {
+            toast("Payment required before sending order to the kitchen", { icon: "💳" });
+            onPayBill();
             return;
         }
 
