@@ -2,8 +2,6 @@ import { memo, useCallback, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import {
     ArrowPathIcon,
-    BanknotesIcon,
-    CheckIcon,
     CubeIcon,
     FireIcon,
     MagnifyingGlassIcon,
@@ -156,10 +154,10 @@ export function MenuManagerScreen({ venueId }: { venueId?: string } = {}) {
     const { venue } = useVenue(venueId);
     const [searchParams, setSearchParams] = useSearchParams();
 
-    // Active Tab: "menu" | "categories" | "top-sellers" | "pricing"
-    const activeTab = (searchParams.get("tab") as "menu" | "categories" | "top-sellers" | "pricing") || "menu";
+    // Active Tab: "menu" | "categories" | "top-sellers"
+    const activeTab = (searchParams.get("tab") as "menu" | "categories" | "top-sellers") || "menu";
 
-    const setTab = (tab: "menu" | "categories" | "top-sellers" | "pricing") => {
+    const setTab = (tab: "menu" | "categories" | "top-sellers") => {
         setSearchParams((prev) => {
             const next = new URLSearchParams(prev);
             if (tab === "menu") next.delete("tab");
@@ -194,38 +192,6 @@ export function MenuManagerScreen({ venueId }: { venueId?: string } = {}) {
     const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
     const [newCategoryName, setNewCategoryName] = useState("");
     const [isBulkUploadOpen, setIsBulkUploadOpen] = useState(false);
-
-    // ── Pricing & Tax (venue-level; drives bill math + inclusive display) ──
-    const [vatPct, setVatPct] = useState("12.5");
-    const [taxInclusive, setTaxInclusive] = useState(false);
-    const [savingTax, setSavingTax] = useState(false);
-
-    useEffect(() => {
-        if (!venue.id || venue.id === "00000000-0000-0000-0000-000000000000") return;
-        setVatPct(String(venue.vat_pct ?? 12.5));
-        setTaxInclusive(Boolean(venue.tax_inclusive));
-    }, [venue.id, venue.vat_pct, venue.tax_inclusive]);
-
-    const handleSaveTax = async () => {
-        if (!venue.id || venue.id === "00000000-0000-0000-0000-000000000000") return;
-        const vat = Math.min(Math.max(parseFloat(vatPct) || 0, 0), 100);
-        setSavingTax(true);
-        try {
-            const { error } = await db.updateVenue(venue.id, {
-                service_charge_pct: 0,
-                vat_pct: vat,
-                tax_inclusive: taxInclusive,
-            });
-            if (error) throw error;
-            setVatPct(String(vat));
-            toast.success("Pricing & tax settings saved.");
-        } catch (err) {
-            console.error("[MenuManager] Tax settings save failed:", err);
-            toast.error("Could not save settings — check your connection and try again.");
-        } finally {
-            setSavingTax(false);
-        }
-    };
 
     // Image Upload State inside Form
     const [imagePreview, setImagePreview] = useState<string>("");
@@ -571,7 +537,7 @@ export function MenuManagerScreen({ venueId }: { venueId?: string } = {}) {
                         )}
                     >
                         <TagIcon className="h-4 w-4" strokeWidth={2} />
-                        Categories ({categories.length})
+                        Categories ({categories.length + (unassignedCount > 0 ? 1 : 0)})
                     </button>
                     <button
                         type="button"
@@ -585,19 +551,6 @@ export function MenuManagerScreen({ venueId }: { venueId?: string } = {}) {
                     >
                         <ChartBarIcon className="h-4 w-4" strokeWidth={2} />
                         Sales Performance
-                    </button>
-                    <button
-                        type="button"
-                        onClick={() => setTab("pricing")}
-                        className={clsx(
-                            "inline-flex items-center gap-2 rounded-lg px-4 py-2 text-xs font-bold tracking-tight transition-all duration-150",
-                            activeTab === "pricing"
-                                ? "bg-licorice text-isabelline shadow-[0_4px_12px_rgba(35,20,12,0.18)]"
-                                : "text-feldgrau hover:bg-isabelline hover:text-licorice"
-                        )}
-                    >
-                        <BanknotesIcon className="h-4 w-4" strokeWidth={2} />
-                        Pricing & Tax
                     </button>
                 </div>
             </div>
@@ -813,6 +766,34 @@ export function MenuManagerScreen({ venueId }: { venueId?: string } = {}) {
                                     </div>
                                 );
                             })}
+
+                            {/* Unassigned Category Row */}
+                            <div className="flex items-center justify-between py-3.5">
+                                <div className="flex items-center gap-3">
+                                    <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-isabelline text-licorice">
+                                        <TagIcon className="h-4 w-4" strokeWidth={2} />
+                                    </div>
+                                    <div>
+                                        <h4 className="text-sm font-bold tracking-tight text-licorice">Unassigned</h4>
+                                        <p className="text-xs text-feldgrau">{unassignedCount} items in category</p>
+                                    </div>
+                                </div>
+
+                                {unassignedCount > 0 ? (
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            setSelectedCategory("Unassigned");
+                                            setTab("menu");
+                                        }}
+                                        className="rounded-xl bg-isabelline px-3 py-1.5 text-xs font-bold text-licorice hover:bg-licorice hover:text-isabelline transition-all cursor-pointer"
+                                    >
+                                        View Items
+                                    </button>
+                                ) : (
+                                    <span className="text-xs font-medium text-feldgrau/40 italic">0 items</span>
+                                )}
+                            </div>
                         </div>
                     </div>
                 </main>
@@ -821,69 +802,6 @@ export function MenuManagerScreen({ venueId }: { venueId?: string } = {}) {
             {/* ═══════════════════════════════════════════════════════════
                 TAB 3: SALES PERFORMANCE
               ═══════════════════════════════════════════════════════════ */}
-            {/* ═══════════════════════════════════════════════════════════
-                TAB 4: PRICING & TAX (venue-level)
-              ═══════════════════════════════════════════════════════════ */}
-            {activeTab === "pricing" && (
-                <main className="mx-auto max-w-3xl px-6 pt-6 pb-16">
-                    <div className="rounded-2xl border border-licorice/8 bg-white p-6 shadow-sm">
-                        <h2 className="text-lg font-bold tracking-tight text-licorice">Pricing & Tax</h2>
-                        <p className="mt-1 max-w-lg text-[12px] leading-[1.5] tracking-tight text-feldgrau">
-                            VAT is applied to guest bills based on your venue settings. Set to 0% if your venue is not registered for VAT.
-                        </p>
-
-                        <div className="mt-6 max-w-xs">
-                            <label className="flex flex-col gap-1.5">
-                                <span className="text-[11px] font-bold uppercase tracking-[0.12em] text-feldgrau">
-                                    VAT Rate (%)
-                                </span>
-                                <input
-                                    type="number"
-                                    min={0}
-                                    max={100}
-                                    step={0.5}
-                                    value={vatPct}
-                                    onChange={(e) => setVatPct(e.target.value)}
-                                    disabled={savingTax}
-                                    className="rounded-lg border border-licorice/10 bg-isabelline px-3.5 py-2.5 font-mono text-sm font-bold tabular-nums text-licorice outline-none focus:ring-2 focus:ring-khaki disabled:opacity-60"
-                                />
-                            </label>
-                        </div>
-
-                        <label className="mt-6 flex cursor-pointer items-start gap-3 rounded-xl border border-licorice/8 bg-isabelline p-4">
-                            <input
-                                type="checkbox"
-                                checked={taxInclusive}
-                                onChange={(e) => setTaxInclusive(e.target.checked)}
-                                disabled={savingTax}
-                                className="mt-0.5 h-4 w-4 accent-licorice"
-                            />
-                            <span className="flex flex-col gap-0.5">
-                                <span className="text-[13px] font-bold tracking-tight text-licorice">
-                                    Show tax-inclusive prices to guests
-                                </span>
-                                <span className="text-[11.5px] leading-[1.5] tracking-tight text-feldgrau">
-                                    Menu, item details and the cart pill will display prices with service & VAT
-                                    already included, so guests see the exact amount they'll pay. When off, base
-                                    prices are shown and taxes appear as separate lines at checkout.
-                                </span>
-                            </span>
-                        </label>
-
-                        <div className="mt-6 flex items-center justify-end gap-3">
-                            <button
-                                type="button"
-                                onClick={handleSaveTax}
-                                disabled={savingTax}
-                                className="inline-flex items-center gap-2 rounded-lg bg-licorice px-5 py-2.5 text-xs font-bold tracking-tight text-isabelline shadow-[0_4px_12px_rgba(35,20,12,0.18)] transition-all hover:bg-licorice/90 active:scale-95 disabled:opacity-70"
-                            >
-                                <CheckIcon className="h-4 w-4" strokeWidth={2.5} />
-                                {savingTax ? "Saving…" : "Save Settings"}
-                            </button>
-                        </div>
-                    </div>
-                </main>
-            )}
 
             {activeTab === "top-sellers" && (
                 <main className="mx-auto max-w-7xl px-6 pt-6">

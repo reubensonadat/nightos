@@ -313,7 +313,7 @@ export const db = {
           )
           .eq('slug', slug)
           .eq('is_active', true)
-          .single(),
+          .maybeSingle(),
       `venue:slug:${slug}`,
       TTL.VENUE,
     ),
@@ -327,19 +327,22 @@ export const db = {
             'id, owner_id, name, slug, description, logo_url, address, phone, email, payment_model, service_charge_pct, vat_pct, tax_inclusive, currency, timezone, is_active, created_at, updated_at, brand_primary, brand_secondary, brand_accent, brand_text_secondary, brand_danger, brand_light_blue',
           )
           .eq('id', id)
-          .single(),
+          .maybeSingle(),
       `venue:id:${id}`,
       TTL.VENUE,
     ),
 
   updateVenue: (venueId: string, updates: Partial<DbVenue>) => {
     cacheInvalidate(`venue:id:${venueId}`);
+    // Strip client-only fields that do not exist in public.venues schema
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { fulfillment_mode, ...dbUpdates } = updates;
     return supabase
       .from('venues')
-      .update(updates)
+      .update(dbUpdates)
       .eq('id', venueId)
       .select()
-      .single();
+      .maybeSingle();
   },
 
   /* ── Tables ── */
@@ -822,7 +825,7 @@ export const db = {
       sessionToken,
     )
       .select()
-      .single();
+      .maybeSingle();
   },
 
   setBillPin: async (billId: string, pin: string) => {
@@ -905,7 +908,7 @@ export const db = {
     return withSession(supabase.from('bills').update(updates), sessionToken)
       .eq('id', id)
       .select()
-      .single();
+      .maybeSingle();
   },
 
   updateTablePartySize: async (tableId: string, billId: string, guestCount: number) => {
@@ -918,7 +921,7 @@ export const db = {
       .update({ guest_count: Math.max(1, guestCount), last_activity_at: new Date().toISOString() })
       .eq('id', billId)
       .select()
-      .single();
+      .maybeSingle();
 
     if (billErr) return { data: null, error: billErr };
 
@@ -1058,7 +1061,7 @@ export const db = {
       sessionToken,
     )
       .select()
-      .single();
+      .maybeSingle();
   },
 
   createOrderItem: (
@@ -1095,7 +1098,7 @@ export const db = {
       sessionToken,
     )
       .select()
-      .single();
+      .maybeSingle();
   },
 
   /**
@@ -1712,29 +1715,36 @@ export const db = {
         .limit(1)
         .maybeSingle();
 
-      if (!data) {
-        // Fallback to local storage cache if table is not yet migrated
+      if (error) {
+        // Table doesn't exist yet or permission error — fallback gracefully to local storage
         const localKey = `nightos:bar_station_shift:${venueId}`;
         const raw = localStorage.getItem(localKey);
         if (raw) {
-          const parsed = JSON.parse(raw);
-          if (parsed && parsed.status === 'active') {
-            return { data: parsed, error: null };
-          }
+          try {
+            const parsed = JSON.parse(raw);
+            if (parsed && parsed.status === 'active') {
+              return { data: parsed, error: null };
+            }
+          } catch { /* noop */ }
+        }
+        return { data: null, error: null };
+      }
+
+      if (!data) {
+        // Fallback to local storage cache
+        const localKey = `nightos:bar_station_shift:${venueId}`;
+        const raw = localStorage.getItem(localKey);
+        if (raw) {
+          try {
+            const parsed = JSON.parse(raw);
+            if (parsed && parsed.status === 'active') {
+              return { data: parsed, error: null };
+            }
+          } catch { /* noop */ }
         }
       }
-      return { data, error: error && error.code !== 'PGRST116' ? error : null };
+      return { data, error: null };
     } catch {
-      const localKey = `nightos:bar_station_shift:${venueId}`;
-      const raw = localStorage.getItem(localKey);
-      if (raw) {
-        try {
-          const parsed = JSON.parse(raw);
-          if (parsed && parsed.status === 'active') {
-            return { data: parsed, error: null };
-          }
-        } catch { /* noop */ }
-      }
       return { data: null, error: null };
     }
   },
@@ -1756,7 +1766,7 @@ export const db = {
           status: 'active',
         })
         .select()
-        .single();
+        .maybeSingle();
       return { data, error };
     } catch (e) {
       return { data: null, error: e };
@@ -1773,7 +1783,7 @@ export const db = {
         })
         .eq('id', shiftId)
         .select()
-        .single();
+        .maybeSingle();
       return { data, error };
     } catch (e) {
       return { data: null, error: e };
@@ -1796,7 +1806,7 @@ export const db = {
         })
         .eq('id', shiftId)
         .select()
-        .single();
+        .maybeSingle();
       return { data, error };
     } catch (e) {
       return { data: null, error: e };

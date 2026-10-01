@@ -52,9 +52,9 @@ export function ConfirmModal({
                     <h2 className="text-[17px] font-bold tracking-tight text-licorice">
                         {title}
                     </h2>
-                    <p className="mt-2 text-[13px] leading-relaxed text-feldgrau">
+                    <div className="mt-2 text-[13px] leading-relaxed text-feldgrau">
                         {body}
-                    </p>
+                    </div>
                 </div>
 
                 {/* Actions */}

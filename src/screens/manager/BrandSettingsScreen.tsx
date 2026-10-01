@@ -124,13 +124,12 @@ export function BrandSettingsScreen({ venueId }: Props) {
         payment_model: paymentModel,
         brand_primary: primaryColor,
         brand_accent: accentColor,
-        fulfillment_mode: fulfillmentMode,
       };
 
       const { data, error } = await db.updateVenue(effectiveVenueId, updates);
       if (error || !data) throw error || new Error("Failed to update venue");
 
-      populateFromVenue(data);
+      populateFromVenue({ ...data, fulfillment_mode: fulfillmentMode });
       await refreshVenue();
       toast.success("Brand & Tax settings saved successfully!", { icon: "✨" });
     } catch (err) {
