@@ -38,7 +38,7 @@ export function TermsOfServiceScreen() {
           </div>
 
           {/* Hamburger Menu - Mobile only */}
-          <button 
+          <button
             className="lg:hidden text-[#f4f3e8] p-2 -mr-2"
             onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
             aria-label="Toggle Menu"
@@ -83,11 +83,10 @@ export function TermsOfServiceScreen() {
         </nav>
 
         {/* Mobile Dropdown Menu */}
-        <div className={`lg:hidden absolute top-full left-0 w-full bg-[#1a110b] border-t border-white/5 shadow-2xl py-6 px-5 flex flex-col gap-5 transition-all duration-300 ease-in-out ${
-          isMobileMenuOpen 
-            ? 'opacity-100 translate-y-0 pointer-events-auto' 
+        <div className={`lg:hidden absolute top-full left-0 w-full bg-[#1a110b] border-t border-white/5 shadow-2xl py-6 px-5 flex flex-col gap-5 transition-all duration-300 ease-in-out ${isMobileMenuOpen
+            ? 'opacity-100 translate-y-0 pointer-events-auto'
             : 'opacity-0 -translate-y-4 pointer-events-none'
-        }`}>
+          }`}>
           <button onClick={() => handleNav('/')} className="text-left text-[16px] font-medium hover:text-white transition-colors">
             Home
           </button>
@@ -136,7 +135,7 @@ export function TermsOfServiceScreen() {
         </div>
 
         <div className="space-y-10 text-[15px] leading-relaxed text-[#f4f3e8]/80">
-          
+
           {/* Section 1 */}
           <section>
             <h2 className="text-xl font-bold tracking-tight text-white mb-3">1. Scope of Service &amp; Venue Responsibilities</h2>
@@ -162,31 +161,20 @@ export function TermsOfServiceScreen() {
           <section>
             <h2 className="text-xl font-bold tracking-tight text-white mb-3">2. Pricing, Payouts, and Transaction Fees</h2>
             <div className="space-y-3">
-              <div>
-                <p>
-                  <strong className="text-white">Revenue Model &amp; Platform Fees:</strong> Bysen does not charge recurring monthly software subscription fees. Instead, Bysen charges a tiered platform fee per transaction based on the total transaction amount. The Bysen platform fee is structured as follows:
-                </p>
-                <ul className="list-disc pl-6 mt-2 space-y-1 text-[#f4f3e8]/75 font-mono text-[13.5px]">
-                  <li>Transactions between 0.00 GHS and 50.00 GHS: 1.00 GHS</li>
-                  <li>Transactions between 51.00 GHS and 100.00 GHS: 2.00 GHS</li>
-                  <li>Transactions between 101.00 GHS and 150.00 GHS: 3.00 GHS</li>
-                  <li>Transactions between 151.00 GHS and 200.00 GHS: 4.00 GHS</li>
-                  <li>Transactions between 200.00 GHS and 500.00 GHS: 7.00 GHS</li>
-                  <li>Transactions between 501.00 GHS and 700.00 GHS: 12.00 GHS</li>
-                  <li>Transactions over 700.00 GHS: 15.00 GHS</li>
-                </ul>
-              </div>
               <p>
-                <strong className="text-white">Digital Payment Processing Fees:</strong> For digital payments processed via Paystack, Paystack currently charges a separate 2% payment processing fee. The total deduction per digital transaction will consist of Paystack’s 2% fee plus the applicable Bysen tiered platform fee outlined above.
+                <strong className="text-white">Revenue Model &amp; Platform Fees:</strong> Bysen does not charge recurring monthly software subscription fees. Instead, Bysen charges a flat platform fee of 10% of each transaction total. This fee is deducted from the Venue’s settlement and is never added to what guests pay. Of the 10%, Paystack’s processing fee (currently 2%) is deducted first and the remainder constitutes Bysen’s platform fee; the Venue receives the remaining 90% of each transaction.
               </p>
               <p>
-                <strong className="text-white">Third-Party Rate Changes:</strong> If Paystack adjusts its processing fees, the total deduction from digital transactions will automatically adjust to reflect Paystack’s new rate. Bysen will provide at least 30 days’ written notice before any change to the Bysen tiered platform fees takes effect.
+                <strong className="text-white">Digital Payment Processing Fees:</strong> For digital payments processed via Paystack, the total deduction per digital transaction is the flat 10% platform fee outlined above, which is inclusive of Paystack’s processing fee (currently 2%).
+              </p>
+              <p>
+                <strong className="text-white">Third-Party Rate Changes:</strong> If Paystack adjusts its processing fees, Bysen’s share of the flat 10% platform fee adjusts accordingly so the total deduction remains 10%. Bysen will provide at least 30 days’ written notice before any change to the Bysen platform fee takes effect.
               </p>
               <p>
                 <strong className="text-white">Fund Handling &amp; Settlement:</strong> All settlements and payouts are made directly to the Venue operator’s designated bank account or registered mobile money wallet. Bysen does not hold, touch, or manage the Venue’s funds. Paystack routes the applicable fees and disburses the remaining funds directly to the Venue based on their processing timelines.
               </p>
               <p>
-                <strong className="text-white">Cash Transactions and Invoicing:</strong> For transactions processed in physical cash and logged into the Platform, only the applicable Bysen tiered platform fee applies. These fees will be billed to the Venue via a monthly invoice. This invoice is subject to a 5-day grace period, after which platform access may be restricted until payment is resolved. Bysen reserves the right to audit cash transaction logs against sales records.
+                <strong className="text-white">Cash Transactions and Invoicing:</strong> For transactions processed in physical cash and logged into the Platform, only the flat 10% Bysen platform fee applies. These fees will be billed to the Venue via a monthly invoice. This invoice is subject to a 5-day grace period, after which platform access may be restricted until payment is resolved. Bysen reserves the right to audit cash transaction logs against sales records.
               </p>
               <p>
                 <strong className="text-white">Refunds, Disputes, and Chargebacks:</strong> Refund requests are handled by the Venue directly. Chargebacks and payment disputes initiated through Paystack are governed by Paystack’s own dispute process. Bysen will provide transaction records to support a Venue’s response but is not a party to the dispute.

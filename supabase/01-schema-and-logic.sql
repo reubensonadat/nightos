@@ -1067,24 +1067,13 @@ ALTER TABLE public.payments
 CREATE INDEX IF NOT EXISTS payments_fee_settled_idx
     ON public.payments (venue_id, fee_settled);
 
--- Fee formula: flat GHS by bill amount — the same tiered schedule
--- Paystack charges per transaction, so cash and online fees are unified.
+-- Fee formula: flat 10% of the transaction amount (venue-pays platform fee).
+-- Canonical definition lives in 09-payment-fee-architecture.sql.
 CREATE OR REPLACE FUNCTION public.platform_fee_for(p_amount numeric)
 RETURNS numeric
-LANGUAGE sql STABLE
+LANGUAGE sql IMMUTABLE
 SET search_path = public AS $$
-    SELECT LEAST(
-        CASE
-            WHEN p_amount <= 50   THEN 1.00
-            WHEN p_amount <= 100  THEN 2.00
-            WHEN p_amount <= 150  THEN 3.00
-            WHEN p_amount <= 200  THEN 4.00
-            WHEN p_amount <= 500  THEN 7.00
-            WHEN p_amount <= 700  THEN 12.00
-            ELSE 15.00
-        END,
-        GREATEST(p_amount, 0)
-    )::numeric(10,2);
+    SELECT ROUND(GREATEST(COALESCE(p_amount, 0), 0) * 0.10, 2)::numeric(10,2);
 $$;
 
 -- â”€â”€ B2. CASH SETTLEMENT (waiter confirms the cash) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
@@ -2052,7 +2041,7 @@ CREATE POLICY "Owner manages own venue" ON public.venues
 --   SELECT public.get_staff_profile_by_phone('0240000001');
 --   SELECT name, owner_id IS NOT NULL AS owner_linked FROM venues WHERE slug='velvet-lounge';
 --   SELECT public.platform_fee_for(45), public.platform_fee_for(60), public.platform_fee_for(160), public.platform_fee_for(5000);
---     -- expect 1.00 | 2.00 | 4.00 | 5.00 (tiered ₵1–₵5, unified with Paystack)
+--     -- expect 4.50 | 6.00 | 16.00 | 500.00 (flat 10% platform fee)
 --   SELECT public.expire_stale_sessions();
 --   SELECT public.outstanding_balance((SELECT id FROM venues WHERE slug='velvet-lounge'));
 --   SELECT tablename FROM pg_publication_tables WHERE pubname='supabase_realtime' ORDER BY tablename;
