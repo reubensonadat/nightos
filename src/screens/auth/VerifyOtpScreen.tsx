@@ -95,7 +95,7 @@ export function VerifyOtpScreen() {
 
     setError(null)
     setLoading(true)
-    const { error } = await verifyPhoneOtp(phone, otpToVerify)
+    const { error, role: resolvedRole, venueSlug } = await verifyPhoneOtp(phone, otpToVerify)
     setLoading(false)
 
     if (error) {
@@ -104,7 +104,7 @@ export function VerifyOtpScreen() {
     } else {
       toast.success('Verified! Welcome back.')
       sessionStorage.removeItem(OTP_STORAGE_KEY)
-      navigate(sectorPath(staffSession?.role ?? role), { replace: true })
+      navigate(sectorPath(resolvedRole || staffSession?.role || role, venueSlug), { replace: true })
     }
   }
 

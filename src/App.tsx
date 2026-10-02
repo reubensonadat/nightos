@@ -829,7 +829,7 @@ function AppShell() {
 
       {(mode === "kitchen" || mode === "bar") && (
         (staffSession || role === "owner" || role === "manager" || role === "kitchen" || role === "bar") ? (
-          (mode === "kitchen" && currentVenue?.fulfillment_mode === "kitchen") ? (
+          mode === "kitchen" ? (
             <KitchenDisplayScreen
               venueId={staffSession?.venue_id || authVenue?.id || venueId || ""}
               staffId={staffSession?.id || user?.id || ""}
@@ -938,14 +938,15 @@ function AppRoutes() {
       if (redirectParam && isAllowedForTarget(role, redirectParam)) {
         return <Navigate to={redirectParam} replace />;
       }
+      const redirectSlug = redirectParam ? (redirectParam.match(/^\/v\/([^/]+)/)?.[1] || null) : null;
       const targetRole = role || (venue ? "manager" : null);
       if (targetRole) {
-        return <Navigate to={sectorPath(targetRole, venueSlug || venue?.slug)} replace />;
+        return <Navigate to={sectorPath(targetRole, venueSlug || redirectSlug || venue?.slug)} replace />;
       }
-      // Role still resolving (login race: SIGNED_IN fired but loadUserData
-      // hasn't committed role yet). Hold here — navigating to /manager with a
-      // null role makes the roles-gate bounce back to /login, ping-ponging
-      // until the browser throttles navigation.
+      // If initialization is complete and user has no venue/role assigned, direct to venue onboarding
+      if (!isInitializing) {
+        return <Navigate to="/setup" replace />;
+      }
       return <LoadingScreen venueName={venue?.name} />;
     }
     return <CentralAuthScreen initialMode={strippedPath === "/signup" ? "signup" : "login"} venueSlug={venueSlug} />;

@@ -105,7 +105,9 @@ export function CentralAuthScreen({
   const navigate = useNavigate();
   const location = useLocation();
   const [searchParams] = useSearchParams();
-  const activeVenueSlug = venueSlug || searchParams.get("venue");
+  const redirectParam = searchParams.get("redirect") || (location.state as { from?: string } | undefined)?.from;
+  const redirectSlug = redirectParam ? (redirectParam.match(/^\/v\/([^/]+)/)?.[1] || null) : null;
+  const activeVenueSlug = venueSlug || searchParams.get("venue") || redirectSlug || null;
   const { venue: targetVenue } = useVenue(activeVenueSlug || undefined);
   const {
     isAuthenticated,
@@ -128,9 +130,9 @@ export function CentralAuthScreen({
     if (fromParam && isAllowedForTarget(userRole, fromParam)) {
       return fromParam;
     }
-    const slug = venueSlugOverride || activeVenueSlug || staffSession?.venue_slug || venue?.slug;
+    const slug = venueSlugOverride || activeVenueSlug || redirectSlug || staffSession?.venue_slug || venue?.slug;
     return sectorPath(userRole, slug);
-  }, [searchParams, location.state, activeVenueSlug, staffSession?.venue_slug, venue?.slug]);
+  }, [searchParams, location.state, activeVenueSlug, redirectSlug, staffSession?.venue_slug, venue?.slug]);
 
   const [step, setStep] = useState<Step>(initialMode === "signup" ? "signup" : "login");
   const [shellMode, setShellMode] = useState<ShellMode>(initialMode === "signup" ? "signup" : "login");

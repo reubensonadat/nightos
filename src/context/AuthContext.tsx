@@ -57,13 +57,14 @@ export function sectorPath(role: string | null, venueSlug?: string | null): stri
 // eslint-disable-next-line react-refresh/only-export-components
 export function isAllowedForTarget(role: string | null, target: string): boolean {
   if (!role) return false
-  if (target.startsWith('/kitchen') || target.startsWith('/bar')) {
+  const cleanTarget = target.replace(/^\/v\/[^/]+/, '') || '/'
+  if (cleanTarget.startsWith('/kitchen') || cleanTarget.startsWith('/bar')) {
     return role === 'owner' || role === 'manager' || role === 'kitchen' || role === 'bar'
   }
-  if (target.startsWith('/waiter')) {
+  if (cleanTarget.startsWith('/waiter')) {
     return role === 'owner' || role === 'manager' || role === 'waiter'
   }
-  if (target.startsWith('/manager')) {
+  if (cleanTarget.startsWith('/manager')) {
     return role === 'owner' || role === 'manager'
   }
   return true
@@ -126,7 +127,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     // Determine preferred venue from argument, URL, or local storage
     const pathMatch = window.location.pathname.match(/\/v\/([^/]+)/)
-    const effectiveTarget = targetVenueSlugOrId || (pathMatch ? pathMatch[1] : null)
+    const searchMatch = window.location.search.match(/[?&]redirect=(?:%2F|\/)?v(?:%2F|\/)([^%&/]+)/i)
+    const effectiveTarget = targetVenueSlugOrId || (pathMatch ? pathMatch[1] : (searchMatch ? decodeURIComponent(searchMatch[1]) : null))
 
     const rawPhone = (
       userPhone?.trim() ||
@@ -136,7 +138,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       lastPhoneRef.current?.trim() ||
       null
     )
-    const rawEmail = userEmail?.trim() || null
+    const rawEmail = (
+      userEmail?.trim() ||
+      user?.email?.trim() ||
+      authUser?.email?.trim() ||
+      (user?.user_metadata?.email as string | undefined)?.trim() ||
+      (authUser?.user_metadata?.email as string | undefined)?.trim() ||
+      null
+    )
 
     /** Resolve an active staff membership by phone (optionally venue-scoped).
      *  STAFF is the stronger signal: a phone on both a staff row and a venue
@@ -147,51 +156,122 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       phone: string,
       scope: string | null,
     ): Promise<{ role: string | null; venueSlug: string | null } | null> => {
-      const { data: staffData } = await authDb.venueByStaffPhone(phone, scope)
-      if (!staffData) return null
-      const sd = staffData as Record<string, unknown>
-      const v = sd.venue as DbVenue
-      setVenue(v)
-      setVenues(v ? [v] : [])
-      setRole(sd.role as string)
+      let staffData: Record<string, unknown> | null = null
+      try {
+        const { data } = await authDb.venueByStaffPhone(phone, scope)
+        if (data) staffData = data as Record<string, unknown>
+      } catch (e) {
+        console.warn('[AuthContext] venueByStaffPhone RPC failed, trying direct query fallback:', e)
+      }
 
-      const { data } = await supabase
-        .rpc('get_staff_profile_by_phone', {
-          p_phone: phone,
-          ...(scope ? { p_venue_slug: scope } : {}),
-        })
-        .single()
-      const fullStaffData = data as Record<string, unknown>
-      const resolvedSlug = (fullStaffData?.venue_slug as string) || v?.slug || null
+      // If RPC returned a match, process it
+      if (staffData) {
+        const v = staffData.venue as DbVenue
+        setVenue(v)
+        setVenues(v ? [v] : [])
+        setRole(staffData.role as string)
 
-      if (fullStaffData && fullStaffData.venue_id) {
-        setStaffSession({
-          id: fullStaffData.id as string,
-          name: fullStaffData.name as string,
-          role: fullStaffData.role as DbStaffSession['role'],
-          venue_id: fullStaffData.venue_id as string,
-          venue_name: fullStaffData.venue_name as string,
-          venue_slug: fullStaffData.venue_slug as string,
-          area_assignment: fullStaffData.area_assignment as string | null,
-          max_tables: fullStaffData.max_tables as number,
-        })
-        setProfile({
-          id: userId,
-          email: (fullStaffData.email as string) || userEmail,
-          phone_number: (fullStaffData.phone as string) || phone,
-          name: (fullStaffData.name as string) || resolvedPersonName,
-        })
-
+        let fullStaffData: Record<string, unknown> | null = null
         try {
-          await supabase.rpc('clock_in_staff', { p_staff_id: fullStaffData.id })
+          const { data } = await supabase
+            .rpc('get_staff_profile_by_phone', {
+              p_phone: phone,
+              ...(scope ? { p_venue_slug: scope } : {}),
+            })
+            .single()
+          fullStaffData = data as Record<string, unknown>
         } catch {
-          /* non-fatal */
+          /* fallback below */
+        }
+
+        const resolvedSlug = (fullStaffData?.venue_slug as string) || v?.slug || null
+
+        if (fullStaffData && fullStaffData.venue_id) {
+          setStaffSession({
+            id: fullStaffData.id as string,
+            name: fullStaffData.name as string,
+            role: fullStaffData.role as DbStaffSession['role'],
+            venue_id: fullStaffData.venue_id as string,
+            venue_name: fullStaffData.venue_name as string,
+            venue_slug: fullStaffData.venue_slug as string,
+            area_assignment: fullStaffData.area_assignment as string | null,
+            max_tables: fullStaffData.max_tables as number,
+          })
+          setProfile({
+            id: userId,
+            email: (fullStaffData.email as string) || userEmail,
+            phone_number: (fullStaffData.phone as string) || phone,
+            name: (fullStaffData.name as string) || resolvedPersonName,
+          })
+
+          try {
+            await supabase.rpc('clock_in_staff', { p_staff_id: fullStaffData.id })
+          } catch {
+            /* non-fatal */
+          }
+        }
+        if (v?.brand_primary || v?.brand_accent) {
+          applyBrandTheme(v.brand_primary, v.brand_accent, v.brand_secondary);
+        }
+        return { role: staffData.role as string, venueSlug: resolvedSlug }
+      }
+
+      // Resilient Direct Query Fallback (table lookup using normalized 9 digits)
+      const norm = phone.replace(/\D/g, '').slice(-9)
+      if (norm.length >= 9) {
+        let staffQuery = supabase
+          .from('staff')
+          .select('id, name, phone, email, role, venue_id, is_active, area_assignment, max_tables, venues!inner(*)')
+          .eq('is_active', true)
+
+        if (scope) {
+          const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(scope)
+          if (isUuid) {
+            staffQuery = staffQuery.eq('venues.id', scope)
+          } else {
+            staffQuery = staffQuery.eq('venues.slug', scope)
+          }
+        }
+
+        const { data: rows } = await staffQuery
+        const match = rows?.find((r) => r.phone && r.phone.replace(/\D/g, '').slice(-9) === norm)
+        if (match && match.venue_id) {
+          const venueObj = match.venues as unknown as DbVenue
+          setVenue(venueObj)
+          setVenues(venueObj ? [venueObj] : [])
+          setRole(match.role)
+          setStaffSession({
+            id: match.id,
+            name: match.name,
+            role: match.role as DbStaffSession['role'],
+            venue_id: match.venue_id,
+            venue_name: venueObj.name,
+            venue_slug: venueObj.slug,
+            area_assignment: match.area_assignment,
+            max_tables: match.max_tables,
+          })
+          setProfile({
+            id: userId,
+            email: match.email || userEmail,
+            phone_number: match.phone || phone,
+            name: match.name || resolvedPersonName,
+          })
+
+          if (venueObj?.brand_primary || venueObj?.brand_accent) {
+            applyBrandTheme(venueObj.brand_primary, venueObj.brand_accent, venueObj.brand_secondary)
+          }
+
+          try {
+            await supabase.rpc('clock_in_staff', { p_staff_id: match.id })
+          } catch {
+            /* non-fatal */
+          }
+
+          return { role: match.role, venueSlug: venueObj.slug }
         }
       }
-      if (v?.brand_primary || v?.brand_accent) {
-        applyBrandTheme(v.brand_primary, v.brand_accent, v.brand_secondary);
-      }
-      return { role: sd.role as string, venueSlug: resolvedSlug }
+
+      return null
     }
 
     /** Resolve an active staff membership by email (optionally venue-scoped). */
@@ -206,7 +286,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         .eq('is_active', true)
 
       if (scope) {
-        staffQuery = staffQuery.or(`slug.eq.${scope},id.eq.${scope}`, { referencedTable: 'venues' })
+        const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(scope)
+        if (isUuid) {
+          staffQuery = staffQuery.eq('venues.id', scope)
+        } else {
+          staffQuery = staffQuery.eq('venues.slug', scope)
+        }
       }
 
       const { data: staffByEmail } = await staffQuery.maybeSingle()

@@ -10,7 +10,7 @@ export function ProtectedRoute({
   roles?: string[];
   children: React.ReactNode;
 }) {
-  const { isAuthenticated, isInitializing, role, staffSession } = useAuth()
+  const { isAuthenticated, isInitializing, role, staffSession, venue } = useAuth()
   const location = useLocation()
 
   if (isInitializing) {
@@ -26,7 +26,7 @@ export function ProtectedRoute({
   if (roles && roles.length > 0) {
     const r = staffSession?.role || role
     if (!r || !roles.includes(r)) {
-      return <Navigate to={r ? sectorPath(r) : '/login'} replace />
+      return <Navigate to={r ? sectorPath(r, staffSession?.venue_slug || venue?.slug) : '/login'} replace />
     }
   }
 
