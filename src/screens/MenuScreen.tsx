@@ -144,7 +144,7 @@ export function MenuScreen({
     onBack,
     onViewCart,
 }: Props) {
-    const [active, setActive] = useState<MenuCategory>("Signatures");
+    const [active, setActive] = useState<MenuCategory>("All");
     const [query, setQuery] = useState("");
     const [activeItemId, setActiveItemId] = useState<string | null>(null);
     const [menuItems, setMenuItems] = useState<MenuItem[]>(() => {
@@ -202,19 +202,19 @@ export function MenuScreen({
 
     const items = menuItems;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    const categories: MenuCategory[] = [...new Set(items.map(i => i.category))];
+    const categories: MenuCategory[] = ["All", ...new Set(items.map(i => i.category).filter(Boolean))];
 
     // Ensure active category still exists after data loads
     useEffect(() => {
         if (categories.length > 0 && !categories.includes(active)) {
             // eslint-disable-next-line react-hooks/set-state-in-effect
-            setActive(categories[0]);
+            setActive("All");
         }
     }, [categories, active]);
 
     const visibleItems = useMemo<MenuItem[]>(() => {
         const q = query.trim().toLowerCase();
-        let filtered = items.filter((m) => m.category === active);
+        let filtered = active === "All" ? items : items.filter((m) => m.category === active);
         if (q) {
             filtered = filtered.filter(
                 (m) =>
@@ -250,31 +250,6 @@ export function MenuScreen({
                     </div>
                 )}
 
-                {/* ── VIP Deposit Credit Banner ── */}
-                {depositCredit && depositCredit.paid && depositCredit.amount > 0 && (
-                    <div
-                        onClick={onViewCart}
-                        role="button"
-                        tabIndex={0}
-                        className="bg-licorice text-isabelline px-5 md:px-8 py-2 border-b border-khaki/20 flex items-center justify-between shadow-xs cursor-pointer hover:bg-licorice/95 transition-colors"
-                        title="Click to view tab and credit breakdown"
-                    >
-                        <div className="flex items-center gap-2">
-                            <span className="flex h-5 w-5 items-center justify-center rounded-full bg-khaki/20 text-[11px]">👑</span>
-                            <span className="text-[11px] font-bold text-khaki uppercase tracking-wider">
-                                VIP Table Credit
-                            </span>
-                        </div>
-                        <div className="flex items-center gap-1.5 font-mono text-[12px]">
-                            <span className="font-bold text-emerald-400">
-                                {formatGHS(depositCredit.remaining)}
-                            </span>
-                            <span className="text-[10px] text-isabelline/60">
-                                remaining of {formatGHS(depositCredit.amount)}
-                            </span>
-                        </div>
-                    </div>
-                )}
 
                 {/* ── Row 1: Venue & Status ── */}
                 <div className={`mx-auto flex w-full max-w-7xl items-center justify-between px-5 md:px-8 ${!tablePin ? 'pt-[max(env(safe-area-inset-top),14px)]' : 'pt-2'} pb-2.5`}>

@@ -280,11 +280,13 @@ function HistoryCard({
   order,
   venueName,
   sessionToken,
+  depositCovered,
   onPayBill,
 }: {
   order: OrderSummary;
   venueName?: string | null;
   sessionToken?: string | null;
+  depositCovered?: boolean;
   onPayBill?: (order: OrderSummary) => void;
 }) {
   const [open, setOpen] = useState(false);
@@ -313,18 +315,27 @@ function HistoryCard({
             <ChevronDownIcon className="h-4 w-4 -rotate-90 text-feldgrau/50" strokeWidth={2.25} />
           </div>
         </button>
-        {!order.cancelled && onPayBill && (
-          <div className="border-t border-isabelline px-4 py-2 bg-isabelline/20 flex items-center justify-between">
-            <span className="text-[10px] font-medium text-feldgrau">Ready to settle this order?</span>
-            <button
-              type="button"
-              onClick={() => onPayBill(order)}
-              className="inline-flex items-center gap-1.5 rounded-full bg-licorice px-3 py-1 text-[11px] font-bold text-khaki hover:bg-licorice/90 transition-all active:scale-95"
-            >
-              <span>Pay {formatGHS(order.total)}</span>
-              <ArrowRightIcon className="h-3 w-3" strokeWidth={2.5} />
-            </button>
-          </div>
+        {!order.cancelled && (
+          depositCovered ? (
+            <div className="border-t border-isabelline px-4 py-2 bg-isabelline/20 flex items-center justify-between">
+              <span className="text-[10px] font-medium text-feldgrau">Table Deposit Status</span>
+              <span className="inline-flex items-center gap-1 rounded-full bg-khaki/15 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-licorice ring-1 ring-khaki/30">
+                ✦ Covered by Deposit
+              </span>
+            </div>
+          ) : onPayBill ? (
+            <div className="border-t border-isabelline px-4 py-2 bg-isabelline/20 flex items-center justify-between">
+              <span className="text-[10px] font-medium text-feldgrau">Ready to settle this order?</span>
+              <button
+                type="button"
+                onClick={() => onPayBill(order)}
+                className="inline-flex items-center gap-1.5 rounded-full bg-licorice px-3 py-1 text-[11px] font-bold text-khaki hover:bg-licorice/90 transition-all active:scale-95"
+              >
+                <span>Pay {formatGHS(order.total)}</span>
+                <ArrowRightIcon className="h-3 w-3" strokeWidth={2.5} />
+              </button>
+            </div>
+          ) : null
         )}
       </div>
       {open && (
@@ -397,12 +408,7 @@ export function OrdersScreen({ activeOrders, history, tableLabel, tablePin, bill
     <main className="relative min-h-svh w-full bg-isabelline font-sans text-licorice antialiased">
       {/* ── Top Bar ── */}
       <header className="sticky top-0 z-30 bg-isabelline/95 backdrop-blur-xl border-b border-licorice/8">
-        {tablePin && (
-          <div className="pt-[max(env(safe-area-inset-top),0px)]">
-            <TablePinBanner pin={tablePin} tableLabel={tableLabel} onCallWaiter={onCallWaiter} callingWaiter={callingWaiter} waiterCalled={waiterCalled} />
-          </div>
-        )}
-        <div className={`mx-auto flex w-full max-w-7xl items-center justify-between px-5 md:px-8 ${!tablePin ? 'pt-[max(env(safe-area-inset-top),16px)]' : 'pt-3'} pb-3 relative`}>
+        <div className="mx-auto flex w-full max-w-7xl items-center justify-between px-5 md:px-8 pt-[max(env(safe-area-inset-top),16px)] pb-3 relative">
           <button
             type="button"
             onClick={() => onBack ? onBack() : navigate(-1)}
@@ -473,6 +479,7 @@ export function OrdersScreen({ activeOrders, history, tableLabel, tablePin, bill
                     order={o}
                     venueName={venueName}
                     sessionToken={sessionToken}
+                    depositCovered={depositPaid && depositAmount > 0 && excessDue === 0}
                     onPayBill={onPayBill}
                   />
                 ))}
@@ -486,19 +493,19 @@ export function OrdersScreen({ activeOrders, history, tableLabel, tablePin, bill
       {activeSpend > 0 && (
         <div className="fixed bottom-[calc(70px+env(safe-area-inset-bottom))] left-0 right-0 z-40 px-5 max-w-7xl mx-auto">
           {depositPaid && depositAmount > 0 && excessDue === 0 ? (
-            <div className="rounded-2xl bg-licorice p-4 shadow-[0_12px_32px_rgba(35,20,12,0.35)] ring-1 ring-emerald-500/40 flex items-center justify-between gap-4">
+            <div className="rounded-2xl bg-licorice p-4 shadow-[0_12px_32px_rgba(35,20,12,0.35)] ring-1 ring-khaki/30 flex items-center justify-between gap-4">
               <div>
-                <p className="text-[10px] font-bold uppercase tracking-wider text-emerald-400">
+                <p className="text-[10px] font-bold uppercase tracking-wider text-khaki">
                   Prepaid Table Credit Active
                 </p>
-                <p className="font-mono text-lg font-black tracking-tight text-emerald-300">
+                <p className="font-mono text-lg font-black tracking-tight text-isabelline">
                   {formatGHS(remainingCredit)} remaining
                 </p>
                 <p className="text-[11px] text-isabelline/60">
                   Consumed: {formatGHS(activeSpend)} (Covered by Deposit)
                 </p>
               </div>
-              <span className="rounded-full bg-emerald-500/20 px-3.5 py-1.5 text-[11px] font-bold text-emerald-300 ring-1 ring-emerald-500/30">
+              <span className="rounded-full bg-khaki/15 px-3.5 py-1.5 text-[11px] font-bold text-khaki ring-1 ring-khaki/30">
                 Deposit Covered
               </span>
             </div>
@@ -506,7 +513,7 @@ export function OrdersScreen({ activeOrders, history, tableLabel, tablePin, bill
             <div className="rounded-2xl bg-licorice p-4 shadow-[0_12px_32px_rgba(35,20,12,0.35)] ring-1 ring-white/10 flex items-center justify-between gap-4">
               <div>
                 <p className="text-[10px] font-bold uppercase tracking-wider text-khaki">
-                  {depositPaid && depositAmount > 0 ? "Deposit Exhausted · Excess Due" : "Total Tab Balance"}
+                  {depositPaid && depositAmount > 0 ? "Amount Due Now" : "Total Tab Balance"}
                 </p>
                 <p className="font-mono text-lg font-black tracking-tight text-isabelline">
                   {formatGHS(excessDue)}

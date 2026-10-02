@@ -2,6 +2,8 @@ export type ManagerSignOutModalProps = {
     isOpen: boolean;
     onClose: () => void;
     onSignOut: () => void;
+    stationLabel?: string;
+    onSwitchToStation?: () => void;
     onSwitchToKitchen?: () => void;
     onSwitchToWaiter?: () => void;
 };
@@ -10,6 +12,8 @@ export function ManagerSignOutModal({
     isOpen,
     onClose,
     onSignOut,
+    stationLabel,
+    onSwitchToStation,
     onSwitchToKitchen,
     onSwitchToWaiter,
 }: ManagerSignOutModalProps) {
@@ -40,16 +44,17 @@ export function ManagerSignOutModal({
                 </div>
 
                 <div className="flex flex-col gap-2 px-6 pt-4 pb-[max(env(safe-area-inset-bottom),24px)]">
-                    {onSwitchToKitchen && (
+                    {(onSwitchToStation || onSwitchToKitchen) && (
                         <button
                             type="button"
                             onClick={() => {
-                                onSwitchToKitchen();
+                                if (onSwitchToStation) onSwitchToStation();
+                                else if (onSwitchToKitchen) onSwitchToKitchen();
                                 onClose();
                             }}
                             className="w-full rounded-full bg-white py-3.5 text-[13px] font-bold tracking-tight text-licorice ring-1 ring-licorice/12 transition-all hover:bg-licorice/5 active:scale-[0.98]"
                         >
-                            Kitchen Display
+                            {stationLabel || "Kitchen Display"}
                         </button>
                     )}
                     {onSwitchToWaiter && (

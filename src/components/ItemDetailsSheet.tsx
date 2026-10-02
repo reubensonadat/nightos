@@ -169,7 +169,7 @@ export function ItemDetailsSheet({ item, taxRatePct = 0, onClose }: Props) {
                         <div
                             className="
                                 relative h-64 w-full overflow-hidden
-                                rounded-3xl ring-1 ring-white/60
+                                rounded-3xl bg-white p-4 ring-1 ring-white/60
                                 shadow-[0_12px_40px_rgba(35,20,12,0.15)]
                             "
                         >
@@ -182,11 +182,11 @@ export function ItemDetailsSheet({ item, taxRatePct = 0, onClose }: Props) {
                                             style={{ transform: `translateX(-${currentImageIndex * 100}%)` }}
                                         >
                                             {images.map((src, idx) => (
-                                                <div key={idx} className="relative h-full w-full shrink-0">
+                                                <div key={idx} className="relative h-full w-full shrink-0 flex items-center justify-center">
                                                     <img
                                                         src={src}
                                                         alt={`${item.name} - ${idx + 1}`}
-                                                        className="h-full w-full object-cover"
+                                                        className="h-full w-full object-contain"
                                                     />
                                                 </div>
                                             ))}

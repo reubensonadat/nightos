@@ -261,12 +261,7 @@ export function CartScreen({ venueId, tableLabel, tablePin, billId, customerSess
         return (
             <main className="relative min-h-svh w-full bg-isabelline font-sans text-licorice antialiased">
                 <header className="sticky top-0 z-50 bg-licorice">
-                    {tablePin && (
-                        <div className="pt-[max(env(safe-area-inset-top),0px)] pb-2">
-                            <TablePinBanner pin={tablePin} tableLabel={tableLabel} onCallWaiter={onCallWaiter} callingWaiter={callingWaiter} waiterCalled={waiterCalled} />
-                        </div>
-                    )}
-                    <div className={`relative z-10 mx-auto flex w-full max-w-7xl items-center justify-between px-5 md:px-8 ${!tablePin ? 'pt-[max(env(safe-area-inset-top),14px)]' : 'pt-0'} pb-3`}>
+                    <div className="relative z-10 mx-auto flex w-full max-w-7xl items-center justify-between px-5 md:px-8 pt-[max(env(safe-area-inset-top),14px)] pb-3">
                         <button
                             type="button"
                             onClick={onBack}
@@ -290,17 +285,12 @@ export function CartScreen({ venueId, tableLabel, tablePin, billId, customerSess
         );
     }
 
-    // ── Empty state ── (only show if NO draft items AND NO placed session items exist)
-    if (!hasDraft && !hasPlaced && !loadingPlaced) {
+    // ── Empty state ── (show if NO draft items in cart)
+    if (!hasDraft) {
         return (
             <main className="relative min-h-svh w-full bg-isabelline font-sans text-licorice antialiased">
                 <header className="sticky top-0 z-50 bg-licorice">
-                    {tablePin && (
-                        <div className="pt-[max(env(safe-area-inset-top),0px)] pb-2">
-                            <TablePinBanner pin={tablePin} tableLabel={tableLabel} onCallWaiter={onCallWaiter} callingWaiter={callingWaiter} waiterCalled={waiterCalled} />
-                        </div>
-                    )}
-                    <div className={`relative z-10 mx-auto flex w-full max-w-7xl items-center justify-between px-5 md:px-8 ${!tablePin ? 'pt-[max(env(safe-area-inset-top),14px)]' : 'pt-0'} pb-3`}>
+                    <div className="relative z-10 mx-auto flex w-full max-w-7xl items-center justify-between px-5 md:px-8 pt-[max(env(safe-area-inset-top),14px)] pb-3">
                         <button
                             type="button"
                             onClick={onBack}
@@ -376,12 +366,7 @@ export function CartScreen({ venueId, tableLabel, tablePin, billId, customerSess
     return (
         <main className="relative min-h-svh w-full bg-isabelline font-sans text-licorice antialiased">
             <header className="sticky top-0 z-50 bg-licorice">
-                {tablePin && (
-                    <div className="pt-[max(env(safe-area-inset-top),0px)] pb-2">
-                        <TablePinBanner pin={tablePin} tableLabel={tableLabel} onCallWaiter={onCallWaiter} callingWaiter={callingWaiter} waiterCalled={waiterCalled} />
-                    </div>
-                )}
-                <div className={`relative z-10 mx-auto flex w-full max-w-7xl items-center justify-between px-5 md:px-8 ${!tablePin ? 'pt-[max(env(safe-area-inset-top),14px)]' : 'pt-0'} pb-3`}>
+                <div className="relative z-10 mx-auto flex w-full max-w-7xl items-center justify-between px-5 md:px-8 pt-[max(env(safe-area-inset-top),14px)] pb-3">
                     <button
                         type="button"
                         onClick={onBack}
@@ -438,7 +423,7 @@ export function CartScreen({ venueId, tableLabel, tablePin, billId, customerSess
             {/* ═══════════════════════════════════════════════════════════
                 OVERLAPPING CONTENT
               ═══════════════════════════════════════════════════════════ */}
-            <section className="relative z-20 mx-auto w-full max-w-7xl -mt-12 px-5 md:px-8 pb-[calc(140px+env(safe-area-inset-bottom))]">
+            <section className="relative z-20 mx-auto w-full max-w-7xl -mt-12 px-5 md:px-8 pb-[calc(110px+env(safe-area-inset-bottom))]">
                 {/* ── Cart draft line items ── */}
                 {hasDraft && (
                     <div className="flex flex-col gap-3">
@@ -458,11 +443,11 @@ export function CartScreen({ venueId, tableLabel, tablePin, billId, customerSess
                                 >
                                     <div className="flex gap-3">
                                         {/* Square image */}
-                                        <div className="relative h-20 w-20 shrink-0 overflow-hidden rounded-xl ring-1 ring-isabelline">
+                                        <div className="relative h-20 w-20 shrink-0 overflow-hidden rounded-xl bg-white p-1.5 ring-1 ring-isabelline flex items-center justify-center">
                                             <img
                                                 src={line.item.image}
                                                 alt={line.item.name}
-                                                className="h-full w-full object-cover"
+                                                className="h-full w-full object-contain"
                                             />
                                         </div>
 
@@ -560,54 +545,6 @@ export function CartScreen({ venueId, tableLabel, tablePin, billId, customerSess
                     </div>
                 )}
 
-                {/* ── Placed session items ── */}
-                {hasPlaced && (
-                    <div className={`flex flex-col gap-3 ${hasDraft ? "mt-6" : ""}`}>
-                        <div className="flex items-center justify-between px-1">
-                            <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-feldgrau">
-                                Placed Session Items ({placedItems.length})
-                            </span>
-                            <span className="text-[9px] font-bold uppercase tracking-wider text-khaki">
-                                Sent to Station
-                            </span>
-                        </div>
-                        {placedItems.map((item) => (
-                            <div
-                                key={item.id}
-                                className="relative overflow-hidden rounded-xl bg-white p-3.5 shadow-[0_4px_16px_rgba(35,20,12,0.06)] ring-1 ring-isabelline"
-                            >
-                                <div className="flex items-center justify-between">
-                                    <div className="min-w-0 flex-1 pr-3">
-                                        <div className="flex items-center gap-2">
-                                            <span className="font-mono text-[13px] font-bold text-licorice">
-                                                {item.quantity}x
-                                            </span>
-                                            <h3 className="truncate text-[14px] font-bold leading-tight tracking-tight text-licorice">
-                                                {item.product_name}
-                                            </h3>
-                                        </div>
-                                        {item.notes && (
-                                            <p className="mt-1 text-[10.5px] italic text-feldgrau/80">
-                                                "{item.notes}"
-                                            </p>
-                                        )}
-                                    </div>
-                                    <div className="text-right shrink-0">
-                                        <span className="font-mono text-[14px] font-bold tabular-nums text-khaki">
-                                            {formatGHS(Number(item.line_total || 0))}
-                                        </span>
-                                        <div className="mt-1">
-                                            <span className="inline-flex rounded-full bg-licorice/5 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider text-feldgrau">
-                                                {item.status || "sent"}
-                                            </span>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        ))}
-                    </div>
-                )}
-
                 {/* ── Add more items link ── */}
                 <button
                     type="button"
@@ -624,58 +561,18 @@ export function CartScreen({ venueId, tableLabel, tablePin, billId, customerSess
                     Add more items
                 </button>
 
-                {/* ── Order notes (for new draft items) ── */}
-                {hasDraft && (
-                    <div className="mt-4 rounded-xl bg-white p-4 shadow-[0_4px_16px_rgba(35,20,12,0.04)] ring-1 ring-isabelline">
-                        <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-2">
-                                <div className="flex h-7 w-7 items-center justify-center rounded-full bg-khaki/15">
-                                    <PencilSquareIcon className="h-3.5 w-3.5 text-licorice/70" strokeWidth={2} />
-                                </div>
-                                <span className="text-[12px] font-bold tracking-tight text-licorice">
-                                    Notes for the kitchen
-                                </span>
-                            </div>
-                            <span className="text-[9px] font-bold uppercase tracking-wider text-feldgrau">
-                                Optional
-                            </span>
-                        </div>
-                        <textarea
-                            value={orderNotes}
-                            onChange={(e) => setOrderNotes(e.target.value.slice(0, 200))}
-                            placeholder="Allergies, timing, or anything we should know…"
-                            rows={2}
-                            className="
-                                mt-3 w-full resize-none rounded-xl
-                                bg-isabelline/60 px-3 py-2.5
-                                text-[12.5px] text-licorice
-                                placeholder:text-feldgrau/60
-                                ring-1 ring-isabelline
-                                focus:outline-none focus:ring-2 focus:ring-licorice/20
-                                transition-all
-                            "
-                        />
-                        <div className="mt-1 text-right text-[9px] font-medium tracking-tight text-feldgrau/70">
-                            {orderNotes.length}/200
-                        </div>
-                    </div>
-                )}
-
-                {/* ── Bill summary ── */}
-                <div className="mt-4 overflow-hidden rounded-xl bg-licorice text-isabelline shadow-[0_12px_32px_rgba(35,20,12,0.18)]">
+                {/* ── Bill & Deposit Ledger ── */}
+                <div className="mt-4 overflow-hidden rounded-xl bg-licorice text-isabelline shadow-[0_12px_28px_rgba(35,20,12,0.20)] ring-1 ring-white/10">
                     {/* Header */}
-                    <div className="flex items-center justify-between border-b border-isabelline/10 px-4 py-3">
-                        <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-khaki">
+                    <div className="border-b border-isabelline/10 px-5 py-3.5 bg-isabelline/[0.03]">
+                        <span className="text-[11px] font-bold uppercase tracking-[0.2em] text-khaki">
                             {depositAmount > 0 && depositPaid ? "Bill & Deposit Ledger" : "Bill Summary"}
-                        </span>
-                        <span className="text-[10px] font-bold uppercase tracking-wider text-isabelline/50">
-                            Table {tableLabel ?? "—"}
                         </span>
                     </div>
 
                     {/* Rows */}
-                    <div className="space-y-2 px-4 py-3">
-                        <div className="flex items-center justify-between text-[12px]">
+                    <div className="space-y-3 px-5 py-4">
+                        <div className="flex items-center justify-between text-[13px]">
                             <span className="tracking-tight text-isabelline/70">
                                 Orders Subtotal{venueTax.taxInclusive && venueTax.vatPct > 0 ? " (excl. VAT)" : ""}
                             </span>
@@ -684,7 +581,7 @@ export function CartScreen({ venueId, tableLabel, tablePin, billId, customerSess
                             </span>
                         </div>
                         {billBreakdown.serviceCharge > 0 && (
-                            <div className="flex items-center justify-between text-[12px]">
+                            <div className="flex items-center justify-between text-[13px]">
                                 <span className="tracking-tight text-isabelline/70">
                                     Service Charge <span className="text-isabelline/40">({venueTax.serviceChargePct}%)</span>
                                 </span>
@@ -694,7 +591,7 @@ export function CartScreen({ venueId, tableLabel, tablePin, billId, customerSess
                             </div>
                         )}
                         {venueTax.vatPct > 0 && (
-                            <div className="flex items-center justify-between text-[12px]">
+                            <div className="flex items-center justify-between text-[13px]">
                                 <span className="tracking-tight text-isabelline/70">
                                     VAT <span className="text-isabelline/40">({venueTax.vatPct}%)</span>
                                 </span>
@@ -703,8 +600,8 @@ export function CartScreen({ venueId, tableLabel, tablePin, billId, customerSess
                                 </span>
                             </div>
                         )}
-                        <div className="flex items-center justify-between text-[12px] pt-1 border-t border-isabelline/10">
-                            <span className="tracking-tight text-isabelline/80 font-medium">Gross Consumed Spend</span>
+                        <div className="flex items-center justify-between text-[13px] pt-2 border-t border-isabelline/10">
+                            <span className="tracking-tight text-isabelline font-semibold">Gross Consumed Spend</span>
                             <span className="font-mono font-bold tabular-nums text-isabelline">
                                 {formatGHS(billBreakdown.grossConsumed)}
                             </span>
@@ -712,18 +609,18 @@ export function CartScreen({ venueId, tableLabel, tablePin, billId, customerSess
 
                         {depositAmount > 0 && depositPaid && (
                             <>
-                                <div className="flex items-center justify-between text-[12px] text-khaki">
+                                <div className="flex items-center justify-between text-[13px] text-khaki">
                                     <span className="tracking-tight font-medium">Prepaid Table Deposit</span>
                                     <span className="font-mono font-bold tabular-nums">
                                         -{formatGHS(depositAmount)}
                                     </span>
                                 </div>
                                 {billBreakdown.remainingCredit > 0 && (
-                                    <div className="flex items-center justify-between text-[12px] rounded-lg bg-emerald-500/10 px-2.5 py-1.5 ring-1 ring-emerald-500/20">
-                                        <span className="text-emerald-400 font-bold text-[11px] uppercase tracking-wider">
+                                    <div className="flex items-center justify-between text-[13px]">
+                                        <span className="tracking-tight font-semibold text-khaki">
                                             Remaining Table Credit
                                         </span>
-                                        <span className="font-mono font-bold tabular-nums text-emerald-300">
+                                        <span className="font-mono font-bold tabular-nums text-khaki">
                                             {formatGHS(billBreakdown.remainingCredit)}
                                         </span>
                                     </div>
@@ -732,21 +629,19 @@ export function CartScreen({ venueId, tableLabel, tablePin, billId, customerSess
                         )}
                     </div>
 
-                    {/* Grand total */}
-                    <div className="flex items-end justify-between border-t border-isabelline/10 px-4 py-4">
+                    {/* Grand total / Amount Due */}
+                    <div className="flex items-end justify-between border-t border-isabelline/10 px-5 py-4 bg-isabelline/[0.02]">
                         <div>
-                            <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-khaki">
-                                {depositAmount > 0 && depositPaid
-                                    ? (billBreakdown.amountDue > 0 ? "Excess Amount Due" : "Amount Due Now")
-                                    : "Grand Total"}
+                            <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-khaki">
+                                {depositAmount > 0 && depositPaid ? "Amount Due Now" : "Grand Total"}
                             </p>
-                            <p className="text-[10px] font-medium tracking-tight text-isabelline/50">
-                                {depositAmount > 0 && depositPaid
-                                    ? (billBreakdown.amountDue > 0 ? "Deposit exhausted · pay excess" : "Fully covered by upfront deposit")
+                            <p className="text-[11px] font-medium tracking-tight text-isabelline/50">
+                                {depositAmount > 0 && depositPaid && billBreakdown.amountDue === 0
+                                    ? "Fully covered by upfront deposit"
                                     : "Pay after your meal"}
                             </p>
                         </div>
-                        <span className="font-mono text-[22px] font-black tabular-nums text-isabelline">
+                        <span className="font-mono text-[24px] font-black tabular-nums text-isabelline">
                             {formatGHS(total)}
                         </span>
                     </div>
@@ -757,19 +652,20 @@ export function CartScreen({ venueId, tableLabel, tablePin, billId, customerSess
                 STICKY BOTTOM CTA — Send to Kitchen (when draft items exist)
                 OR Pay Table Bill (when draft is empty and placed items exist)
               ═══════════════════════════════════════════════════════════ */}
-            {hasDraft ? (
-                <div className="fixed inset-x-0 bottom-[calc(60px+env(safe-area-inset-bottom))] z-40 flex justify-center px-5 pb-[max(env(safe-area-inset-bottom),18px)] pt-3 bg-gradient-to-t from-isabelline via-isabelline/95 to-transparent">
+            {hasDraft && (
+                <div className="fixed inset-x-0 bottom-[calc(60px+env(safe-area-inset-bottom))] z-40 flex justify-center px-5 pb-[max(env(safe-area-inset-bottom),18px)] pt-3 pointer-events-none">
                     <button
                         type="button"
                         onClick={handleSendToKitchen}
                         disabled={sending}
                         className="
+                            pointer-events-auto
                             group flex w-full max-w-md md:max-w-2xl items-center justify-between
                             gap-3 rounded-full bg-licorice px-6 py-4
-                            shadow-[0_20px_50px_rgba(35,20,12,0.25)]
+                            shadow-[0_20px_50px_rgba(35,20,12,0.30)]
                             ring-1 ring-licorice/80
                             transition-all duration-200 ease-out
-                            hover:bg-licorice/95 hover:shadow-[0_24px_60px_rgba(35,20,12,0.30)]
+                            hover:bg-licorice/95 hover:shadow-[0_24px_60px_rgba(35,20,12,0.35)]
                             active:scale-[0.985]
                             focus:outline-none focus-visible:ring-2 focus-visible:ring-khaki
                             disabled:opacity-90
@@ -811,57 +707,7 @@ export function CartScreen({ venueId, tableLabel, tablePin, billId, customerSess
                         </span>
                     </button>
                 </div>
-            ) : hasPlaced && onPayBill ? (
-                <div className="fixed inset-x-0 bottom-[calc(60px+env(safe-area-inset-bottom))] z-40 flex justify-center px-5 pb-[max(env(safe-area-inset-bottom),18px)] pt-3 bg-gradient-to-t from-isabelline via-isabelline/95 to-transparent">
-                    {depositAmount > 0 && depositPaid && billBreakdown.amountDue === 0 ? (
-                        <div className="flex w-full max-w-md md:max-w-2xl items-center justify-between gap-3 rounded-full bg-licorice px-6 py-4 shadow-[0_20px_50px_rgba(35,20,12,0.25)] ring-1 ring-emerald-500/40">
-                            <span className="flex flex-col items-start leading-tight">
-                                <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-emerald-400">
-                                    Prepaid Deposit Active
-                                </span>
-                                <span className="text-[15px] font-bold tracking-tight text-isabelline">
-                                    {formatGHS(billBreakdown.remainingCredit)} Credit Remaining
-                                </span>
-                            </span>
-                            <span className="rounded-full bg-emerald-500/20 px-3.5 py-1.5 text-[11px] font-bold text-emerald-300 ring-1 ring-emerald-500/30">
-                                Covered
-                            </span>
-                        </div>
-                    ) : (
-                        <button
-                            type="button"
-                            onClick={onPayBill}
-                            className="
-                                group flex w-full max-w-md md:max-w-2xl items-center justify-between
-                                gap-3 rounded-full bg-licorice px-6 py-4
-                                shadow-[0_20px_50px_rgba(35,20,12,0.25)]
-                                ring-1 ring-licorice/80
-                                transition-all duration-200 ease-out
-                                hover:bg-licorice/95 hover:shadow-[0_24px_60px_rgba(35,20,12,0.30)]
-                                active:scale-[0.985]
-                                focus:outline-none focus-visible:ring-2 focus-visible:ring-khaki
-                            "
-                        >
-                            <span className="flex flex-col items-start leading-tight">
-                                <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-khaki">
-                                    {depositAmount > 0 && depositPaid ? "Deposit Exhausted" : "Table Balance Due"}
-                                </span>
-                                <span className="text-[15px] font-bold tracking-tight text-isabelline">
-                                    {depositAmount > 0 && depositPaid ? "Pay Excess Bill" : "Pay Bill Now"}
-                                </span>
-                            </span>
-                            <div className="flex items-center gap-3">
-                                <span className="font-mono text-[16px] font-bold text-khaki">
-                                    {formatGHS(total)}
-                                </span>
-                                <span className="flex h-9 w-9 items-center justify-center rounded-full bg-khaki text-licorice transition-transform duration-200 group-hover:translate-x-0.5">
-                                    <ArrowRightIcon className="h-4 w-4" strokeWidth={2.5} />
-                                </span>
-                            </div>
-                        </button>
-                    )}
-                </div>
-            ) : null}
+            )}
         </main>
     );
 }

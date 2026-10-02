@@ -551,8 +551,13 @@ export function ManagerShell({ managerName, venueName, venueLogo, activePage, on
                 isOpen={showSignOutModal}
                 onClose={() => setShowSignOutModal(false)}
                 onSignOut={onSignOut}
-                onSwitchToKitchen={() => navigate("/kitchen")}
-                onSwitchToWaiter={() => navigate("/waiter")}
+                stationLabel={(authVenue?.fulfillment_mode || (authVenue?.id ? localStorage.getItem(`bysen_venue_fulfillment_${authVenue.id}`) : null)) === "bar" ? "Bar Station" : "Kitchen Display"}
+                onSwitchToStation={() => {
+                    const isBar = (authVenue?.fulfillment_mode || (authVenue?.id ? localStorage.getItem(`bysen_venue_fulfillment_${authVenue.id}`) : null)) === "bar";
+                    const slugPrefix = venueSlug ? `/v/${venueSlug}` : "";
+                    navigate(isBar ? `${slugPrefix}/bar` : `${slugPrefix}/kitchen`);
+                }}
+                onSwitchToWaiter={() => navigate(venueSlug ? `/v/${venueSlug}/waiter` : "/waiter")}
             />
         </div>
     );

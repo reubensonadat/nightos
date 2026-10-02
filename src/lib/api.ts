@@ -961,10 +961,40 @@ export const db = {
         })
         .eq('id', billId);
       billErr = res.error;
+
+      // Cancel any unresolved order submissions for this bill so stations update
+      await supabase
+        .from('order_submissions')
+        .update({ status: 'cancelled', updated_at: now })
+        .eq('bill_id', billId)
+        .in('status', ['pending', 'confirmed', 'preparing']);
+      await supabase
+        .from('order_items')
+        .update({ status: 'cancelled' })
+        .eq('bill_id', billId)
+        .in('status', ['pending', 'confirmed', 'preparing']);
     }
 
     // 2. Also close any remaining open/settling bills for this table
     if (tableId) {
+      const { data: tableBills } = await supabase
+        .from('bills')
+        .select('id')
+        .eq('table_id', tableId);
+      const bIds = (tableBills || []).map(b => b.id);
+      if (bIds.length > 0) {
+        await supabase
+          .from('order_submissions')
+          .update({ status: 'cancelled', updated_at: now })
+          .in('bill_id', bIds)
+          .in('status', ['pending', 'confirmed', 'preparing']);
+        await supabase
+          .from('order_items')
+          .update({ status: 'cancelled' })
+          .in('bill_id', bIds)
+          .in('status', ['pending', 'confirmed', 'preparing']);
+      }
+
       await supabase
         .from('bills')
         .update({
@@ -1442,19 +1472,45 @@ export const db = {
          bills!inner(id, waiter_id, status, tables!inner(table_number, table_label))`,
       )
       .eq('venue_id', venueId)
-      .in('status', ['pending', 'confirmed', 'preparing', 'ready'])
-      .order('created_at', { ascending: false }),
+      .in('status', ['pending', 'confirmed', 'preparing', 'ready', 'served', 'cancelled'])
+      .order('created_at', { ascending: false })
+      .limit(80),
 
-  setOrderStatus: async (submissionId: string, status: string, staffId: string) => {
+  setOrderStatus: async (submissionId: string, status: string, staffId?: string | null) => {
     cacheInvalidate('orders:');
-    const { data, error } = await supabase
-      .rpc('set_order_status', {
+    const now = new Date().toISOString();
+
+    // 1. Try RPC first if defined
+    try {
+      await supabase.rpc('set_order_status', {
         p_submission_id: submissionId,
         p_status: status,
-        p_staff_id: staffId,
+        p_staff_id: staffId || null,
       });
-    // RETURNS boolean — PostgREST returns the scalar directly.
-    return { data: (data as boolean) ?? false, error };
+    } catch {
+      // Continue to direct update
+    }
+
+    // 2. Guaranteed direct table update to order_submissions
+    const { error: subErr } = await supabase
+      .from('order_submissions')
+      .update({ status, updated_at: now })
+      .eq('id', submissionId);
+
+    // 3. If cancelling or serving, cascade to order_items
+    if (status === 'cancelled') {
+      await supabase
+        .from('order_items')
+        .update({ status: 'cancelled' })
+        .eq('submission_id', submissionId);
+    } else if (status === 'served') {
+      await supabase
+        .from('order_items')
+        .update({ status: 'served' })
+        .eq('submission_id', submissionId);
+    }
+
+    return { data: !subErr, error: subErr };
   },
 
   /** Staff closes a table: cancels the bill (no successful payments),
