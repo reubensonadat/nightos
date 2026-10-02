@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import {
     ArrowLeftIcon,
+    ArrowRightIcon,
     BanknotesIcon,
     CheckIcon,
     CreditCardIcon,
@@ -159,12 +160,13 @@ export function CheckoutScreen({ total, billId, venueId, sessionToken, onBack, o
             const fee = Number((bill as { convenience_fee?: number })?.convenience_fee || 0);
             const remainingAmount = Math.max(0, Math.round((bill.total - bill.amount_paid) * 100) / 100);
             const displayedSubtotal = Math.round(((bill.subtotal || 0) + fee) * 100) / 100;
+            const targetPay = (total > 0 && total < remainingAmount) ? total : remainingAmount;
             return {
-                subtotal: displayedSubtotal,
-                vat: bill.vat || 0,
-                billTotal: bill.total,
-                payAmount: remainingAmount,
-                totalPaid: bill.total,
+                subtotal: targetPay < remainingAmount ? targetPay : displayedSubtotal,
+                vat: targetPay < remainingAmount ? 0 : (bill.vat || 0),
+                billTotal: targetPay < remainingAmount ? targetPay : bill.total,
+                payAmount: targetPay,
+                totalPaid: targetPay,
             };
         }
         // Fallback while the bill loads
@@ -376,7 +378,7 @@ export function CheckoutScreen({ total, billId, venueId, sessionToken, onBack, o
                             Checkout
                         </span>
                         <span className="text-[9px] font-semibold uppercase tracking-[0.18em] text-feldgrau">
-                            {tableLabel ? `Table ${tableLabel}` : venue?.name || "Bysen"}
+                            {tableLabel ? (tableLabel.trim().toLowerCase().startsWith("table") ? tableLabel : `Table ${tableLabel}`) : venue?.name || "Bysen"}
                         </span>
                     </div>
 
@@ -453,7 +455,7 @@ export function CheckoutScreen({ total, billId, venueId, sessionToken, onBack, o
                                     </span>
                                 </div>
                                 {Number(bill.remaining_credit || 0) > 0 && (
-                                    <div className="flex items-center justify-between text-[11.5px] rounded-lg bg-emerald-50 px-2.5 py-1 text-emerald-800 ring-1 ring-emerald-200">
+                                    <div className="flex items-center justify-between text-[11.5px] rounded-lg bg-khaki/10 px-2.5 py-1 text-khaki ring-1 ring-khaki/30">
                                         <span className="font-bold">Remaining Credit</span>
                                         <span className="font-mono font-bold tabular-nums">
                                             {formatGHS(Number(bill.remaining_credit))}
@@ -468,7 +470,7 @@ export function CheckoutScreen({ total, billId, venueId, sessionToken, onBack, o
                     <div className="flex items-end justify-between border-t border-isabelline px-4 py-3">
                         <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-feldgrau">
                             {bill && bill.deposit_paid && Number(bill.deposit_amount || 0) > 0
-                                ? (payAmount > 0 ? "Excess Amount Due" : "Amount Due Now")
+                                ? "Amount Due Now"
                                 : (bill && bill.amount_paid > 0 ? "Amount Due" : "Bill Total")}
                         </span>
                         <span className="font-mono text-[18px] font-bold tabular-nums text-licorice">
@@ -538,25 +540,6 @@ export function CheckoutScreen({ total, billId, venueId, sessionToken, onBack, o
                                 </button>
                             );
                         })}
-                    </div>
-                </div>
-
-                {/* ── Grand Total Preview ── */}
-                <div className="rounded-2xl bg-licorice p-4 text-isabelline shadow-[0_8px_24px_rgba(35,20,12,0.15)]">
-                    <div className="flex items-end justify-between">
-                        <div>
-                            <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-khaki">
-                                You Pay
-                            </p>
-                            <p className="mt-0.5 text-[10px] font-medium tracking-tight text-isabelline/50">
-                                {isPrepay
-                                    ? "Prepay your bill — pay before ordering"
-                                    : "Pay at the table when you're done"}
-                            </p>
-                        </div>
-                        <span className="font-mono text-[22px] font-black tabular-nums text-isabelline">
-                            {formatGHS(payAmount)}
-                        </span>
                     </div>
                 </div>
             </section>
@@ -641,24 +624,19 @@ export function CheckoutScreen({ total, billId, venueId, sessionToken, onBack, o
                         className="
                             group flex w-full max-w-md md:max-w-2xl items-center justify-between
                             gap-3 rounded-full bg-licorice px-6 py-4
-                            shadow-[0_20px_50px_rgba(35,20,12,0.25)]
-                            ring-1 ring-licorice/80
+                            shadow-[0_20px_50px_rgba(35,20,12,0.28)]
+                            ring-1 ring-white/10
                             transition-all duration-200 ease-out
-                            hover:bg-licorice/95 hover:shadow-[0_24px_60px_rgba(35,20,12,0.30)]
+                            hover:bg-licorice/95 hover:shadow-[0_24px_60px_rgba(35,20,12,0.35)]
                             active:scale-[0.985]
                             focus:outline-none focus-visible:ring-2 focus-visible:ring-khaki
                         "
                     >
-                        <span className="flex flex-col items-start leading-tight">
-                            <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-khaki">
-                                Pay with {PAYMENT_OPTIONS.find((p) => p.id === method)?.label}
-                            </span>
-                            <span className="text-[15px] font-bold tracking-tight text-isabelline">
-                                Pay {formatGHS(payAmount)}
-                            </span>
+                        <span className="text-[15px] font-bold tracking-tight text-isabelline">
+                            Pay with {PAYMENT_OPTIONS.find((p) => p.id === method)?.label}
                         </span>
-                        <span className="flex h-9 w-9 items-center justify-center rounded-full bg-isabelline text-licorice">
-                            <CheckIcon className="h-4 w-4" strokeWidth={3} />
+                        <span className="flex h-9 w-9 items-center justify-center rounded-full bg-khaki text-licorice transition-transform duration-200 group-hover:translate-x-0.5">
+                            <ArrowRightIcon className="h-4 w-4" strokeWidth={2.5} />
                         </span>
                     </PaystackButton>
                 ) : method === 'cash' ? (
@@ -695,24 +673,19 @@ export function CheckoutScreen({ total, billId, venueId, sessionToken, onBack, o
                                 className="
                                     group flex w-full items-center justify-between
                                     gap-3 rounded-full bg-licorice px-6 py-4
-                                    shadow-[0_20px_50px_rgba(35,20,12,0.25)]
-                                    ring-1 ring-licorice/80
+                                    shadow-[0_20px_50px_rgba(35,20,12,0.28)]
+                                    ring-1 ring-white/10
                                     transition-all duration-200 ease-out
-                                    hover:bg-licorice/95 hover:shadow-[0_24px_60px_rgba(35,20,12,0.30)]
+                                    hover:bg-licorice/95 hover:shadow-[0_24px_60px_rgba(35,20,12,0.35)]
                                     active:scale-[0.985]
                                     focus:outline-none focus-visible:ring-2 focus-visible:ring-khaki
                                 "
                             >
-                                <span className="flex flex-col items-start leading-tight">
-                                    <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-khaki">
-                                        Pay with cash
-                                    </span>
-                                    <span className="text-[15px] font-bold tracking-tight text-isabelline">
-                                        Notify waiter for {formatGHSString(payAmount)}
-                                    </span>
+                                <span className="text-[15px] font-bold tracking-tight text-isabelline">
+                                    Request Waiter for Cash
                                 </span>
-                                <span className="flex h-9 w-9 items-center justify-center rounded-full bg-isabelline text-licorice">
-                                    <BanknotesIcon className="h-4 w-4" strokeWidth={2} />
+                                <span className="flex h-9 w-9 items-center justify-center rounded-full bg-khaki text-licorice transition-transform duration-200 group-hover:translate-x-0.5">
+                                    <ArrowRightIcon className="h-4 w-4" strokeWidth={2.5} />
                                 </span>
                             </button>
                         )}
