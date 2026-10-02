@@ -698,6 +698,18 @@ function AppShell() {
     }
   }, [mode, location.pathname, navigate, currentVenue.slug, targetSlug]);
 
+  // Auto-redirect /kitchen to /bar if the venue is configured in "bar" fulfillment mode
+  useEffect(() => {
+    const rawFulfillment = currentVenue?.fulfillment_mode || (currentVenue?.id ? localStorage.getItem(`bysen_venue_fulfillment_${currentVenue.id}`) : null);
+    const fulfillment = rawFulfillment || "bar";
+    const cleanPath = location.pathname.replace(/^\/v\/[^/]+/, "");
+    if (fulfillment === "bar" && (cleanPath === "/kitchen" || cleanPath === "/kitchen/")) {
+      const slug = currentVenueSlug || targetSlug;
+      const slugPrefix = slug ? `/v/${slug}` : "";
+      navigate(`${slugPrefix}/bar`, { replace: true });
+    }
+  }, [currentVenue?.fulfillment_mode, currentVenue?.id, currentVenueSlug, targetSlug, location.pathname, navigate]);
+
   const switchToCustomer = () => {
     setMode("customer");
   };

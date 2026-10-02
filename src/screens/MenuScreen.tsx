@@ -144,7 +144,7 @@ export function MenuScreen({
     onBack,
     onViewCart,
 }: Props) {
-    const [active, setActive] = useState<MenuCategory>("Signatures");
+    const [active, setActive] = useState<MenuCategory>("All");
     const [query, setQuery] = useState("");
     const [activeItemId, setActiveItemId] = useState<string | null>(null);
     const [menuItems, setMenuItems] = useState<MenuItem[]>(() => {
@@ -202,19 +202,19 @@ export function MenuScreen({
 
     const items = menuItems;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    const categories: MenuCategory[] = [...new Set(items.map(i => i.category))];
+    const categories: MenuCategory[] = ["All", ...new Set(items.map(i => i.category).filter(Boolean))];
 
     // Ensure active category still exists after data loads
     useEffect(() => {
         if (categories.length > 0 && !categories.includes(active)) {
             // eslint-disable-next-line react-hooks/set-state-in-effect
-            setActive(categories[0]);
+            setActive("All");
         }
     }, [categories, active]);
 
     const visibleItems = useMemo<MenuItem[]>(() => {
         const q = query.trim().toLowerCase();
-        let filtered = items.filter((m) => m.category === active);
+        let filtered = active === "All" ? items : items.filter((m) => m.category === active);
         if (q) {
             filtered = filtered.filter(
                 (m) =>

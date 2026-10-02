@@ -139,11 +139,15 @@ export function BarStationScreen({ venueId, staffId, staffName, onExit, onSignOu
     // Active Station Shift (Shared for this terminal across all bartenders)
     const shiftStorageKey = useMemo(() => `nightos:bar_station_shift:${venueId}`, [venueId]);
     const [activeShift, setActiveShift] = useState<BarStationShift | null>(null);
+    const [loadingShift, setLoadingShift] = useState(true);
 
     // Load initial shift
     useEffect(() => {
         const init = async () => {
-            if (!venueId) return;
+            if (!venueId) {
+                setLoadingShift(false);
+                return;
+            }
             try {
                 const { data } = await db.activeBarShift(venueId);
                 if (data && data.status === "active") {
@@ -161,6 +165,7 @@ export function BarStationScreen({ venueId, staffId, staffName, onExit, onSignOu
                         directAdjustments: data.direct_adjustments || {},
                         status: "active",
                     });
+                    setLoadingShift(false);
                     return;
                 }
             } catch (err) {
@@ -177,6 +182,8 @@ export function BarStationScreen({ venueId, staffId, staffName, onExit, onSignOu
                 }
             } catch (err) {
                 console.error("Failed to load bar station shift from storage:", err);
+            } finally {
+                setLoadingShift(false);
             }
         };
         init();
@@ -844,6 +851,19 @@ export function BarStationScreen({ venueId, staffId, staffName, onExit, onSignOu
             }
         }
     };
+
+    if (loadingShift) {
+        return (
+            <div className="min-h-screen bg-[#F4F3E8] flex items-center justify-center">
+                <div className="flex flex-col items-center gap-3 animate-pulse">
+                    <ArrowPathIcon className="h-7 w-7 text-[#1A110B] animate-spin" />
+                    <span className="text-xs font-bold uppercase tracking-wider text-[#606F69]">
+                        Checking Bar Shift Status...
+                    </span>
+                </div>
+            </div>
+        );
+    }
 
     /* ═══════════════════════════════════════════════════════════════════════════
        RENDER SCENE 1: SHIFT OPENING GATE (If no shift started today)

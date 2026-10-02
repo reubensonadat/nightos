@@ -438,7 +438,7 @@ export function CartScreen({ venueId, tableLabel, tablePin, billId, customerSess
             {/* ═══════════════════════════════════════════════════════════
                 OVERLAPPING CONTENT
               ═══════════════════════════════════════════════════════════ */}
-            <section className="relative z-20 mx-auto w-full max-w-7xl -mt-12 px-5 md:px-8 pb-[calc(140px+env(safe-area-inset-bottom))]">
+            <section className="relative z-20 mx-auto w-full max-w-7xl -mt-12 px-5 md:px-8 pb-[calc(180px+env(safe-area-inset-bottom))]">
                 {/* ── Cart draft line items ── */}
                 {hasDraft && (
                     <div className="flex flex-col gap-3">
@@ -758,18 +758,19 @@ export function CartScreen({ venueId, tableLabel, tablePin, billId, customerSess
                 OR Pay Table Bill (when draft is empty and placed items exist)
               ═══════════════════════════════════════════════════════════ */}
             {hasDraft ? (
-                <div className="fixed inset-x-0 bottom-[calc(60px+env(safe-area-inset-bottom))] z-40 flex justify-center px-5 pb-[max(env(safe-area-inset-bottom),18px)] pt-3 bg-gradient-to-t from-isabelline via-isabelline/95 to-transparent">
+                <div className="fixed inset-x-0 bottom-[calc(60px+env(safe-area-inset-bottom))] z-40 flex justify-center px-5 pb-[max(env(safe-area-inset-bottom),18px)] pt-3 pointer-events-none">
                     <button
                         type="button"
                         onClick={handleSendToKitchen}
                         disabled={sending}
                         className="
+                            pointer-events-auto
                             group flex w-full max-w-md md:max-w-2xl items-center justify-between
                             gap-3 rounded-full bg-licorice px-6 py-4
-                            shadow-[0_20px_50px_rgba(35,20,12,0.25)]
+                            shadow-[0_20px_50px_rgba(35,20,12,0.30)]
                             ring-1 ring-licorice/80
                             transition-all duration-200 ease-out
-                            hover:bg-licorice/95 hover:shadow-[0_24px_60px_rgba(35,20,12,0.30)]
+                            hover:bg-licorice/95 hover:shadow-[0_24px_60px_rgba(35,20,12,0.35)]
                             active:scale-[0.985]
                             focus:outline-none focus-visible:ring-2 focus-visible:ring-khaki
                             disabled:opacity-90
@@ -812,9 +813,9 @@ export function CartScreen({ venueId, tableLabel, tablePin, billId, customerSess
                     </button>
                 </div>
             ) : hasPlaced && onPayBill ? (
-                <div className="fixed inset-x-0 bottom-[calc(60px+env(safe-area-inset-bottom))] z-40 flex justify-center px-5 pb-[max(env(safe-area-inset-bottom),18px)] pt-3 bg-gradient-to-t from-isabelline via-isabelline/95 to-transparent">
+                <div className="fixed inset-x-0 bottom-[calc(60px+env(safe-area-inset-bottom))] z-40 flex justify-center px-5 pb-[max(env(safe-area-inset-bottom),18px)] pt-3 pointer-events-none">
                     {depositAmount > 0 && depositPaid && billBreakdown.amountDue === 0 ? (
-                        <div className="flex w-full max-w-md md:max-w-2xl items-center justify-between gap-3 rounded-full bg-licorice px-6 py-4 shadow-[0_20px_50px_rgba(35,20,12,0.25)] ring-1 ring-emerald-500/40">
+                        <div className="pointer-events-auto flex w-full max-w-md md:max-w-2xl items-center justify-between gap-3 rounded-full bg-licorice px-6 py-4 shadow-[0_20px_50px_rgba(35,20,12,0.30)] ring-1 ring-emerald-500/40">
                             <span className="flex flex-col items-start leading-tight">
                                 <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-emerald-400">
                                     Prepaid Deposit Active
@@ -832,12 +833,13 @@ export function CartScreen({ venueId, tableLabel, tablePin, billId, customerSess
                             type="button"
                             onClick={onPayBill}
                             className="
+                                pointer-events-auto
                                 group flex w-full max-w-md md:max-w-2xl items-center justify-between
                                 gap-3 rounded-full bg-licorice px-6 py-4
-                                shadow-[0_20px_50px_rgba(35,20,12,0.25)]
+                                shadow-[0_20px_50px_rgba(35,20,12,0.30)]
                                 ring-1 ring-licorice/80
                                 transition-all duration-200 ease-out
-                                hover:bg-licorice/95 hover:shadow-[0_24px_60px_rgba(35,20,12,0.30)]
+                                hover:bg-licorice/95 hover:shadow-[0_24px_60px_rgba(35,20,12,0.35)]
                                 active:scale-[0.985]
                                 focus:outline-none focus-visible:ring-2 focus-visible:ring-khaki
                             "
