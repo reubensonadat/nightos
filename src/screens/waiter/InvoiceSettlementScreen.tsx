@@ -65,6 +65,11 @@ export function InvoiceSettlementScreen() {
     const [settling, setSettling] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [fee, setFee] = useState<number | null>(null);
+    const [split, setSplit] = useState<{
+        subaccount?: string | null;
+        transaction_charge_pesewas?: number;
+        debt_clawback?: number;
+    } | null>(null);
     const [bill, setBill] = useState<{
         id: string;
         subtotal: number;
@@ -142,6 +147,14 @@ export function InvoiceSettlementScreen() {
             setBill(loadedBill);
             setCompletedBill(loadedBill);
 
+            // Pre-fetch the Paystack subaccount split (service charge + debt clawback)
+            db.getDynamicPaystackSplit(billRow.venue_id, Number(billRow.subtotal || 0)).then(
+                ({ data }) => {
+                    if (!cancelled && data) setSplit(data);
+                },
+                () => { },
+            );
+
             if (billRow.status === 'paid' || (Number(billRow.amount_paid || 0) >= Number(billRow.total || 0) && Number(billRow.total || 0) > 0)) {
                 setSettled(true);
             }
@@ -177,6 +190,10 @@ export function InvoiceSettlementScreen() {
     });
 
     const total = bill?.total ?? 0;
+    const splitChargePesewas =
+        split?.subaccount && Number(split.transaction_charge_pesewas || 0) > 0
+            ? Math.min(Number(split.transaction_charge_pesewas), Math.round(total * 0.9 * 100))
+            : 0;
     const received = parseFloat(cashReceived) || 0;
     const change = received - total;
     const canSettle = method === "cash" && received >= total && !!bill;
@@ -221,6 +238,12 @@ export function InvoiceSettlementScreen() {
                     setSettledMethod(method);
                     setVerifying(false);
                     setSettled(true);
+                    const clawback = Number(split?.debt_clawback || 0);
+                    if (clawback > 0) {
+                        db.reconcileVenueFeeDebt(venueId, null, clawback).catch((err) =>
+                            console.warn('[InvoiceSettlement] fee debt reconcile failed:', err),
+                        );
+                    }
                     return;
                 }
             } catch {
@@ -324,6 +347,12 @@ export function InvoiceSettlementScreen() {
                                     <span>Subtotal</span>
                                     <span className="font-mono tabular-nums">{formatGHS(activeBill.subtotal)}</span>
                                 </div>
+                                {activeBill.service_charge > 0 && (
+                                    <div className="flex justify-between text-feldgrau">
+                                        <span>Service Charge</span>
+                                        <span className="font-mono tabular-nums">{formatGHS(activeBill.service_charge)}</span>
+                                    </div>
+                                )}
                                 <div className="flex justify-between text-feldgrau">
                                     <span>VAT</span>
                                     <span className="font-mono tabular-nums">{formatGHS(activeBill.vat)}</span>
@@ -489,6 +518,12 @@ export function InvoiceSettlementScreen() {
                                 <span>Subtotal</span>
                                 <span className="font-mono tabular-nums">{formatGHS(bill.subtotal)}</span>
                             </div>
+                            {bill.service_charge > 0 && (
+                                <div className="flex justify-between text-isabelline/60">
+                                    <span>Service Charge</span>
+                                    <span className="font-mono tabular-nums">{formatGHS(bill.service_charge)}</span>
+                                </div>
+                            )}
                             <div className="flex justify-between text-isabelline/60">
                                 <span>VAT</span>
                                 <span className="font-mono tabular-nums">{formatGHS(bill.vat)}</span>
@@ -541,6 +576,7 @@ export function InvoiceSettlementScreen() {
                                         lineTotal: i.line_total,
                                     }))}
                                     subtotal={bill.subtotal}
+                                    serviceCharge={bill.service_charge}
                                     vat={bill.vat}
                                     total={bill.total}
                                 />
@@ -739,6 +775,8 @@ export function InvoiceSettlementScreen() {
                             amount={total}
                             billId={bill.id}
                             venueId={venueId}
+                            subaccount={split?.subaccount ?? null}
+                            transactionCharge={splitChargePesewas || null}
                             channels={method === "momo" ? ["mobile_money"] : ["card"]}
                             onSuccess={(reference) => void handleDigitalPayment(reference)}
                             className="

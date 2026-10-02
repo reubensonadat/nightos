@@ -740,33 +740,18 @@ BEGIN
 END;
 $$;
 
--- ── 4.10 Platform Convenience Fee (Tiered GHS 1, 2, 3, 4, 5) ──
-CREATE OR REPLACE FUNCTION public.compute_convenience_fee(subtotal numeric)
-RETURNS numeric(10,2) AS $$
-BEGIN
-    IF subtotal IS NULL OR subtotal <= 0 THEN
-        RETURN 0.00;
-    ELSIF subtotal <= 50 THEN
-        RETURN 1.00;
-    ELSIF subtotal <= 100 THEN
-        RETURN 2.00;
-    ELSIF subtotal <= 150 THEN
-        RETURN 3.00;
-    ELSIF subtotal <= 200 THEN
-        RETURN 4.00;
-    ELSE
-        RETURN 5.00;
-    END IF;
-END;
-$$ LANGUAGE plpgsql IMMUTABLE;
-
+-- ── 4.10 Bill Math: flat service charge (venue %) + VAT, tiered convenience fee retired ──
 CREATE OR REPLACE FUNCTION public.recalculate_single_bill(p_bill_id uuid)
-RETURNS void LANGUAGE plpgsql SECURITY DEFINER AS $$
+RETURNS void LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
 DECLARE
     v_subtotal numeric(10,2);
-    v_fee numeric(10,2) := 0;
-    v_total numeric(10,2) := 0;
-    v_paid numeric(10,2) := 0;
+    v_sc_pct   numeric;
+    v_vat_pct  numeric;
+    v_tax_incl boolean;
+    v_service  numeric(10,2) := 0;
+    v_vat      numeric(10,2) := 0;
+    v_total    numeric(10,2) := 0;
+    v_paid     numeric(10,2) := 0;
 BEGIN
     SELECT COALESCE(SUM(oi.line_total), 0) INTO v_subtotal
     FROM public.order_items oi
@@ -775,19 +760,38 @@ BEGIN
       AND COALESCE(oi.status, 'confirmed') != 'cancelled'
       AND COALESCE(os.status, 'confirmed') != 'cancelled';
 
-    -- Tiered Platform Fee: 1, 2, 3, 4, 5
-    v_fee := public.compute_convenience_fee(v_subtotal);
-    v_total := v_subtotal + v_fee;
+    SELECT v.service_charge_pct, v.vat_pct, COALESCE(v.tax_inclusive, false)
+      INTO v_sc_pct, v_vat_pct, v_tax_incl
+    FROM public.bills b
+    JOIN public.venues v ON v.id = b.venue_id
+    WHERE b.id = p_bill_id;
+
+    -- Service charge: flat % of the order subtotal (Bysen standard: 10%)
+    v_service := ROUND(COALESCE(v_subtotal, 0) * COALESCE(v_sc_pct, 0) / 100.0, 2);
+
+    IF COALESCE(v_vat_pct, 0) > 0 THEN
+        IF v_tax_incl THEN
+            -- Menu prices already contain VAT: extract for display, do not add
+            v_vat   := ROUND(v_subtotal - (v_subtotal / (1 + v_vat_pct / 100.0)), 2);
+            v_total := v_subtotal + v_service;
+        ELSE
+            -- VAT added at checkout (matches the checkout screen rows)
+            v_vat   := ROUND(v_subtotal * v_vat_pct / 100.0, 2);
+            v_total := v_subtotal + v_service + v_vat;
+        END IF;
+    ELSE
+        v_total := v_subtotal + v_service;
+    END IF;
 
     SELECT COALESCE(SUM(amount), 0) INTO v_paid
     FROM public.payments
     WHERE bill_id = p_bill_id AND status = 'success';
 
     UPDATE public.bills
-    SET subtotal = v_subtotal,
-        convenience_fee = v_fee,
-        service_charge = 0.00,
-        vat = 0.00,
+    SET subtotal = COALESCE(v_subtotal, 0),
+        convenience_fee = 0.00,
+        service_charge = v_service,
+        vat = v_vat,
         total = v_total,
         amount_paid = v_paid,
         status = CASE
@@ -801,6 +805,8 @@ BEGIN
     WHERE id = p_bill_id;
 END;
 $$;
+
+GRANT EXECUTE ON FUNCTION public.recalculate_single_bill(uuid) TO anon, authenticated, service_role;
 
 CREATE OR REPLACE FUNCTION public.set_order_status(
     p_submission_id uuid,

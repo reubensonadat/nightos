@@ -8,7 +8,7 @@ const faqs = [
   },
   {
     question: "Does Bysen charge monthly subscription fees or transaction fees?",
-    answer: "Bysen does not charge recurring monthly software subscription fees. Instead, we charge a flat platform fee of 10% per transaction, deducted from the venue's settlement — never added to what guests pay. For digital payments via Paystack, this 10% is all-inclusive of processing costs; the venue receives 90% of each transaction."
+    answer: "Bysen does not charge recurring monthly software subscription fees. Instead, a flat 10% service charge is added to every guest bill at checkout. For digital payments via Paystack this 10% is all-inclusive of processing costs; for cash transactions it is itemised on the bill and remitted to Bysen via monthly invoice."
   },
   {
     question: "Can guests use the QR ordering without downloading an app?",

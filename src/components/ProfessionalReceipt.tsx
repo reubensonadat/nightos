@@ -16,14 +16,15 @@ type Props = {
     servedLabel?: string;
     items: ReceiptLine[];
     subtotal: number;
+    serviceCharge?: number;
     vat: number;
     total: number;
 };
 
 /**
  * Professional receipt card — Vendly-style invoice layout, adapted for Bysen:
- * header masthead, meta blocks (Served To / Details), item table, VAT row,
- * Total band. No watermark, no delivery fee, no service charge.
+ * header masthead, meta blocks (Served To / Details), item table, service
+ * charge + VAT rows, Total band. No watermark, no delivery fee.
  */
 export function ProfessionalReceipt({
     venueName,
@@ -34,6 +35,7 @@ export function ProfessionalReceipt({
     servedLabel,
     items,
     subtotal,
+    serviceCharge,
     vat,
     total,
 }: Props) {
@@ -145,13 +147,19 @@ export function ProfessionalReceipt({
                 </table>
             </div>
 
-            {/* ── Totals (no service charge, no delivery fee) ── */}
+            {/* ── Totals ── */}
             <div className="px-7 pt-4 pb-6">
                 <div className="ml-auto w-full max-w-[260px] space-y-1.5 text-[13px]">
                     <div className="flex justify-between text-feldgrau">
                         <span>Subtotal</span>
                         <span className="font-mono tabular-nums">{formatGHS(subtotal)}</span>
                     </div>
+                    {serviceCharge != null && serviceCharge > 0 && (
+                        <div className="flex justify-between text-feldgrau">
+                            <span>Service Charge</span>
+                            <span className="font-mono tabular-nums">{formatGHS(serviceCharge)}</span>
+                        </div>
+                    )}
                     {vat > 0 && (
                         <div className="flex justify-between text-feldgrau">
                             <span>VAT</span>

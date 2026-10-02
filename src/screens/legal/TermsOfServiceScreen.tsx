@@ -162,19 +162,19 @@ export function TermsOfServiceScreen() {
             <h2 className="text-xl font-bold tracking-tight text-white mb-3">2. Pricing, Payouts, and Transaction Fees</h2>
             <div className="space-y-3">
               <p>
-                <strong className="text-white">Revenue Model &amp; Platform Fees:</strong> Bysen does not charge recurring monthly software subscription fees. Instead, Bysen charges a flat platform fee of 10% of each transaction total. This fee is deducted from the Venue’s settlement and is never added to what guests pay. Of the 10%, Paystack’s processing fee (currently 2%) is deducted first and the remainder constitutes Bysen’s platform fee; the Venue receives the remaining 90% of each transaction.
+                <strong className="text-white">Revenue Model &amp; Platform Fees:</strong> Bysen does not charge recurring monthly software subscription fees. Instead, Bysen charges a flat 10% service charge on every guest bill. The service charge appears as its own line at checkout — it is not baked into menu prices. For digital payments, the service charge is collected at settlement via the platform’s Paystack subaccount and is all-inclusive of Paystack’s processing fee (currently 2%); for cash payments it is itemised on the bill and remitted to Bysen via monthly invoice. The Venue receives the remainder of each transaction.
               </p>
               <p>
-                <strong className="text-white">Digital Payment Processing Fees:</strong> For digital payments processed via Paystack, the total deduction per digital transaction is the flat 10% platform fee outlined above, which is inclusive of Paystack’s processing fee (currently 2%).
+                <strong className="text-white">Digital Payment Processing Fees:</strong> For digital payments processed via Paystack, the 10% service charge included in the amount the guest pays is all-inclusive of Paystack’s processing fee (currently 2%). Paystack settles the remainder of each transaction directly to the Venue’s linked subaccount.
               </p>
               <p>
-                <strong className="text-white">Third-Party Rate Changes:</strong> If Paystack adjusts its processing fees, Bysen’s share of the flat 10% platform fee adjusts accordingly so the total deduction remains 10%. Bysen will provide at least 30 days’ written notice before any change to the Bysen platform fee takes effect.
+                <strong className="text-white">Third-Party Rate Changes:</strong> If Paystack adjusts its processing fees, Bysen’s share of the 10% service charge adjusts accordingly so the guest-facing charge remains 10%. Bysen will provide at least 30 days’ written notice before any change to the Bysen service charge takes effect.
               </p>
               <p>
                 <strong className="text-white">Fund Handling &amp; Settlement:</strong> All settlements and payouts are made directly to the Venue operator’s designated bank account or registered mobile money wallet. Bysen does not hold, touch, or manage the Venue’s funds. Paystack routes the applicable fees and disburses the remaining funds directly to the Venue based on their processing timelines.
               </p>
               <p>
-                <strong className="text-white">Cash Transactions and Invoicing:</strong> For transactions processed in physical cash and logged into the Platform, only the flat 10% Bysen platform fee applies. These fees will be billed to the Venue via a monthly invoice. This invoice is subject to a 5-day grace period, after which platform access may be restricted until payment is resolved. Bysen reserves the right to audit cash transaction logs against sales records.
+                <strong className="text-white">Cash Transactions and Invoicing:</strong> For transactions processed in physical cash and logged into the Platform, the 10% service charge applies (collected as part of the cash the guest hands over). These fees will be billed to the Venue via a monthly invoice. This invoice is subject to a 5-day grace period, after which platform access may be restricted until payment is resolved. Bysen reserves the right to audit cash transaction logs against sales records.
               </p>
               <p>
                 <strong className="text-white">Refunds, Disputes, and Chargebacks:</strong> Refund requests are handled by the Venue directly. Chargebacks and payment disputes initiated through Paystack are governed by Paystack’s own dispute process. Bysen will provide transaction records to support a Venue’s response but is not a party to the dispute.

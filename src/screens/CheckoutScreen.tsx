@@ -82,6 +82,11 @@ export function CheckoutScreen({ total, billId, venueId, sessionToken, onBack, o
     const [countdownLeft, setCountdownLeft] = useState<number | null>(null);
     const [lastReference, setLastReference] = useState<string | null>(null);
     const [cashRequested, setCashRequested] = useState(false);
+    const [split, setSplit] = useState<{
+        subaccount?: string | null;
+        transaction_charge_pesewas?: number;
+        debt_clawback?: number;
+    } | null>(null);
 
     useEffect(() => {
         if (!billId) return;
@@ -104,7 +109,7 @@ export function CheckoutScreen({ total, billId, venueId, sessionToken, onBack, o
                         if (t?.table_label) setTableLabel(t.table_label);
                     }
                 },
-                () => {},
+                () => { },
             );
         if (venueId) {
             db.venueById(venueId)
@@ -112,13 +117,26 @@ export function CheckoutScreen({ total, billId, venueId, sessionToken, onBack, o
                     ({ data }) => {
                         if (!cancelled && data) setVenue(data);
                     },
-                    () => {},
+                    () => { },
                 );
         }
         return () => {
             cancelled = true;
         };
     }, [billId, venueId]);
+
+    // ── Paystack subaccount split: 10% service charge + fee-debt clawback ──
+    useEffect(() => {
+        const remaining = bill ? Number(bill.total || 0) - Number(bill.amount_paid || 0) : 0;
+        if (!venueId || !bill || remaining <= 0) return;
+        let cancelled = false;
+        db.getDynamicPaystackSplit(venueId, Number(bill.subtotal || 0)).then(({ data }) => {
+            if (!cancelled && data) setSplit(data);
+        });
+        return () => {
+            cancelled = true;
+        };
+    }, [venueId, bill]);
 
     // ── Live Supabase Realtime Settlement Listeners ──
     useRealtime({
@@ -190,6 +208,13 @@ export function CheckoutScreen({ total, billId, venueId, sessionToken, onBack, o
         };
     }, [bill, total, venue]);
 
+    // Platform share (pesewas) Paystack routes to the Bysen account — never
+    // more than 90% of what the guest pays, even with debt clawback.
+    const splitChargePesewas =
+        split?.subaccount && Number(split.transaction_charge_pesewas || 0) > 0
+            ? Math.min(Number(split.transaction_charge_pesewas), Math.round(payAmount * 0.9 * 100))
+            : 0;
+
     // Cash never charges the customer directly — a waiter confirms the payment on their
     // own device. The customer-side CTA is a request for the waiter.
     const handleCashRequest = async () => {
@@ -223,6 +248,15 @@ export function CheckoutScreen({ total, billId, venueId, sessionToken, onBack, o
         }
     };
 
+    /** Settles any fee-debt clawback that was bundled into this transaction. */
+    const reconcileFeeDebt = () => {
+        const clawback = Number(split?.debt_clawback || 0);
+        if (!venueId || clawback <= 0) return Promise.resolve();
+        return db.reconcileVenueFeeDebt(venueId, null, clawback).catch((err) => {
+            console.warn('[CheckoutScreen] fee debt reconcile failed:', err);
+        });
+    };
+
     const handlePaystackSuccess = async (reference: string) => {
         if (!billId) return;
         setLastReference(reference);
@@ -235,6 +269,7 @@ export function CheckoutScreen({ total, billId, venueId, sessionToken, onBack, o
                 setVerifying(false);
                 setPaying(false);
                 setPaid(true);
+                void reconcileFeeDebt();
                 window.setTimeout(onPaid, 1800);
                 return;
             }
@@ -256,6 +291,7 @@ export function CheckoutScreen({ total, billId, venueId, sessionToken, onBack, o
                 setPaying(false);
                 setNeedsCheck(false);
                 setPaid(true);
+                void reconcileFeeDebt();
                 window.setTimeout(onPaid, 1800);
                 return;
             }
@@ -307,7 +343,7 @@ export function CheckoutScreen({ total, billId, venueId, sessionToken, onBack, o
                         <p className="mt-2 text-[13px] leading-relaxed text-feldgrau">
                             Your payment has been received and your table bill is settled.
                         </p>
-                        
+
                         <div className="mt-5 w-full rounded-2xl bg-white p-4 text-left shadow-[0_4px_16px_rgba(35,20,12,0.04)] ring-1 ring-isabelline">
                             <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-feldgrau mb-2 text-center">Order Summary</p>
                             <div className="flex justify-between items-center py-2 border-b border-isabelline">
@@ -635,6 +671,8 @@ export function CheckoutScreen({ total, billId, venueId, sessionToken, onBack, o
                         amount={payAmount}
                         billId={billId}
                         venueId={venueId}
+                        subaccount={split?.subaccount ?? null}
+                        transactionCharge={splitChargePesewas || null}
                         channels={method === 'momo' ? ['mobile_money'] : ['card']}
                         onSuccess={handlePaystackSuccess}
                         onClose={() => setPaying(false)}
