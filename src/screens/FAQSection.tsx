@@ -8,7 +8,7 @@ const faqs = [
   },
   {
     question: "Does Bysen charge monthly subscription fees or transaction fees?",
-    answer: "Bysen does not charge recurring monthly software subscription fees. Instead, we charge a tiered platform fee per transaction based on the order total (from 1.00 GHS for orders up to 50 GHS, up to 15.00 GHS for orders over 700 GHS). Digital payments via Paystack carry a separate 2% processing fee."
+    answer: "Bysen does not charge recurring monthly software subscription fees. Instead, a flat 10% service charge is added to every guest bill at checkout. For digital payments via Paystack this 10% is all-inclusive of processing costs; for cash transactions it is itemised on the bill and remitted to Bysen via monthly invoice."
   },
   {
     question: "Can guests use the QR ordering without downloading an app?",
@@ -37,7 +37,7 @@ export function FAQSection() {
         <h2 className="font-brand text-[35px] font-bold mb-12 text-center md:text-left">
           Frequently Asked Questions
         </h2>
-        
+
         <div className="flex flex-col border-t border-[#1a110b]/10">
           {faqs.map((faq, index) => {
             const isOpen = openIndex === index;
@@ -51,13 +51,13 @@ export function FAQSection() {
                     {faq.question}
                   </span>
                   <div className="flex-shrink-0 ml-4">
-                    <ChevronDownIcon 
-                      className={`w-5 h-5 transition-transform duration-300 ease-spring ${isOpen ? 'rotate-180 text-[#c9935a]' : 'text-[#1a110b]'}`} 
+                    <ChevronDownIcon
+                      className={`w-5 h-5 transition-transform duration-300 ease-spring ${isOpen ? 'rotate-180 text-[#c9935a]' : 'text-[#1a110b]'}`}
                     />
                   </div>
                 </button>
-                
-                <div 
+
+                <div
                   className={`overflow-hidden transition-all duration-300 ease-spring ${isOpen ? 'max-h-96 opacity-100 pb-6' : 'max-h-0 opacity-0'}`}
                 >
                   <p className="font-['Inter'] text-[15px] font-normal leading-relaxed text-[#1a110b]/80 pr-8 md:pr-12">

@@ -31,6 +31,11 @@ type Props = {
   billId: string;
   venueId: string;
   channels?: ('card' | 'mobile_money')[];
+  /** Paystack subaccount code (ACCT_xxx) — when set, Paystack settles the
+   *  transaction_charge (pesewas) to the platform and the rest to the venue. */
+  subaccount?: string | null;
+  /** Amount (in pesewas) routed to the platform subaccount settlement. */
+  transactionCharge?: number | null;
   onSuccess: (reference: string) => void;
   onClose?: () => void;
   children?: React.ReactNode;
@@ -44,6 +49,8 @@ export function PaystackButton({
   billId,
   venueId,
   channels,
+  subaccount,
+  transactionCharge,
   onSuccess,
   onClose,
   children,
@@ -97,6 +104,10 @@ export function PaystackButton({
       amount: amountPesewas,
       currency: 'GHS',
       ref,
+      ...(subaccount ? { subaccount, bearer: 'account' } : {}),
+      ...(subaccount && transactionCharge && transactionCharge > 0
+        ? { transaction_charge: Math.round(transactionCharge) }
+        : {}),
       ...(channels && channels.length > 0 ? { channels } : {}),
       metadata: {
         bill_id: billId,
@@ -113,7 +124,7 @@ export function PaystackButton({
 
     const handler = window.PaystackPop.setup(config);
     handler.openIframe();
-  }, [amount, billId, venueId, email, channels, onSuccess, onClose]);
+  }, [amount, billId, venueId, email, channels, subaccount, transactionCharge, onSuccess, onClose]);
 
   return (
     <button

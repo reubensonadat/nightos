@@ -41,6 +41,9 @@ export type DbVenue = {
   brand_danger: string | null;
   brand_light_blue: string | null;
   fulfillment_mode?: 'bar' | 'kitchen';
+  paystack_subaccount_code?: string | null;
+  settlement_bank_code?: string | null;
+  settlement_account_number?: string | null;
 };
 
 export type DbTable = {

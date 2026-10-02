@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
     SparklesIcon,
     ShieldCheckIcon,
@@ -36,6 +36,28 @@ export function VipTableDepositScreen({
     const [paying, setPaying] = useState(false);
     const [paid, setPaid] = useState(false);
     const [selectedChannel, setSelectedChannel] = useState<"both" | "momo" | "card">("both");
+    const [split, setSplit] = useState<{
+        subaccount?: string | null;
+        transaction_charge_pesewas?: number;
+        debt_clawback?: number;
+    } | null>(null);
+
+    // Pre-fetch the Paystack subaccount split for this deposit
+    useEffect(() => {
+        if (!venueId || minDeposit <= 0) return;
+        let cancelled = false;
+        db.getDynamicPaystackSplit(venueId, minDeposit).then(({ data }) => {
+            if (!cancelled && data) setSplit(data);
+        });
+        return () => {
+            cancelled = true;
+        };
+    }, [venueId, minDeposit]);
+
+    const splitChargePesewas =
+        split?.subaccount && Number(split.transaction_charge_pesewas || 0) > 0
+            ? Math.min(Number(split.transaction_charge_pesewas), Math.round(minDeposit * 0.9 * 100))
+            : 0;
 
     const handlePaystackSuccess = async (reference: string) => {
         setPaying(true);
@@ -48,6 +70,12 @@ export function VipTableDepositScreen({
                 reference,
                 method: selectedChannel === "momo" ? "mobile_money" : selectedChannel === "card" ? "card" : "paystack",
             });
+
+            // 1b. Settle any fee-debt clawback bundled into this deposit charge
+            const clawback = Number(split?.debt_clawback || 0);
+            if (clawback > 0) {
+                db.reconcileVenueFeeDebt(venueId, null, clawback).catch(() => undefined);
+            }
 
             // 2. Automatically save PIN if present so guest is unlocked
             if (tablePin) {
@@ -234,6 +262,8 @@ export function VipTableDepositScreen({
                             amount={minDeposit}
                             billId={billId}
                             venueId={venueId}
+                            subaccount={split?.subaccount ?? null}
+                            transactionCharge={splitChargePesewas || null}
                             channels={
                                 selectedChannel === "momo"
                                     ? ["mobile_money"]

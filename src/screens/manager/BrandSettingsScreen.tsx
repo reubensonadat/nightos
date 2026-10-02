@@ -46,9 +46,15 @@ export function BrandSettingsScreen({ venueId }: Props) {
   // Tax & Fees
   const [vatEnabled, setVatEnabled] = useState(false);
   const [vatPct, setVatPct] = useState<number>(12.5);
+  const [serviceChargePct, setServiceChargePct] = useState<number>(10);
   const [taxInclusive, setTaxInclusive] = useState(false);
   const [paymentModel, setPaymentModel] = useState<"PREPAY" | "POSTPAY">("POSTPAY");
   const [fulfillmentMode, setFulfillmentMode] = useState<"bar" | "kitchen">("bar");
+
+  // Paystack payout (subaccount) details
+  const [subaccountCode, setSubaccountCode] = useState("");
+  const [bankCode, setBankCode] = useState("");
+  const [accountNumber, setAccountNumber] = useState("");
 
   // Brand colors
   const [primaryColor, setPrimaryColor] = useState("#1C130D");
@@ -66,11 +72,16 @@ export function BrandSettingsScreen({ venueId }: Props) {
     const hasVat = (data.vat_pct ?? 0) > 0;
     setVatEnabled(hasVat);
     setVatPct(hasVat ? data.vat_pct : 12.5);
+    setServiceChargePct(Number(data.service_charge_pct ?? 10) || 0);
 
     setTaxInclusive(data.tax_inclusive ?? false);
     setPaymentModel(data.payment_model ?? "POSTPAY");
     const savedMode = (data.fulfillment_mode as "bar" | "kitchen") || (typeof window !== "undefined" ? localStorage.getItem(`bysen_venue_fulfillment_${data.id}`) as "bar" | "kitchen" : null) || "bar";
     setFulfillmentMode(savedMode);
+
+    setSubaccountCode(data.paystack_subaccount_code || "");
+    setBankCode(data.settlement_bank_code || "");
+    setAccountNumber(data.settlement_account_number || "");
 
     setPrimaryColor(data.brand_primary || "#1C130D");
     setAccentColor(data.brand_accent || "#C5A880");
@@ -119,9 +130,12 @@ export function BrandSettingsScreen({ venueId }: Props) {
         phone: phone.trim() || null,
         email: email.trim() || null,
         vat_pct: computedVat,
-        service_charge_pct: 0,
+        service_charge_pct: serviceChargePct,
         tax_inclusive: taxInclusive,
         payment_model: paymentModel,
+        paystack_subaccount_code: subaccountCode.trim() || null,
+        settlement_bank_code: bankCode.trim() || null,
+        settlement_account_number: accountNumber.trim() || null,
         brand_primary: primaryColor,
         brand_accent: accentColor,
       };
@@ -156,8 +170,12 @@ export function BrandSettingsScreen({ venueId }: Props) {
     setEmail("");
     setVatEnabled(false);
     setVatPct(12.5);
+    setServiceChargePct(10);
     setTaxInclusive(false);
     setPaymentModel("POSTPAY");
+    setSubaccountCode("");
+    setBankCode("");
+    setAccountNumber("");
     setPrimaryColor("#1C130D");
     setAccentColor("#C5A880");
     setShowResetModal(false);
@@ -184,6 +202,11 @@ export function BrandSettingsScreen({ venueId }: Props) {
       previewTotal = Math.round((previewSubtotal + previewVatAmount) * 100) / 100;
     }
   }
+
+  // Service charge: flat % of the raw order subtotal (same rule as the DB trigger)
+  const previewServiceCharge =
+    Math.round((previewBase * (Number(serviceChargePct) || 0) / 100) * 100) / 100;
+  previewTotal = Math.round((previewTotal + previewServiceCharge) * 100) / 100;
 
   if (loading) {
     return (
@@ -409,6 +432,29 @@ export function BrandSettingsScreen({ venueId }: Props) {
               )}
             </div>
 
+            {/* 1b. Service Charge */}
+            <div className="py-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+              <div>
+                <h3 className="text-sm font-bold text-licorice">Service Charge</h3>
+                <p className="mt-0.5 text-xs text-feldgrau">
+                  Flat percentage added to every guest bill at checkout and shown as its own line
+                  on the bill. Bysen standard: 10%.
+                </p>
+              </div>
+              <div className="relative shrink-0">
+                <input
+                  type="number"
+                  step="0.5"
+                  min="0"
+                  max="30"
+                  value={serviceChargePct}
+                  onChange={(e) => setServiceChargePct(parseFloat(e.target.value) || 0)}
+                  className="w-28 rounded-xl border border-licorice/15 bg-isabelline/30 px-3.5 py-1.5 font-mono text-sm font-bold text-licorice shadow-sm focus:border-licorice focus:bg-white focus:outline-none"
+                />
+                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-feldgrau">%</span>
+              </div>
+            </div>
+
             {/* 2. Menu Pricing Model */}
             <div className="py-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
               <div>
@@ -549,6 +595,12 @@ export function BrandSettingsScreen({ venueId }: Props) {
                     <span>Subtotal {taxInclusive && vatEnabled ? "(Net)" : ""}</span>
                     <span>{formatGHS(previewSubtotal)}</span>
                   </div>
+                  {serviceChargePct > 0 && (
+                    <div className="flex justify-between text-feldgrau">
+                      <span>Service Charge ({serviceChargePct}%)</span>
+                      <span>{formatGHS(previewServiceCharge)}</span>
+                    </div>
+                  )}
                   {vatEnabled && (
                     <div className="flex justify-between text-feldgrau">
                       <span>VAT ({vatPct}% {taxInclusive ? "incl." : "added"})</span>
@@ -561,6 +613,63 @@ export function BrandSettingsScreen({ venueId }: Props) {
                   </div>
                 </div>
               </div>
+            </div>
+          </div>
+        </div>
+
+        {/* ── SECTION 2b: PAYSTACK PAYOUT DETAILS ── */}
+        <div className="rounded-[1.75rem] border border-licorice/8 bg-white p-6 sm:p-8 shadow-[0_4px_20px_rgba(35,20,12,0.03)] space-y-6">
+          <div className="flex items-center gap-3 border-b border-isabelline pb-4">
+            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-isabelline text-licorice">
+              <CurrencyDollarIcon className="h-5 w-5" strokeWidth={2} />
+            </div>
+            <div>
+              <h2 className="font-serif text-lg font-bold text-licorice">Paystack Payout Details</h2>
+              <p className="text-xs text-feldgrau">
+                Where Paystack settles this venue's money. Create the subaccount in your Paystack
+                dashboard (Settings → Subaccounts) with the venue's bank details, then paste the
+                ACCT_xxxx code here. Guest payments then settle directly to the venue with only the
+                10% service charge routed to Bysen.
+              </p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 gap-5 sm:grid-cols-3">
+            <div>
+              <label className="block text-[11px] font-bold uppercase tracking-wider text-feldgrau mb-1.5">
+                Subaccount Code
+              </label>
+              <input
+                type="text"
+                value={subaccountCode}
+                onChange={(e) => setSubaccountCode(e.target.value)}
+                placeholder="ACCT_xxxxxxxxxxxx"
+                className="w-full rounded-xl border border-licorice/15 bg-isabelline/30 px-4 py-2.5 text-sm font-semibold text-licorice placeholder:text-feldgrau/40 transition-all focus:border-licorice focus:bg-white focus:outline-none focus:ring-1 focus:ring-licorice"
+              />
+            </div>
+            <div>
+              <label className="block text-[11px] font-bold uppercase tracking-wider text-feldgrau mb-1.5">
+                Settlement Bank Code
+              </label>
+              <input
+                type="text"
+                value={bankCode}
+                onChange={(e) => setBankCode(e.target.value)}
+                placeholder="e.g. 030100 (GCB)"
+                className="w-full rounded-xl border border-licorice/15 bg-isabelline/30 px-4 py-2.5 text-sm font-semibold text-licorice placeholder:text-feldgrau/40 transition-all focus:border-licorice focus:bg-white focus:outline-none focus:ring-1 focus:ring-licorice"
+              />
+            </div>
+            <div>
+              <label className="block text-[11px] font-bold uppercase tracking-wider text-feldgrau mb-1.5">
+                Account Number
+              </label>
+              <input
+                type="text"
+                value={accountNumber}
+                onChange={(e) => setAccountNumber(e.target.value)}
+                placeholder="Venue bank / momo account number"
+                className="w-full rounded-xl border border-licorice/15 bg-isabelline/30 px-4 py-2.5 text-sm font-semibold text-licorice placeholder:text-feldgrau/40 transition-all focus:border-licorice focus:bg-white focus:outline-none focus:ring-1 focus:ring-licorice"
+              />
             </div>
           </div>
         </div>
