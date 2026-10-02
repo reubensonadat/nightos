@@ -21,6 +21,7 @@ import { OrdersScreen } from "./screens/OrdersScreen";
 import { CustomerBottomNav } from "./components/CustomerBottomNav";
 import { PartyPrompt } from "./components/PartyPrompt";
 import { TablePinModal } from "./components/TablePinModal";
+import { DepositWelcomeModal } from "./components/DepositWelcomeModal";
 import { VipTableDepositScreen } from "./screens/VipTableDepositScreen";
 import { ClockIcon, BuildingStorefrontIcon } from "@heroicons/react/24/outline";
 import { LoadingScreen } from "./components/LoadingScreen";
@@ -183,6 +184,22 @@ function CustomerShell({
     },
     [updateParty, session, setTab],
   );
+
+  // VIP Table Credit Welcome Modal State
+  const [depositWelcomeDismissed, setDepositWelcomeDismissed] = useState<boolean>(false);
+  const isDepositActive = Boolean(bill?.deposit_paid && Number(bill?.deposit_amount || 0) > 0);
+  const showDepositWelcome =
+    isDepositActive &&
+    pinUnlocked &&
+    !partyPromptOpen &&
+    !depositWelcomeDismissed &&
+    (() => {
+      try {
+        return sessionStorage.getItem(`nightos:deposit_welcome:${bill?.id}`) !== "1";
+      } catch {
+        return true;
+      }
+    })();
 
   useEffect(() => {
     let cancelled = false;
@@ -503,6 +520,22 @@ function CustomerShell({
           initialSize={bill?.guest_count || session?.party_size || 1}
           onConfirm={handlePartyConfirm}
           onClose={() => setPartyPromptOpen(false)}
+        />
+      )}
+
+      {showDepositWelcome && bill && (
+        <DepositWelcomeModal
+          venueName={venueName}
+          tableLabel={tableLabel}
+          depositAmount={Number(bill.deposit_amount || 0)}
+          onClose={() => {
+            try {
+              sessionStorage.setItem(`nightos:deposit_welcome:${bill.id}`, "1");
+            } catch {
+              /* noop */
+            }
+            setDepositWelcomeDismissed(true);
+          }}
         />
       )}
     </div>

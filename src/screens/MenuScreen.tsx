@@ -250,31 +250,6 @@ export function MenuScreen({
                     </div>
                 )}
 
-                {/* ── VIP Deposit Credit Banner ── */}
-                {depositCredit && depositCredit.paid && depositCredit.amount > 0 && (
-                    <div
-                        onClick={onViewCart}
-                        role="button"
-                        tabIndex={0}
-                        className="bg-licorice text-isabelline px-5 md:px-8 py-2 border-b border-khaki/20 flex items-center justify-between shadow-xs cursor-pointer hover:bg-licorice/95 transition-colors"
-                        title="Click to view tab and credit breakdown"
-                    >
-                        <div className="flex items-center gap-2">
-                            <span className="flex h-5 w-5 items-center justify-center rounded-full bg-khaki/20 text-[11px]">👑</span>
-                            <span className="text-[11px] font-bold text-khaki uppercase tracking-wider">
-                                VIP Table Credit
-                            </span>
-                        </div>
-                        <div className="flex items-center gap-1.5 font-mono text-[12px]">
-                            <span className="font-bold text-emerald-400">
-                                {formatGHS(depositCredit.remaining)}
-                            </span>
-                            <span className="text-[10px] text-isabelline/60">
-                                remaining of {formatGHS(depositCredit.amount)}
-                            </span>
-                        </div>
-                    </div>
-                )}
 
                 {/* ── Row 1: Venue & Status ── */}
                 <div className={`mx-auto flex w-full max-w-7xl items-center justify-between px-5 md:px-8 ${!tablePin ? 'pt-[max(env(safe-area-inset-top),14px)]' : 'pt-2'} pb-2.5`}>

@@ -20,6 +20,7 @@ import {
     CheckCircleIcon,
     InformationCircleIcon,
     CheckBadgeIcon,
+    CurrencyDollarIcon,
 } from "@heroicons/react/24/outline";
 import toast from "react-hot-toast";
 import { formatGHS } from "../../data/menu";
@@ -83,6 +84,7 @@ type BarTicket = {
     id: string;
     submissionId: string;
     billId: string;
+    billStatus?: string;
     tableNumber: number;
     tableLabel: string;
     waiterId: string | null;
@@ -368,56 +370,60 @@ export function BarStationScreen({ venueId, staffId, staffName, onExit, onSignOu
             const waiterMap: Record<string, string> = {};
             for (const s of staffRows ?? []) waiterMap[s.id] = s.name;
 
-            const mapped: BarTicket[] = rows
-                .filter((r: any) => {
-                    const bill = Array.isArray(r.bills) ? r.bills[0] : r.bills;
-                    return bill?.status !== "cancelled" && r.status !== "cancelled";
-                })
-                .map((r: any) => {
-                    const bill = Array.isArray(r.bills) ? r.bills[0] : r.bills;
-                    const table = Array.isArray(bill?.tables) ? bill?.tables[0] : bill?.tables;
-                    const items: TicketItem[] = (r.order_items || []).map((it: any) => {
-                        const matchedProduct = products.find(
-                            (p: DbProduct) => p.id === it.product_id || p.name.toLowerCase() === (it.product_name || "").toLowerCase()
-                        ) || FALLBACK_DRINKS.find(
-                            f => f.id === it.product_id || f.name.toLowerCase() === (it.product_name || "").toLowerCase()
-                        );
-                        const unitPrice = Number(it.unit_price ?? matchedProduct?.price ?? 0);
-                        const quantity = Number(it.quantity || 1);
-                        const lineTotal = Number(it.line_total ?? (unitPrice * quantity));
+            const mapped: BarTicket[] = rows.map((r: any) => {
+                const bill = Array.isArray(r.bills) ? r.bills[0] : r.bills;
+                const table = Array.isArray(bill?.tables) ? bill?.tables[0] : bill?.tables;
+                const billStatus = bill?.status || "open";
 
-                        return {
-                            productId: it.product_id || matchedProduct?.id,
-                            name: it.product_name,
-                            quantity,
-                            unitPrice,
-                            lineTotal,
-                            notes: it.notes || null,
-                        };
-                    });
+                // If parent bill was cancelled, mark status as cancelled
+                let effectiveStatus = r.status;
+                if (billStatus === "cancelled" && effectiveStatus !== "served") {
+                    effectiveStatus = "cancelled";
+                }
 
-                    const totalAmount = items.reduce((sum, it) => sum + (it.lineTotal || 0), 0);
-
-                    const billWaiterId = bill?.waiter_id || null;
-                    const isWaiterOnDuty = billWaiterId ? activeStaffIds.has(billWaiterId) : false;
-                    const waiterName = isWaiterOnDuty && billWaiterId ? (waiterMap[billWaiterId] || "Staff") : "Unassigned";
+                const items: TicketItem[] = (r.order_items || []).map((it: any) => {
+                    const matchedProduct = products.find(
+                        (p: DbProduct) => p.id === it.product_id || p.name.toLowerCase() === (it.product_name || "").toLowerCase()
+                    ) || FALLBACK_DRINKS.find(
+                        f => f.id === it.product_id || f.name.toLowerCase() === (it.product_name || "").toLowerCase()
+                    );
+                    const unitPrice = Number(it.unit_price ?? matchedProduct?.price ?? 0);
+                    const quantity = Number(it.quantity || 1);
+                    const lineTotal = Number(it.line_total ?? (unitPrice * quantity));
 
                     return {
-                        id: r.id,
-                        submissionId: r.id,
-                        billId: r.bill_id,
-                        tableNumber: table?.table_number ?? 0,
-                        tableLabel: table?.table_label || `Table ${table?.table_number || "?"}`,
-                        waiterId: billWaiterId,
-                        waiterName,
-                        guestName: r.guest_name || "Guest",
-                        status: r.status,
-                        placedAt: r.created_at,
-                        notes: r.notes || null,
-                        items,
-                        totalAmount,
+                        productId: it.product_id || matchedProduct?.id,
+                        name: it.product_name,
+                        quantity,
+                        unitPrice,
+                        lineTotal,
+                        notes: it.notes || null,
                     };
                 });
+
+                const totalAmount = items.reduce((sum, it) => sum + (it.lineTotal || 0), 0);
+
+                const billWaiterId = bill?.waiter_id || null;
+                const isWaiterOnDuty = billWaiterId ? activeStaffIds.has(billWaiterId) : false;
+                const waiterName = isWaiterOnDuty && billWaiterId ? (waiterMap[billWaiterId] || "Staff") : "Unassigned";
+
+                return {
+                    id: r.id,
+                    submissionId: r.id,
+                    billId: r.bill_id,
+                    billStatus,
+                    tableNumber: table?.table_number ?? 0,
+                    tableLabel: table?.table_label || `Table ${table?.table_number || "?"}`,
+                    waiterId: billWaiterId,
+                    waiterName,
+                    guestName: r.guest_name || "Guest",
+                    status: effectiveStatus,
+                    placedAt: r.created_at,
+                    notes: r.notes || null,
+                    items,
+                    totalAmount,
+                };
+            });
 
             setRawTickets(mapped);
         } catch (err) {
@@ -431,8 +437,7 @@ export function BarStationScreen({ venueId, staffId, staffName, onExit, onSignOu
         void loadTickets();
     }, [loadTickets]);
 
-    // Realtime listener for incoming orders — disabled until the venue id is
-    // resolved so we never subscribe to the whole table across all venues.
+    // Realtime listeners for incoming orders, table closures, and item updates
     const venueReady = Boolean(venueId && venueId !== "00000000-0000-0000-0000-000000000000");
     useRealtime({
         table: "order_submissions",
@@ -443,10 +448,27 @@ export function BarStationScreen({ venueId, staffId, staffName, onExit, onSignOu
         onDelete: loadTickets,
     });
 
-    // Active tickets awaiting pouring
+    useRealtime({
+        table: "bills",
+        filter: `venue_id=eq.${venueId}`,
+        enabled: venueReady,
+        onInsert: loadTickets,
+        onUpdate: loadTickets,
+        onDelete: loadTickets,
+    });
+
+    useRealtime({
+        table: "order_items",
+        enabled: venueReady,
+        onInsert: loadTickets,
+        onUpdate: loadTickets,
+        onDelete: loadTickets,
+    });
+
+    // Active tickets awaiting pouring (FIFO)
     const activeTickets = useMemo(() => {
         return rawTickets
-            .filter(t => t.status === "pending" || t.status === "confirmed" || t.status === "preparing")
+            .filter(t => (t.status === "pending" || t.status === "confirmed" || t.status === "preparing") && t.billStatus !== "cancelled" && t.billStatus !== "closed")
             .sort((a, b) => {
                 const timeA = Date.parse(a.placedAt) || 0;
                 const timeB = Date.parse(b.placedAt) || 0;
@@ -454,10 +476,26 @@ export function BarStationScreen({ venueId, staffId, staffName, onExit, onSignOu
             });
     }, [rawTickets]);
 
-    // Dispense action: "POURED ✓"
+    // Inactive tickets: Served / Ready / Cancelled / Table Ended (LIFO: newest first at bottom)
+    const inactiveTickets = useMemo(() => {
+        return rawTickets
+            .filter(t => t.status === "ready" || t.status === "served" || t.status === "cancelled" || t.billStatus === "cancelled" || t.billStatus === "closed")
+            .sort((a, b) => {
+                const timeA = Date.parse(a.placedAt) || 0;
+                const timeB = Date.parse(b.placedAt) || 0;
+                return timeB - timeA;
+            });
+    }, [rawTickets]);
+
+    // Combined queue: Active orders at top, greyed out finished/cancelled at bottom
+    const allDisplayTickets = useMemo(() => {
+        return [...activeTickets, ...inactiveTickets];
+    }, [activeTickets, inactiveTickets]);
+
+    // Dispense action: "SERVED ✓"
     const handleDispenseTicket = async (ticket: BarTicket) => {
         try {
-            await db.setOrderStatus(ticket.submissionId, "ready", staffId);
+            await db.setOrderStatus(ticket.submissionId, "served", staffId);
 
             // Record drawn items into shift
             if (activeShift) {
@@ -476,7 +514,7 @@ export function BarStationScreen({ venueId, staffId, staffName, onExit, onSignOu
             }
 
             setRecentlyPoured(prev => [ticket, ...prev.slice(0, 7)]);
-            toast.success(`Served for ${ticket.tableLabel}! Waiter notified.`, { icon: "🍹" });
+            toast.success(`Served for ${ticket.tableLabel}!`, { icon: "🍹" });
             void loadTickets();
         } catch (err) {
             console.error("Failed to dispense ticket:", err);
@@ -1220,72 +1258,91 @@ export function BarStationScreen({ venueId, staffId, staffName, onExit, onSignOu
             {activeTab === "QUEUE" && (
                 <main className="flex-1 max-w-5xl mx-auto w-full p-4 sm:p-6 space-y-5">
                     {/* Orders Queue List */}
-                    {activeTickets.length === 0 ? (
-                        <div className="rounded-lg bg-white p-12 border border-[#1A110B]/10 text-center space-y-2">
-                            <div className="h-10 w-10 rounded-md bg-emerald-100 text-emerald-800 flex items-center justify-center mx-auto text-lg font-bold">
+                    {allDisplayTickets.length === 0 ? (
+                        <div className="rounded-xl bg-white p-12 border border-[#1A110B]/10 text-center space-y-2 shadow-sm">
+                            <div className="h-10 w-10 rounded-full bg-emerald-100 text-emerald-800 flex items-center justify-center mx-auto text-lg font-bold">
                                 ✓
                             </div>
-                            <h3 className="font-black text-base text-[#1A110B]">All Table Drinks Dispensed!</h3>
+                            <h3 className="font-bold text-base text-[#1A110B]">All Table Drinks Dispensed!</h3>
                             <p className="text-xs text-[#606F69] max-w-sm mx-auto">
                                 The bar queue is clear. New drink tickets submitted by table waiters will stream in automatically.
                             </p>
                         </div>
                     ) : (
                         <div className="space-y-3">
-                            {activeTickets.map(ticket => {
+                            {allDisplayTickets.map(ticket => {
                                 const waitMins = Math.floor((Date.now() - new Date(ticket.placedAt).getTime()) / 60000);
                                 const isUrgent = waitMins >= 8;
+                                const isActive = (ticket.status === "pending" || ticket.status === "confirmed" || ticket.status === "preparing") && ticket.billStatus !== "cancelled" && ticket.billStatus !== "closed";
+                                const isCancelled = ticket.status === "cancelled" || ticket.billStatus === "cancelled";
+                                const isTableEnded = ticket.billStatus === "closed" && !isCancelled;
+                                const isServed = ticket.status === "served" || ticket.status === "ready";
 
                                 return (
                                     <div
                                         key={ticket.id}
-                                        className={`rounded-lg bg-white p-4 sm:p-5 border transition shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4 ${
-                                            isUrgent
-                                                ? "border-rose-300 bg-rose-50/20"
-                                                : "border-[#1A110B]/10 hover:border-[#1A110B]/20"
+                                        className={`rounded-xl p-4 sm:p-5 border transition flex flex-col sm:flex-row sm:items-center justify-between gap-4 ${
+                                            isActive
+                                                ? isUrgent
+                                                    ? "bg-white border-rose-300 shadow-sm"
+                                                    : "bg-white border-[#1A110B]/10 hover:border-[#1A110B]/20 shadow-sm"
+                                                : "bg-white/60 border-slate-200/80 opacity-60"
                                         }`}
                                     >
                                         {/* Ticket Details */}
-                                        <div className="space-y-2.5 min-w-0 flex-1">
+                                        <div className="space-y-2 min-w-0 flex-1">
                                             {/* Top info */}
                                             <div className="flex items-center gap-2.5 flex-wrap">
-                                                <span className="rounded-md bg-[#1A110B] text-white px-2.5 py-1 text-xs font-black tracking-tight">
+                                                <span className={`rounded-md px-2.5 py-1 text-xs font-bold tracking-tight ${
+                                                    isActive ? "bg-[#1A110B] text-white" : "bg-slate-700 text-white"
+                                                }`}>
                                                     {ticket.tableLabel}
                                                 </span>
-                                                <span className="inline-flex items-center gap-1 text-xs font-bold text-[#1A110B]">
+                                                <span className="inline-flex items-center gap-1 text-xs font-medium text-[#1A110B]">
                                                     <UserIcon className="h-3.5 w-3.5 text-[#606F69]" />
                                                     <span>{ticket.waiterName}</span>
                                                 </span>
-                                                <span
-                                                    className={`rounded-md px-2 py-0.5 text-[10px] font-bold ${
-                                                        isUrgent
-                                                            ? "bg-rose-100 text-rose-900 border border-rose-300"
-                                                            : "bg-[#1A110B]/5 text-[#606F69]"
-                                                    }`}
-                                                >
-                                                    {waitMins === 0 ? "Just now" : `${waitMins}m ago`}
-                                                </span>
+                                                {isActive && (
+                                                    <span
+                                                        className={`rounded-full px-2.5 py-0.5 text-[10px] font-semibold ${
+                                                            isUrgent
+                                                                ? "bg-rose-50 text-rose-800 border border-rose-200/60"
+                                                                : "bg-[#1A110B]/5 text-[#606F69]"
+                                                        }`}
+                                                    >
+                                                        {waitMins === 0 ? "Just now" : `${waitMins}m ago`}
+                                                    </span>
+                                                )}
                                                 <span className="text-[10px] font-mono text-[#606F69]">
                                                     #{ticket.id.slice(0, 8)}
                                                 </span>
+                                                {!isActive && (
+                                                    <span className="text-[10px] text-[#606F69]">
+                                                        {new Date(ticket.placedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                                                    </span>
+                                                )}
                                             </div>
 
                                             {/* Itemized drink lines */}
-                                            <div className="flex flex-wrap gap-2 pt-1">
+                                            <div className="flex flex-wrap gap-2 pt-0.5">
                                                 {ticket.items.map((it, idx) => (
                                                     <div
                                                         key={idx}
-                                                        className="inline-flex items-center gap-1.5 rounded-md bg-[#F4F3E8] px-3 py-1.5 text-xs font-bold text-[#1A110B] border border-[#1A110B]/10"
+                                                        className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium border ${
+                                                            isActive
+                                                                ? "bg-[#1A110B]/[0.03] text-[#1A110B] border-[#1A110B]/10"
+                                                                : "bg-slate-50 text-slate-700 border-slate-200"
+                                                        }`}
                                                     >
-                                                        <span className="text-[#1A110B] font-mono font-black">×{it.quantity}</span>
+                                                        <span className="font-mono font-bold">×{it.quantity}</span>
                                                         <span>{it.name}</span>
                                                         {(it.lineTotal ?? 0) > 0 && (
-                                                            <span className="text-[14px] font-mono font-bold text-[#1A110B] tabular-nums">
+                                                            <span className="text-xs font-mono font-bold text-[#1A110B] tabular-nums">
                                                                 · {formatGHS(it.lineTotal ?? 0)}
                                                             </span>
                                                         )}
                                                         {it.notes && (
-                                                            <span className="text-[10px] font-normal italic text-slate-500">
+                                                            <span className="text-[10px] font-normal italic text-[#606F69]">
                                                                 ({it.notes})
                                                             </span>
                                                         )}
@@ -1294,20 +1351,42 @@ export function BarStationScreen({ venueId, staffId, staffName, onExit, onSignOu
                                             </div>
 
                                             {ticket.notes && (
-                                                <div className="text-[11px] italic text-[#1A110B] bg-[#F4F3E8] rounded-md p-2 border border-[#1A110B]/10">
+                                                <div className="text-xs italic text-[#1A110B] bg-[#1A110B]/[0.03] rounded-lg p-2 border border-[#1A110B]/8">
                                                     Order Note: "{ticket.notes}"
                                                 </div>
                                             )}
                                         </div>
 
-                                        {/* Dispense Action */}
-                                        <button
-                                            type="button"
-                                            onClick={() => void handleDispenseTicket(ticket)}
-                                            className="w-full sm:w-auto rounded-lg bg-[#1A110B] hover:bg-[#1A110B]/90 text-white px-6 py-3 text-xs font-black tracking-wide shadow-md transition-all active:scale-95 shrink-0 flex items-center justify-center cursor-pointer"
-                                        >
-                                            <span>✓ SERVED</span>
-                                        </button>
+                                        {/* Action / Status Pill */}
+                                        <div className="shrink-0">
+                                            {isActive ? (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => void handleDispenseTicket(ticket)}
+                                                    className="w-full sm:w-auto rounded-xl bg-[#1A110B] hover:bg-[#1A110B]/90 text-white px-6 py-2.5 text-xs font-bold tracking-wide shadow-sm transition-all active:scale-95 flex items-center justify-center cursor-pointer"
+                                                >
+                                                    <span>✓ SERVED</span>
+                                                </button>
+                                            ) : (
+                                                <div className="flex items-center gap-2">
+                                                    {isCancelled && (
+                                                        <span className="inline-flex items-center gap-1 rounded-full bg-rose-50 border border-rose-200/60 px-3 py-1 text-xs font-bold text-rose-800">
+                                                            ✕ Cancelled
+                                                        </span>
+                                                    )}
+                                                    {isTableEnded && (
+                                                        <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 border border-slate-200 px-3 py-1 text-xs font-bold text-slate-700">
+                                                            Table Ended
+                                                        </span>
+                                                    )}
+                                                    {isServed && (
+                                                        <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 border border-emerald-200/60 px-3 py-1 text-xs font-bold text-emerald-800">
+                                                            ✓ Served
+                                                        </span>
+                                                    )}
+                                                </div>
+                                            )}
+                                        </div>
                                     </div>
                                 );
                             })}
@@ -1459,91 +1538,128 @@ export function BarStationScreen({ venueId, staffId, staffName, onExit, onSignOu
                ═══════════════════════════════════════════════════════════ */}
             {activeTab === "REPORT" && (
                 <main className="flex-1 max-w-5xl mx-auto w-full p-4 sm:p-6 space-y-6">
-                    {/* Top Shift Financial Summary Banner */}
-                    <div className="rounded-xl bg-[#1A110B] text-white p-5 sm:p-6 border border-white/10 shadow-lg space-y-5">
-                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-white/10 pb-4">
-                            <div>
-                                <span className="text-[10px] font-black uppercase tracking-wider text-rose-400">
-                                    Station Closing Reconciliation
-                                </span>
-                                <h2 className="text-xl sm:text-2xl font-black text-white tracking-tight mt-0.5">
-                                    End-of-Shift Reconciliation & Waiter Audit
-                                </h2>
-                                <p className="text-xs text-white/70 mt-1">
-                                    Shift started at {activeShift ? new Date(activeShift.startedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "—"} by {activeShift?.startedByStaffName || "Bartender"}.
-                                </p>
-                            </div>
-                            <button
-                                type="button"
-                                onClick={() => void loadShiftAuditData()}
-                                className="inline-flex items-center gap-1.5 self-start sm:self-auto rounded-md border border-white/20 px-3 py-1.5 text-xs font-bold text-white hover:bg-white/10 transition"
-                            >
-                                <ArrowPathIcon className={`h-3.5 w-3.5 ${loadingShiftAudit ? "animate-spin" : ""}`} />
-                                <span>Refresh Ledger</span>
-                            </button>
+                    {/* Header: Title & Action */}
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                        <div>
+                            <span className="text-[11px] font-bold uppercase tracking-wider text-[#606F69]">
+                                Station Closing Reconciliation
+                            </span>
+                            <h2 className="text-2xl font-bold tracking-tight text-[#1A110B] mt-0.5">
+                                Shift Report & Waiter Audit
+                            </h2>
+                            <p className="text-xs text-[#606F69] mt-1">
+                                Shift started at {activeShift ? new Date(activeShift.startedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "—"} by {activeShift?.startedByStaffName || "Bartender"}.
+                            </p>
                         </div>
+                        <button
+                            type="button"
+                            onClick={() => void loadShiftAuditData()}
+                            className="inline-flex items-center gap-2 self-start sm:self-auto rounded-xl bg-white border border-[#1A110B]/15 px-3.5 py-2 text-xs font-semibold text-[#1A110B] hover:bg-[#1A110B]/5 shadow-sm transition cursor-pointer"
+                        >
+                            <ArrowPathIcon className={`h-4 w-4 text-[#606F69] ${loadingShiftAudit ? "animate-spin" : ""}`} />
+                            <span>Refresh Ledger</span>
+                        </button>
+                    </div>
 
-                        {/* Top Summary Metrics Grid */}
-                        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-                            <div className="rounded-lg bg-white/5 p-3.5 border border-white/10 space-y-1">
-                                <span className="text-[10px] font-bold uppercase tracking-wider text-white/60">
-                                    Orders & Items Handled
+                    {/* ═══════════════════════════════════════════════════════════════════════════
+                       TOP SUMMARY KPI STRIP (MATCHING MANAGER SHIFT REPORT CARDS)
+                       ═══════════════════════════════════════════════════════════════════════════ */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                        {/* Shift Revenue */}
+                        <div className="rounded-xl bg-white p-5 border border-[#1A110B]/10 shadow-sm flex flex-col justify-between min-w-0 h-full min-h-[135px]">
+                            <div className="flex items-center justify-between">
+                                <span className="text-xs font-semibold uppercase tracking-wider text-[#606F69] truncate mr-2">
+                                    Shift Revenue
                                 </span>
-                                <div className="text-lg sm:text-xl font-black text-white">
-                                    {auditSummaryTotals.totalOrders} <span className="text-xs font-medium text-white/70">tickets</span>
+                                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#1A110B]/5 text-[#1A110B] shrink-0">
+                                    <CurrencyDollarIcon className="h-5 w-5" />
                                 </div>
-                                <span className="text-[11px] font-mono text-emerald-400 font-bold block">
-                                    {auditSummaryTotals.totalItems} total drinks poured
-                                </span>
                             </div>
-
-                            <div className="rounded-lg bg-white/5 p-3.5 border border-white/10 space-y-1">
-                                <span className="text-[10px] font-bold uppercase tracking-wider text-white/60">
-                                    Total System Revenue
-                                </span>
-                                <div className="text-lg sm:text-xl font-black text-white font-mono tabular-nums">
+                            <div className="mt-2 min-w-0">
+                                <div className="text-2xl sm:text-3xl font-bold tracking-tight text-[#1A110B] tabular-nums truncate">
                                     {formatGHS(auditSummaryTotals.totalRevenue)}
                                 </div>
-                                <span className="text-[11px] text-white/70 block">
-                                    Logged across all tables
-                                </span>
-                            </div>
-
-                            <div className="rounded-lg bg-white/5 p-3.5 border border-white/10 space-y-1">
-                                <span className="text-[10px] font-bold uppercase tracking-wider text-white/60">
-                                    Payment Channels Split
-                                </span>
-                                <div className="text-xs font-mono space-y-0.5 pt-0.5">
-                                    <div className="text-emerald-300 font-bold">💵 Cash: {formatGHS(auditSummaryTotals.cashRevenue)}</div>
-                                    <div className="text-sky-300 font-bold">📱 MoMo: {formatGHS(auditSummaryTotals.momoRevenue)}</div>
-                                    <div className="text-amber-300 font-bold">💳 Card: {formatGHS(auditSummaryTotals.cardRevenue)}</div>
+                                <div className="mt-1 flex items-center justify-between text-xs text-[#606F69] gap-2 min-w-0 whitespace-nowrap overflow-hidden">
+                                    <span className="truncate">{auditSummaryTotals.totalOrders} {auditSummaryTotals.totalOrders === 1 ? "order" : "orders"} placed</span>
+                                    <span className="shrink-0">{auditSummaryTotals.totalItems} drinks poured</span>
                                 </div>
                             </div>
+                        </div>
 
-                            <div className="rounded-lg bg-white/5 p-3.5 border border-white/10 space-y-1">
-                                <span className="text-[10px] font-bold uppercase tracking-wider text-white/60">
+                        {/* Expected Till Cash */}
+                        <div className="rounded-xl bg-white p-5 border border-[#1A110B]/10 shadow-sm flex flex-col justify-between min-w-0 h-full min-h-[135px]">
+                            <div className="flex items-center justify-between">
+                                <span className="text-xs font-semibold uppercase tracking-wider text-[#606F69] truncate mr-2">
                                     Expected Till Cash
                                 </span>
-                                <div className="text-lg sm:text-xl font-black text-emerald-400 font-mono tabular-nums">
+                                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#1A110B]/5 text-[#1A110B] shrink-0">
+                                    <BanknotesIcon className="h-5 w-5" />
+                                </div>
+                            </div>
+                            <div className="mt-2 min-w-0">
+                                <div className="text-2xl sm:text-3xl font-bold tracking-tight text-[#1A110B] tabular-nums truncate">
                                     {formatGHS(auditSummaryTotals.expectedCashInTill)}
                                 </div>
-                                <span className="text-[10px] text-white/60 block">
-                                    Float ({formatGHS(auditSummaryTotals.startingFloat)}) + Cash Sales
+                                <div className="mt-1 flex items-center justify-between text-xs text-[#606F69] gap-2 min-w-0 whitespace-nowrap overflow-hidden">
+                                    <span className="truncate">Float {formatGHS(auditSummaryTotals.startingFloat)}</span>
+                                    <span className="shrink-0 font-semibold text-[#1A110B]/80">+ Cash Sales</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Cash Handed In */}
+                        <div className="rounded-xl bg-white p-5 border border-[#1A110B]/10 shadow-sm flex flex-col justify-between min-w-0 h-full min-h-[135px]">
+                            <div className="flex items-center justify-between">
+                                <span className="text-xs font-semibold uppercase tracking-wider text-[#606F69] truncate mr-2">
+                                    Cash Handed In
                                 </span>
+                                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#1A110B]/5 text-[#1A110B] shrink-0">
+                                    <BanknotesIcon className="h-5 w-5" />
+                                </div>
+                            </div>
+                            <div className="mt-2 min-w-0">
+                                <div className="text-2xl sm:text-3xl font-bold tracking-tight text-[#1A110B] tabular-nums truncate">
+                                    {formatGHS(auditSummaryTotals.cashRevenue)}
+                                </div>
+                                <div className="mt-1 flex items-center justify-between text-xs text-[#606F69] gap-2 min-w-0 whitespace-nowrap overflow-hidden">
+                                    <span className="truncate">{auditSummaryTotals.totalRevenue > 0 ? ((auditSummaryTotals.cashRevenue / auditSummaryTotals.totalRevenue) * 100).toFixed(1) : "0.0"}% of total</span>
+                                    <span className="shrink-0 font-semibold text-[#1A110B]/80">Physical Cash</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Digital Payments */}
+                        <div className="rounded-xl bg-white p-5 border border-[#1A110B]/10 shadow-sm flex flex-col justify-between min-w-0 h-full min-h-[135px]">
+                            <div className="flex items-center justify-between">
+                                <span className="text-xs font-semibold uppercase tracking-wider text-[#606F69] truncate mr-2">
+                                    Digital Payments
+                                </span>
+                                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#1A110B]/5 text-[#1A110B] shrink-0">
+                                    <CreditCardIcon className="h-5 w-5" />
+                                </div>
+                            </div>
+                            <div className="mt-2 min-w-0">
+                                <div className="text-2xl sm:text-3xl font-bold tracking-tight text-[#1A110B] tabular-nums truncate">
+                                    {formatGHS(auditSummaryTotals.momoRevenue + auditSummaryTotals.cardRevenue)}
+                                </div>
+                                <div className="mt-1 flex items-center justify-between text-xs text-[#606F69] gap-2 min-w-0 whitespace-nowrap overflow-hidden">
+                                    <span className="truncate">MoMo {formatGHS(auditSummaryTotals.momoRevenue)}</span>
+                                    <span className="shrink-0 font-semibold text-[#1A110B]/80">Card {formatGHS(auditSummaryTotals.cardRevenue)}</span>
+                                </div>
                             </div>
                         </div>
                     </div>
 
-                    {/* Sub-Tabs Toggle: [Inventory Reconciliation] | [Cash Flow & Waiter Audit] */}
-                    <div className="flex items-center justify-between border-b border-[#1A110B]/10 pb-2">
-                        <div className="inline-flex rounded-lg bg-[#1A110B]/5 p-1 border border-[#1A110B]/10">
+                    {/* Navigation Sub-Tabs Toggle */}
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between bg-white rounded-xl p-2 border border-[#1A110B]/10 shadow-sm">
+                        <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0">
                             <button
                                 type="button"
                                 onClick={() => setAuditSubTab("STOCK")}
-                                className={`flex items-center gap-2 rounded-md px-4 py-2 text-xs font-bold transition cursor-pointer ${
+                                className={`flex items-center gap-2 rounded-lg px-3.5 py-2 text-xs font-semibold transition whitespace-nowrap cursor-pointer ${
                                     auditSubTab === "STOCK"
-                                        ? "bg-[#1A110B] text-white shadow-xs"
-                                        : "text-[#1A110B]/70 hover:text-[#1A110B]"
+                                        ? "bg-[#1A110B] text-white shadow-sm"
+                                        : "text-[#1A110B] hover:bg-[#1A110B]/5"
                                 }`}
                             >
                                 <ArchiveBoxIcon className="h-4 w-4" />
@@ -1553,16 +1669,18 @@ export function BarStationScreen({ venueId, staffId, staffName, onExit, onSignOu
                             <button
                                 type="button"
                                 onClick={() => setAuditSubTab("CASHFLOW")}
-                                className={`flex items-center gap-2 rounded-md px-4 py-2 text-xs font-bold transition cursor-pointer ${
+                                className={`flex items-center gap-2 rounded-lg px-3.5 py-2 text-xs font-semibold transition whitespace-nowrap cursor-pointer ${
                                     auditSubTab === "CASHFLOW"
-                                        ? "bg-[#1A110B] text-white shadow-xs"
-                                        : "text-[#1A110B]/70 hover:text-[#1A110B]"
+                                        ? "bg-[#1A110B] text-white shadow-sm"
+                                        : "text-[#1A110B] hover:bg-[#1A110B]/5"
                                 }`}
                             >
                                 <BanknotesIcon className="h-4 w-4" />
                                 <span>2. Waiter Collections & Table Cash Flow</span>
                                 {waiterAuditGroups.length > 0 && (
-                                    <span className="rounded-md bg-white/20 text-current px-1.5 py-0.2 text-[10px] font-black">
+                                    <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${
+                                        auditSubTab === "CASHFLOW" ? "bg-white/20 text-white" : "bg-[#1A110B]/10 text-[#1A110B]"
+                                    }`}>
                                         {waiterAuditGroups.length}
                                     </span>
                                 )}
@@ -1575,34 +1693,34 @@ export function BarStationScreen({ venueId, staffId, staffName, onExit, onSignOu
                        ───────────────────────────────────────────────────────────── */}
                     {auditSubTab === "STOCK" && (
                         <div className="space-y-4">
-                            <div className="bg-white p-4 rounded-lg border border-[#1A110B]/10 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs">
+                            <div className="bg-white p-4 sm:p-5 rounded-xl border border-[#1A110B]/10 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-sm">
                                 <div>
-                                    <h3 className="text-sm font-black text-[#1A110B]">
+                                    <h3 className="text-sm font-bold text-[#1A110B]">
                                         Bottle Depletion & Shelf Count-Out
                                     </h3>
-                                    <p className="text-xs text-[#606F69]">
+                                    <p className="text-xs text-[#606F69] mt-0.5">
                                         Table orders are automatically deducted. Adjust walk-up sales and verify final physical shelf counts.
                                     </p>
                                 </div>
-                                <div className="text-[11px] font-bold text-[#1A110B] bg-[#F4F3E8] px-3 py-1.5 rounded-md border border-[#1A110B]/10">
+                                <div className="text-xs font-medium text-[#606F69] bg-[#1A110B]/5 px-3 py-1.5 rounded-lg border border-[#1A110B]/8 shrink-0">
                                     Formula: Start + Restock − Tables − Walk-ups = Expected
                                 </div>
                             </div>
 
                             {/* Inventory Table */}
-                            <div className="rounded-lg bg-white border border-[#1A110B]/10 shadow-xs overflow-hidden">
+                            <div className="rounded-xl bg-white border border-[#1A110B]/10 shadow-sm overflow-hidden">
                                 <div className="overflow-x-auto">
                                     <table className="w-full text-left text-xs border-collapse">
                                         <thead>
-                                            <tr className="bg-[#1A110B]/5 border-b border-[#1A110B]/10 text-[11px] font-black text-[#606F69] uppercase tracking-wider">
-                                                <th className="p-3">Beverage Item</th>
-                                                <th className="p-3 text-center">Start</th>
-                                                <th className="p-3 text-center">Restock</th>
-                                                <th className="p-3 text-center text-rose-700">Tables (Auto)</th>
-                                                <th className="p-3 text-center">Walk-Up Adjust</th>
-                                                <th className="p-3 text-center font-black text-[#1A110B]">Expected</th>
-                                                <th className="p-3 text-center">Physical Count</th>
-                                                <th className="p-3 text-right">Variance</th>
+                                            <tr className="bg-[#1A110B]/[0.03] border-b border-[#1A110B]/10 text-[11px] font-semibold text-[#606F69] uppercase tracking-wider">
+                                                <th className="p-3.5">Beverage Item</th>
+                                                <th className="p-3.5 text-center">Start</th>
+                                                <th className="p-3.5 text-center">Restock</th>
+                                                <th className="p-3.5 text-center">Tables (Auto)</th>
+                                                <th className="p-3.5 text-center">Walk-Up Adjust</th>
+                                                <th className="p-3.5 text-center font-bold text-[#1A110B]">Expected</th>
+                                                <th className="p-3.5 text-center">Physical Count</th>
+                                                <th className="p-3.5 text-right">Variance</th>
                                             </tr>
                                         </thead>
                                         <tbody className="divide-y divide-[#1A110B]/10">
@@ -1612,33 +1730,33 @@ export function BarStationScreen({ venueId, staffId, staffName, onExit, onSignOu
                                                 const diff = counted - expected;
 
                                                 return (
-                                                    <tr key={item.id} className="hover:bg-[#F4F3E8]/40 transition">
-                                                        <td className="p-3 font-bold text-[#1A110B]">
+                                                    <tr key={item.id} className="hover:bg-[#1A110B]/[0.02] transition">
+                                                        <td className="p-3.5 font-semibold text-[#1A110B]">
                                                             <div>{item.name}</div>
-                                                            <div className="text-[10px] font-medium text-[#606F69]">{item.category}</div>
+                                                            <div className="text-[10px] font-normal text-[#606F69] mt-0.5">{item.category}</div>
                                                         </td>
-                                                        <td className="p-3 text-center font-mono font-bold text-[#1A110B]">{item.opening}</td>
-                                                        <td className="p-3 text-center font-mono font-bold text-emerald-700">+{item.added}</td>
-                                                        <td className="p-3 text-center font-mono font-bold text-rose-700">−{item.drawn}</td>
+                                                        <td className="p-3.5 text-center font-mono font-medium text-[#1A110B]">{item.opening}</td>
+                                                        <td className="p-3.5 text-center font-mono font-medium text-emerald-700">+{item.added}</td>
+                                                        <td className="p-3.5 text-center font-mono font-medium text-[#1A110B]">−{item.drawn}</td>
                                                         
                                                         {/* Walk-up Quick Adjust Controls */}
-                                                        <td className="p-3 text-center">
-                                                            <div className="inline-flex items-center gap-1.5 bg-[#F4F3E8] border border-[#1A110B]/10 rounded-md p-1">
+                                                        <td className="p-3.5 text-center">
+                                                            <div className="inline-flex items-center gap-1.5 bg-[#1A110B]/5 border border-[#1A110B]/10 rounded-lg p-1">
                                                                 <button
                                                                     type="button"
                                                                     onClick={() => handleAdjustDirectSale(item.id, -1)}
-                                                                    className="h-5 w-5 rounded-sm bg-white hover:bg-[#1A110B]/10 text-[#1A110B] flex items-center justify-center font-black cursor-pointer"
+                                                                    className="h-5 w-5 rounded bg-white hover:bg-white/80 text-[#1A110B] flex items-center justify-center font-bold text-xs shadow-xs cursor-pointer"
                                                                     title="Decrease Walk-up"
                                                                 >
                                                                     −
                                                                 </button>
-                                                                <span className="font-mono font-black text-xs px-1">
+                                                                <span className="font-mono font-bold text-xs px-1 text-[#1A110B]">
                                                                     {item.direct}
                                                                 </span>
                                                                 <button
                                                                     type="button"
                                                                     onClick={() => handleAdjustDirectSale(item.id, 1)}
-                                                                    className="h-5 w-5 rounded-sm bg-white hover:bg-[#1A110B]/10 text-[#1A110B] flex items-center justify-center font-black cursor-pointer"
+                                                                    className="h-5 w-5 rounded bg-white hover:bg-white/80 text-[#1A110B] flex items-center justify-center font-bold text-xs shadow-xs cursor-pointer"
                                                                     title="Increase Walk-up"
                                                                 >
                                                                     +
@@ -1646,32 +1764,32 @@ export function BarStationScreen({ venueId, staffId, staffName, onExit, onSignOu
                                                             </div>
                                                         </td>
 
-                                                        <td className="p-3 text-center font-mono font-black text-sm text-[#1A110B]">
+                                                        <td className="p-3.5 text-center font-mono font-bold text-sm text-[#1A110B]">
                                                             {expected}
                                                         </td>
 
                                                         {/* Physical Count Input */}
-                                                        <td className="p-3 text-center">
+                                                        <td className="p-3.5 text-center">
                                                             <input
                                                                 type="number"
                                                                 value={counted}
                                                                 onChange={e => setClosingCounts({ ...closingCounts, [item.id]: Number(e.target.value) })}
-                                                                className="w-16 rounded-md border border-[#1A110B]/20 py-1 text-center font-black text-xs tabular-nums focus:ring-1 focus:ring-[#1A110B]"
+                                                                className="w-16 rounded-lg border border-[#1A110B]/15 bg-white py-1 text-center font-bold text-xs tabular-nums focus:ring-1 focus:ring-[#1A110B]"
                                                             />
                                                         </td>
 
                                                         {/* Variance Pill */}
-                                                        <td className="p-3 text-right">
+                                                        <td className="p-3.5 text-right">
                                                             {diff !== 0 ? (
-                                                                <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-black ${
+                                                                <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-semibold ${
                                                                     diff < 0
-                                                                        ? "bg-rose-100 text-rose-900 border border-rose-300"
-                                                                        : "bg-emerald-100 text-emerald-900 border border-emerald-300"
+                                                                        ? "bg-rose-50 text-rose-800 border border-rose-200/60"
+                                                                        : "bg-amber-50 text-amber-800 border border-amber-200/60"
                                                                 }`}>
                                                                     {diff > 0 ? `+${diff} Over` : `${diff} Short`}
                                                                 </span>
                                                             ) : (
-                                                                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-black bg-emerald-50 text-emerald-800 border border-emerald-200">
+                                                                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-50 text-emerald-800 border border-emerald-200/60">
                                                                     ✓ Balanced
                                                                 </span>
                                                             )}
@@ -1691,27 +1809,27 @@ export function BarStationScreen({ venueId, staffId, staffName, onExit, onSignOu
                        ───────────────────────────────────────────────────────────── */}
                     {auditSubTab === "CASHFLOW" && (
                         <div className="space-y-4">
-                            <div className="bg-white p-4 rounded-lg border border-[#1A110B]/10 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs">
+                            <div className="bg-white p-4 sm:p-5 rounded-xl border border-[#1A110B]/10 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-sm">
                                 <div>
-                                    <h3 className="text-sm font-black text-[#1A110B]">
+                                    <h3 className="text-sm font-bold text-[#1A110B]">
                                         Staff & Table Billing Collections Audit
                                     </h3>
-                                    <p className="text-xs text-[#606F69]">
+                                    <p className="text-xs text-[#606F69] mt-0.5">
                                         Click any waiter card to expand and audit every individual transaction, payment channel, and table bill.
                                     </p>
                                 </div>
-                                <div className="flex items-center rounded-md bg-[#F4F3E8] px-3 py-1.5 border border-[#1A110B]/10 text-xs">
-                                    <MagnifyingGlassIcon className="h-3.5 w-3.5 text-[#606F69] mr-1.5" />
+                                <div className="flex items-center rounded-xl bg-[#1A110B]/5 px-3 py-2 border border-[#1A110B]/10 text-xs">
+                                    <MagnifyingGlassIcon className="h-4 w-4 text-[#606F69] mr-2" />
                                     <input
                                         type="text"
                                         placeholder="Filter staff or table..."
                                         value={auditSearch}
                                         onChange={e => setAuditSearch(e.target.value)}
-                                        className="bg-transparent text-xs font-medium text-[#1A110B] focus:outline-none w-36"
+                                        className="bg-transparent text-xs font-medium text-[#1A110B] focus:outline-none w-36 sm:w-44 placeholder:text-[#606F69]"
                                     />
                                     {auditSearch && (
-                                        <button onClick={() => setAuditSearch("")} className="text-[#606F69]">
-                                            <XMarkIcon className="h-3 w-3" />
+                                        <button onClick={() => setAuditSearch("")} className="text-[#606F69] hover:text-[#1A110B]">
+                                            <XMarkIcon className="h-3.5 w-3.5" />
                                         </button>
                                     )}
                                 </div>
@@ -1719,8 +1837,8 @@ export function BarStationScreen({ venueId, staffId, staffName, onExit, onSignOu
 
                             {/* Waiter Cards Accordion List */}
                             {waiterAuditGroups.length === 0 ? (
-                                <div className="rounded-lg bg-white p-12 border border-[#1A110B]/10 text-center space-y-2">
-                                    <CheckBadgeIcon className="h-10 w-10 text-slate-400 mx-auto" />
+                                <div className="rounded-xl bg-white p-12 border border-[#1A110B]/10 text-center space-y-2 shadow-sm">
+                                    <CheckBadgeIcon className="h-10 w-10 text-[#606F69]/40 mx-auto" />
                                     <h3 className="font-bold text-sm text-[#1A110B]">No Table Transactions Logged Yet</h3>
                                     <p className="text-xs text-[#606F69] max-w-sm mx-auto">
                                         Orders placed by waiters during this active shift will automatically stream into this audit ledger.
@@ -1736,28 +1854,28 @@ export function BarStationScreen({ venueId, staffId, staffName, onExit, onSignOu
                                             return (
                                                 <div
                                                     key={waiter.waiterId}
-                                                    className="rounded-lg bg-white border border-[#1A110B]/10 shadow-xs overflow-hidden transition"
+                                                    className="rounded-xl bg-white border border-[#1A110B]/10 shadow-sm overflow-hidden transition"
                                                 >
                                                     {/* Accordion Card Header */}
                                                     <div
                                                         onClick={() => toggleWaiterAccordion(waiter.waiterId)}
-                                                        className="p-4 flex items-center justify-between gap-4 cursor-pointer hover:bg-[#F4F3E8]/40 select-none transition"
+                                                        className="p-4 flex items-center justify-between gap-4 cursor-pointer hover:bg-[#1A110B]/[0.02] select-none transition"
                                                     >
                                                         {/* Left: Waiter Name & Info */}
                                                         <div className="flex items-center gap-3 min-w-0">
-                                                            <div className="h-9 w-9 rounded-full bg-[#1A110B] text-white flex items-center justify-center font-black text-xs shrink-0">
+                                                            <div className="h-9 w-9 rounded-full bg-[#1A110B]/5 text-[#1A110B] border border-[#1A110B]/10 flex items-center justify-center font-bold text-xs shrink-0">
                                                                 {waiter.waiterName.slice(0, 2).toUpperCase()}
                                                             </div>
                                                             <div className="min-w-0">
                                                                 <div className="flex items-center gap-2">
-                                                                    <span className="font-black text-sm text-[#1A110B] truncate">
+                                                                    <span className="font-bold text-sm text-[#1A110B] truncate">
                                                                         {waiter.waiterName}
                                                                     </span>
-                                                                    <span className="rounded-md bg-[#1A110B]/5 px-2 py-0.5 text-[10px] font-bold text-[#606F69] uppercase">
+                                                                    <span className="rounded-md bg-[#1A110B]/5 px-2 py-0.5 text-[10px] font-semibold text-[#606F69] uppercase">
                                                                         {waiter.waiterRole}
                                                                     </span>
                                                                 </div>
-                                                                <div className="text-[11px] text-[#606F69]">
+                                                                <div className="text-[11px] text-[#606F69] mt-0.5">
                                                                     {waiter.orders.length} orders served
                                                                 </div>
                                                             </div>
@@ -1766,21 +1884,21 @@ export function BarStationScreen({ venueId, staffId, staffName, onExit, onSignOu
                                                         {/* Right: Total Handled + Payment Pills + Chevron */}
                                                         <div className="flex items-center gap-3 shrink-0">
                                                             <div className="text-right hidden sm:block">
-                                                                <div className="text-sm font-black font-mono text-[#1A110B] tabular-nums">
+                                                                <div className="text-sm font-bold font-mono text-[#1A110B] tabular-nums">
                                                                     {formatGHS(waiter.totalAmount)}
                                                                 </div>
-                                                                <div className="flex items-center gap-1.5 text-[10px] font-bold font-mono">
+                                                                <div className="flex items-center gap-2 text-[10px] font-semibold font-mono mt-0.5">
                                                                     {waiter.cashAmount > 0 && <span className="text-emerald-700">Cash {formatGHS(waiter.cashAmount)}</span>}
                                                                     {waiter.momoAmount > 0 && <span className="text-sky-700">MoMo {formatGHS(waiter.momoAmount)}</span>}
                                                                     {waiter.cardAmount > 0 && <span className="text-amber-700">Card {formatGHS(waiter.cardAmount)}</span>}
                                                                 </div>
                                                             </div>
 
-                                                            <div className="sm:hidden font-black text-xs font-mono">
+                                                            <div className="sm:hidden font-bold text-xs font-mono">
                                                                 {formatGHS(waiter.totalAmount)}
                                                             </div>
 
-                                                            <div className="rounded-full bg-[#1A110B]/5 p-1.5 text-[#1A110B]">
+                                                            <div className="rounded-lg bg-[#1A110B]/5 p-1.5 text-[#1A110B]">
                                                                 {isExpanded ? (
                                                                     <ChevronUpIcon className="h-4 w-4" />
                                                                 ) : (
@@ -1792,8 +1910,8 @@ export function BarStationScreen({ venueId, staffId, staffName, onExit, onSignOu
 
                                                     {/* Expanded Content: Itemized Transactions Ledger */}
                                                     {isExpanded && (
-                                                        <div className="border-t border-[#1A110B]/10 bg-[#F4F3E8]/30 p-3 sm:p-4 space-y-2.5 animate-in fade-in duration-150">
-                                                            <span className="text-[10px] font-black uppercase tracking-wider text-[#606F69] block">
+                                                        <div className="border-t border-[#1A110B]/10 bg-[#1A110B]/[0.02] p-3 sm:p-4 space-y-2.5 animate-in fade-in duration-150">
+                                                            <span className="text-[10px] font-bold uppercase tracking-wider text-[#606F69] block">
                                                                 Individual Order Tickets Served by {waiter.waiterName}
                                                             </span>
 
@@ -1801,11 +1919,11 @@ export function BarStationScreen({ venueId, staffId, staffName, onExit, onSignOu
                                                                 {waiter.orders.map(ord => (
                                                                     <div
                                                                         key={ord.id}
-                                                                        className="rounded-md bg-white p-3 border border-[#1A110B]/10 shadow-2xs flex flex-col sm:flex-row sm:items-center justify-between gap-3"
+                                                                        className="rounded-lg bg-white p-3.5 border border-[#1A110B]/10 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3"
                                                                     >
                                                                         <div className="space-y-1.5 min-w-0 flex-1">
                                                                             <div className="flex items-center gap-2 flex-wrap text-xs">
-                                                                                <span className="rounded-md bg-[#1A110B] text-white px-2 py-0.5 text-[10px] font-black">
+                                                                                <span className="rounded-md bg-[#1A110B] text-white px-2 py-0.5 text-[10px] font-bold">
                                                                                     {ord.tableLabel}
                                                                                 </span>
                                                                                 <span className="font-mono text-[10px] text-[#606F69]">
@@ -1816,14 +1934,14 @@ export function BarStationScreen({ venueId, staffId, staffName, onExit, onSignOu
                                                                                 </span>
                                                                                 
                                                                                 {/* Payment Method Badge */}
-                                                                                <span className={`rounded-full px-2 py-0.5 text-[9px] font-black uppercase ${
+                                                                                <span className={`rounded-full px-2.5 py-0.5 text-[9px] font-semibold uppercase ${
                                                                                     ord.paymentMethod === "cash"
-                                                                                        ? "bg-emerald-100 text-emerald-800"
+                                                                                        ? "bg-emerald-50 text-emerald-800 border border-emerald-200/60"
                                                                                         : ord.paymentMethod === "mobile_money"
-                                                                                        ? "bg-sky-100 text-sky-800"
+                                                                                        ? "bg-sky-50 text-sky-800 border border-sky-200/60"
                                                                                         : ord.paymentMethod === "card"
-                                                                                        ? "bg-amber-100 text-amber-800"
-                                                                                        : "bg-slate-100 text-slate-700"
+                                                                                        ? "bg-amber-50 text-amber-800 border border-amber-200/60"
+                                                                                        : "bg-slate-100 text-slate-700 border border-slate-200"
                                                                                 }`}>
                                                                                     {ord.paymentMethod === "cash" && "💵 Cash"}
                                                                                     {ord.paymentMethod === "mobile_money" && "📱 Mobile Money"}
@@ -1837,11 +1955,11 @@ export function BarStationScreen({ venueId, staffId, staffName, onExit, onSignOu
                                                                                 {ord.items.map((it, idx) => (
                                                                                     <span
                                                                                         key={idx}
-                                                                                        className="rounded-md bg-[#F4F3E8] px-2 py-1 text-[11px] font-bold text-[#1A110B] border border-[#1A110B]/10"
+                                                                                        className="rounded-lg bg-[#1A110B]/[0.03] px-2.5 py-1 text-xs font-medium text-[#1A110B] border border-[#1A110B]/8"
                                                                                     >
-                                                                                        <span className="font-mono font-black">×{it.quantity}</span> {it.name}
+                                                                                        <span className="font-mono font-bold">×{it.quantity}</span> {it.name}
                                                                                         {it.lineTotal > 0 && (
-                                                                                            <span className="text-[10px] font-mono font-medium text-[#606F69] ml-1">
+                                                                                            <span className="text-[10px] font-mono font-semibold text-[#606F69] ml-1">
                                                                                                 · {formatGHS(it.lineTotal)}
                                                                                             </span>
                                                                                         )}
@@ -1852,7 +1970,7 @@ export function BarStationScreen({ venueId, staffId, staffName, onExit, onSignOu
 
                                                                         {/* Order Total */}
                                                                         <div className="text-right shrink-0">
-                                                                            <span className="text-sm font-black font-mono text-[#1A110B]">
+                                                                            <span className="text-sm font-bold font-mono text-[#1A110B]">
                                                                                 {formatGHS(ord.totalAmount)}
                                                                             </span>
                                                                         </div>
@@ -1872,13 +1990,13 @@ export function BarStationScreen({ venueId, staffId, staffName, onExit, onSignOu
                     {/* ─────────────────────────────────────────────────────────────
                         FINAL SHIFT HANDOVER & CLOSE SECTION
                        ───────────────────────────────────────────────────────────── */}
-                    <div className="rounded-xl bg-white p-5 sm:p-6 border border-[#1A110B]/15 shadow-md space-y-4">
+                    <div className="rounded-xl bg-white p-5 sm:p-6 border border-[#1A110B]/10 shadow-sm space-y-4">
                         <div className="flex items-center justify-between border-b border-[#1A110B]/10 pb-3">
                             <div>
                                 <span className="text-[10px] font-bold uppercase tracking-wider text-[#606F69]">
                                     Station Sign-Off
                                 </span>
-                                <h3 className="text-base font-black text-[#1A110B]">
+                                <h3 className="text-base font-bold text-[#1A110B]">
                                     Physical Till Count & Handover Sign-Off
                                 </h3>
                             </div>
@@ -1887,29 +2005,29 @@ export function BarStationScreen({ venueId, staffId, staffName, onExit, onSignOu
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             {/* Cash Count */}
                             <div className="space-y-1.5">
-                                <label className="text-xs font-black text-[#1A110B] block">
+                                <label className="text-xs font-bold text-[#1A110B] block">
                                     Counted Physical Cash in Drawer (GH₵)
                                 </label>
                                 <div className="relative">
-                                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-bold text-[#606F69]">GH₵</span>
+                                    <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-xs font-bold text-[#606F69]">GH₵</span>
                                     <input
                                         type="number"
                                         placeholder="0.00"
                                         value={closingCashCount}
                                         onChange={e => setClosingCashCount(e.target.value)}
-                                        className="w-full rounded-md border border-[#1A110B]/20 bg-[#F4F3E8]/50 py-2 pl-12 pr-3 text-sm font-black text-[#1A110B] focus:ring-1 focus:ring-[#1A110B]"
+                                        className="w-full rounded-xl border border-[#1A110B]/15 bg-white py-2.5 pl-12 pr-3 text-sm font-bold text-[#1A110B] focus:ring-1 focus:ring-[#1A110B]"
                                     />
                                 </div>
-                                <div className="flex items-center justify-between text-[11px] pt-1">
+                                <div className="flex items-center justify-between text-xs pt-1">
                                     <span className="text-[#606F69]">Expected in Till:</span>
                                     <span className="font-mono font-bold text-[#1A110B]">
                                         {formatGHS(auditSummaryTotals.expectedCashInTill)}
                                     </span>
                                 </div>
                                 {closingCashCount && (
-                                    <div className="flex items-center justify-between text-[11px] pt-0.5">
+                                    <div className="flex items-center justify-between text-xs pt-0.5">
                                         <span className="text-[#606F69]">Till Variance:</span>
-                                        <span className={`font-mono font-black ${
+                                        <span className={`font-mono font-bold ${
                                             auditSummaryTotals.cashVariance === 0
                                                 ? "text-emerald-700"
                                                 : auditSummaryTotals.cashVariance < 0
@@ -1928,7 +2046,7 @@ export function BarStationScreen({ venueId, staffId, staffName, onExit, onSignOu
 
                             {/* Handover Notes */}
                             <div className="space-y-1.5">
-                                <label className="text-xs font-black text-[#1A110B] block">
+                                <label className="text-xs font-bold text-[#1A110B] block">
                                     Handover Notes for Next Shift / Supervisor (Optional)
                                 </label>
                                 <textarea
@@ -1936,7 +2054,7 @@ export function BarStationScreen({ venueId, staffId, staffName, onExit, onSignOu
                                     placeholder="e.g. 2 bottles in ice bath, cash handed over to Shift Supervisor..."
                                     value={handoverNotes}
                                     onChange={e => setHandoverNotes(e.target.value)}
-                                    className="w-full rounded-md border border-[#1A110B]/20 bg-[#F4F3E8]/50 p-2 text-xs font-medium text-[#1A110B] focus:ring-1 focus:ring-[#1A110B]"
+                                    className="w-full rounded-xl border border-[#1A110B]/15 bg-white p-2.5 text-xs font-medium text-[#1A110B] focus:ring-1 focus:ring-[#1A110B]"
                                 />
                             </div>
                         </div>
@@ -1945,14 +2063,14 @@ export function BarStationScreen({ venueId, staffId, staffName, onExit, onSignOu
                             <button
                                 type="button"
                                 onClick={() => setActiveTab("QUEUE")}
-                                className="flex-1 rounded-lg bg-[#F4F3E8] hover:bg-[#1A110B]/10 py-3 text-xs font-bold text-[#1A110B] transition cursor-pointer"
+                                className="flex-1 rounded-xl bg-white border border-[#1A110B]/15 hover:bg-[#1A110B]/5 py-3 text-xs font-semibold text-[#1A110B] transition cursor-pointer"
                             >
                                 Back to Drink Queue
                             </button>
                             <button
                                 type="button"
                                 onClick={handleConfirmCloseShift}
-                                className="flex-1 rounded-lg bg-rose-600 hover:bg-rose-700 py-3 text-xs font-black text-white shadow-md transition cursor-pointer"
+                                className="flex-1 rounded-xl bg-[#1A110B] hover:bg-[#1A110B]/90 py-3 text-xs font-bold text-white shadow-sm transition cursor-pointer"
                             >
                                 Confirm & End Station Shift Handover
                             </button>
