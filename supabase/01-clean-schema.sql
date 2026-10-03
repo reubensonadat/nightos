@@ -806,12 +806,17 @@ BEGIN
             ELSE 0
         END,
         status = CASE
+            WHEN status IN ('cancelled', 'closed') THEN status
             WHEN v_paid >= (v_total - 0.01) AND v_total > 0 THEN 'paid'
             WHEN v_paid > 0 THEN 'settling'
             WHEN status = 'paid' AND v_paid < (v_total - 0.01) THEN 'open'
             ELSE status
         END,
-        closed_at = CASE WHEN v_paid >= (v_total - 0.01) AND v_total > 0 THEN now() ELSE closed_at END,
+        closed_at = CASE
+            WHEN status IN ('cancelled', 'closed') THEN closed_at
+            WHEN v_paid >= (v_total - 0.01) AND v_total > 0 THEN now()
+            ELSE NULL
+        END,
         updated_at = now()
     WHERE id = p_bill_id;
 END;

@@ -958,7 +958,7 @@ export const db = {
       const res = await supabase
         .from('bills')
         .update({
-          status: 'closed',
+          status: 'cancelled',
           closed_at: now,
           updated_at: now,
         })
@@ -1001,7 +1001,7 @@ export const db = {
       await supabase
         .from('bills')
         .update({
-          status: 'closed',
+          status: 'cancelled',
           closed_at: now,
           updated_at: now,
         })
