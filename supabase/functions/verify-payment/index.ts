@@ -84,7 +84,7 @@ serve(async (req) => {
     // 2. Load the bill — the server-side source of truth for the amount.
     const { data: bill } = await supabase
       .from('bills')
-      .select('total, amount_paid, venue_id, status')
+      .select('total, amount_paid, venue_id, status, deposit_paid, deposit_amount')
       .eq('id', bill_id)
       .single()
 
@@ -115,14 +115,20 @@ serve(async (req) => {
       )
     }
 
-    // 5. Amount gate — remaining balance only. Rejects forged low-amount
-    //    transactions AND overpayment (a payment bigger than what's owed).
-    if (data.amount !== remainingPesewas) {
-      console.error(`[verify-payment] Amount mismatch: expected ${remainingPesewas}, got ${data.amount}`)
+    // 5. Amount gate — slices allowed. The checkout UI lets guests pay a
+    //    partial slice of what's owed (SYSTEM_FLOW §4.2.2), so any successful
+    //    charge up to the remaining balance is legitimate and is credited at
+    //    its actual amount (platform_fee scales with it). Overpayment is
+    //    rejected — except a table deposit landing on a bill that already
+    //    carries orders (deposit charges init at the table's min deposit).
+    const isDepositLanding =
+      !!bill.deposit_paid && data.amount === Math.round((bill.deposit_amount ?? 0) * 100)
+    if (data.amount <= 0 || (data.amount > remainingPesewas + COVERED_TOLERANCE_PESEWAS && !isDepositLanding)) {
+      console.error(`[verify-payment] Amount mismatch: expected <= ${remainingPesewas}, got ${data.amount}`)
       return new Response(
         JSON.stringify({
           error: 'Amount mismatch',
-          detail: `Expected ${remainingPesewas} pesewas (remaining balance), received ${data.amount}.`,
+          detail: `Expected at most ${remainingPesewas} pesewas (remaining balance), received ${data.amount}.`,
         }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )

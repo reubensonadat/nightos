@@ -173,7 +173,7 @@ export function CheckoutScreen({ total, billId, venueId, sessionToken, onBack, o
     const isPrepay = venue?.payment_model === 'PREPAY' || bill?.payment_model === 'PREPAY';
 
     // Reconciled bill math: convenience fee is incorporated into displayed subtotal so Subtotal + VAT = Total
-    const { subtotal, vat, billTotal, payAmount, totalPaid } = useMemo(() => {
+    const { subtotal, vat, billTotal, payAmount, totalPaid, isPartial, remainingDue } = useMemo(() => {
         if (bill) {
             const fee = Number((bill as { convenience_fee?: number })?.convenience_fee || 0);
             const remainingAmount = Math.max(0, Math.round((bill.total - bill.amount_paid) * 100) / 100);
@@ -185,6 +185,8 @@ export function CheckoutScreen({ total, billId, venueId, sessionToken, onBack, o
                 billTotal: targetPay < remainingAmount ? targetPay : bill.total,
                 payAmount: targetPay,
                 totalPaid: targetPay,
+                isPartial: targetPay > 0 && targetPay < remainingAmount,
+                remainingDue: remainingAmount,
             };
         }
         // Fallback while the bill loads
@@ -207,6 +209,8 @@ export function CheckoutScreen({ total, billId, venueId, sessionToken, onBack, o
             billTotal: isTaxIncl ? total : Math.round((sub + computedVat) * 100) / 100,
             payAmount: total,
             totalPaid: total,
+            isPartial: false,
+            remainingDue: 0,
         };
     }, [bill, total, venue]);
 
@@ -456,7 +460,9 @@ export function CheckoutScreen({ total, billId, venueId, sessionToken, onBack, o
                     <div className="space-y-2 px-4 py-3">
                         <div className="flex items-center justify-between text-[12px]">
                             <span className="tracking-tight text-feldgrau">
-                                Orders Subtotal{venue?.tax_inclusive && (venue?.vat_pct ?? 0) > 0 ? " (excl. VAT)" : ""}
+                                {isPartial
+                                    ? "Paying Now — part of your bill"
+                                    : <>Orders Subtotal{venue?.tax_inclusive && (venue?.vat_pct ?? 0) > 0 ? " (excl. VAT)" : ""}</>}
                             </span>
                             <span className="font-mono font-bold tabular-nums text-licorice">
                                 {formatGHS(subtotal)}
@@ -465,7 +471,7 @@ export function CheckoutScreen({ total, billId, venueId, sessionToken, onBack, o
                         {bill && bill.service_charge > 0 && (
                             <div className="flex items-center justify-between text-[12px]">
                                 <span className="tracking-tight text-feldgrau">
-                                    Service Charge <span className="text-feldgrau/60">({venue?.service_charge_pct ?? 0}%)</span>
+                                    Service Charge{isPartial ? " (full bill)" : ""} <span className="text-feldgrau/60">({venue?.service_charge_pct ?? 0}%)</span>
                                 </span>
                                 <span className="font-mono font-bold tabular-nums text-licorice">
                                     {formatGHS(bill.service_charge)}
@@ -505,9 +511,11 @@ export function CheckoutScreen({ total, billId, venueId, sessionToken, onBack, o
                     {/* Bill Total */}
                     <div className="flex items-end justify-between border-t border-isabelline px-4 py-3">
                         <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-feldgrau">
-                            {bill && bill.deposit_paid && Number(bill.deposit_amount || 0) > 0
-                                ? "Amount Due Now"
-                                : (bill && bill.amount_paid > 0 ? "Amount Due" : "Bill Total")}
+                            {isPartial
+                                ? `Paying Now · ${formatGHS(remainingDue)} still due`
+                                : bill && bill.deposit_paid && Number(bill.deposit_amount || 0) > 0
+                                    ? "Amount Due Now"
+                                    : (bill && bill.amount_paid > 0 ? "Amount Due" : "Bill Total")}
                         </span>
                         <span className="font-mono text-[18px] font-bold tabular-nums text-licorice">
                             {formatGHS(payAmount)}
