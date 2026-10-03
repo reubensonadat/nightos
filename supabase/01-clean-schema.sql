@@ -261,7 +261,7 @@ CREATE TABLE public.payments (
     bill_id uuid NOT NULL REFERENCES public.bills(id) ON DELETE CASCADE,
     venue_id uuid NOT NULL REFERENCES public.venues(id) ON DELETE CASCADE,
     amount numeric(10,2) NOT NULL,
-    method text NOT NULL CHECK (method IN ('mobile_money', 'card', 'bank_transfer', 'digital_wallet', 'cash')),
+    method text NOT NULL CHECK (method IN ('mobile_money', 'card', 'bank_transfer', 'digital_wallet', 'cash', 'paystack')),
     reference text UNIQUE,
     payer_name text,
     collected_by uuid REFERENCES public.staff(id),
@@ -752,6 +752,8 @@ DECLARE
     v_vat      numeric(10,2) := 0;
     v_total    numeric(10,2) := 0;
     v_paid     numeric(10,2) := 0;
+    v_dep_paid boolean := false;
+    v_dep      numeric(10,2) := 0;
 BEGIN
     SELECT COALESCE(SUM(oi.line_total), 0) INTO v_subtotal
     FROM public.order_items oi
@@ -787,6 +789,11 @@ BEGIN
     FROM public.payments
     WHERE bill_id = p_bill_id AND status = 'success';
 
+    SELECT COALESCE(deposit_paid, false), COALESCE(deposit_amount, 0)
+      INTO v_dep_paid, v_dep
+    FROM public.bills
+    WHERE id = p_bill_id;
+
     UPDATE public.bills
     SET subtotal = COALESCE(v_subtotal, 0),
         convenience_fee = 0.00,
@@ -794,6 +801,10 @@ BEGIN
         vat = v_vat,
         total = v_total,
         amount_paid = v_paid,
+        remaining_credit = CASE
+            WHEN v_dep_paid THEN GREATEST(v_dep - v_total, 0)
+            ELSE 0
+        END,
         status = CASE
             WHEN v_paid >= (v_total - 0.01) AND v_total > 0 THEN 'paid'
             WHEN v_paid > 0 THEN 'settling'
@@ -845,7 +856,21 @@ CREATE OR REPLACE FUNCTION public.close_bill(
     p_staff_id uuid DEFAULT NULL
 )
 RETURNS boolean LANGUAGE plpgsql SECURITY DEFINER AS $$
+DECLARE
+    v_bill public.bills%ROWTYPE;
 BEGIN
+    -- Money guard: never cancel a bill holding deposit credit or payments.
+    SELECT * INTO v_bill FROM public.bills WHERE id = p_bill_id;
+    IF NOT FOUND
+       OR v_bill.status NOT IN ('open', 'settling')
+       OR v_bill.deposit_paid = true
+       OR COALESCE(v_bill.remaining_credit, 0) > 0
+       OR COALESCE(v_bill.amount_paid, 0) > 0
+       OR EXISTS (SELECT 1 FROM public.payments p
+                  WHERE p.bill_id = p_bill_id AND p.status = 'success') THEN
+        RETURN false;
+    END IF;
+
     UPDATE public.bills
     SET status = 'cancelled', closed_at = now(), updated_at = now()
     WHERE id = p_bill_id;
@@ -855,6 +880,57 @@ BEGIN
     WHERE bill_id = p_bill_id;
 
     RETURN FOUND;
+END;
+$$;
+
+-- ── 4.x Idle-session expiry (money-guarded) ──
+-- Expires zero-money walk-in sessions after 20 minutes of inactivity.
+-- A bill with deposit_paid, remaining_credit, amount_paid or any successful
+-- payment is NEVER expired or auto-cancelled — money keeps the tab alive.
+CREATE OR REPLACE FUNCTION public.expire_stale_sessions()
+RETURNS int
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+DECLARE
+    v_count int;
+BEGIN
+    UPDATE public.customer_sessions cs
+    SET status = 'expired', last_active_at = now()
+    WHERE cs.status = 'active'
+      AND cs.created_at < now() - interval '20 minutes'
+      AND NOT EXISTS (
+          SELECT 1 FROM public.order_submissions os
+          WHERE os.customer_session_id = cs.id
+      )
+      AND NOT EXISTS (
+          SELECT 1 FROM public.bills b
+          WHERE b.id = cs.bill_id
+            AND (
+                b.deposit_paid = true
+                OR COALESCE(b.remaining_credit, 0) > 0
+                OR COALESCE(b.amount_paid, 0) > 0
+                OR EXISTS (SELECT 1 FROM public.payments p
+                           WHERE p.bill_id = b.id AND p.status = 'success')
+            )
+      );
+    GET DIAGNOSTICS v_count = ROW_COUNT;
+
+    UPDATE public.bills b
+    SET status = 'cancelled', closed_at = now(), updated_at = now()
+    WHERE b.status IN ('open', 'settling')
+      AND b.deposit_paid = false
+      AND COALESCE(b.remaining_credit, 0) = 0
+      AND COALESCE(b.amount_paid, 0) = 0
+      AND NOT EXISTS (SELECT 1 FROM public.order_items oi WHERE oi.bill_id = b.id)
+      AND NOT EXISTS (
+          SELECT 1 FROM public.payments p
+          WHERE p.bill_id = b.id AND p.status = 'success'
+      )
+      AND EXISTS (
+          SELECT 1 FROM public.customer_sessions cs
+          WHERE cs.bill_id = b.id AND cs.status = 'expired'
+      );
+
+    RETURN v_count;
 END;
 $$;
 
