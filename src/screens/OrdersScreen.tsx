@@ -542,7 +542,7 @@ export function OrdersScreen({ activeOrders, history, tableLabel, tablePin, bill
                 {activeOrders.map((o) => (
                   <div key={o.orderNumber} className="relative">
                     <ActiveOrderCard order={o} />
-                    {statusStage(o.status).id === "served" && (
+                    {statusStage(o.status).id === "served" && !isDepositCovered && (
                       <div className="mt-2">
                         <button
                           type="button"
@@ -587,21 +587,23 @@ export function OrdersScreen({ activeOrders, history, tableLabel, tablePin, bill
       {(activeSpend > 0 || billRemainingBalance > 0) && (
         <div className="fixed bottom-[calc(70px+env(safe-area-inset-bottom))] left-0 right-0 z-40 px-5 max-w-7xl mx-auto">
           {isDepositCovered ? (
-            <div className="rounded-2xl bg-licorice p-4 shadow-[0_12px_32px_rgba(35,20,12,0.35)] ring-1 ring-khaki/30 flex items-center justify-between gap-4">
+            <div className="rounded-2xl bg-licorice px-5 py-3.5 shadow-[0_12px_32px_rgba(35,20,12,0.35)] ring-1 ring-khaki/30 flex items-center justify-between gap-4">
               <div>
-                <p className="text-[10px] font-bold uppercase tracking-wider text-khaki">
-                  Prepaid Table Credit Active
+                <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-khaki">
+                  Credit Remaining
                 </p>
-                <p className="font-mono text-lg font-black tracking-tight text-isabelline">
-                  {formatGHS(remainingCredit)} remaining
-                </p>
-                <p className="text-[11px] text-isabelline/60">
-                  Consumed: {formatGHS(activeSpend)} (Covered by Deposit)
+                <p className="font-mono text-[20px] font-black tracking-tight text-isabelline mt-0.5">
+                  {formatGHS(remainingCredit)}
                 </p>
               </div>
-              <span className="rounded-full bg-khaki/15 px-3.5 py-1.5 text-[11px] font-bold text-khaki ring-1 ring-khaki/30">
-                Deposit Covered
-              </span>
+              <div className="text-right">
+                <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-isabelline/45">
+                  Spent
+                </p>
+                <p className="font-mono text-[14px] font-bold text-isabelline/80 mt-0.5">
+                  {formatGHS(activeSpend)}
+                </p>
+              </div>
             </div>
           ) : (
             <div className="rounded-2xl bg-licorice p-4 shadow-[0_12px_32px_rgba(35,20,12,0.35)] ring-1 ring-white/10 flex items-center justify-between gap-4">

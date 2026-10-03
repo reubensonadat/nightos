@@ -568,11 +568,21 @@ export function CartScreen({ venueId, tableLabel, tablePin, billId, customerSess
                             <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-khaki">
                                 Subtotal
                             </p>
-                            <p className="text-[11px] font-medium tracking-tight text-isabelline/50 mt-0.5">
-                                {depositAmount > 0 && depositPaid && billBreakdown.remainingCredit > 0
-                                    ? `Prepaid credit active (${formatGHS(billBreakdown.remainingCredit)} remaining)`
-                                    : "Taxes & fees calculated at checkout"}
-                            </p>
+                            <div className="text-[11px] font-medium tracking-tight text-isabelline/60 mt-0.5">
+                                {depositAmount > 0 && depositPaid ? (
+                                    billBreakdown.remainingCredit > 0 ? (
+                                        <span className="inline-flex items-center gap-1">
+                                            Prepaid credit active ({formatGHS(billBreakdown.remainingCredit)} remaining)
+                                        </span>
+                                    ) : (
+                                        <span className="text-amber-400 font-semibold inline-flex items-center gap-1">
+                                            Credit exhausted · {formatGHS(billBreakdown.amountDue)} due at checkout
+                                        </span>
+                                    )
+                                ) : (
+                                    "Taxes & fees calculated at checkout"
+                                )}
+                            </div>
                         </div>
                         <span className="font-mono text-[22px] font-black tabular-nums text-isabelline">
                             {formatGHS(draftSubtotal)}

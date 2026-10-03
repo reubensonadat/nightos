@@ -396,7 +396,13 @@ export function MenuScreen({
             {/* ═══════════════════════════════════════════════════════════
                 CONTENT — editorial title + cards, flows naturally
               ═══════════════════════════════════════════════════════════ */}
-            <section className="mx-auto w-full max-w-7xl px-5 md:px-8 pt-6 pb-[calc(200px+env(safe-area-inset-bottom))]">
+            <section
+                className={`mx-auto w-full max-w-7xl px-5 md:px-8 pt-6 transition-[padding] duration-200 ${
+                    itemCount > 0
+                        ? "pb-[calc(140px+env(safe-area-inset-bottom))]"
+                        : "pb-[calc(76px+env(safe-area-inset-bottom))]"
+                }`}
+            >
 
                 {/* Empty state */}
                 {loading ? (
@@ -457,11 +463,11 @@ export function MenuScreen({
                 FLOATING CART SUMMARY
               ═══════════════════════════════════════════════════════════ */}
             {itemCount > 0 && (
-                <div className="fixed inset-x-0 bottom-[calc(60px+env(safe-area-inset-bottom))] z-40 flex justify-center px-5 pb-[max(env(safe-area-inset-bottom),18px)] pt-3 bg-gradient-to-t from-isabelline via-isabelline/95 to-transparent">
+                <div className="fixed inset-x-0 bottom-[calc(60px+env(safe-area-inset-bottom))] z-40 flex justify-center px-5 pb-[max(env(safe-area-inset-bottom),18px)] pt-3 pointer-events-none">
                     <button
                         type="button"
                         onClick={onViewCart}
-                        className="animate-velvet-rise flex w-full max-w-md md:max-w-2xl items-center justify-between gap-3 rounded-full bg-licorice px-6 py-4 shadow-[0_20px_50px_rgba(35,20,12,0.25)] ring-1 ring-licorice/80 transition-all duration-200 ease-out hover:bg-licorice/95 hover:shadow-[0_24px_60px_rgba(35,20,12,0.30)] active:scale-[0.985] focus:outline-none focus-visible:ring-2 focus-visible:ring-khaki"
+                        className="pointer-events-auto group animate-velvet-rise flex w-full max-w-md md:max-w-2xl items-center justify-between gap-3 rounded-full bg-licorice px-6 py-4 shadow-[0_20px_50px_rgba(35,20,12,0.25)] ring-1 ring-licorice/80 transition-all duration-200 ease-out hover:bg-licorice/95 hover:shadow-[0_24px_60px_rgba(35,20,12,0.30)] active:scale-[0.985] focus:outline-none focus-visible:ring-2 focus-visible:ring-khaki"
                         aria-label={`View cart — ${itemCount} items, ${formatGHSString(subtotal)}`}
                     >
                         <div className="flex items-center gap-3">
