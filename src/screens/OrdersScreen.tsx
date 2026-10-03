@@ -4,6 +4,7 @@ import {
   ArrowRightIcon,
   CheckIcon,
   ChevronDownIcon,
+  ChevronRightIcon,
   ClipboardDocumentListIcon,
   XMarkIcon,
 } from "@heroicons/react/24/outline";
@@ -16,6 +17,21 @@ import { ReceiptDownloader } from "../components/ReceiptDownloader";
 import { STAGES, statusStage, type OrderSummary } from "./OrderTrackingScreen";
 import { ProfessionalReceipt } from "../components/ProfessionalReceipt";
 import { TablePinBanner } from "../components/TablePinBanner";
+
+function formatOrderTime(ts: number): string {
+  const d = new Date(ts);
+  const now = new Date();
+  const isToday =
+    d.getDate() === now.getDate() &&
+    d.getMonth() === now.getMonth() &&
+    d.getFullYear() === now.getFullYear();
+
+  const timeStr = d.toLocaleTimeString("en-GH", { hour: "numeric", minute: "2-digit", hour12: true });
+  if (isToday) {
+    return timeStr;
+  }
+  return `${d.toLocaleDateString("en-GH", { month: "short", day: "numeric" })}, ${timeStr}`;
+}
 
 function formatDate(ts: number): string {
   return new Date(ts).toLocaleDateString("en-GH", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
@@ -150,73 +166,63 @@ type ReceiptModalProps = {
   order: OrderSummary;
   venueName?: string | null;
   sessionToken?: string | null;
+  depositCovered?: boolean;
+  onPayBill?: (order: OrderSummary) => void;
   onClose: () => void;
 };
 
-function ReceiptModal({ order, venueName, sessionToken, onClose }: ReceiptModalProps) {
+function ReceiptModal({ order, venueName, sessionToken, depositCovered, onPayBill, onClose }: ReceiptModalProps) {
   const [items, setItems] = useState<DbOrderItem[] | null>(null);
-  const [bill, setBill] = useState<{
-    subtotal: number;
-    vat: number;
-    total: number;
-    status?: string;
-    created_at: string;
-    tables?: { table_label?: string; table_number?: number } | null;
-  } | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [tableLabel, setTableLabel] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [showPrintable, setShowPrintable] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
-    (async () => {
-      try {
-        const [itemsRes, billRes] = await Promise.all([
-          order.billId ? db.orderItemsByBill(order.billId, sessionToken) : Promise.resolve({ data: null }),
-          order.billId ? db.customerBill(order.billId, sessionToken) : Promise.resolve({ data: null }),
-        ]);
-        if (cancelled) return;
-        const activeItems = (itemsRes.data ?? []).filter((i) => i.status !== 'cancelled');
-        setItems(activeItems.length > 0 ? activeItems : null);
-        if (billRes.data) {
-          setBill({
-            subtotal: Number(billRes.data.subtotal ?? 0),
-            vat: Number(billRes.data.vat ?? 0),
-            total: Number(billRes.data.total ?? order.total),
-            status: billRes.data.status,
-            created_at: billRes.data.created_at,
+    if (order.submissionId || order.billId) {
+      setLoading(true);
+      Promise.all([
+        order.submissionId
+          ? db.orderItemsBySubmission(order.submissionId, sessionToken)
+          : Promise.resolve({ data: null }),
+        order.billId ? db.customerBill(order.billId, sessionToken) : Promise.resolve({ data: null }),
+      ])
+        .then(([itemsRes, billRes]) => {
+          if (cancelled) return;
+          const activeItems = (itemsRes.data ?? []).filter((i) => i.status !== 'cancelled');
+          if (activeItems.length > 0) setItems(activeItems);
+          if (billRes.data) {
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            tables: (Array.isArray(billRes.data.tables) ? billRes.data.tables[0] : billRes.data.tables) as any,
-          });
-        }
-      } catch (err) {
-        console.error("Error loading receipt details:", err);
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    })();
+            const tbl = (Array.isArray(billRes.data.tables) ? billRes.data.tables[0] : billRes.data.tables) as any;
+            if (tbl?.table_label) setTableLabel(tbl.table_label);
+          }
+        })
+        .catch((err) => console.error("Error loading receipt details:", err))
+        .finally(() => {
+          if (!cancelled) setLoading(false);
+        });
+    }
     return () => {
       cancelled = true;
     };
-  }, [order.billId, order.total, sessionToken]);
+  }, [order.submissionId, order.billId, sessionToken]);
 
-  // Items shown from the DB when available, else the summary snapshot.
+  // Items shown from DB submission when available, else the summary snapshot for this order.
   const shownItems =
     items && items.length > 0
       ? items.map((i) => ({ name: i.product_name, qty: i.quantity, lineTotal: Number(i.line_total) }))
       : order.items.map((i) => ({ name: i.name, qty: i.qty, lineTotal: i.lineTotal }));
 
-  const itemsSubtotal = shownItems.reduce((s, i) => s + i.lineTotal, 0);
-  const receiptTotal = bill ? bill.total : order.total;
-  const vat = bill ? bill.vat : Math.max(0, Math.round((receiptTotal - itemsSubtotal) * 100) / 100);
-  const stamp = bill?.created_at ?? new Date(order.sentAt).toISOString();
+  const itemsSubtotal = shownItems.reduce((s, i) => s + i.lineTotal, 0) || order.total;
+  const receiptTotal = order.total > 0 ? order.total : itemsSubtotal;
+  const vat = Math.max(0, Math.round((receiptTotal - itemsSubtotal) * 100) / 100);
+  const stamp = new Date(order.sentAt).toISOString();
 
-  const rawLabel = bill?.tables?.table_label;
-  const formattedTable = rawLabel
-    ? (rawLabel.trim().toLowerCase().startsWith("table") ? rawLabel : `Table ${rawLabel}`)
+  const formattedTable = tableLabel
+    ? (tableLabel.trim().toLowerCase().startsWith("table") ? tableLabel : `Table ${tableLabel}`)
     : (venueName || "Bysen");
 
-  const statusDisplay = bill
-    ? (bill.status === "paid" ? "Paid" : bill.status === "settling" ? "Partially Paid" : "Unpaid")
-    : statusLabelFor(order);
+  const statusDisplay = statusLabelFor(order);
 
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center">
@@ -232,9 +238,11 @@ function ReceiptModal({ order, venueName, sessionToken, onClose }: ReceiptModalP
           <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-licorice/15" />
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-khaki">Your receipt</p>
+              <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-khaki">
+                Order #{order.orderNumber}
+              </p>
               <p className="text-[15px] font-black tracking-[-0.02em] text-licorice">
-                {formattedTable}
+                {formattedTable} · {formatOrderTime(order.sentAt)}
               </p>
             </div>
             <button
@@ -254,19 +262,105 @@ function ReceiptModal({ order, venueName, sessionToken, onClose }: ReceiptModalP
               <div className="h-8 w-8 animate-spin rounded-full border-2 border-licorice/20 border-t-licorice" />
             </div>
           ) : (
-            <ReceiptDownloader fileName={`Receipt-${order.orderNumber}.png`}>
-              <ProfessionalReceipt
-                venueName={venueName || "Bysen"}
-                refCode={order.orderNumber}
-                dateISO={stamp}
-                statusLabel={statusDisplay}
-                servedLabel={formattedTable}
-                items={shownItems}
-                subtotal={itemsSubtotal}
-                vat={vat}
-                total={receiptTotal}
-              />
-            </ReceiptDownloader>
+            <div className="space-y-4">
+              {/* ── Itemized List ── */}
+              <div className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-licorice/8">
+                <div className="flex items-center justify-between border-b border-licorice/8 pb-2.5">
+                  <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-feldgrau">
+                    Items ({shownItems.reduce((acc, i) => acc + i.qty, 0)})
+                  </span>
+                  <span className="rounded-full bg-licorice/5 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider text-feldgrau">
+                    {statusDisplay}
+                  </span>
+                </div>
+
+                <div className="divide-y divide-licorice/5 pt-1">
+                  {shownItems.map((it, idx) => (
+                    <div key={idx} className="flex items-center justify-between py-2.5 text-[13px]">
+                      <div className="flex items-center gap-2 min-w-0 pr-2">
+                        <span className="font-mono font-bold text-licorice shrink-0">{it.qty}x</span>
+                        <span className="truncate font-medium text-licorice">{it.name}</span>
+                      </div>
+                      <span className="font-mono font-bold tabular-nums text-licorice shrink-0">
+                        {formatGHS(it.lineTotal)}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Subtotal & Total */}
+                <div className="mt-2 space-y-1.5 border-t border-licorice/8 pt-3 text-[12px]">
+                  <div className="flex items-center justify-between text-feldgrau">
+                    <span>Subtotal</span>
+                    <span className="font-mono font-bold tabular-nums">{formatGHS(itemsSubtotal)}</span>
+                  </div>
+                  {vat > 0 && (
+                    <div className="flex items-center justify-between text-feldgrau">
+                      <span>VAT</span>
+                      <span className="font-mono font-bold tabular-nums">{formatGHS(vat)}</span>
+                    </div>
+                  )}
+                  <div className="flex items-center justify-between pt-1.5 text-[14px] font-black text-licorice">
+                    <span>Order Total</span>
+                    <span className="font-mono text-[16px] tabular-nums text-khaki">
+                      {formatGHS(receiptTotal)}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* ── Order Action Buttons ── */}
+              <div className="space-y-2.5 pt-1">
+                {!order.cancelled && (
+                  depositCovered ? (
+                    <div className="rounded-2xl bg-khaki/10 py-3.5 px-4 text-center ring-1 ring-khaki/30">
+                      <span className="text-[12.5px] font-bold text-khaki">
+                        ✦ Covered by Prepaid Table Deposit
+                      </span>
+                    </div>
+                  ) : onPayBill ? (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        onClose();
+                        onPayBill(order);
+                      }}
+                      className="flex w-full items-center justify-center gap-2 rounded-full bg-licorice py-3.5 px-5 text-[14px] font-bold text-khaki shadow-[0_8px_20px_rgba(35,20,12,0.25)] transition-all hover:bg-licorice/90 active:scale-[0.98]"
+                    >
+                      <span>Pay This Order</span>
+                      <ArrowRightIcon className="h-4 w-4" strokeWidth={2.5} />
+                    </button>
+                  ) : null
+                )}
+
+                {/* ── Print Receipt Button ── */}
+                <button
+                  type="button"
+                  onClick={() => setShowPrintable((v) => !v)}
+                  className="flex w-full items-center justify-center rounded-full border border-licorice/15 bg-white py-3.5 px-5 text-[13.5px] font-bold text-licorice shadow-xs transition-all hover:bg-isabelline active:scale-[0.98]"
+                >
+                  <span>{showPrintable ? "Hide Receipt" : "Print Receipt"}</span>
+                </button>
+              </div>
+
+              {showPrintable && (
+                <div className="mt-2 animate-velvet-fade">
+                  <ReceiptDownloader fileName={`Receipt-${order.orderNumber}.png`}>
+                    <ProfessionalReceipt
+                      venueName={venueName || "Bysen"}
+                      refCode={order.orderNumber}
+                      dateISO={stamp}
+                      statusLabel={statusDisplay}
+                      servedLabel={formattedTable}
+                      items={shownItems}
+                      subtotal={itemsSubtotal}
+                      vat={vat}
+                      total={receiptTotal}
+                    />
+                  </ReceiptDownloader>
+                </div>
+              )}
+            </div>
           )}
         </div>
       </div>
@@ -293,56 +387,50 @@ function HistoryCard({
 
   return (
     <>
-      <div className="rounded-xl bg-white shadow-sm ring-1 ring-isabelline overflow-hidden">
+      <div className="overflow-hidden rounded-xl bg-white shadow-xs ring-1 ring-licorice/8 transition-all hover:ring-khaki/30 active:scale-[0.99]">
         <button
           type="button"
           onClick={() => setOpen(true)}
-          className="flex w-full items-center justify-between px-4 py-3 transition-all hover:bg-isabelline/30 active:scale-[0.995] text-left"
+          className="flex w-full items-center justify-between p-4 text-left transition-colors hover:bg-isabelline/20"
         >
-          <div className="min-w-0 flex-1">
+          <div className="min-w-0 flex-1 pr-3">
             <div className="flex items-center gap-2">
-              <p className="text-[12px] font-bold tracking-tight text-licorice">Order #{order.orderNumber}</p>
-              {order.cancelled && (
-                <span className="rounded-full bg-red-50 ring-1 ring-red-200 text-red-500 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider">
+              <p className="whitespace-nowrap text-[13px] font-bold tracking-tight text-licorice">
+                Order #{order.orderNumber}
+              </p>
+              {order.cancelled ? (
+                <span className="shrink-0 rounded-full bg-red-50 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider text-red-500 ring-1 ring-red-200">
                   Cancelled
+                </span>
+              ) : (
+                <span className="shrink-0 rounded-full bg-licorice/5 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider text-feldgrau ring-1 ring-licorice/10">
+                  {statusLabelFor(order)}
                 </span>
               )}
             </div>
-            <p className="text-[10px] text-feldgrau">{order.itemCount} {order.itemCount === 1 ? "item" : "items"} · {formatDate(order.sentAt)}</p>
+            <p className="mt-1 text-[11.5px] text-feldgrau">
+              {order.itemCount} {order.itemCount === 1 ? "item" : "items"} · {formatOrderTime(order.sentAt)}
+            </p>
           </div>
-          <div className="flex items-center gap-2">
-            <span className="font-mono text-[13px] font-bold tabular-nums text-khaki">{formatGHS(order.total)}</span>
-            <ChevronDownIcon className="h-4 w-4 -rotate-90 text-feldgrau/50" strokeWidth={2.25} />
+          <div className="flex items-center gap-2 shrink-0">
+            <span
+              className={`font-mono text-[14.5px] font-bold tabular-nums ${
+                order.cancelled ? "text-feldgrau/40 line-through" : "text-khaki"
+              }`}
+            >
+              {formatGHS(order.total)}
+            </span>
+            <ChevronRightIcon className="h-4 w-4 text-feldgrau/40" strokeWidth={2.25} />
           </div>
         </button>
-        {!order.cancelled && (
-          depositCovered ? (
-            <div className="border-t border-isabelline px-4 py-2 bg-isabelline/20 flex items-center justify-between">
-              <span className="text-[10px] font-medium text-feldgrau">Table Deposit Status</span>
-              <span className="inline-flex items-center gap-1 rounded-full bg-khaki/15 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-licorice ring-1 ring-khaki/30">
-                ✦ Covered by Deposit
-              </span>
-            </div>
-          ) : onPayBill ? (
-            <div className="border-t border-isabelline px-4 py-2 bg-isabelline/20 flex items-center justify-between">
-              <span className="text-[10px] font-medium text-feldgrau">Ready to settle this order?</span>
-              <button
-                type="button"
-                onClick={() => onPayBill(order)}
-                className="inline-flex items-center gap-1.5 rounded-full bg-licorice px-3 py-1 text-[11px] font-bold text-khaki hover:bg-licorice/90 transition-all active:scale-95"
-              >
-                <span>Pay {formatGHS(order.total)}</span>
-                <ArrowRightIcon className="h-3 w-3" strokeWidth={2.5} />
-              </button>
-            </div>
-          ) : null
-        )}
       </div>
       {open && (
         <ReceiptModal
           order={order}
           venueName={venueName}
           sessionToken={sessionToken}
+          depositCovered={depositCovered}
+          onPayBill={onPayBill}
           onClose={() => setOpen(false)}
         />
       )}
@@ -387,13 +475,19 @@ export function OrdersScreen({ activeOrders, history, tableLabel, tablePin, bill
     [activeOrders, history]
   );
 
+  const billRemainingBalance = bill
+    ? Math.max(0, Math.round((Number(bill.total || 0) - Number(bill.amount_paid || 0)) * 100) / 100)
+    : (depositPaid && depositAmount > 0
+        ? Math.max(0, Math.round((activeSpend - depositAmount) * 100) / 100)
+        : activeSpend);
+
   const remainingCredit = depositPaid && depositAmount > 0
-    ? Math.max(0, Math.round((depositAmount - activeSpend) * 100) / 100)
+    ? (bill?.remaining_credit !== undefined && bill?.remaining_credit !== null
+        ? Number(bill.remaining_credit)
+        : Math.max(0, Math.round((depositAmount - activeSpend) * 100) / 100))
     : 0;
 
-  const excessDue = depositPaid && depositAmount > 0
-    ? Math.max(0, Math.round((activeSpend - depositAmount) * 100) / 100)
-    : activeSpend;
+  const isDepositCovered = depositPaid && depositAmount > 0 && billRemainingBalance === 0;
 
   const payableOrder = useMemo(
     () =>
@@ -479,7 +573,7 @@ export function OrdersScreen({ activeOrders, history, tableLabel, tablePin, bill
                     order={o}
                     venueName={venueName}
                     sessionToken={sessionToken}
-                    depositCovered={depositPaid && depositAmount > 0 && excessDue === 0}
+                    depositCovered={isDepositCovered}
                     onPayBill={onPayBill}
                   />
                 ))}
@@ -490,9 +584,9 @@ export function OrdersScreen({ activeOrders, history, tableLabel, tablePin, bill
       )}
 
       {/* ── Fixed Bottom Payment Banner ── */}
-      {activeSpend > 0 && (
+      {(activeSpend > 0 || billRemainingBalance > 0) && (
         <div className="fixed bottom-[calc(70px+env(safe-area-inset-bottom))] left-0 right-0 z-40 px-5 max-w-7xl mx-auto">
-          {depositPaid && depositAmount > 0 && excessDue === 0 ? (
+          {isDepositCovered ? (
             <div className="rounded-2xl bg-licorice p-4 shadow-[0_12px_32px_rgba(35,20,12,0.35)] ring-1 ring-khaki/30 flex items-center justify-between gap-4">
               <div>
                 <p className="text-[10px] font-bold uppercase tracking-wider text-khaki">
@@ -515,14 +609,9 @@ export function OrdersScreen({ activeOrders, history, tableLabel, tablePin, bill
                 <p className="text-[10px] font-bold uppercase tracking-wider text-khaki">
                   {depositPaid && depositAmount > 0 ? "Amount Due Now" : "Total Tab Balance"}
                 </p>
-                <p className="font-mono text-lg font-black tracking-tight text-isabelline">
-                  {formatGHS(excessDue)}
+                <p className="font-mono text-xl font-black tracking-tight text-isabelline">
+                  {formatGHS(billRemainingBalance)}
                 </p>
-                {depositPaid && depositAmount > 0 && (
-                  <p className="text-[11px] text-isabelline/60">
-                    Gross Consumed: {formatGHS(activeSpend)} - Deposit: {formatGHS(depositAmount)}
-                  </p>
-                )}
               </div>
               <button
                 type="button"
@@ -532,7 +621,7 @@ export function OrdersScreen({ activeOrders, history, tableLabel, tablePin, bill
                   } else {
                     onPayBill({
                       orderNumber: _billId ? _billId.slice(0, 8).toUpperCase() : "BILL",
-                      total: excessDue,
+                      total: billRemainingBalance,
                       itemCount: 1,
                       items: [],
                       sentAt: Date.now(),
@@ -540,10 +629,9 @@ export function OrdersScreen({ activeOrders, history, tableLabel, tablePin, bill
                     });
                   }
                 }}
-                className="inline-flex items-center gap-2 rounded-full bg-khaki px-5 py-2.5 text-[12px] font-extrabold tracking-tight text-licorice transition-all hover:bg-khaki/90 active:scale-95 shadow-sm"
+                className="shrink-0 inline-flex items-center gap-2 rounded-full bg-khaki px-5 py-3 text-[13px] font-bold tracking-tight text-licorice whitespace-nowrap transition-all hover:bg-khaki/90 active:scale-95 shadow-sm"
               >
-                <span>{depositPaid && depositAmount > 0 ? "Pay Excess Bill" : "Pay Bill Now"}</span>
-                <ArrowRightIcon className="h-4 w-4" strokeWidth={2.5} />
+                <span>Pay Bill →</span>
               </button>
             </div>
           )}

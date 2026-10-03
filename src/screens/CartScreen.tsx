@@ -561,88 +561,21 @@ export function CartScreen({ venueId, tableLabel, tablePin, billId, customerSess
                     Add more items
                 </button>
 
-                {/* ── Bill & Deposit Ledger ── */}
+                {/* ── Simple Subtotal Card ── */}
                 <div className="mt-4 overflow-hidden rounded-xl bg-licorice text-isabelline shadow-[0_12px_28px_rgba(35,20,12,0.20)] ring-1 ring-white/10">
-                    {/* Header */}
-                    <div className="border-b border-isabelline/10 px-5 py-3.5 bg-isabelline/[0.03]">
-                        <span className="text-[11px] font-bold uppercase tracking-[0.2em] text-khaki">
-                            {depositAmount > 0 && depositPaid ? "Bill & Deposit Ledger" : "Bill Summary"}
-                        </span>
-                    </div>
-
-                    {/* Rows */}
-                    <div className="space-y-3 px-5 py-4">
-                        <div className="flex items-center justify-between text-[13px]">
-                            <span className="tracking-tight text-isabelline/70">
-                                Orders Subtotal{venueTax.taxInclusive && venueTax.vatPct > 0 ? " (excl. VAT)" : ""}
-                            </span>
-                            <span className="font-mono font-bold tabular-nums text-isabelline">
-                                {formatGHS(billBreakdown.subtotal)}
-                            </span>
-                        </div>
-                        {billBreakdown.serviceCharge > 0 && (
-                            <div className="flex items-center justify-between text-[13px]">
-                                <span className="tracking-tight text-isabelline/70">
-                                    Service Charge <span className="text-isabelline/40">({venueTax.serviceChargePct}%)</span>
-                                </span>
-                                <span className="font-mono font-bold tabular-nums text-isabelline">
-                                    {formatGHS(billBreakdown.serviceCharge)}
-                                </span>
-                            </div>
-                        )}
-                        {venueTax.vatPct > 0 && (
-                            <div className="flex items-center justify-between text-[13px]">
-                                <span className="tracking-tight text-isabelline/70">
-                                    VAT <span className="text-isabelline/40">({venueTax.vatPct}%)</span>
-                                </span>
-                                <span className="font-mono font-bold tabular-nums text-isabelline">
-                                    {formatGHS(billBreakdown.vat)}
-                                </span>
-                            </div>
-                        )}
-                        <div className="flex items-center justify-between text-[13px] pt-2 border-t border-isabelline/10">
-                            <span className="tracking-tight text-isabelline font-semibold">Gross Consumed Spend</span>
-                            <span className="font-mono font-bold tabular-nums text-isabelline">
-                                {formatGHS(billBreakdown.grossConsumed)}
-                            </span>
-                        </div>
-
-                        {depositAmount > 0 && depositPaid && (
-                            <>
-                                <div className="flex items-center justify-between text-[13px] text-khaki">
-                                    <span className="tracking-tight font-medium">Prepaid Table Deposit</span>
-                                    <span className="font-mono font-bold tabular-nums">
-                                        -{formatGHS(depositAmount)}
-                                    </span>
-                                </div>
-                                {billBreakdown.remainingCredit > 0 && (
-                                    <div className="flex items-center justify-between text-[13px]">
-                                        <span className="tracking-tight font-semibold text-khaki">
-                                            Remaining Table Credit
-                                        </span>
-                                        <span className="font-mono font-bold tabular-nums text-khaki">
-                                            {formatGHS(billBreakdown.remainingCredit)}
-                                        </span>
-                                    </div>
-                                )}
-                            </>
-                        )}
-                    </div>
-
-                    {/* Grand total / Amount Due */}
-                    <div className="flex items-end justify-between border-t border-isabelline/10 px-5 py-4 bg-isabelline/[0.02]">
+                    <div className="flex items-center justify-between px-5 py-4.5">
                         <div>
                             <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-khaki">
-                                {depositAmount > 0 && depositPaid ? "Amount Due Now" : "Grand Total"}
+                                Subtotal
                             </p>
-                            <p className="text-[11px] font-medium tracking-tight text-isabelline/50">
-                                {depositAmount > 0 && depositPaid && billBreakdown.amountDue === 0
-                                    ? "Fully covered by upfront deposit"
-                                    : "Pay after your meal"}
+                            <p className="text-[11px] font-medium tracking-tight text-isabelline/50 mt-0.5">
+                                {depositAmount > 0 && depositPaid && billBreakdown.remainingCredit > 0
+                                    ? `Prepaid credit active (${formatGHS(billBreakdown.remainingCredit)} remaining)`
+                                    : "Taxes & fees calculated at checkout"}
                             </p>
                         </div>
-                        <span className="font-mono text-[24px] font-black tabular-nums text-isabelline">
-                            {formatGHS(total)}
+                        <span className="font-mono text-[22px] font-black tabular-nums text-isabelline">
+                            {formatGHS(draftSubtotal)}
                         </span>
                     </div>
                 </div>
