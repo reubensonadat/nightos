@@ -562,8 +562,8 @@ both. `is_merged` = secondary only.
 
 ## 4.3 Keys & environments
 
-- Client: `VITE_PAYSTACK_PUBLIC_KEY` (dev) / `VITE_PAYSTACK_LIVE_KEY` (prod).
-  🛠 live key missing from .env — prod popup currently disabled.
+- Client: one public key, `VITE_PAYSTACK_PUBLIC_KEY`, used in dev AND prod —
+  swap `pk_test_...` ↔ `pk_live_...` (and redeploy) to flip modes.
 - Server: `PAYSTACK_SECRET_KEY` + service role only in Supabase Edge Function
   secrets — never in the client. ✅ convention; verify both functions read
   from env.

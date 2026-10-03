@@ -1146,7 +1146,12 @@ BEGIN
     );
 
     v_new_paid := v_bill.amount_paid + p_amount;
-    IF v_new_paid >= v_bill.total - 0.005 THEN
+    -- Deposit credit guard (migration 17): cash cannot auto-close a tab
+    -- whose deposit still covers the total — the guest is mid-visit with
+    -- unspent credit. Explicit settlement closes it instead.
+    IF v_new_paid >= v_bill.total - 0.005
+       AND NOT (COALESCE(v_bill.deposit_paid, false)
+                AND (COALESCE(v_bill.deposit_amount, 0) - v_bill.total) > 0.005) THEN
         v_status := 'paid';
         UPDATE public.bills
         SET amount_paid = v_new_paid, status = 'paid', closed_at = now(), updated_at = now()
@@ -1965,9 +1970,10 @@ BEGIN
 END $$;
 
 -- Bill auto-close trigger. Mirrors record_cash_payment's logic: a bill
--- closes only when its 'success' payments cover `total`, so partial
--- cash payments keep it 'settling'. Online payments always carry the
--- full amount (gated in the edge functions), so they close on insert.
+-- closes only when it has a total, its 'success' payments cover it, and
+-- no unspent deposit credit remains (migrations 16 + 17) — deposit-
+-- covered tabs stay 'settling' while the guest is mid-visit and close
+-- only via explicit settlement.
 CREATE OR REPLACE FUNCTION public.bill_auto_close_on_payment()
 RETURNS trigger
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
@@ -1988,7 +1994,10 @@ BEGIN
     FROM public.payments
     WHERE bill_id = NEW.bill_id AND status = 'success';
 
-    IF v_paid >= v_bill.total - 0.005 THEN
+    IF v_bill.total > 0
+       AND v_paid >= v_bill.total - 0.005
+       AND NOT (COALESCE(v_bill.deposit_paid, false)
+                AND (COALESCE(v_bill.deposit_amount, 0) - v_bill.total) > 0.005) THEN
         UPDATE public.bills
         SET amount_paid = v_paid, status = 'paid', closed_at = now(), updated_at = now()
         WHERE id = v_bill.id;

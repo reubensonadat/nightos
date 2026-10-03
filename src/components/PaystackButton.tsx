@@ -1,4 +1,4 @@
- 
+
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 import { useCallback, useEffect, useRef, useState } from 'react';
 import toast from 'react-hot-toast';
@@ -62,7 +62,7 @@ export function PaystackButton({
   });
 
   useEffect(() => {
-     
+
     if (typeof window.PaystackPop !== 'undefined') {
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setScriptReady(true);
@@ -79,9 +79,9 @@ export function PaystackButton({
   }, []);
 
   const handlePayment = useCallback(() => {
-    const key = import.meta.env.PROD
-      ? import.meta.env.VITE_PAYSTACK_LIVE_KEY || ''
-      : import.meta.env.VITE_PAYSTACK_PUBLIC_KEY || '';
+    // One key across dev and prod — swap pk_test_... ↔ pk_live_... in the
+    // environment (local .env / host dashboard) and redeploy to flip modes.
+    const key = import.meta.env.VITE_PAYSTACK_PUBLIC_KEY || '';
     if (!key || key.startsWith('pk_test_placeholder') || key.startsWith('pk_live_placeholder')) {
       toast.error("Payments aren't set up yet — the venue is missing its Paystack key.");
       return;
@@ -98,6 +98,15 @@ export function PaystackButton({
     const ref = generateReference();
     const amountPesewas = Math.round(amount * 100);
 
+    // Deposit-first fees: a subaccount charge NEVER settles 100% to the
+    // venue. If the caller passed no explicit charge (RPC miss/failure),
+    // default to the platform's 10%, hard-capped at 90% of the amount.
+    const effectiveCharge = subaccount
+      ? transactionCharge && transactionCharge > 0
+        ? Math.round(transactionCharge)
+        : Math.min(Math.round(amount * 0.10 * 100), Math.round(amount * 0.90 * 100))
+      : 0;
+
     const config: Parameters<typeof window.PaystackPop.setup>[0] = {
       key,
       email: email || `${billId.slice(0, 8)}@bysen.com`,
@@ -105,9 +114,7 @@ export function PaystackButton({
       currency: 'GHS',
       ref,
       ...(subaccount ? { subaccount, bearer: 'account' } : {}),
-      ...(subaccount && transactionCharge && transactionCharge > 0
-        ? { transaction_charge: Math.round(transactionCharge) }
-        : {}),
+      ...(subaccount ? { transaction_charge: effectiveCharge } : {}),
       ...(channels && channels.length > 0 ? { channels } : {}),
       metadata: {
         bill_id: billId,

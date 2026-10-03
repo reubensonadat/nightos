@@ -768,8 +768,21 @@ BEGIN
     JOIN public.venues v ON v.id = b.venue_id
     WHERE b.id = p_bill_id;
 
-    -- Service charge: flat % of the order subtotal (Bysen standard: 10%)
-    v_service := ROUND(COALESCE(v_subtotal, 0) * COALESCE(v_sc_pct, 0) / 100.0, 2);
+    -- Deposit state first — the fee base depends on it (deposit-first fees)
+    SELECT COALESCE(deposit_paid, false), COALESCE(deposit_amount, 0)
+      INTO v_dep_paid, v_dep
+    FROM public.bills
+    WHERE id = p_bill_id;
+
+    -- Deposit-first fees: on a deposit bill the service charge applies ONLY
+    -- to spend beyond the deposit (the deposit's own 10% was collected by
+    -- the Paystack split when the deposit was paid). No-deposit bills
+    -- charge it on the full subtotal as before.
+    v_service := ROUND(
+        (CASE WHEN v_dep_paid
+              THEN GREATEST(COALESCE(v_subtotal, 0) - v_dep, 0)
+              ELSE COALESCE(v_subtotal, 0)
+         END) * COALESCE(v_sc_pct, 0) / 100.0, 2);
 
     IF COALESCE(v_vat_pct, 0) > 0 THEN
         IF v_tax_incl THEN
@@ -789,11 +802,6 @@ BEGIN
     FROM public.payments
     WHERE bill_id = p_bill_id AND status = 'success';
 
-    SELECT COALESCE(deposit_paid, false), COALESCE(deposit_amount, 0)
-      INTO v_dep_paid, v_dep
-    FROM public.bills
-    WHERE id = p_bill_id;
-
     UPDATE public.bills
     SET subtotal = COALESCE(v_subtotal, 0),
         convenience_fee = 0.00,
@@ -806,12 +814,19 @@ BEGIN
             ELSE 0
         END,
         status = CASE
-            WHEN v_paid >= (v_total - 0.01) AND v_total > 0 THEN 'paid'
+            WHEN status IN ('cancelled', 'closed') THEN status
+            WHEN v_paid >= (v_total - 0.01) AND v_total > 0
+                 AND NOT (v_dep_paid AND (v_dep - v_total) > 0.005) THEN 'paid'
             WHEN v_paid > 0 THEN 'settling'
             WHEN status = 'paid' AND v_paid < (v_total - 0.01) THEN 'open'
             ELSE status
         END,
-        closed_at = CASE WHEN v_paid >= (v_total - 0.01) AND v_total > 0 THEN now() ELSE closed_at END,
+        closed_at = CASE
+            WHEN status IN ('cancelled', 'closed') THEN closed_at
+            WHEN v_paid >= (v_total - 0.01) AND v_total > 0
+                 AND NOT (v_dep_paid AND (v_dep - v_total) > 0.005) THEN now()
+            ELSE NULL
+        END,
         updated_at = now()
     WHERE id = p_bill_id;
 END;

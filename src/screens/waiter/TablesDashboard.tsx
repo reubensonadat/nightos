@@ -4,6 +4,7 @@ import {
     ArrowRightIcon,
     UserGroupIcon,
     QrCodeIcon,
+    KeyIcon,
 } from "@heroicons/react/24/outline";
 import { formatGHS, formatGHSString } from "../../data/menu";
 import { db } from "../../lib/api";
@@ -34,6 +35,8 @@ export type Table = {
     waiterId?: string;
     server?: string;
     assistanceType?: 'call_waiter' | 'cash_settlement';
+    billId?: string;
+    tablePin?: string;
     qrCodeToken?: string;
     area?: string;
 };
@@ -152,6 +155,8 @@ function transformToTables(
                 waiterId: isWaiteronDuty && waiterId ? waiterId : undefined,
                 server: isWaiteronDuty && waiterId ? (waiterNames[waiterId] ?? undefined) : undefined,
                 assistanceType: (bill.assistance_type as 'call_waiter' | 'cash_settlement') || undefined,
+                billId: bill.id as string,
+                tablePin: (bill.table_pin as string) || undefined,
                 qrCodeToken: (t.qr_code_token as string) || undefined,
                 area: (t.area as string) || undefined,
             };
@@ -542,6 +547,15 @@ export function TablesDashboard({ venueId, venueName, staffName, staffId, onSign
                                                         <p className="mt-1 text-[10px] font-medium italic tracking-tight text-feldgrau/60">
                                                             Unassigned
                                                         </p>
+                                                    )}
+                                                    {table.tablePin && (
+                                                        <span
+                                                            className="mt-1.5 inline-flex items-center gap-1 rounded-md bg-licorice/[0.06] px-1.5 py-0.5 font-mono text-[10px] font-bold tracking-[0.18em] text-licorice/80 ring-1 ring-licorice/10"
+                                                            title="Table code — read this to a guest who is locked out (e.g. after switching devices)"
+                                                        >
+                                                            <KeyIcon className="h-3 w-3" strokeWidth={2.25} />
+                                                            {table.tablePin}
+                                                        </span>
                                                     )}
                                                 </>
                                             );

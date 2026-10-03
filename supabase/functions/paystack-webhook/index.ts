@@ -79,7 +79,7 @@ serve(async (req) => {
 
       const { data: bill } = await supabase
         .from('bills')
-        .select('total, amount_paid, venue_id, status')
+        .select('total, amount_paid, venue_id, status, deposit_paid, deposit_amount')
         .eq('id', billId)
         .single()
 
@@ -95,9 +95,13 @@ serve(async (req) => {
         })
       }
 
-      // 3. Amount gate — remaining balance only. Rejects forged low-amount
-      //    transactions AND overpayment.
-      if (data.amount !== remainingPesewas) {
+      // 3. Amount gate — slices allowed. Any successful charge up to the
+      //    remaining balance is a legitimate partial payment and is credited
+      //    at its actual amount. Overpayment is rejected — except a table
+      //    deposit landing on a bill that already carries orders.
+      const isDepositLanding =
+        !!bill.deposit_paid && data.amount === Math.round((bill.deposit_amount ?? 0) * 100)
+      if (data.amount <= 0 || (data.amount > remainingPesewas + COVERED_TOLERANCE_PESEWAS && !isDepositLanding)) {
         console.error(`[webhook] Amount mismatch: expected ${remainingPesewas}, got ${data.amount} - NOT crediting`)
         await supabase
           .from('payment_events')
