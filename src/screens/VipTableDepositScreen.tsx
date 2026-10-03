@@ -135,6 +135,28 @@ export function VipTableDepositScreen({
                 toast.success("Table unlocked!");
                 onDepositPaid();
             } else {
+                // Deposit recovery: if this table already carries a deposit-
+                // paid bill from the last 2 hours, the guest's original table
+                // code still lands them back into that tab — no re-payment.
+                const { data: depBill } = await db.recentDepositBillForTable(table.id);
+                const depUpdated = depBill?.updated_at ? new Date(depBill.updated_at).getTime() : 0;
+                const withinTwoHours = Date.now() - depUpdated < 2 * 60 * 60 * 1000;
+                if (
+                    depBill &&
+                    depBill.id !== billId &&
+                    depBill.table_pin &&
+                    withinTwoHours &&
+                    code === depBill.table_pin.trim()
+                ) {
+                    try {
+                        localStorage.setItem(`nightos:table_pin:${depBill.id}`, depBill.table_pin);
+                    } catch {
+                        /* ignore */
+                    }
+                    toast.success("Welcome back — your deposit tab was found!");
+                    onDepositPaid();
+                    return;
+                }
                 setCodeError("Incorrect code. Please ask your table host or waiter.");
             }
         } catch (err) {
@@ -217,11 +239,10 @@ export function VipTableDepositScreen({
                             <button
                                 type="button"
                                 onClick={() => setSelectedChannel(selectedChannel === "momo" ? "both" : "momo")}
-                                className={`flex items-center justify-center gap-2 rounded-2xl py-3.5 px-4 text-xs font-bold transition-all cursor-pointer ${
-                                    selectedChannel === "momo"
+                                className={`flex items-center justify-center gap-2 rounded-2xl py-3.5 px-4 text-xs font-bold transition-all cursor-pointer ${selectedChannel === "momo"
                                         ? "bg-khaki text-licorice shadow-[0_4px_16px_rgba(208,186,152,0.35)] ring-2 ring-khaki"
                                         : "bg-white/[0.06] text-isabelline hover:bg-white/[0.1] border border-white/10"
-                                }`}
+                                    }`}
                             >
                                 <DevicePhoneMobileIcon className="h-4 w-4 shrink-0" />
                                 <span>Mobile Money</span>
@@ -229,11 +250,10 @@ export function VipTableDepositScreen({
                             <button
                                 type="button"
                                 onClick={() => setSelectedChannel(selectedChannel === "card" ? "both" : "card")}
-                                className={`flex items-center justify-center gap-2 rounded-2xl py-3.5 px-4 text-xs font-bold transition-all cursor-pointer ${
-                                    selectedChannel === "card"
+                                className={`flex items-center justify-center gap-2 rounded-2xl py-3.5 px-4 text-xs font-bold transition-all cursor-pointer ${selectedChannel === "card"
                                         ? "bg-khaki text-licorice shadow-[0_4px_16px_rgba(208,186,152,0.35)] ring-2 ring-khaki"
                                         : "bg-white/[0.06] text-isabelline hover:bg-white/[0.1] border border-white/10"
-                                }`}
+                                    }`}
                             >
                                 <CreditCardIcon className="h-4 w-4 shrink-0" />
                                 <span>Bank Card</span>
@@ -307,8 +327,8 @@ export function VipTableDepositScreen({
                                 selectedChannel === "momo"
                                     ? ["mobile_money"]
                                     : selectedChannel === "card"
-                                    ? ["card"]
-                                    : undefined
+                                        ? ["card"]
+                                        : undefined
                             }
                             onSuccess={handlePaystackSuccess}
                             className="

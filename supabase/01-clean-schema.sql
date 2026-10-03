@@ -807,14 +807,16 @@ BEGIN
         END,
         status = CASE
             WHEN status IN ('cancelled', 'closed') THEN status
-            WHEN v_paid >= (v_total - 0.01) AND v_total > 0 THEN 'paid'
+            WHEN v_paid >= (v_total - 0.01) AND v_total > 0
+                 AND NOT (v_dep_paid AND (v_dep - v_total) > 0.005) THEN 'paid'
             WHEN v_paid > 0 THEN 'settling'
             WHEN status = 'paid' AND v_paid < (v_total - 0.01) THEN 'open'
             ELSE status
         END,
         closed_at = CASE
             WHEN status IN ('cancelled', 'closed') THEN closed_at
-            WHEN v_paid >= (v_total - 0.01) AND v_total > 0 THEN now()
+            WHEN v_paid >= (v_total - 0.01) AND v_total > 0
+                 AND NOT (v_dep_paid AND (v_dep - v_total) > 0.005) THEN now()
             ELSE NULL
         END,
         updated_at = now()

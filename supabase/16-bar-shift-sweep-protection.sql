@@ -33,7 +33,7 @@ BEGIN
     IF NEW.status = 'ended' AND (OLD.status IS NULL OR OLD.status != 'ended') THEN
         -- Close active customer sessions that do NOT own a money-carrying bill
         UPDATE public.customer_sessions cs
-        SET status = 'closed', updated_at = now()
+        SET status = 'closed', closed_at = now(), last_active_at = now()
         WHERE cs.venue_id = NEW.venue_id
           AND cs.status = 'active'
           AND NOT EXISTS (

@@ -1,4 +1,4 @@
- 
+
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 import { useCallback, useEffect, useRef, useState } from 'react';
 import toast from 'react-hot-toast';
@@ -62,7 +62,7 @@ export function PaystackButton({
   });
 
   useEffect(() => {
-     
+
     if (typeof window.PaystackPop !== 'undefined') {
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setScriptReady(true);
@@ -79,9 +79,9 @@ export function PaystackButton({
   }, []);
 
   const handlePayment = useCallback(() => {
-    const key = import.meta.env.PROD
-      ? import.meta.env.VITE_PAYSTACK_LIVE_KEY || ''
-      : import.meta.env.VITE_PAYSTACK_PUBLIC_KEY || '';
+    // One key across dev and prod — swap pk_test_... ↔ pk_live_... in the
+    // environment (local .env / host dashboard) and redeploy to flip modes.
+    const key = import.meta.env.VITE_PAYSTACK_PUBLIC_KEY || '';
     if (!key || key.startsWith('pk_test_placeholder') || key.startsWith('pk_live_placeholder')) {
       toast.error("Payments aren't set up yet — the venue is missing its Paystack key.");
       return;

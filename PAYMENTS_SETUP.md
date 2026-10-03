@@ -102,10 +102,9 @@ Copy [`.env.example`](.env.example) to `.env` and fill in:
 |---|---|---|
 | `VITE_SUPABASE_URL` | `https://YOUR_PROJECT_REF.supabase.co` | browser |
 | `VITE_SUPABASE_ANON_KEY` | anon public key | browser |
-| `VITE_PAYSTACK_PUBLIC_KEY` | `pk_test_...` | browser (dev) |
-| `VITE_PAYSTACK_LIVE_KEY` | `pk_live_...` (blank until go-live) | browser (prod) |
+| `VITE_PAYSTACK_PUBLIC_KEY` | `pk_test_...` → swap to `pk_live_...` at go-live | browser (dev + prod) |
 
-`PaystackButton` picks the key based on `import.meta.env.PROD` and refuses to
+`PaystackButton` reads this single key in every environment and refuses to
 open the popup if it's missing or a placeholder — no silent failures.
 
 ## Step 6 — Test the full loop (test mode)
@@ -130,7 +129,8 @@ SELECT paystack_reference, event_type, amount_pesewas, created_at
 
 1. Complete Paystack business verification (GH registration + settlement bank account).
 2. Swap secrets: `PAYSTACK_SECRET_KEY=sk_live_...` (`npx supabase secrets set ...`).
-3. Set `VITE_PAYSTACK_LIVE_KEY=pk_live_...` in your Cloudflare Pages production env.
+3. Swap `VITE_PAYSTACK_PUBLIC_KEY=pk_live_...` in your Cloudflare Pages production
+   env (replacing the test key), then redeploy.
 4. Re-run Step 6 with a real GHS 1 transaction, then refund it from the Paystack
    dashboard and confirm the bill reopens (`charge.refund` path).
 

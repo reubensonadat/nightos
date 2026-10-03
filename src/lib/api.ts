@@ -710,7 +710,24 @@ export const db = {
       .eq('table_id', tableId)
       .in('status', ['open', 'settling'])
       .is('closed_at', null)
+      .order('deposit_paid', { ascending: false })
       .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+
+  /** Newest deposit-paid, still-open bill on a table — powers the deposit
+   *  screen's "Paid already? Enter code" recovery: a guest who paid within
+   *  the last 2 hours re-enters with their original table code instead of
+   *  paying again. */
+  recentDepositBillForTable: (tableId: string) =>
+    supabase
+      .from('bills')
+      .select('id, table_id, table_pin, deposit_paid, status, updated_at')
+      .eq('table_id', tableId)
+      .eq('deposit_paid', true)
+      .in('status', ['open', 'settling'])
+      .is('closed_at', null)
+      .order('updated_at', { ascending: false })
       .limit(1)
       .maybeSingle(),
 
@@ -724,6 +741,7 @@ export const db = {
       .eq('table_id', tableId)
       .in('status', ['open', 'settling', 'paid'])
       .is('closed_at', null)
+      .order('deposit_paid', { ascending: false })
       .order('created_at', { ascending: false })
       .limit(1)
       .maybeSingle(),
