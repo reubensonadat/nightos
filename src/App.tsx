@@ -313,6 +313,47 @@ function CustomerShell({
     },
   });
 
+  // ── Prepaid Table Balance & Credit Ledger Calculations ──
+  const depositAmount = Number(bill?.deposit_amount || 0);
+
+  const activeSpend = useMemo(
+    () => [...activeOrders, ...history].filter((o) => !o.cancelled).reduce((sum, o) => sum + o.total, 0),
+    [activeOrders, history]
+  );
+
+  const remainingCredit = useMemo(() => {
+    if (!isDepositActive) return 0;
+    if (bill?.remaining_credit !== undefined && bill?.remaining_credit !== null) {
+      const dbRem = Number(bill.remaining_credit);
+      if (dbRem > 0) return dbRem;
+      if (activeSpend === 0 && Number(bill.total || 0) === 0) return depositAmount;
+      return 0;
+    }
+    return Math.max(0, Math.round((depositAmount - activeSpend) * 100) / 100);
+  }, [bill, isDepositActive, depositAmount, activeSpend]);
+
+  const amountDue = useMemo(() => {
+    if (!isDepositActive) return 0;
+    if (bill?.total !== undefined && bill?.total !== null && Number(bill.total) > 0) {
+      return Math.max(0, Math.round((Number(bill.total) - Number(bill.amount_paid || 0)) * 100) / 100);
+    }
+    return Math.max(0, Math.round((activeSpend - depositAmount) * 100) / 100);
+  }, [bill, isDepositActive, depositAmount, activeSpend]);
+
+  const netBalance = useMemo(() => {
+    if (amountDue > 0) return -amountDue;
+    return remainingCredit;
+  }, [amountDue, remainingCredit]);
+
+  const totalSpend = useMemo(() => {
+    if (activeSpend > 0) return activeSpend;
+    if (isDepositActive) {
+      if (amountDue > 0) return depositAmount + amountDue;
+      return Math.max(0, depositAmount - remainingCredit);
+    }
+    return 0;
+  }, [activeSpend, isDepositActive, depositAmount, amountDue, remainingCredit]);
+
   const handleOrderSent = useCallback((order: OrderSummary) => {
     setActiveOrders((prev) => [...prev, order]);
     setTab("orders");
@@ -453,11 +494,11 @@ function CustomerShell({
           billId={bill?.id}
           sessionToken={session?.session_token}
           depositCredit={
-            bill?.deposit_paid && Number(bill?.deposit_amount || 0) > 0
+            isDepositPaid
               ? {
-                amount: Number(bill.deposit_amount),
-                remaining: Number(bill.remaining_credit ?? bill.deposit_amount),
-                paid: Boolean(bill.deposit_paid),
+                amount: depositAmount,
+                remaining: remainingCredit,
+                paid: true,
               }
               : null
           }
@@ -527,7 +568,11 @@ function CustomerShell({
         <DepositWelcomeModal
           venueName={venueName}
           tableLabel={tableLabel}
-          depositAmount={Number(bill.deposit_amount || 0)}
+          depositAmount={depositAmount}
+          remainingCredit={remainingCredit}
+          amountDue={amountDue}
+          netBalance={netBalance}
+          totalSpend={totalSpend}
           onClose={() => {
             try {
               sessionStorage.setItem(`nightos:deposit_welcome:${bill.id}`, "1");

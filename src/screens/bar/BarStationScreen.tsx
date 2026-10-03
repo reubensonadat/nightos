@@ -1238,17 +1238,6 @@ export function BarStationScreen({ venueId, staffId, staffName, onExit, onSignOu
                             <span>Shift Report & Waiter Audit</span>
                         </button>
                     </div>
-
-                    {/* Desktop Station Actions */}
-                    <div className="hidden md:flex items-center gap-2">
-                        <button
-                            type="button"
-                            onClick={handleOpenEndShift}
-                            className="inline-flex items-center gap-1.5 rounded-md bg-rose-600/30 hover:bg-rose-600/40 border border-rose-500/40 px-3.5 py-1.5 text-xs font-bold text-rose-200 transition cursor-pointer"
-                        >
-                            <span>End Shift</span>
-                        </button>
-                    </div>
                 </div>
             </header>
 
@@ -1538,27 +1527,17 @@ export function BarStationScreen({ venueId, staffId, staffName, onExit, onSignOu
                ═══════════════════════════════════════════════════════════ */}
             {activeTab === "REPORT" && (
                 <main className="flex-1 max-w-5xl mx-auto w-full p-4 sm:p-6 space-y-6">
-                    {/* Header: Title & Action */}
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                        <div>
-                            <span className="text-[11px] font-bold uppercase tracking-wider text-[#606F69]">
-                                Station Closing Reconciliation
-                            </span>
-                            <h2 className="text-2xl font-bold tracking-tight text-[#1A110B] mt-0.5">
-                                Shift Report & Waiter Audit
-                            </h2>
-                            <p className="text-xs text-[#606F69] mt-1">
-                                Shift started at {activeShift ? new Date(activeShift.startedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "—"} by {activeShift?.startedByStaffName || "Bartender"}.
-                            </p>
-                        </div>
-                        <button
-                            type="button"
-                            onClick={() => void loadShiftAuditData()}
-                            className="inline-flex items-center gap-2 self-start sm:self-auto rounded-xl bg-white border border-[#1A110B]/15 px-3.5 py-2 text-xs font-semibold text-[#1A110B] hover:bg-[#1A110B]/5 shadow-sm transition cursor-pointer"
-                        >
-                            <ArrowPathIcon className={`h-4 w-4 text-[#606F69] ${loadingShiftAudit ? "animate-spin" : ""}`} />
-                            <span>Refresh Ledger</span>
-                        </button>
+                    {/* Header: Title */}
+                    <div>
+                        <span className="text-[11px] font-bold uppercase tracking-wider text-[#606F69]">
+                            Station Closing Reconciliation
+                        </span>
+                        <h2 className="text-2xl font-bold tracking-tight text-[#1A110B] mt-0.5">
+                            Shift Report & Waiter Audit
+                        </h2>
+                        <p className="text-xs text-[#606F69] mt-1">
+                            Shift started at {activeShift ? new Date(activeShift.startedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "—"} by {activeShift?.startedByStaffName || "Bartender"}.
+                        </p>
                     </div>
 
                     {/* ═══════════════════════════════════════════════════════════════════════════
@@ -1651,34 +1630,34 @@ export function BarStationScreen({ venueId, staffId, staffName, onExit, onSignOu
                     </div>
 
                     {/* Navigation Sub-Tabs Toggle */}
-                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between bg-white rounded-xl p-2 border border-[#1A110B]/10 shadow-sm">
-                        <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0">
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between bg-white rounded-xl p-1.5 sm:p-2 border border-[#1A110B]/10 shadow-sm">
+                        <div className="grid grid-cols-2 gap-1.5 w-full sm:w-auto sm:flex sm:items-center">
                             <button
                                 type="button"
                                 onClick={() => setAuditSubTab("STOCK")}
-                                className={`flex items-center gap-2 rounded-lg px-3.5 py-2 text-xs font-semibold transition whitespace-nowrap cursor-pointer ${
+                                className={`flex items-center justify-center sm:justify-start gap-1.5 sm:gap-2 rounded-lg px-3 py-2 text-xs font-bold transition cursor-pointer ${
                                     auditSubTab === "STOCK"
                                         ? "bg-[#1A110B] text-white shadow-sm"
                                         : "text-[#1A110B] hover:bg-[#1A110B]/5"
                                 }`}
                             >
-                                <ArchiveBoxIcon className="h-4 w-4" />
-                                <span>1. Beverage Stock Reconciliation</span>
+                                <ArchiveBoxIcon className="h-4 w-4 shrink-0" />
+                                <span className="truncate">Beverage Stock</span>
                             </button>
 
                             <button
                                 type="button"
                                 onClick={() => setAuditSubTab("CASHFLOW")}
-                                className={`flex items-center gap-2 rounded-lg px-3.5 py-2 text-xs font-semibold transition whitespace-nowrap cursor-pointer ${
+                                className={`flex items-center justify-center sm:justify-start gap-1.5 sm:gap-2 rounded-lg px-3 py-2 text-xs font-bold transition cursor-pointer ${
                                     auditSubTab === "CASHFLOW"
                                         ? "bg-[#1A110B] text-white shadow-sm"
                                         : "text-[#1A110B] hover:bg-[#1A110B]/5"
                                 }`}
                             >
-                                <BanknotesIcon className="h-4 w-4" />
-                                <span>2. Waiter Collections & Table Cash Flow</span>
+                                <BanknotesIcon className="h-4 w-4 shrink-0" />
+                                <span className="truncate">Waiter Ledger</span>
                                 {waiterAuditGroups.length > 0 && (
-                                    <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${
+                                    <span className={`rounded-full px-1.5 py-0.2 text-[10px] font-bold shrink-0 ${
                                         auditSubTab === "CASHFLOW" ? "bg-white/20 text-white" : "bg-[#1A110B]/10 text-[#1A110B]"
                                     }`}>
                                         {waiterAuditGroups.length}
@@ -1693,32 +1672,18 @@ export function BarStationScreen({ venueId, staffId, staffName, onExit, onSignOu
                        ───────────────────────────────────────────────────────────── */}
                     {auditSubTab === "STOCK" && (
                         <div className="space-y-4">
-                            <div className="bg-white p-4 sm:p-5 rounded-xl border border-[#1A110B]/10 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-sm">
-                                <div>
-                                    <h3 className="text-sm font-bold text-[#1A110B]">
-                                        Bottle Depletion & Shelf Count-Out
-                                    </h3>
-                                    <p className="text-xs text-[#606F69] mt-0.5">
-                                        Table orders are automatically deducted. Adjust walk-up sales and verify final physical shelf counts.
-                                    </p>
-                                </div>
-                                <div className="text-xs font-medium text-[#606F69] bg-[#1A110B]/5 px-3 py-1.5 rounded-lg border border-[#1A110B]/8 shrink-0">
-                                    Formula: Start + Restock − Tables − Walk-ups = Expected
-                                </div>
-                            </div>
-
                             {/* Inventory Table */}
                             <div className="rounded-xl bg-white border border-[#1A110B]/10 shadow-sm overflow-hidden">
                                 <div className="overflow-x-auto">
                                     <table className="w-full text-left text-xs border-collapse">
                                         <thead>
-                                            <tr className="bg-[#1A110B]/[0.03] border-b border-[#1A110B]/10 text-[11px] font-semibold text-[#606F69] uppercase tracking-wider">
+                                            <tr className="bg-[#1A110B]/[0.03] border-b border-[#1A110B]/10 text-xs font-bold text-[#606F69] uppercase tracking-wider">
                                                 <th className="p-3.5">Beverage Item</th>
                                                 <th className="p-3.5 text-center">Start</th>
                                                 <th className="p-3.5 text-center">Restock</th>
                                                 <th className="p-3.5 text-center">Tables (Auto)</th>
                                                 <th className="p-3.5 text-center">Walk-Up Adjust</th>
-                                                <th className="p-3.5 text-center font-bold text-[#1A110B]">Expected</th>
+                                                <th className="p-3.5 text-center font-black text-[#1A110B]">Expected</th>
                                                 <th className="p-3.5 text-center">Physical Count</th>
                                                 <th className="p-3.5 text-right">Variance</th>
                                             </tr>
@@ -1728,35 +1693,54 @@ export function BarStationScreen({ venueId, staffId, staffName, onExit, onSignOu
                                                 const expected = item.remaining;
                                                 const counted = closingCounts[item.id] ?? expected;
                                                 const diff = counted - expected;
+                                                const hasTableDeduction = item.drawn > 0;
 
                                                 return (
                                                     <tr key={item.id} className="hover:bg-[#1A110B]/[0.02] transition">
-                                                        <td className="p-3.5 font-semibold text-[#1A110B]">
-                                                            <div>{item.name}</div>
-                                                            <div className="text-[10px] font-normal text-[#606F69] mt-0.5">{item.category}</div>
+                                                        <td className="p-3.5 font-bold text-[#1A110B]">
+                                                            <div className="text-sm font-bold text-[#1A110B]">{item.name}</div>
+                                                            <div className="text-[11px] font-medium text-[#606F69] mt-0.5">{item.category}</div>
                                                         </td>
-                                                        <td className="p-3.5 text-center font-mono font-medium text-[#1A110B]">{item.opening}</td>
-                                                        <td className="p-3.5 text-center font-mono font-medium text-emerald-700">+{item.added}</td>
-                                                        <td className="p-3.5 text-center font-mono font-medium text-[#1A110B]">−{item.drawn}</td>
+                                                        <td className="p-3.5 text-center font-bold text-[14px] sm:text-[15px] text-[#1A110B] tabular-nums">
+                                                            {item.opening}
+                                                        </td>
+                                                        <td className="p-3.5 text-center font-bold text-[14px] sm:text-[15px] tabular-nums">
+                                                            {item.added > 0 ? (
+                                                                <span className="text-emerald-700 font-black">+{item.added}</span>
+                                                            ) : (
+                                                                <span className="text-[#606F69]/60 font-semibold">+0</span>
+                                                            )}
+                                                        </td>
+                                                        <td className="p-3.5 text-center tabular-nums">
+                                                            {hasTableDeduction ? (
+                                                                <span className="inline-flex items-center justify-center font-black text-[14px] sm:text-[15px] text-rose-600 bg-rose-50 px-2.5 py-0.5 rounded-md border border-rose-200/70">
+                                                                    −{item.drawn}
+                                                                </span>
+                                                            ) : (
+                                                                <span className="font-semibold text-[14px] sm:text-[15px] text-[#606F69]/60">
+                                                                    −0
+                                                                </span>
+                                                            )}
+                                                        </td>
                                                         
                                                         {/* Walk-up Quick Adjust Controls */}
                                                         <td className="p-3.5 text-center">
-                                                            <div className="inline-flex items-center gap-1.5 bg-[#1A110B]/5 border border-[#1A110B]/10 rounded-lg p-1">
+                                                            <div className="inline-flex items-center gap-1.5 bg-[#1A110B]/5 border border-[#1A110B]/10 rounded-lg p-1 shadow-2xs">
                                                                 <button
                                                                     type="button"
                                                                     onClick={() => handleAdjustDirectSale(item.id, -1)}
-                                                                    className="h-5 w-5 rounded bg-white hover:bg-white/80 text-[#1A110B] flex items-center justify-center font-bold text-xs shadow-xs cursor-pointer"
+                                                                    className="h-6 w-6 sm:h-7 sm:w-7 rounded-md bg-white hover:bg-white/80 text-[#1A110B] flex items-center justify-center font-black text-sm shadow-xs cursor-pointer active:scale-95 transition"
                                                                     title="Decrease Walk-up"
                                                                 >
                                                                     −
                                                                 </button>
-                                                                <span className="font-mono font-bold text-xs px-1 text-[#1A110B]">
+                                                                <span className={`font-black text-[14px] sm:text-[15px] px-2 tabular-nums ${item.direct > 0 ? "text-[#1A110B]" : "text-[#606F69]/70"}`}>
                                                                     {item.direct}
                                                                 </span>
                                                                 <button
                                                                     type="button"
                                                                     onClick={() => handleAdjustDirectSale(item.id, 1)}
-                                                                    className="h-5 w-5 rounded bg-white hover:bg-white/80 text-[#1A110B] flex items-center justify-center font-bold text-xs shadow-xs cursor-pointer"
+                                                                    className="h-6 w-6 sm:h-7 sm:w-7 rounded-md bg-white hover:bg-white/80 text-[#1A110B] flex items-center justify-center font-black text-sm shadow-xs cursor-pointer active:scale-95 transition"
                                                                     title="Increase Walk-up"
                                                                 >
                                                                     +
@@ -1764,7 +1748,7 @@ export function BarStationScreen({ venueId, staffId, staffName, onExit, onSignOu
                                                             </div>
                                                         </td>
 
-                                                        <td className="p-3.5 text-center font-mono font-bold text-sm text-[#1A110B]">
+                                                        <td className="p-3.5 text-center font-black text-[15px] sm:text-[16px] text-[#1A110B] tabular-nums">
                                                             {expected}
                                                         </td>
 
@@ -1774,22 +1758,22 @@ export function BarStationScreen({ venueId, staffId, staffName, onExit, onSignOu
                                                                 type="number"
                                                                 value={counted}
                                                                 onChange={e => setClosingCounts({ ...closingCounts, [item.id]: Number(e.target.value) })}
-                                                                className="w-16 rounded-lg border border-[#1A110B]/15 bg-white py-1 text-center font-bold text-xs tabular-nums focus:ring-1 focus:ring-[#1A110B]"
+                                                                className="w-18 sm:w-20 rounded-lg border border-[#1A110B]/20 bg-white py-1.5 text-center font-black text-[14px] sm:text-[15px] text-[#1A110B] tabular-nums shadow-xs focus:ring-2 focus:ring-[#1A110B]/20 focus:outline-none"
                                                             />
                                                         </td>
 
                                                         {/* Variance Pill */}
                                                         <td className="p-3.5 text-right">
                                                             {diff !== 0 ? (
-                                                                <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-semibold ${
+                                                                <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-bold ${
                                                                     diff < 0
-                                                                        ? "bg-rose-50 text-rose-800 border border-rose-200/60"
-                                                                        : "bg-amber-50 text-amber-800 border border-amber-200/60"
+                                                                        ? "bg-rose-50 text-rose-800 border border-rose-200"
+                                                                        : "bg-amber-50 text-amber-800 border border-amber-200"
                                                                 }`}>
                                                                     {diff > 0 ? `+${diff} Over` : `${diff} Short`}
                                                                 </span>
                                                             ) : (
-                                                                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-50 text-emerald-800 border border-emerald-200/60">
+                                                                <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold bg-emerald-50 text-emerald-800 border border-emerald-200">
                                                                     ✓ Balanced
                                                                 </span>
                                                             )}

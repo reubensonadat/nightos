@@ -1,17 +1,16 @@
 import { useEffect, useState } from "react";
 import {
-    SparklesIcon,
-    ShieldCheckIcon,
     CreditCardIcon,
     DevicePhoneMobileIcon,
     CheckCircleIcon,
     ArrowPathIcon,
-    ReceiptPercentIcon,
-} from "@heroicons/react/24/outline";
+    KeyIcon,
+} from "@heroicons/react/24/solid";
 import toast from "react-hot-toast";
 import { formatGHS } from "../data/menu";
 import { PaystackButton } from "../components/PaystackButton";
 import { db, type DbTable } from "../lib/api";
+import heroImage from "../assets/hero-image.jpg";
 
 type Props = {
     venueId: string;
@@ -26,7 +25,6 @@ type Props = {
 
 export function VipTableDepositScreen({
     venueId,
-    venueName,
     table,
     billId,
     tablePin,
@@ -36,6 +34,11 @@ export function VipTableDepositScreen({
     const [paying, setPaying] = useState(false);
     const [paid, setPaid] = useState(false);
     const [selectedChannel, setSelectedChannel] = useState<"both" | "momo" | "card">("both");
+    const [showCodeInput, setShowCodeInput] = useState(false);
+    const [enteredCode, setEnteredCode] = useState("");
+    const [verifyingCode, setVerifyingCode] = useState(false);
+    const [codeError, setCodeError] = useState<string | null>(null);
+
     const [split, setSplit] = useState<{
         subaccount?: string | null;
         transaction_charge_pesewas?: number;
@@ -87,7 +90,7 @@ export function VipTableDepositScreen({
             }
 
             setPaid(true);
-            toast.success(`🎉 VIP Table Unlocked! ${formatGHS(minDeposit)} credit is ready to spend.`);
+            toast.success(`🎉 Table Unlocked! ${formatGHS(minDeposit)} credit is ready to spend.`);
             setTimeout(() => {
                 onDepositPaid();
             }, 1200);
@@ -97,7 +100,7 @@ export function VipTableDepositScreen({
             try {
                 await db.setBillDeposit(billId, minDeposit, true);
                 setPaid(true);
-                toast.success(`🎉 VIP Table Unlocked! Credit added.`);
+                toast.success(`🎉 Table Unlocked! Credit added.`);
                 setTimeout(() => {
                     onDepositPaid();
                 }, 1200);
@@ -108,149 +111,185 @@ export function VipTableDepositScreen({
         }
     };
 
+    const handleVerifyCode = async (e?: React.FormEvent) => {
+        if (e) e.preventDefault();
+        const code = enteredCode.trim();
+        if (!code) return;
+
+        setVerifyingCode(true);
+        setCodeError(null);
+
+        try {
+            let validPin = tablePin;
+            if (!validPin) {
+                const { data: billData } = await db.billById(billId);
+                validPin = billData?.table_pin ?? null;
+            }
+
+            if (validPin && code === validPin.trim()) {
+                try {
+                    localStorage.setItem(`nightos:table_pin:${billId}`, validPin);
+                } catch {
+                    /* ignore */
+                }
+                toast.success("Table unlocked!");
+                onDepositPaid();
+            } else {
+                setCodeError("Incorrect code. Please ask your table host or waiter.");
+            }
+        } catch (err) {
+            console.error("Code verification error:", err);
+            setCodeError("Could not verify code. Please try again.");
+        } finally {
+            setVerifyingCode(false);
+        }
+    };
+
     if (paid) {
         return (
-            <main className="min-h-svh bg-licorice text-isabelline flex flex-col items-center justify-center px-6 py-12 text-center antialiased">
-                <div className="relative flex h-20 w-20 items-center justify-center rounded-full bg-emerald-500/20 text-emerald-400 ring-2 ring-emerald-500/40">
-                    <CheckCircleIcon className="h-12 w-12" />
-                </div>
-                <span className="mt-6 inline-flex items-center gap-1.5 rounded-full bg-emerald-500/15 px-3.5 py-1 text-xs font-bold uppercase tracking-wider text-emerald-300 ring-1 ring-emerald-500/30">
-                    Deposit Confirmed
-                </span>
-                <h1 className="mt-3 text-3xl font-black tracking-tight text-isabelline">
-                    Table Unlocked!
-                </h1>
-                <p className="mt-2 max-w-sm text-sm leading-relaxed text-isabelline/70">
-                    Your upfront deposit of <span className="font-mono font-bold text-khaki">{formatGHS(minDeposit)}</span> has been credited to {table.table_label}. You can now order drinks, bottles, and food.
-                </p>
-                <div className="mt-8 flex items-center gap-2 text-xs text-khaki font-medium">
-                    <ArrowPathIcon className="h-4 w-4 animate-spin" />
-                    Opening VIP Menu…
+            <main className="relative min-h-svh bg-[#0E0A08] text-isabelline flex flex-col items-center justify-center px-6 py-12 text-center antialiased overflow-hidden">
+                <div
+                    className="absolute inset-0 z-0 bg-cover bg-center opacity-45 scale-105"
+                    style={{ backgroundImage: `url(${heroImage})` }}
+                />
+                <div className="absolute inset-0 z-0 bg-gradient-to-b from-[#0E0A08]/70 via-[#0E0A08]/55 to-[#0E0A08]/85" />
+
+                <div className="relative z-10 flex flex-col items-center">
+                    <div className="relative flex h-20 w-20 items-center justify-center rounded-full bg-emerald-500/20 text-emerald-400 ring-2 ring-emerald-500/40 shadow-[0_0_40px_rgba(16,185,129,0.3)]">
+                        <CheckCircleIcon className="h-12 w-12" />
+                    </div>
+                    <span className="mt-6 inline-flex items-center gap-1.5 rounded-full bg-emerald-500/15 px-3.5 py-1 text-xs font-bold uppercase tracking-wider text-emerald-300 ring-1 ring-emerald-500/30">
+                        Deposit Confirmed
+                    </span>
+                    <h1 className="mt-3 text-3xl font-black tracking-tight text-white sm:text-4xl">
+                        Table Unlocked!
+                    </h1>
+                    <p className="mt-2 max-w-sm text-sm leading-relaxed text-isabelline/70">
+                        Your upfront deposit of <span className="font-mono font-bold text-khaki">{formatGHS(minDeposit)}</span> has been credited to {table.table_label}. You can now order drinks, bottles, and food.
+                    </p>
+                    <div className="mt-8 flex items-center gap-2 text-xs text-khaki font-medium">
+                        <ArrowPathIcon className="h-4 w-4 animate-spin" />
+                        Opening Menu…
+                    </div>
                 </div>
             </main>
         );
     }
 
     return (
-        <main className="min-h-svh bg-licorice text-isabelline flex flex-col justify-between antialiased selection:bg-khaki selection:text-licorice">
-            {/* Top Bar */}
-            <header className="relative z-10 border-b border-isabelline/10 px-6 py-4">
-                <div className="mx-auto flex max-w-lg items-center justify-between">
-                    <div className="flex items-center gap-2.5">
-                        <div className="flex h-8 w-8 items-center justify-center rounded-full bg-khaki/20 text-khaki ring-1 ring-khaki/40 font-serif font-black text-sm">
-                            👑
-                        </div>
-                        <div className="flex flex-col text-left">
-                            <span className="text-[11px] font-bold uppercase tracking-wider text-khaki">
-                                {venueName || "VIP Seating"}
-                            </span>
-                            <span className="text-xs font-bold text-isabelline/90">
-                                {table.table_label} {table.area ? `• ${table.area}` : ""}
-                            </span>
-                        </div>
-                    </div>
-                    <span className="rounded-full bg-khaki/15 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-khaki ring-1 ring-khaki/30">
-                        VIP Minimum Spend
-                    </span>
-                </div>
-            </header>
+        <main className="relative min-h-svh bg-[#0E0A08] text-isabelline flex flex-col justify-between antialiased overflow-hidden selection:bg-khaki selection:text-licorice">
+            {/* Atmospheric Hero Image Background */}
+            <div
+                className="absolute inset-0 z-0 bg-cover bg-center opacity-55 scale-105"
+                style={{ backgroundImage: `url(${heroImage})` }}
+            />
+            {/* Clean Dark Neutral Gradient Overlay with tuned mid-section tint */}
+            <div className="absolute inset-0 z-0 bg-gradient-to-b from-[#0E0A08]/70 via-[#0E0A08]/60 to-[#0E0A08]/85 pointer-events-none" />
 
             {/* Central Card */}
-            <div className="relative flex-1 flex flex-col items-center justify-center px-6 py-8">
-                {/* Ambient glow */}
-                <div
-                    aria-hidden="true"
-                    className="pointer-events-none absolute inset-0 flex items-center justify-center"
-                >
-                    <div className="h-72 w-72 rounded-full bg-khaki/15 blur-[100px]" />
-                </div>
-
-                <div className="relative z-10 w-full max-w-md text-center">
-                    {/* Crown badge */}
-                    <div className="mx-auto inline-flex items-center gap-2 rounded-full bg-isabelline/8 px-4 py-1.5 ring-1 ring-isabelline/15">
-                        <SparklesIcon className="h-4 w-4 text-khaki" />
-                        <span className="text-xs font-bold tracking-wide text-isabelline">
-                            Prepaid Table Deposit Required
-                        </span>
-                    </div>
-
-                    <h1 className="mt-4 text-3xl font-black tracking-tight text-isabelline sm:text-4xl">
+            <div className="relative z-10 flex-1 flex flex-col items-center justify-center px-6 py-10">
+                <div className="w-full max-w-md text-center">
+                    {/* Clean Header Title */}
+                    <h1 className="text-3xl sm:text-4xl font-black tracking-tight text-white">
                         Unlock {table.table_label}
                     </h1>
 
-                    <p className="mt-2 text-xs leading-relaxed text-isabelline/70 sm:text-sm">
-                        To access and start ordering at this VIP table, an upfront minimum spend deposit is required.
+                    <p className="mt-2.5 text-xs leading-relaxed text-isabelline/75 sm:text-sm max-w-sm mx-auto">
+                        To access ordering at this exclusive table, an upfront consumable credit is required.
                     </p>
 
                     {/* Deposit Amount Hero Box */}
-                    <div className="mt-6 overflow-hidden rounded-3xl border border-khaki/30 bg-gradient-to-b from-isabelline/10 to-isabelline/5 p-6 shadow-2xl backdrop-blur-md">
-                        <span className="text-[11px] font-bold uppercase tracking-[0.2em] text-khaki">
+                    <div className="mt-6 overflow-hidden rounded-3xl border border-khaki/20 bg-gradient-to-b from-white/[0.08] to-white/[0.02] p-6 sm:p-7 shadow-[0_20px_50px_rgba(0,0,0,0.5)] backdrop-blur-xl ring-1 ring-white/10">
+                        <span className="text-[11px] font-extrabold uppercase tracking-[0.25em] text-khaki/90">
                             Upfront Table Deposit
                         </span>
-                        <div className="mt-1 font-mono text-4xl font-black tracking-tight text-khaki sm:text-5xl">
+                        <div className="mt-2 font-mono text-4xl font-black tracking-tight text-khaki sm:text-5xl drop-shadow-[0_2px_10px_rgba(208,186,152,0.25)]">
                             {formatGHS(minDeposit)}
                         </div>
-                        <div className="mt-3 flex items-center justify-center gap-1.5 text-xs text-emerald-400 font-semibold">
-                            <CheckCircleIcon className="h-4 w-4 shrink-0" />
-                            <span>100% Consumable Credit</span>
-                        </div>
                     </div>
 
-                    {/* How It Works Perks */}
-                    <div className="mt-6 space-y-3 text-left">
-                        <div className="flex items-start gap-3 rounded-2xl border border-isabelline/8 bg-isabelline/5 p-3.5">
-                            <ReceiptPercentIcon className="h-5 w-5 shrink-0 text-khaki mt-0.5" />
-                            <div className="text-xs leading-relaxed">
-                                <span className="font-bold text-isabelline">100% of deposit converts to credit. </span>
-                                <span className="text-isabelline/70">
-                                    Every drink, bottle, and dish ordered by your party deducts directly from this balance.
-                                </span>
-                            </div>
+                    {/* Payment Method Selector Section */}
+                    <div className="mt-8">
+                        <h3 className="text-sm font-bold text-white tracking-tight">
+                            Select Payment Method
+                        </h3>
+                        <div className="mt-3 grid grid-cols-2 gap-2.5 max-w-sm mx-auto">
+                            <button
+                                type="button"
+                                onClick={() => setSelectedChannel(selectedChannel === "momo" ? "both" : "momo")}
+                                className={`flex items-center justify-center gap-2 rounded-2xl py-3.5 px-4 text-xs font-bold transition-all cursor-pointer ${
+                                    selectedChannel === "momo"
+                                        ? "bg-khaki text-licorice shadow-[0_4px_16px_rgba(208,186,152,0.35)] ring-2 ring-khaki"
+                                        : "bg-white/[0.06] text-isabelline hover:bg-white/[0.1] border border-white/10"
+                                }`}
+                            >
+                                <DevicePhoneMobileIcon className="h-4 w-4 shrink-0" />
+                                <span>Mobile Money</span>
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => setSelectedChannel(selectedChannel === "card" ? "both" : "card")}
+                                className={`flex items-center justify-center gap-2 rounded-2xl py-3.5 px-4 text-xs font-bold transition-all cursor-pointer ${
+                                    selectedChannel === "card"
+                                        ? "bg-khaki text-licorice shadow-[0_4px_16px_rgba(208,186,152,0.35)] ring-2 ring-khaki"
+                                        : "bg-white/[0.06] text-isabelline hover:bg-white/[0.1] border border-white/10"
+                                }`}
+                            >
+                                <CreditCardIcon className="h-4 w-4 shrink-0" />
+                                <span>Bank Card</span>
+                            </button>
                         </div>
 
-                        <div className="flex items-start gap-3 rounded-2xl border border-isabelline/8 bg-isabelline/5 p-3.5">
-                            <ShieldCheckIcon className="h-5 w-5 shrink-0 text-khaki mt-0.5" />
-                            <div className="text-xs leading-relaxed">
-                                <span className="font-bold text-isabelline">Instant table unlock. </span>
-                                <span className="text-isabelline/70">
-                                    Payments are securely processed via Paystack. As soon as your deposit confirms, ordering opens immediately.
-                                </span>
-                            </div>
+                        {/* Paid already? Enter Code Section */}
+                        <div className="mt-5 max-w-sm mx-auto">
+                            {!showCodeInput ? (
+                                <button
+                                    type="button"
+                                    onClick={() => setShowCodeInput(true)}
+                                    className="inline-flex items-center gap-1.5 text-xs font-semibold text-khaki/90 hover:text-khaki transition-colors cursor-pointer py-1"
+                                >
+                                    <KeyIcon className="h-3.5 w-3.5" />
+                                    <span>Paid already? Enter code</span>
+                                </button>
+                            ) : (
+                                <form onSubmit={handleVerifyCode} className="mt-2 space-y-2.5 animate-fade-in">
+                                    <div className="flex items-center gap-2">
+                                        <input
+                                            type="text"
+                                            inputMode="numeric"
+                                            maxLength={6}
+                                            pattern="[0-9]*"
+                                            placeholder="Enter Code"
+                                            value={enteredCode}
+                                            onChange={(e) => {
+                                                setEnteredCode(e.target.value.replace(/\D/g, "").slice(0, 6));
+                                                setCodeError(null);
+                                            }}
+                                            className="flex-1 rounded-2xl border border-white/15 bg-white/[0.06] px-4 py-3 text-center font-mono text-sm font-bold tracking-widest text-white placeholder:text-isabelline/30 placeholder:tracking-normal focus:border-khaki focus:outline-none focus:ring-1 focus:ring-khaki"
+                                            autoFocus
+                                        />
+                                        <button
+                                            type="submit"
+                                            disabled={verifyingCode || !enteredCode.trim()}
+                                            className="rounded-2xl bg-khaki px-4 py-3 text-xs font-bold text-licorice transition-all hover:bg-khaki/90 active:scale-95 disabled:opacity-50 cursor-pointer"
+                                        >
+                                            {verifyingCode ? "Verifying…" : "Submit"}
+                                        </button>
+                                    </div>
+                                    {codeError && (
+                                        <p className="text-[11px] font-semibold text-rose-400">
+                                            {codeError}
+                                        </p>
+                                    )}
+                                </form>
+                            )}
                         </div>
-                    </div>
-
-                    {/* Payment Channel Selector */}
-                    <div className="mt-6 grid grid-cols-2 gap-2 text-left">
-                        <button
-                            type="button"
-                            onClick={() => setSelectedChannel("momo")}
-                            className={`flex items-center gap-2 rounded-xl p-3 text-xs font-bold transition-all ${
-                                selectedChannel === "momo"
-                                    ? "bg-khaki text-licorice shadow-sm ring-1 ring-khaki"
-                                    : "bg-isabelline/5 text-isabelline/80 hover:bg-isabelline/10 ring-1 ring-isabelline/10"
-                            }`}
-                        >
-                            <DevicePhoneMobileIcon className="h-4 w-4 shrink-0" />
-                            <span>Mobile Money</span>
-                        </button>
-                        <button
-                            type="button"
-                            onClick={() => setSelectedChannel("card")}
-                            className={`flex items-center gap-2 rounded-xl p-3 text-xs font-bold transition-all ${
-                                selectedChannel === "card"
-                                    ? "bg-khaki text-licorice shadow-sm ring-1 ring-khaki"
-                                    : "bg-isabelline/5 text-isabelline/80 hover:bg-isabelline/10 ring-1 ring-isabelline/10"
-                            }`}
-                        >
-                            <CreditCardIcon className="h-4 w-4 shrink-0" />
-                            <span>Bank Card</span>
-                        </button>
                     </div>
                 </div>
             </div>
 
             {/* Bottom Sticky Action */}
-            <div className="relative z-10 border-t border-isabelline/10 bg-licorice/95 px-6 py-5 backdrop-blur-md">
+            <div className="relative z-10 border-t border-white/10 bg-[#0E0A08]/90 px-6 py-5 backdrop-blur-xl">
                 <div className="mx-auto max-w-md">
                     {paying ? (
                         <div className="flex w-full items-center justify-center gap-2.5 rounded-full bg-khaki/20 py-4 text-sm font-bold text-khaki ring-1 ring-khaki/40">
@@ -273,28 +312,20 @@ export function VipTableDepositScreen({
                             }
                             onSuccess={handlePaystackSuccess}
                             className="
-                                group flex w-full items-center justify-between
-                                gap-3 rounded-full bg-khaki px-6 py-4
-                                text-licorice shadow-[0_10px_35px_rgba(202,168,98,0.25)]
+                                flex w-full items-center justify-center
+                                rounded-full bg-khaki px-6 py-4
+                                text-licorice shadow-md shadow-black/30
                                 transition-all duration-200 ease-out
                                 hover:bg-khaki/90 active:scale-[0.985] cursor-pointer
                             "
                         >
-                            <span className="flex flex-col items-start leading-tight text-left">
-                                <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-licorice/70">
-                                    Pay Deposit with Paystack
-                                </span>
-                                <span className="text-[15px] font-black tracking-tight text-licorice">
-                                    Pay {formatGHS(minDeposit)} & Unlock Table
-                                </span>
-                            </span>
-                            <span className="flex h-9 w-9 items-center justify-center rounded-full bg-licorice text-khaki">
-                                ➔
+                            <span className="font-display text-[15px] sm:text-base font-black tracking-wide uppercase text-licorice text-center">
+                                Unlock {table.table_label}
                             </span>
                         </PaystackButton>
                     )}
-                    <p className="mt-3 text-center text-[11px] text-isabelline/50">
-                        Secured by Paystack · GH₵ 2,000 becomes full credit
+                    <p className="mt-3 text-center text-[11px] text-isabelline/60 font-medium">
+                        Secured by Paystack
                     </p>
                 </div>
             </div>

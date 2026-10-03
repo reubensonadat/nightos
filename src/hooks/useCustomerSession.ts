@@ -305,6 +305,11 @@ export function useCustomerSession(venueId: string | null, tableId: string | nul
 
         if (existingBill) {
           bill = existingBill
+          if (!existingBill.table_pin) {
+            const fallbackPin = String(Math.floor(1000 + Math.random() * 9000))
+            await db.setBillPin(existingBill.id, fallbackPin)
+            bill.table_pin = fallbackPin
+          }
           if (minDeposit > 0 && !existingBill.deposit_paid && Number(existingBill.deposit_amount || 0) === 0) {
             bill.deposit_amount = minDeposit
           }
@@ -317,13 +322,13 @@ export function useCustomerSession(venueId: string | null, tableId: string | nul
             session = { ...session, bill_id: existingBill.id }
           }
         } else {
-          const autoPin = Math.floor(1000 + Math.random() * 9000).toString()
+          const generatedPin = String(Math.floor(1000 + Math.random() * 9000))
           const { data: newBill, error: createBillErr } = await db.createBill(
             venueId,
             tableId,
             session.party_size || 1,
             token,
-            autoPin,
+            generatedPin,
             minDeposit,
             false,
           )
@@ -333,24 +338,41 @@ export function useCustomerSession(venueId: string | null, tableId: string | nul
           }
           bill = newBill
           createdFreshBill = true
-          try { localStorage.setItem(`nightos:table_pin:${newBill.id}`, autoPin) } catch { /* noop */ }
           await supabase
             .from('customer_sessions')
             .update({ bill_id: newBill.id })
             .setHeader('x-session-token', token)
             .eq('id', session.id)
           session = { ...session, bill_id: newBill.id }
+
+          // Immediately unlock PIN for the creator of the new tab
+          if (generatedPin) {
+            try {
+              localStorage.setItem(`nightos:table_pin:${newBill.id}`, generatedPin)
+            } catch { /* noop */ }
+          }
         }
       }
 
       const resolvedTable = (state.table) || (tableId ? (await db.tableById(tableId)).data : null)
 
-      if (bill?.table_pin) {
-        try {
-          if (session && localStorage.getItem(`nightos:party:${session.id}`) === '1') {
-            localStorage.setItem(`nightos:table_pin:${bill.id}`, bill.table_pin)
-          }
-        } catch { /* noop */ }
+      // Guarantee every active bill has a valid 4-digit PIN in the database & local storage
+      if (bill) {
+        if (!bill.table_pin) {
+          const fallbackPin = String(Math.floor(1000 + Math.random() * 9000))
+          await db.setBillPin(bill.id, fallbackPin)
+          bill.table_pin = fallbackPin
+          try {
+            localStorage.setItem(`nightos:table_pin:${bill.id}`, fallbackPin)
+          } catch { /* noop */ }
+        } else {
+          try {
+            // If this is the active session owner, preserve PIN in localStorage
+            if (localStorage.getItem(`nightos:party:${session?.id}`) === '1' || createdFreshBill) {
+              localStorage.setItem(`nightos:table_pin:${bill.id}`, bill.table_pin)
+            }
+          } catch { /* noop */ }
+        }
       }
 
       setState((s) => ({ ...s, session, bill, table: resolvedTable ?? null, isNewTab: createdFreshBill, isBarClosed: false, loading: false, error: null }))
@@ -418,20 +440,17 @@ export function useCustomerSession(venueId: string | null, tableId: string | nul
 
       if (error) return { error: 'Failed to save party size' }
 
-      const tablePin = bill.table_pin || Math.floor(1000 + Math.random() * 9000).toString();
       const { error: billErr } = await db.updateBill(
         bill.id,
-        { guest_count: partySize, table_pin: tablePin },
+        { guest_count: partySize },
         session.session_token,
       )
       if (billErr) return { error: 'Failed to save party size' }
 
-      try { localStorage.setItem(`nightos:table_pin:${bill.id}`, tablePin); } catch { /* noop */ }
-
       setState((s) => ({
         ...s,
         session: { ...(updated as CustomerSession), bill_id: s.session?.bill_id ?? null },
-        bill: bill ? { ...bill, guest_count: partySize, table_pin: tablePin } : bill,
+        bill: bill ? { ...bill, guest_count: partySize } : bill,
       }))
 
       await assignWaiter(bill.id, session.session_token)
