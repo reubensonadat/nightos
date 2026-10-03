@@ -130,11 +130,18 @@ export function calculateDynamicPaystackSplit(
 }
 
 /**
- * Table Deposit & Consumable Credit Ledger:
- * - Upfront Minimum Spend Deposit paid (e.g. GH₵ 2,000 via Paystack).
- * - Drinks, food, and active orders deduct from this deposit credit balance.
- * - Remaining Credit is shown to guest while balance > 0 (bill due = 0).
- * - When credit is exhausted, subsequent orders accumulate as excess payable bill.
+ * Table Deposit & Consumable Credit Ledger (deposit-first fees):
+ * - Upfront Minimum Spend Deposit paid (e.g. GH₵ 2,000 via Paystack); the
+ *   platform's 10% is taken from the deposit at payment time via the
+ *   Paystack split (transaction_charge), not from the guest at checkout.
+ * - Drinks, food, and active orders deduct from the deposit credit balance
+ *   at menu prices — the guest sees the full deposit as their credit.
+ * - No service charge is stacked on deposit-covered spend. The 10% applies
+ *   ONLY to spend beyond the deposit: order 2,200 on a 2,000 deposit →
+ *   200 excess + 10% (20) → GH₵ 220 due at checkout.
+ * - When credit is exhausted, subsequent orders accumulate as excess payable
+ *   bill carrying the service charge. Unused credit is forfeited
+ *   (deposit = minimum spend, non-refundable).
  * - Cancelled orders are strictly excluded.
  */
 export type BillDepositBreakdown = {
@@ -157,7 +164,13 @@ export function computeBillWithDeposit(
   taxInclusive: boolean = true,
   serviceChargePct: number = 0
 ): BillDepositBreakdown {
-  const serviceCharge = Math.round(grossItems * (Math.max(serviceChargePct, 0) / 100) * 100) / 100;
+  // Deposit-first fees: the service-charge base is the spend beyond the
+  // deposit for deposit bills (the deposit's own 10% was collected by the
+  // Paystack split when it was paid); the full subtotal for regular bills.
+  const feeBase = depositPaid
+    ? Math.max(0, grossItems - Math.max(depositAmount, 0))
+    : grossItems;
+  const serviceCharge = Math.round(feeBase * (Math.max(serviceChargePct, 0) / 100) * 100) / 100;
   let subtotal = grossItems;
   let vat = 0;
 

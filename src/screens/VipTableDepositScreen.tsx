@@ -57,10 +57,19 @@ export function VipTableDepositScreen({
         };
     }, [venueId, minDeposit]);
 
-    const splitChargePesewas =
-        split?.subaccount && Number(split.transaction_charge_pesewas || 0) > 0
-            ? Math.min(Number(split.transaction_charge_pesewas), Math.round(minDeposit * 0.9 * 100))
-            : 0;
+    // Deposit-first fees: the platform's 10% of the deposit is collected
+    // HERE, via transaction_charge, the moment the deposit is paid. If the
+    // dynamic-split RPC returned nothing (miss/failure), fall back to the
+    // client-side 10% — never send a subaccount charge without a platform cut.
+    const fallbackFeePesewas = Math.round(minDeposit * 0.10 * 100);
+    const splitChargePesewas = split?.subaccount
+        ? Math.min(
+            Number(split.transaction_charge_pesewas || 0) > 0
+                ? Number(split.transaction_charge_pesewas)
+                : fallbackFeePesewas,
+            Math.round(minDeposit * 0.9 * 100),
+        )
+        : 0;
 
     const handlePaystackSuccess = async (reference: string) => {
         setPaying(true);
@@ -240,8 +249,8 @@ export function VipTableDepositScreen({
                                 type="button"
                                 onClick={() => setSelectedChannel(selectedChannel === "momo" ? "both" : "momo")}
                                 className={`flex items-center justify-center gap-2 rounded-2xl py-3.5 px-4 text-xs font-bold transition-all cursor-pointer ${selectedChannel === "momo"
-                                        ? "bg-khaki text-licorice shadow-[0_4px_16px_rgba(208,186,152,0.35)] ring-2 ring-khaki"
-                                        : "bg-white/[0.06] text-isabelline hover:bg-white/[0.1] border border-white/10"
+                                    ? "bg-khaki text-licorice shadow-[0_4px_16px_rgba(208,186,152,0.35)] ring-2 ring-khaki"
+                                    : "bg-white/[0.06] text-isabelline hover:bg-white/[0.1] border border-white/10"
                                     }`}
                             >
                                 <DevicePhoneMobileIcon className="h-4 w-4 shrink-0" />
@@ -251,8 +260,8 @@ export function VipTableDepositScreen({
                                 type="button"
                                 onClick={() => setSelectedChannel(selectedChannel === "card" ? "both" : "card")}
                                 className={`flex items-center justify-center gap-2 rounded-2xl py-3.5 px-4 text-xs font-bold transition-all cursor-pointer ${selectedChannel === "card"
-                                        ? "bg-khaki text-licorice shadow-[0_4px_16px_rgba(208,186,152,0.35)] ring-2 ring-khaki"
-                                        : "bg-white/[0.06] text-isabelline hover:bg-white/[0.1] border border-white/10"
+                                    ? "bg-khaki text-licorice shadow-[0_4px_16px_rgba(208,186,152,0.35)] ring-2 ring-khaki"
+                                    : "bg-white/[0.06] text-isabelline hover:bg-white/[0.1] border border-white/10"
                                     }`}
                             >
                                 <CreditCardIcon className="h-4 w-4 shrink-0" />
