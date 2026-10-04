@@ -561,31 +561,31 @@ export function CartScreen({ venueId, tableLabel, tablePin, billId, customerSess
                     Add more items
                 </button>
 
-                {/* ── Simple Subtotal Card ── */}
+                {/* ── Subtotal / Remaining Credit Card ── */}
                 <div className="mt-4 overflow-hidden rounded-xl bg-licorice text-isabelline shadow-[0_12px_28px_rgba(35,20,12,0.20)] ring-1 ring-white/10">
                     <div className="flex items-center justify-between px-5 py-4.5">
                         <div>
                             <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-khaki">
-                                Subtotal
+                                {depositAmount > 0 && depositPaid
+                                    ? billBreakdown.remainingCredit > 0
+                                        ? "Remaining Credit"
+                                        : "Amount Due"
+                                    : "Subtotal"}
                             </p>
-                            <div className="text-[11px] font-medium tracking-tight text-isabelline/60 mt-0.5">
-                                {depositAmount > 0 && depositPaid ? (
-                                    billBreakdown.remainingCredit > 0 ? (
-                                        <span className="inline-flex items-center gap-1">
-                                            Prepaid credit active ({formatGHS(billBreakdown.remainingCredit)} remaining)
-                                        </span>
-                                    ) : (
-                                        <span className="text-amber-400 font-semibold inline-flex items-center gap-1">
-                                            Credit exhausted · {formatGHS(billBreakdown.amountDue)} due at checkout
-                                        </span>
-                                    )
-                                ) : (
-                                    "Taxes & fees calculated at checkout"
-                                )}
-                            </div>
+                            <p className="text-[11px] font-medium tracking-tight text-isabelline/50 mt-0.5">
+                                {depositAmount > 0 && depositPaid
+                                    ? billBreakdown.remainingCredit > 0
+                                        ? "Covered by table deposit"
+                                        : "Table deposit exhausted"
+                                    : "Taxes & fees calculated at checkout"}
+                            </p>
                         </div>
                         <span className="font-mono text-[22px] font-black tabular-nums text-isabelline">
-                            {formatGHS(draftSubtotal)}
+                            {depositAmount > 0 && depositPaid
+                                ? billBreakdown.remainingCredit > 0
+                                    ? formatGHS(billBreakdown.remainingCredit)
+                                    : formatGHS(billBreakdown.amountDue)
+                                : formatGHS(draftSubtotal)}
                         </span>
                     </div>
                 </div>

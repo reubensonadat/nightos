@@ -1,15 +1,17 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import {
     CreditCardIcon,
     DevicePhoneMobileIcon,
     CheckCircleIcon,
     ArrowPathIcon,
     KeyIcon,
+    BanknotesIcon,
 } from "@heroicons/react/24/solid";
 import toast from "react-hot-toast";
 import { formatGHS } from "../data/menu";
 import { PaystackButton } from "../components/PaystackButton";
 import { db, type DbTable } from "../lib/api";
+import { useRealtime } from "../hooks/useRealtime";
 import heroImage from "../assets/hero-image.jpg";
 
 type Props = {
@@ -27,6 +29,7 @@ export function VipTableDepositScreen({
     venueId,
     table,
     billId,
+    sessionToken,
     tablePin,
     minDeposit,
     onDepositPaid,
@@ -38,12 +41,36 @@ export function VipTableDepositScreen({
     const [enteredCode, setEnteredCode] = useState("");
     const [verifyingCode, setVerifyingCode] = useState(false);
     const [codeError, setCodeError] = useState<string | null>(null);
+    const [callingCash, setCallingCash] = useState(false);
+    const [cashRequested, setCashRequested] = useState(false);
 
     const [split, setSplit] = useState<{
         subaccount?: string | null;
         transaction_charge_pesewas?: number;
         debt_clawback?: number;
     } | null>(null);
+
+    // Live Realtime sync: if a waiter or another guest pays the deposit, unlock instantly
+    useRealtime({
+        table: "bills",
+        filter: billId ? `id=eq.${billId}` : undefined,
+        onUpdate: (updatedRow: Record<string, unknown>) => {
+            if (updatedRow.deposit_paid === true) {
+                if (tablePin) {
+                    try {
+                        localStorage.setItem(`nightos:table_pin:${billId}`, tablePin);
+                    } catch {
+                        /* ignore */
+                    }
+                }
+                setPaid(true);
+                toast.success(`🎉 Table Unlocked! Deposit confirmed.`);
+                setTimeout(() => {
+                    onDepositPaid();
+                }, 1000);
+            }
+        },
+    });
 
     // Pre-fetch the Paystack subaccount split for this deposit
     useEffect(() => {
@@ -71,6 +98,20 @@ export function VipTableDepositScreen({
         )
         : 0;
 
+    const handleCallWaiterCash = useCallback(async () => {
+        if (!venueId || !billId) return;
+        setCallingCash(true);
+        try {
+            await db.requestWaiterAssistance(billId, 'cash_deposit', sessionToken);
+            setCashRequested(true);
+            toast.success(`🔔 Waiter called to collect ${formatGHS(minDeposit)} cash deposit.`);
+        } catch {
+            toast.error("Could not call waiter. Please flag down your server.");
+        } finally {
+            setCallingCash(false);
+        }
+    }, [venueId, billId, sessionToken, minDeposit]);
+
     const handlePaystackSuccess = async (reference: string) => {
         setPaying(true);
         try {
@@ -78,6 +119,7 @@ export function VipTableDepositScreen({
             await db.recordDepositPayment({
                 billId,
                 venueId,
+                tableId: table.id,
                 amount: minDeposit,
                 reference,
                 method: selectedChannel === "momo" ? "mobile_money" : selectedChannel === "card" ? "card" : "paystack",
@@ -269,8 +311,28 @@ export function VipTableDepositScreen({
                             </button>
                         </div>
 
+                        {/* Cash Deposit / Call Waiter Option */}
+                        <div className="mt-3 max-w-sm mx-auto">
+                            {cashRequested ? (
+                                <div className="rounded-2xl border border-khaki/30 bg-khaki/10 px-4 py-3 text-center text-xs font-semibold text-khaki animate-fade-in flex items-center justify-center gap-2">
+                                    <span className="h-2 w-2 rounded-full bg-khaki animate-ping" />
+                                    <span>Waiter called to collect {formatGHS(minDeposit)} in cash</span>
+                                </div>
+                            ) : (
+                                <button
+                                    type="button"
+                                    onClick={handleCallWaiterCash}
+                                    disabled={callingCash}
+                                    className="w-full flex items-center justify-center gap-2 rounded-2xl py-3 px-4 text-xs font-bold transition-all cursor-pointer bg-white/[0.04] text-isabelline/80 hover:text-isabelline hover:bg-white/[0.08] border border-white/10 active:scale-98"
+                                >
+                                    <BanknotesIcon className="h-4 w-4 text-khaki" />
+                                    <span>{callingCash ? "Calling Waiter…" : "Paying with Cash? Call Waiter"}</span>
+                                </button>
+                            )}
+                        </div>
+
                         {/* Paid already? Enter Code Section */}
-                        <div className="mt-5 max-w-sm mx-auto">
+                        <div className="mt-4 max-w-sm mx-auto">
                             {!showCodeInput ? (
                                 <button
                                     type="button"

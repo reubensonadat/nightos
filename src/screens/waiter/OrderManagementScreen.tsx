@@ -9,6 +9,7 @@ import {
     UserGroupIcon,
     XMarkIcon,
     Cog8ToothIcon,
+    BanknotesIcon,
 } from "@heroicons/react/24/outline";
 import { CheckCircleIcon } from "@heroicons/react/24/solid";
 import toast from "react-hot-toast";
@@ -20,6 +21,7 @@ import { MenuItemCard } from "../../components/MenuItemCard";
 import { ConfirmModal } from "../../components/ConfirmModal";
 import bellRingingIcon from "../../assets/bell-ringing.svg";
 import { sounds } from "../../lib/sound";
+import { generateReference } from "../../lib/utils";
 
 /* ────────────────────────── Types ────────────────────────── */
 
@@ -92,6 +94,7 @@ export function OrderManagementScreen() {
     const [partySizeInput, setPartySizeInput] = useState<number>(1);
     const [savingParty, setSavingParty] = useState(false);
     const [freeingTable, setFreeingTable] = useState(false);
+    const [confirmingDeposit, setConfirmingDeposit] = useState(false);
 
     const [prevGuestCount, setPrevGuestCount] = useState(currentBill?.guest_count);
     if (currentBill?.guest_count !== prevGuestCount) {
@@ -492,52 +495,6 @@ export function OrderManagementScreen() {
                     </div>
                 )}
 
-                {/* Paid Bill Alert Banner */}
-                {currentBill && (currentBill.status === 'paid' || (Number(currentBill.amount_paid || 0) >= Number(currentBill.total || 0) && Number(currentBill.total || 0) > 0)) && (
-                    <div className="mx-auto w-full max-w-7xl px-5 md:px-8 pb-3 animate-velvet-fade">
-                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-2xl bg-emerald-50 border border-emerald-500/30 p-3.5 shadow-sm">
-                            <div className="flex items-center gap-3">
-                                <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-600 text-white shadow-sm shrink-0">
-                                    <CheckCircleIcon className="h-5 w-5" />
-                                </div>
-                                <div>
-                                    <p className="text-[10px] font-bold uppercase tracking-wider text-emerald-800">Bill Settled · Paid</p>
-                                    <p className="text-[13px] font-black text-emerald-950">
-                                        Paid in full ({formatGHS(Number(currentBill.total || 0))})
-                                    </p>
-                                </div>
-                            </div>
-                            <div className="flex items-center gap-2 self-end sm:self-auto">
-                                <button
-                                    type="button"
-                                    onClick={() => navigate(`/waiter/table/${table.id}/settle`)}
-                                    className="rounded-xl bg-white border border-emerald-600/30 px-3 py-2 text-[11px] font-bold text-emerald-900 shadow-2xs transition-all hover:bg-emerald-100 active:scale-95"
-                                >
-                                    Receipt Details
-                                </button>
-                                <button
-                                    type="button"
-                                    onClick={handleFreeTable}
-                                    disabled={freeingTable}
-                                    className="rounded-xl bg-emerald-700 px-3.5 py-2 text-[11px] font-bold text-white shadow-sm transition-all hover:bg-emerald-800 active:scale-95 disabled:opacity-50 flex items-center gap-1.5"
-                                >
-                                    {freeingTable ? (
-                                        <>
-                                            <span className="h-3 w-3 animate-spin rounded-full border-2 border-white/30 border-t-white" />
-                                            Freeing…
-                                        </>
-                                    ) : (
-                                        <>
-                                            <CheckIcon className="h-3.5 w-3.5" strokeWidth={2.5} />
-                                            Free Table for Next Guests
-                                        </>
-                                    )}
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                )}
-
                 {/* Tab bar */}
                 <nav className="mx-auto w-full max-w-7xl px-5 md:px-8 pb-3">
                     <div className="flex items-center gap-1 rounded-full bg-white p-1 shadow-sm ring-1 ring-licorice/8">
@@ -587,27 +544,95 @@ export function OrderManagementScreen() {
                                 <div className="h-6 w-6 animate-spin rounded-full border-2 border-licorice/20 border-t-licorice" />
                             </div>
                         ) : submissions.length === 0 ? (
-                            <div className="flex flex-col items-center justify-center rounded-lg bg-white px-6 py-16 text-center shadow-sm ring-1 ring-isabelline">
-                                <span className="h-1.5 w-1.5 rounded-full bg-khaki" />
-                                <h3 className="mt-4 text-[15px] font-bold tracking-tight text-licorice">
-                                    Nothing ordered yet
-                                </h3>
-                                <p className="mt-1.5 text-[12px] leading-[1.5] tracking-tight text-feldgrau">
-                                    {billId
-                                        ? "Orders from the table will appear here live."
-                                        : "Switch to Add Items to take this table's order."}
-                                </p>
-                                {!billId && (
+                            Number(table.min_deposit || currentBill?.deposit_amount || 0) > 0 && currentBill && !currentBill.deposit_paid ? (
+                                <div className="rounded-3xl bg-licorice text-isabelline p-6 sm:p-8 shadow-[0_12px_32px_rgba(35,20,12,0.25)] ring-1 ring-khaki/30 text-center animate-velvet-fade">
+                                    <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-khaki/15 text-khaki ring-1 ring-khaki/30 shadow-sm">
+                                        <BanknotesIcon className="h-7 w-7" />
+                                    </div>
+                                    <span className="mt-4 inline-flex items-center gap-1.5 rounded-full bg-khaki/15 px-3.5 py-1 text-[11px] font-bold uppercase tracking-wider text-khaki ring-1 ring-khaki/30">
+                                        VIP Cash Deposit Required
+                                    </span>
+                                    <h3 className="mt-3 text-3xl sm:text-4xl font-black tracking-tight text-white font-mono">
+                                        {formatGHS(Number(table.min_deposit || currentBill.deposit_amount || 0))}
+                                    </h3>
+                                    <p className="mt-2 text-[12px] sm:text-sm text-isabelline/70 max-w-sm mx-auto leading-relaxed">
+                                        {currentBill.assistance_type === 'cash_deposit'
+                                            ? "The guest requested to pay their upfront table deposit in physical cash."
+                                            : "Collect the upfront deposit in physical cash to unlock ordering for this table."}
+                                    </p>
                                     <button
                                         type="button"
-                                        onClick={() => setTab("add")}
-                                        className="mt-5 inline-flex items-center gap-1.5 rounded-full bg-licorice px-4 py-2 text-[11px] font-bold tracking-tight text-isabelline shadow-[0_4px_12px_rgba(35,20,12,0.18)] active:scale-95"
+                                        disabled={confirmingDeposit}
+                                        onClick={async () => {
+                                            if (!currentBill || !staffId) return;
+                                            setConfirmingDeposit(true);
+                                            try {
+                                                const depositToCollect = Number(table.min_deposit || currentBill.deposit_amount || 0);
+                                                const ref = generateReference();
+                                                const { error: depErr } = await db.recordDepositPayment({
+                                                    billId: currentBill.id,
+                                                    venueId,
+                                                    tableId: table.id,
+                                                    amount: depositToCollect,
+                                                    reference: ref,
+                                                    method: "cash",
+                                                    staffId,
+                                                });
+
+                                                if (depErr) {
+                                                    toast.error("Could not register cash deposit.");
+                                                    return;
+                                                }
+
+                                                await db.clearWaiterAssistance(currentBill.id);
+                                                setCurrentBill((prev) => prev ? { ...prev, deposit_paid: true, deposit_amount: depositToCollect, assistance_type: null } : null);
+                                                sounds.playPaymentSuccess();
+                                                toast.success(`🎉 Cash deposit of ${formatGHSString(depositToCollect)} confirmed! Table unlocked.`);
+                                            } catch (err) {
+                                                console.error("Cash deposit confirm error:", err);
+                                                toast.error("Failed to confirm deposit.");
+                                            } finally {
+                                                setConfirmingDeposit(false);
+                                            }
+                                        }}
+                                        className="mt-6 flex w-full max-w-sm mx-auto items-center justify-center gap-2 rounded-full bg-khaki py-4 px-6 text-[14px] font-bold text-licorice shadow-md transition-all hover:bg-khaki/90 active:scale-95 disabled:opacity-50 cursor-pointer"
                                     >
-                                        <PlusIcon className="h-3.5 w-3.5" strokeWidth={2.5} />
-                                        Add Items
+                                        {confirmingDeposit ? (
+                                            <>
+                                                <span className="h-4 w-4 animate-spin rounded-full border-2 border-licorice/30 border-t-licorice" />
+                                                Confirming Cash Deposit…
+                                            </>
+                                        ) : (
+                                            <>
+                                                <CheckIcon className="h-4 w-4" strokeWidth={2.5} />
+                                                Collect & Confirm {formatGHS(Number(table.min_deposit || currentBill.deposit_amount || 0))} Cash
+                                            </>
+                                        )}
                                     </button>
-                                )}
-                            </div>
+                                </div>
+                            ) : (
+                                <div className="flex flex-col items-center justify-center rounded-lg bg-white px-6 py-16 text-center shadow-sm ring-1 ring-isabelline">
+                                    <span className="h-1.5 w-1.5 rounded-full bg-khaki" />
+                                    <h3 className="mt-4 text-[15px] font-bold tracking-tight text-licorice">
+                                        Nothing ordered yet
+                                    </h3>
+                                    <p className="mt-1.5 text-[12px] leading-[1.5] tracking-tight text-feldgrau">
+                                        {billId
+                                            ? "Orders from the table will appear here live."
+                                            : "Switch to Add Items to take this table's order."}
+                                    </p>
+                                    {!billId && (
+                                        <button
+                                            type="button"
+                                            onClick={() => setTab("add")}
+                                            className="mt-5 inline-flex items-center gap-1.5 rounded-full bg-licorice px-4 py-2 text-[11px] font-bold tracking-tight text-isabelline shadow-[0_4px_12px_rgba(35,20,12,0.18)] active:scale-95"
+                                        >
+                                            <PlusIcon className="h-3.5 w-3.5" strokeWidth={2.5} />
+                                            Add Items
+                                        </button>
+                                    )}
+                                </div>
+                            )
                         ) : (
                             <div className="flex flex-col gap-3">
                                 {submissions.map((sub, idx) => {

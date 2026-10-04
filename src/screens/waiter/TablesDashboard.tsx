@@ -34,11 +34,12 @@ export type Table = {
     reservationGuests?: number;
     waiterId?: string;
     server?: string;
-    assistanceType?: 'call_waiter' | 'cash_settlement';
+    assistanceType?: 'call_waiter' | 'cash_settlement' | 'cash_deposit';
     billId?: string;
     tablePin?: string;
     qrCodeToken?: string;
     area?: string;
+    min_deposit?: number;
 };
 
 /* ────────────────────────── Soft Star SVG ────────────────────────── */

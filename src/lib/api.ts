@@ -131,7 +131,7 @@ export type DbBill = {
   is_merged: boolean;
   merged_into_bill_id: string | null;
   table_pin?: string | null;
-  assistance_type?: 'call_waiter' | 'cash_settlement' | null;
+  assistance_type?: 'call_waiter' | 'cash_settlement' | 'cash_deposit' | null;
   assistance_requested_at?: string | null;
   created_at: string;
   updated_at: string;
@@ -866,19 +866,42 @@ export const db = {
   recordDepositPayment: async (args: {
     billId: string;
     venueId: string;
+    tableId?: string;
     amount: number;
     reference: string;
     method?: string;
+    staffId?: string;
   }) => {
     cacheInvalidate('bills:');
-    // 1. Set the bill deposit
+    if (args.tableId) {
+      try {
+        const { data: rpcData, error: rpcErr } = await supabase.rpc('record_deposit_payment_with_merge', {
+          p_venue_id: args.venueId,
+          p_table_id: args.tableId,
+          p_bill_id: args.billId,
+          p_amount: args.amount,
+          p_reference: args.reference,
+          p_method: args.method || 'paystack',
+          p_staff_id: args.staffId || null,
+        });
+        if (!rpcErr && rpcData) {
+          return { data: rpcData, error: null };
+        }
+      } catch (err) {
+        console.warn('[api.recordDepositPayment] Merge RPC error, falling back:', err);
+      }
+    }
+
+    // Fallback: standard set_bill_deposit
     await supabase.rpc('set_bill_deposit', {
       p_bill_id: args.billId,
       p_deposit_amount: args.amount,
       p_deposit_paid: true,
     });
 
-    // 2. Record payment row for audit & accounting
+    const isCash = args.method === 'cash' || args.method === 'cash_deposit';
+    const platformFee = Math.round(Number(args.amount || 0) * 0.10 * 100) / 100;
+
     const { data, error } = await supabase
       .from('payments')
       .upsert(
@@ -889,7 +912,10 @@ export const db = {
           method: args.method || 'paystack',
           reference: args.reference,
           status: 'success',
-          payer_name: 'VIP Table Deposit',
+          payer_name: isCash ? 'VIP Cash Deposit' : 'VIP Table Deposit',
+          server_id: args.staffId || null,
+          platform_fee: platformFee,
+          fee_settled: !isCash,
         },
         { onConflict: 'reference', ignoreDuplicates: true },
       );
@@ -2209,7 +2235,7 @@ export const db = {
   },
 
   /* ── Realtime Waiter Assistance ── */
-  requestWaiterAssistance: (billId: string, type: 'call_waiter' | 'cash_settlement', sessionToken?: string | null) =>
+  requestWaiterAssistance: (billId: string, type: 'call_waiter' | 'cash_settlement' | 'cash_deposit', sessionToken?: string | null) =>
     withSession(
       supabase
         .from('bills')
