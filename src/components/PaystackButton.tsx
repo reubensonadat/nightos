@@ -107,6 +107,18 @@ export function PaystackButton({
         : Math.min(Math.round(amount * 0.10 * 100), Math.round(amount * 0.90 * 100))
       : 0;
 
+    // Split diagnostic — proves exactly what routing was attached to this
+    // charge. subaccount + charge → platform receives `charge`, venue receives
+    // the rest; no subaccount → 100% to the main Bysen account.
+    console.info('[Paystack] charge initialized', {
+      ref,
+      amountGHS: amount,
+      amountPesewas,
+      subaccount: subaccount ?? null,
+      transaction_charge_pesewas: subaccount ? effectiveCharge : 0,
+      bearer: subaccount ? 'account' : null,
+    });
+
     const config: Parameters<typeof window.PaystackPop.setup>[0] = {
       key,
       email: email || `${billId.slice(0, 8)}@bysen.com`,
