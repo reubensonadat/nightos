@@ -1750,7 +1750,7 @@ export function ShiftReportScreen({ venueId, isModal = false, onClose }: Props) 
                                             : "text-rose-400"
                                     }`}
                                 >
-                                    {cashVariance >= 0 ? `+${formatGHS(cashVariance)}` : formatGHS(cashVariance)}
+                                    {cashVariance > 0 ? <span className="inline-flex items-baseline"><span>+</span>{formatGHS(cashVariance)}</span> : formatGHS(cashVariance)}
                                     {cashVariance === 0 ? " (Balanced Cleanly)" : cashVariance > 0 ? " (Over)" : " (Short)"}
                                 </span>
                             </div>

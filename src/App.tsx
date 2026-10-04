@@ -329,13 +329,14 @@ function CustomerShell({
       if (activeSpend === 0 && Number(bill.total || 0) === 0) return depositAmount;
       return 0;
     }
-    return Math.max(0, Math.round((depositAmount - activeSpend) * 100) / 100);
+    const currentSpend = activeSpend > 0 ? activeSpend : Number(bill?.total || 0);
+    return Math.max(0, Math.round((depositAmount - currentSpend) * 100) / 100);
   }, [bill, isDepositActive, depositAmount, activeSpend]);
 
   const amountDue = useMemo(() => {
     if (!isDepositActive) return 0;
     if (bill?.total !== undefined && bill?.total !== null && Number(bill.total) > 0) {
-      return Math.max(0, Math.round((Number(bill.total) - Number(bill.amount_paid || 0)) * 100) / 100);
+      return Math.max(0, Math.round((Number(bill.total) - depositAmount - Number(bill.amount_paid || 0)) * 100) / 100);
     }
     return Math.max(0, Math.round((activeSpend - depositAmount) * 100) / 100);
   }, [bill, isDepositActive, depositAmount, activeSpend]);
@@ -347,12 +348,15 @@ function CustomerShell({
 
   const totalSpend = useMemo(() => {
     if (activeSpend > 0) return activeSpend;
+    if (bill?.total !== undefined && bill?.total !== null && Number(bill.total) > 0) {
+      return Number(bill.total);
+    }
     if (isDepositActive) {
       if (amountDue > 0) return depositAmount + amountDue;
       return Math.max(0, depositAmount - remainingCredit);
     }
     return 0;
-  }, [activeSpend, isDepositActive, depositAmount, amountDue, remainingCredit]);
+  }, [activeSpend, bill, isDepositActive, depositAmount, amountDue, remainingCredit]);
 
   const handleOrderSent = useCallback((order: OrderSummary) => {
     setActiveOrders((prev) => [...prev, order]);

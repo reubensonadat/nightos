@@ -476,7 +476,9 @@ export function OrdersScreen({ activeOrders, history, tableLabel, tablePin, bill
   );
 
   const billRemainingBalance = bill
-    ? Math.max(0, Math.round((Number(bill.total || 0) - Number(bill.amount_paid || 0)) * 100) / 100)
+    ? (depositPaid && depositAmount > 0
+        ? Math.max(0, Math.round((Number(bill.total || 0) - depositAmount - Number(bill.amount_paid || 0)) * 100) / 100)
+        : Math.max(0, Math.round((Number(bill.total || 0) - Number(bill.amount_paid || 0)) * 100) / 100))
     : (depositPaid && depositAmount > 0
         ? Math.max(0, Math.round((activeSpend - depositAmount) * 100) / 100)
         : activeSpend);
@@ -484,7 +486,7 @@ export function OrdersScreen({ activeOrders, history, tableLabel, tablePin, bill
   const remainingCredit = depositPaid && depositAmount > 0
     ? (bill?.remaining_credit !== undefined && bill?.remaining_credit !== null
         ? Number(bill.remaining_credit)
-        : Math.max(0, Math.round((depositAmount - activeSpend) * 100) / 100))
+        : Math.max(0, Math.round((depositAmount - (bill ? Number(bill.total || 0) : activeSpend)) * 100) / 100))
     : 0;
 
   const isDepositCovered = depositPaid && depositAmount > 0 && billRemainingBalance === 0;
@@ -601,7 +603,7 @@ export function OrdersScreen({ activeOrders, history, tableLabel, tablePin, bill
                   Spent
                 </p>
                 <p className="font-mono text-[14px] font-bold text-isabelline/80 mt-0.5">
-                  {formatGHS(activeSpend)}
+                  {formatGHS(bill ? Number(bill.total || 0) : activeSpend)}
                 </p>
               </div>
             </div>

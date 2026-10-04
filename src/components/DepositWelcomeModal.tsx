@@ -88,11 +88,7 @@ export function DepositWelcomeModal({
               <span className="inline-flex items-center rounded-md bg-amber-500/10 px-2 py-0.5 text-[11px] font-bold text-amber-800 ring-1 ring-amber-500/20">
                 Deposit Exhausted
               </span>
-            ) : (
-              <span className="inline-flex items-center rounded-md bg-emerald-500/10 px-2 py-0.5 text-[11px] font-bold text-emerald-800 ring-1 ring-emerald-500/20">
-                Prepaid Credit Active
-              </span>
-            )}
+            ) : null}
           </div>
 
           <h2 className="font-display text-[22px] font-black tracking-[-0.03em] text-licorice">
@@ -104,13 +100,15 @@ export function DepositWelcomeModal({
           </h2>
           <p className="mt-1 text-[12px] leading-relaxed text-feldgrau">
             {venueName ? `${venueName} · ` : ""}
-            {isNegative
-              ? `Orders have exceeded the initial ${formatGHS(initialDeposit)} prepaid deposit.`
-              : isFullySpent
-              ? `The initial ${formatGHS(initialDeposit)} deposit has been fully utilized.`
-              : isPartiallySpent
-              ? "Your table has active prepaid credit remaining to spend on drinks and food."
-              : "Your upfront deposit is ready to spend on drinks and food."}
+            {isNegative ? (
+              <>Orders have exceeded the initial {formatGHS(initialDeposit)} prepaid deposit.</>
+            ) : isFullySpent ? (
+              <>The initial {formatGHS(initialDeposit)} deposit has been fully utilized.</>
+            ) : isPartiallySpent ? (
+              "Your table has active prepaid credit remaining to spend on drinks and food."
+            ) : (
+              "Your upfront deposit is ready to spend on drinks and food."
+            )}
           </p>
         </div>
 
@@ -162,33 +160,21 @@ export function DepositWelcomeModal({
 
           {/* Ledger Breakdown Details */}
           {(isPartiallySpent || isNegative || isFullySpent) && (
-            <div className="mt-4 pt-3.5 border-t border-isabelline/10 grid grid-cols-3 gap-2 text-[11px]">
+            <div className="mt-4 pt-3.5 border-t border-isabelline/10 grid grid-cols-2 gap-4 text-[11px]">
               <div>
                 <span className="block text-isabelline/50 text-[9.5px] uppercase tracking-wider font-semibold">
                   Initial Deposit
                 </span>
-                <span className="font-mono font-bold text-isabelline/90">
+                <span className="font-mono font-bold text-isabelline/90 text-[13px]">
                   {formatGHS(initialDeposit)}
-                </span>
-              </div>
-              <div>
-                <span className="block text-isabelline/50 text-[9.5px] uppercase tracking-wider font-semibold">
-                  Total Spent
-                </span>
-                <span className="font-mono font-bold text-isabelline/90">
-                  {formatGHS(totalSpend)}
                 </span>
               </div>
               <div className="text-right">
                 <span className="block text-isabelline/50 text-[9.5px] uppercase tracking-wider font-semibold">
-                  {isNegative ? "Amount Due" : "Remaining"}
+                  Total Spent
                 </span>
-                <span
-                  className={`font-mono font-bold ${
-                    isNegative ? "text-rose-400" : "text-khaki"
-                  }`}
-                >
-                  {isNegative ? `-${formatGHS(amountDue)}` : formatGHS(remainingCredit)}
+                <span className="font-mono font-bold text-isabelline/90 text-[13px]">
+                  {formatGHS(totalSpend)}
                 </span>
               </div>
             </div>

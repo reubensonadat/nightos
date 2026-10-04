@@ -512,7 +512,7 @@ export function CheckoutScreen({ total, billId, venueId, sessionToken, onBack, o
                     <div className="flex items-end justify-between border-t border-isabelline px-4 py-3">
                         <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-feldgrau">
                             {isPartial
-                                ? `Paying Now · ${formatGHS(remainingDue)} still due`
+                                ? `Paying Now · ${formatGHSString(remainingDue)} still due`
                                 : bill && bill.deposit_paid && Number(bill.deposit_amount || 0) > 0
                                     ? "Amount Due Now"
                                     : (bill && bill.amount_paid > 0 ? "Amount Due" : "Bill Total")}

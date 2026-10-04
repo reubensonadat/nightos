@@ -8,7 +8,7 @@ import {
     BanknotesIcon,
 } from "@heroicons/react/24/solid";
 import toast from "react-hot-toast";
-import { formatGHS } from "../data/menu";
+import { formatGHS, formatGHSString } from "../data/menu";
 import { PaystackButton } from "../components/PaystackButton";
 import { db, type DbTable } from "../lib/api";
 import { useRealtime } from "../hooks/useRealtime";
@@ -104,7 +104,7 @@ export function VipTableDepositScreen({
         try {
             await db.requestWaiterAssistance(billId, 'cash_deposit', sessionToken);
             setCashRequested(true);
-            toast.success(`🔔 Waiter called to collect ${formatGHS(minDeposit)} cash deposit.`);
+            toast.success(`🔔 Waiter called to collect ${formatGHSString(minDeposit)} cash deposit.`);
         } catch {
             toast.error("Could not call waiter. Please flag down your server.");
         } finally {
@@ -141,7 +141,7 @@ export function VipTableDepositScreen({
             }
 
             setPaid(true);
-            toast.success(`🎉 Table Unlocked! ${formatGHS(minDeposit)} credit is ready to spend.`);
+            toast.success(`🎉 Table Unlocked! ${formatGHSString(minDeposit)} credit is ready to spend.`);
             setTimeout(() => {
                 onDepositPaid();
             }, 1200);

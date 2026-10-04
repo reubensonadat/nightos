@@ -2018,11 +2018,20 @@ export function BarStationScreen({ venueId, staffId, staffName, onExit, onSignOu
                                                 ? "text-rose-700"
                                                 : "text-amber-700"
                                         }`}>
-                                            {auditSummaryTotals.cashVariance === 0
-                                                ? "✓ Balanced"
-                                                : auditSummaryTotals.cashVariance > 0
-                                                ? `+${formatGHS(auditSummaryTotals.cashVariance)} Over`
-                                                : `${formatGHS(auditSummaryTotals.cashVariance)} Short`}
+                                            {auditSummaryTotals.cashVariance === 0 ? (
+                                                "✓ Balanced"
+                                            ) : auditSummaryTotals.cashVariance > 0 ? (
+                                                <span className="inline-flex items-baseline gap-1">
+                                                    <span>+</span>
+                                                    {formatGHS(auditSummaryTotals.cashVariance)}
+                                                    <span>Over</span>
+                                                </span>
+                                            ) : (
+                                                <span className="inline-flex items-baseline gap-1">
+                                                    {formatGHS(auditSummaryTotals.cashVariance)}
+                                                    <span>Short</span>
+                                                </span>
+                                            )}
                                         </span>
                                     </div>
                                 )}
