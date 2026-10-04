@@ -362,15 +362,21 @@ export function BarStationScreen({ venueId, staffId, staffName, onExit, onSignOu
 
             const activeStaffIds = new Set((shiftsRes.data ?? []).map((s: any) => s.staff_id));
 
+            // Shift-scoped orders: only show tickets created during the active shift
+            const shiftStartTime = activeShift?.startedAt ? new Date(activeShift.startedAt).getTime() : 0;
+            const filteredRows = shiftStartTime
+                ? rows.filter((r: any) => new Date(r.created_at).getTime() >= shiftStartTime)
+                : rows;
+
             // Waiter names map
             const waiterIds = Array.from(
-                new Set(rows.map((r: any) => (Array.isArray(r.bills) ? r.bills[0] : r.bills)?.waiter_id).filter((id): id is string => !!id)),
+                new Set(filteredRows.map((r: any) => (Array.isArray(r.bills) ? r.bills[0] : r.bills)?.waiter_id).filter((id): id is string => !!id)),
             );
             const { data: staffRows } = await db.staffNamesByIds(waiterIds);
             const waiterMap: Record<string, string> = {};
             for (const s of staffRows ?? []) waiterMap[s.id] = s.name;
 
-            const mapped: BarTicket[] = rows.map((r: any) => {
+            const mapped: BarTicket[] = filteredRows.map((r: any) => {
                 const bill = Array.isArray(r.bills) ? r.bills[0] : r.bills;
                 const table = Array.isArray(bill?.tables) ? bill?.tables[0] : bill?.tables;
                 const billStatus = bill?.status || "open";
@@ -431,7 +437,7 @@ export function BarStationScreen({ venueId, staffId, staffName, onExit, onSignOu
         } finally {
             setLoadingTickets(false);
         }
-    }, [venueId, products]);
+    }, [venueId, products, activeShift?.startedAt]);
 
     useEffect(() => {
         void loadTickets();
@@ -851,7 +857,7 @@ export function BarStationScreen({ venueId, staffId, staffName, onExit, onSignOu
             }
         }
 
-        // Close all active customer sessions and open bills on tables for this venue
+        // Close all active customer sessions, open bills, and pending orders for this venue
         try {
             await Promise.all([
                 supabase
@@ -864,7 +870,12 @@ export function BarStationScreen({ venueId, staffId, staffName, onExit, onSignOu
                     .update({ status: 'closed', closed_at: new Date().toISOString() })
                     .eq('venue_id', venueId)
                     .in('status', ['open', 'settling'])
-                    .is('closed_at', null)
+                    .is('closed_at', null),
+                supabase
+                    .from('order_submissions')
+                    .update({ status: 'cancelled' })
+                    .eq('venue_id', venueId)
+                    .in('status', ['pending', 'confirmed', 'preparing', 'ready']),
             ]);
         } catch { /* noop */ }
 
@@ -876,6 +887,8 @@ export function BarStationScreen({ venueId, staffId, staffName, onExit, onSignOu
         } catch { /* noop */ }
 
         persistShift(null);
+        setRawTickets([]);
+        setRecentlyPoured([]);
         toast.success("Station Shift closed & table ordering locked. Handover complete!", { icon: "✅" });
 
         // Destroy session entirely and redirect to login screen
@@ -1166,76 +1179,64 @@ export function BarStationScreen({ venueId, staffId, staffName, onExit, onSignOu
             {/* ═══════════════════════════════════════════════════════════
                TOP STATION NAVIGATION HEADER
                ═══════════════════════════════════════════════════════════ */}
-            <header className="sticky top-0 z-30 bg-[#1A110B] text-white shadow-md border-b border-white/10 px-4 sm:px-6 py-3">
-                <div className="max-w-7xl mx-auto flex flex-col md:flex-row md:items-center justify-between gap-3">
+            <header className="sticky top-0 z-30 bg-[#1A110B] text-white shadow-md border-b border-white/10 px-4 sm:px-6 py-2.5">
+                <div className="max-w-7xl mx-auto flex items-center justify-between gap-3">
                     {/* Station Brand */}
-                    <div className="flex items-center justify-between md:justify-start gap-4">
-                        <div className="flex items-center gap-3">
-                            <BysenIcon size="sm" />
-                            <div>
-                                <h1 className="font-black text-sm tracking-tight text-white">Main Bar Station</h1>
-                                {staffName && (
-                                    <p className="text-[10px] text-white/60 font-medium leading-none mt-0.5">{staffName}</p>
-                                )}
-                            </div>
-                        </div>
-
-                        {/* Top End Shift Button (Mobile view) */}
-                        <div className="flex md:hidden items-center gap-1.5">
-                            <button
-                                type="button"
-                                onClick={handleOpenEndShift}
-                                className="rounded-md bg-rose-600/20 border border-rose-500/40 text-rose-300 px-2.5 py-1 text-xs font-bold cursor-pointer"
-                            >
-                                End Shift
-                            </button>
+                    <div className="flex items-center gap-3 min-w-0">
+                        <BysenIcon size="sm" />
+                        <div className="min-w-0">
+                            <h1 className="font-black text-sm tracking-tight text-white truncate">Main Bar Station</h1>
+                            {staffName && (
+                                <p className="text-[10px] text-white/60 font-medium leading-none mt-0.5 truncate">{staffName}</p>
+                            )}
                         </div>
                     </div>
 
-                    {/* Navigation Tabs */}
-                    <div className="flex items-center gap-1.5 overflow-x-auto pb-1 md:pb-0">
-                        <button
-                            type="button"
-                            onClick={() => setActiveTab("QUEUE")}
-                            className={`flex items-center gap-2 rounded-md px-3.5 py-2 text-xs font-bold transition whitespace-nowrap cursor-pointer ${
-                                activeTab === "QUEUE"
-                                    ? "bg-white text-[#1A110B] shadow-xs"
-                                    : "text-white/70 hover:bg-white/10"
-                            }`}
-                        >
-                            <ClipboardDocumentListIcon className="h-4 w-4" />
-                            <span>Drink Orders Queue</span>
-                            {activeTickets.length > 0 && (
-                                <span className="rounded-md bg-white text-[#1A110B] px-1.5 py-0.2 text-[10px] font-black">
-                                    {activeTickets.length}
-                                </span>
-                            )}
-                        </button>
+                    {/* Navigation Tabs & End Shift */}
+                    <div className="flex items-center gap-2 shrink-0">
+                        <div className="flex items-center gap-1.5">
+                            <button
+                                type="button"
+                                onClick={() => setActiveTab("QUEUE")}
+                                className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-bold transition whitespace-nowrap cursor-pointer ${
+                                    activeTab === "QUEUE"
+                                        ? "bg-white text-[#1A110B] shadow-xs"
+                                        : "text-white/70 hover:bg-white/10"
+                                }`}
+                            >
+                                <ClipboardDocumentListIcon className="h-4 w-4 shrink-0" />
+                                <span>Orders</span>
+                                {activeTickets.length > 0 && (
+                                    <span className="rounded-md bg-[#1A110B] text-white px-1.5 py-0.2 text-[10px] font-black">
+                                        {activeTickets.length}
+                                    </span>
+                                )}
+                            </button>
+
+                            <button
+                                type="button"
+                                onClick={() => setActiveTab("STOCK")}
+                                className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-bold transition whitespace-nowrap cursor-pointer ${
+                                    activeTab === "STOCK"
+                                        ? "bg-white text-[#1A110B] shadow-xs"
+                                        : "text-white/70 hover:bg-white/10"
+                                }`}
+                            >
+                                <ArchiveBoxIcon className="h-4 w-4 shrink-0" />
+                                <span>Stock & Restock</span>
+                            </button>
+                        </div>
 
                         <button
                             type="button"
-                            onClick={() => setActiveTab("STOCK")}
-                            className={`flex items-center gap-2 rounded-md px-3.5 py-2 text-xs font-bold transition whitespace-nowrap cursor-pointer ${
-                                activeTab === "STOCK"
-                                    ? "bg-white text-[#1A110B] shadow-xs"
-                                    : "text-white/70 hover:bg-white/10"
-                            }`}
-                        >
-                            <ArchiveBoxIcon className="h-4 w-4" />
-                            <span>Evening Stock & Restock</span>
-                        </button>
-
-                        <button
-                            type="button"
-                            onClick={() => setActiveTab("REPORT")}
-                            className={`flex items-center gap-2 rounded-md px-3.5 py-2 text-xs font-bold transition whitespace-nowrap cursor-pointer ${
+                            onClick={handleOpenEndShift}
+                            className={`rounded-lg border px-3 py-1.5 text-xs font-bold transition cursor-pointer whitespace-nowrap ${
                                 activeTab === "REPORT"
-                                    ? "bg-white text-[#1A110B] shadow-xs"
-                                    : "text-white/70 hover:bg-white/10"
+                                    ? "bg-rose-500 text-white border-rose-400 shadow-xs"
+                                    : "bg-rose-600/20 hover:bg-rose-600/30 border-rose-500/40 text-rose-300"
                             }`}
                         >
-                            <DocumentChartBarIcon className="h-4 w-4" />
-                            <span>Shift Report & Waiter Audit</span>
+                            End Shift
                         </button>
                     </div>
                 </div>
