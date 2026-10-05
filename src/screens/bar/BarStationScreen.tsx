@@ -1179,64 +1179,66 @@ export function BarStationScreen({ venueId, staffId, staffName, onExit, onSignOu
             {/* ═══════════════════════════════════════════════════════════
                TOP STATION NAVIGATION HEADER
                ═══════════════════════════════════════════════════════════ */}
-            <header className="sticky top-0 z-30 bg-[#1A110B] text-white shadow-md border-b border-white/10 px-4 sm:px-6 py-2.5">
+            <header className="sticky top-0 z-30 bg-[#1A110B] text-white shadow-md border-b border-white/10 px-4 sm:px-6 py-2.5 space-y-2">
+                {/* Top Row: Station Brand Info & End Shift */}
                 <div className="max-w-7xl mx-auto flex items-center justify-between gap-3">
-                    {/* Station Brand */}
                     <div className="flex items-center gap-3 min-w-0">
                         <BysenIcon size="sm" />
                         <div className="min-w-0">
-                            <h1 className="font-black text-sm tracking-tight text-white truncate">Main Bar Station</h1>
+                            <h1 className="font-black text-sm sm:text-base tracking-tight text-white truncate">Main Bar Station</h1>
                             {staffName && (
-                                <p className="text-[10px] text-white/60 font-medium leading-none mt-0.5 truncate">{staffName}</p>
+                                <p className="text-[11px] text-white/60 font-medium leading-none mt-0.5 truncate">{staffName}</p>
                             )}
                         </div>
                     </div>
 
-                    {/* Navigation Tabs & End Shift */}
-                    <div className="flex items-center gap-2 shrink-0">
-                        <div className="flex items-center gap-1.5">
-                            <button
-                                type="button"
-                                onClick={() => setActiveTab("QUEUE")}
-                                className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-bold transition whitespace-nowrap cursor-pointer ${
-                                    activeTab === "QUEUE"
-                                        ? "bg-white text-[#1A110B] shadow-xs"
-                                        : "text-white/70 hover:bg-white/10"
-                                }`}
-                            >
-                                <ClipboardDocumentListIcon className="h-4 w-4 shrink-0" />
-                                <span>Orders</span>
-                                {activeTickets.length > 0 && (
-                                    <span className="rounded-md bg-[#1A110B] text-white px-1.5 py-0.2 text-[10px] font-black">
-                                        {activeTickets.length}
-                                    </span>
-                                )}
-                            </button>
+                    <button
+                        type="button"
+                        onClick={handleOpenEndShift}
+                        className={`rounded-lg border px-3 py-1.5 text-xs font-bold transition cursor-pointer shrink-0 whitespace-nowrap ${
+                            activeTab === "REPORT"
+                                ? "bg-rose-500 text-white border-rose-400 shadow-xs"
+                                : "bg-rose-600/20 hover:bg-rose-600/30 border-rose-500/40 text-rose-300"
+                        }`}
+                    >
+                        End Shift
+                    </button>
+                </div>
 
-                            <button
-                                type="button"
-                                onClick={() => setActiveTab("STOCK")}
-                                className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-bold transition whitespace-nowrap cursor-pointer ${
-                                    activeTab === "STOCK"
-                                        ? "bg-white text-[#1A110B] shadow-xs"
-                                        : "text-white/70 hover:bg-white/10"
-                                }`}
-                            >
-                                <ArchiveBoxIcon className="h-4 w-4 shrink-0" />
-                                <span>Stock & Restock</span>
-                            </button>
-                        </div>
+                {/* Bottom Row: Dedicated Page Toggles (Moved down so it never obscures the logo/name) */}
+                <div className="max-w-7xl mx-auto flex items-center">
+                    <div className="grid grid-cols-2 gap-1.5 w-full sm:w-auto p-1 bg-white/[0.08] rounded-xl border border-white/10">
+                        <button
+                            type="button"
+                            onClick={() => setActiveTab("QUEUE")}
+                            className={`flex items-center justify-center gap-2 rounded-lg px-4 py-1.5 text-xs font-bold transition whitespace-nowrap cursor-pointer ${
+                                activeTab === "QUEUE"
+                                    ? "bg-white text-[#1A110B] shadow-sm"
+                                    : "text-white/70 hover:text-white hover:bg-white/10"
+                            }`}
+                        >
+                            <ClipboardDocumentListIcon className="h-4 w-4 shrink-0" />
+                            <span>Orders</span>
+                            {activeTickets.length > 0 && (
+                                <span className={`rounded-md px-1.5 py-0.2 text-[10px] font-black ${
+                                    activeTab === "QUEUE" ? "bg-[#1A110B] text-white" : "bg-white/20 text-white"
+                                }`}>
+                                    {activeTickets.length}
+                                </span>
+                            )}
+                        </button>
 
                         <button
                             type="button"
-                            onClick={handleOpenEndShift}
-                            className={`rounded-lg border px-3 py-1.5 text-xs font-bold transition cursor-pointer whitespace-nowrap ${
-                                activeTab === "REPORT"
-                                    ? "bg-rose-500 text-white border-rose-400 shadow-xs"
-                                    : "bg-rose-600/20 hover:bg-rose-600/30 border-rose-500/40 text-rose-300"
+                            onClick={() => setActiveTab("STOCK")}
+                            className={`flex items-center justify-center gap-2 rounded-lg px-4 py-1.5 text-xs font-bold transition whitespace-nowrap cursor-pointer ${
+                                activeTab === "STOCK"
+                                    ? "bg-white text-[#1A110B] shadow-sm"
+                                    : "text-white/70 hover:text-white hover:bg-white/10"
                             }`}
                         >
-                            End Shift
+                            <ArchiveBoxIcon className="h-4 w-4 shrink-0" />
+                            <span>Stock & Restock</span>
                         </button>
                     </div>
                 </div>

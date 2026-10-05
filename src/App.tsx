@@ -382,7 +382,7 @@ function CustomerShell({
   if (isPayingBill || payingOrder) {
     return (
       <CheckoutScreen
-        total={payingOrder?.total || bill?.total || 0}
+        total={payingOrder?.total || (isDepositActive ? amountDue : (bill?.total || 0))}
         billId={bill?.id || payingOrder?.billId || ""}
         venueId={payingOrder?.venueId || venueId}
         sessionToken={session?.session_token}

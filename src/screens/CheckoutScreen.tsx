@@ -176,7 +176,9 @@ export function CheckoutScreen({ total, billId, venueId, sessionToken, onBack, o
     const { subtotal, vat, billTotal, payAmount, totalPaid, isPartial, remainingDue } = useMemo(() => {
         if (bill) {
             const fee = Number((bill as { convenience_fee?: number })?.convenience_fee || 0);
-            const remainingAmount = Math.max(0, Math.round((bill.total - bill.amount_paid) * 100) / 100);
+            // Subtract deposit from what the guest actually owes
+            const depositCredit = (bill.deposit_paid && bill.deposit_amount) ? Number(bill.deposit_amount) : 0;
+            const remainingAmount = Math.max(0, Math.round((bill.total - depositCredit - bill.amount_paid) * 100) / 100);
             const displayedSubtotal = Math.round(((bill.subtotal || 0) + fee) * 100) / 100;
             const targetPay = (total > 0 && total < remainingAmount) ? total : remainingAmount;
             return {
